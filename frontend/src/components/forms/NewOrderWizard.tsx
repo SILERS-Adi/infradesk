@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -109,8 +109,13 @@ export function NewOrderWizard({ onClose, defaultClientId }: Props) {
     queryKey: ['clients', defaultClientId],
     queryFn: () => clientsApi.getOne(defaultClientId!),
     enabled: !!defaultClientId && !selectedClient,
-    onSuccess: (c: Client) => setSelectedClient(c),
-  } as Parameters<typeof useQuery>[0]);
+  });
+
+  useEffect(() => {
+    if (defaultClient && !selectedClient) {
+      setSelectedClient(defaultClient);
+    }
+  }, [defaultClient]);
 
   // Clients search
   const { data: clients = [] } = useQuery({

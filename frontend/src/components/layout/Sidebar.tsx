@@ -1,8 +1,8 @@
 import { NavLink } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, Building2, MapPin, Monitor,
-  Ticket, ChevronLeft, ChevronRight, X, MessageSquare, Bot, ScreenShare, Briefcase, ClipboardList,
-  ShoppingCart, Plane, HelpCircle, Download
+  LayoutDashboard, Building2, Monitor,
+  Ticket, ChevronLeft, ChevronRight, X, MessageSquare, Bot, Briefcase, ClipboardList,
+  ShoppingCart, HelpCircle, Download
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useQuery } from '@tanstack/react-query';
@@ -56,35 +56,31 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
     {
       label: 'KLIENCI',
       items: [
-        { to: '/clients',   label: 'Klienci',    icon: <Building2 className="h-5 w-5" /> },
-        { to: '/locations', label: 'Lokalizacje', icon: <MapPin className="h-5 w-5" /> },
+        { to: '/clients', label: 'Klienci', icon: <Building2 className="h-5 w-5" /> },
       ],
     },
     {
       label: 'URZĄDZENIA',
       items: [
-        { to: '/devices',   label: 'Urządzenia',           icon: <Monitor className="h-5 w-5" /> },
-        { to: '/agents', label: 'Agenci',               icon: <Bot className="h-5 w-5" /> },
-        { to: '/users',  label: 'Użytkownicy urządzeń', icon: <Users className="h-5 w-5" /> },
+        { to: '/devices', label: 'Urządzenia', icon: <Monitor className="h-5 w-5" /> },
+        { to: '/agents',  label: 'Agenci',     icon: <Bot className="h-5 w-5" /> },
       ],
     },
     {
       label: 'SERWIS',
       accent: 'blue',
       items: [
-        { to: '/tickets', label: 'Zgłoszenia', icon: <Ticket className="h-5 w-5" />, badge: queueCount > 0 ? queueCount : undefined },
-        { to: '/tasks',       label: 'Zadania',    icon: <ClipboardList className="h-5 w-5" />, badge: myActiveTasksCount > 0 ? myActiveTasksCount : undefined },
-        { to: '/orders',      label: 'Zamówienia',  icon: <ShoppingCart className="h-5 w-5" /> },
-        { to: '/delegations', label: 'Delegacje',   icon: <Plane className="h-5 w-5" /> },
-        { to: '/crm',         label: 'Sesje pracy', icon: <MessageSquare className="h-5 w-5" /> },
+        { to: '/tickets', label: 'Zgłoszenia',  icon: <Ticket className="h-5 w-5" />, badge: queueCount > 0 ? queueCount : undefined },
+        { to: '/tasks',   label: 'Zadania',     icon: <ClipboardList className="h-5 w-5" />, badge: myActiveTasksCount > 0 ? myActiveTasksCount : undefined },
+        { to: '/orders',  label: 'Zamówienia',  icon: <ShoppingCart className="h-5 w-5" /> },
+        { to: '/crm',     label: 'Sesje pracy', icon: <MessageSquare className="h-5 w-5" /> },
       ],
     },
     {
       label: 'SYSTEM',
       accent: 'orange',
       items: [
-        { to: '/rustdesk',   label: 'RustDesk',   icon: <ScreenShare className="h-5 w-5" /> },
-        { to: '/downloads',  label: 'Pobieranie',  icon: <Download    className="h-5 w-5" /> },
+        { to: '/downloads', label: 'Pobieranie', icon: <Download className="h-5 w-5" /> },
       ],
     },
     {
