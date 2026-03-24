@@ -10,7 +10,7 @@ export async function listClients(params: {
   page?: number;
   limit?: number;
 }) {
-  const { status, search, page = 1, limit = 500 } = params;
+  const { status, search, page = 1, limit = 20 } = params;
   const skip = (page - 1) * limit;
 
   const where: Record<string, unknown> = {};

@@ -1,50 +1,51 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Building2, MapPin, Phone, Mail, ChevronRight, Upload } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { useQuery } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { Plus, Search, Building2, ChevronRight, Upload, ChevronLeft, Phone, Mail, Ticket } from 'lucide-react';
 import { clientsApi } from '../../../api/clients';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import { Modal } from '../../../components/ui/Modal';
-import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import { ClientForm } from '../../../components/forms/ClientForm';
 import { ClientStatusBadge } from '../../../components/ui/StatusBadge';
 import { ImportCsvModal } from '../../../components/ui/ImportCsvModal';
 import { useDebounce } from '../../../hooks/useDebounce';
-import { getErrorMessage } from '../../../utils/helpers';
 import type { Client } from '../../../types';
 import { clsx } from 'clsx';
+
+const PAGE_SIZE = 20;
 
 export function ClientsListPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<Client | null>(null);
   const debouncedSearch = useDebounce(search);
 
-  const { data: clients = [], isLoading } = useQuery({
-    queryKey: ['clients', debouncedSearch],
-    queryFn: () => clientsApi.getAll({ search: debouncedSearch || undefined }),
+  const { data, isLoading } = useQuery({
+    queryKey: ['clients', debouncedSearch, page],
+    queryFn: () => clientsApi.getPaged({ search: debouncedSearch || undefined, page, limit: PAGE_SIZE }),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => clientsApi.delete(id),
-    onSuccess: () => {
-      toast.success('Klient usunięty');
-      qc.invalidateQueries({ queryKey: ['clients'] });
-      setDeleteTarget(null);
-    },
-    onError: (err) => toast.error(getErrorMessage(err)),
-  });
+  const clients = data?.data ?? [];
+  const pagination = data?.pagination;
+  const totalPages = pagination?.totalPages ?? 1;
+  const total = pagination?.total ?? 0;
+
+  // Reset page when search changes
+  const handleSearch = (val: string) => {
+    setSearch(val);
+    setPage(1);
+  };
 
   return (
     <div>
       <PageHeader
         title="Klienci"
-        subtitle={`${clients.length} klientów`}
+        subtitle={`${total} klientów`}
         actions={
           <div className="flex items-center gap-2">
             <button
@@ -52,7 +53,7 @@ export function ClientsListPage() {
               className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
             >
               <Upload className="h-4 w-4" />
-              Import CSV Subiekt
+              Import CSV
             </button>
             <Button icon={<Plus className="h-4 w-4" />} onClick={() => setShowCreate(true)}>
               Nowy klient
@@ -67,19 +68,17 @@ export function ClientsListPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Szukaj klienta..."
+            onChange={(e) => handleSearch(e.target.value)}
+            placeholder="Szukaj po nazwie, NIP, mieście, emailu..."
             className="w-full pl-9 pr-3 py-2.5 text-sm bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
           />
         </div>
       </div>
 
-      {/* Loading */}
       {isLoading && (
         <div className="text-center py-12 text-gray-400 text-sm">Ładowanie...</div>
       )}
 
-      {/* Empty */}
       {!isLoading && clients.length === 0 && (
         <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
           <Building2 className="h-10 w-10 text-gray-300 mx-auto mb-3" />
@@ -93,21 +92,20 @@ export function ClientsListPage() {
         </div>
       )}
 
-      {/* Mobile: cards */}
       {!isLoading && clients.length > 0 && (
         <>
-          {/* Desktop: table */}
+          {/* Desktop table */}
           <div className="hidden md:block bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/50">
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Klient</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Nazwa</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Skrócona</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Miasto</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Kontakt</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Lok.</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Zgl.</th>
-                  <th className="px-5 py-3" />
+                  <th className="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Zgłoszenia</th>
+                  <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -120,31 +118,45 @@ export function ClientsListPage() {
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
                         <ClientAvatar client={client} size="sm" />
-                        <div>
-                          <div className="font-medium text-gray-900">{client.name}</div>
-                          {client.legalName && (
-                            <div className="text-xs text-gray-400">{client.legalName}</div>
-                          )}
-                        </div>
+                        <span className="font-medium text-gray-900">{client.name}</span>
                       </div>
                     </td>
-                    <td className="px-5 py-3.5 text-gray-600">{client.city ?? '—'}</td>
                     <td className="px-5 py-3.5 text-gray-600">
-                      <div>{client.email ?? '—'}</div>
-                      {client.phone && <div className="text-xs text-gray-400">{client.phone}</div>}
+                      {client.legalName ?? client.name}
+                    </td>
+                    <td className="px-5 py-3.5 text-gray-600">
+                      {client.city ?? client.addressLine1 ?? '—'}
+                    </td>
+                    <td className="px-5 py-3.5 text-gray-600">
+                      {client.phone && (
+                        <div className="flex items-center gap-1.5">
+                          <Phone className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                          <span>{client.phone}</span>
+                        </div>
+                      )}
+                      {client.email && (
+                        <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-0.5">
+                          <Mail className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate max-w-[160px]">{client.email}</span>
+                        </div>
+                      )}
+                      {!client.phone && !client.email && '—'}
                     </td>
                     <td className="px-5 py-3.5">
                       <ClientStatusBadge status={client.status} />
                     </td>
-                    <td className="px-5 py-3.5 text-gray-600 text-center">{client._count?.locations ?? 0}</td>
-                    <td className="px-5 py-3.5 text-gray-600 text-center">{client._count?.tickets ?? 0}</td>
-                    <td className="px-5 py-3.5">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setDeleteTarget(client); }}
-                        className="text-xs text-red-400 hover:text-red-600 transition-colors"
-                      >
-                        Usuń
-                      </button>
+                    <td className="px-5 py-3.5 text-center">
+                      {(client._count?.tickets ?? 0) > 0 ? (
+                        <span className="inline-flex items-center gap-1 bg-orange-50 text-orange-600 text-xs font-semibold px-2 py-0.5 rounded-full">
+                          <Ticket className="h-3 w-3" />
+                          {client._count?.tickets}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300 text-xs">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <ChevronRight className="h-4 w-4 text-gray-300" />
                     </td>
                   </tr>
                 ))}
@@ -152,7 +164,7 @@ export function ClientsListPage() {
             </table>
           </div>
 
-          {/* Mobile: cards */}
+          {/* Mobile cards */}
           <div className="md:hidden space-y-3">
             {clients.map(client => (
               <div
@@ -162,50 +174,90 @@ export function ClientsListPage() {
               >
                 <ClientAvatar client={client} size="md" />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-gray-900 truncate">{client.name}</span>
                     <ClientStatusBadge status={client.status} />
                   </div>
-                  <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                    {client.city && (
-                      <span className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />{client.city}
-                      </span>
-                    )}
-                    {client.phone && (
-                      <span className="flex items-center gap-1">
-                        <Phone className="h-3 w-3" />{client.phone}
-                      </span>
-                    )}
-                  </div>
+                  {client.legalName && (
+                    <div className="text-xs text-gray-500 truncate">{client.legalName}</div>
+                  )}
                   <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                    <span>{client._count?.locations ?? 0} lok.</span>
-                    <span>{client._count?.tickets ?? 0} zgl.</span>
+                    <span>{client.city ?? client.addressLine1 ?? ''}</span>
+                    {(client._count?.tickets ?? 0) > 0 && (
+                      <span className="text-orange-500">{client._count?.tickets} zgl.</span>
+                    )}
                   </div>
                 </div>
                 <ChevronRight className="h-4 w-4 text-gray-300 flex-shrink-0" />
               </div>
             ))}
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="mt-4 flex items-center justify-between">
+              <p className="text-sm text-gray-500">
+                Strona {page} z {totalPages} · {total} klientów
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Poprzednia
+                </button>
+
+                {/* Page numbers */}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let p: number;
+                    if (totalPages <= 5) p = i + 1;
+                    else if (page <= 3) p = i + 1;
+                    else if (page >= totalPages - 2) p = totalPages - 4 + i;
+                    else p = page - 2 + i;
+                    return (
+                      <button
+                        key={p}
+                        onClick={() => setPage(p)}
+                        className={clsx(
+                          'w-9 h-9 text-sm font-medium rounded-xl transition-colors',
+                          page === p
+                            ? 'bg-brand-600 text-white'
+                            : 'text-gray-600 hover:bg-gray-100'
+                        )}
+                      >
+                        {p}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Następna
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
 
       {/* Modal: nowy klient */}
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Nowy klient" size="xl">
         <ClientForm
-          onSuccess={() => setShowCreate(false)}
+          onSuccess={() => {
+            setShowCreate(false);
+            qc.invalidateQueries({ queryKey: ['clients'] });
+          }}
           onCancel={() => setShowCreate(false)}
         />
       </Modal>
-
-      <ConfirmDialog
-        open={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
-        title="Usuń klienta"
-        message={`Czy na pewno chcesz usunąć klienta "${deleteTarget?.name}"? Tej operacji nie można cofnąć.`}
-        loading={deleteMutation.isPending}
-      />
 
       <ImportCsvModal
         open={showImport}
@@ -216,7 +268,6 @@ export function ClientsListPage() {
   );
 }
 
-// Avatar klienta z logo lub inicjałami
 function ClientAvatar({ client, size }: { client: Client; size: 'sm' | 'md' }) {
   const dim = size === 'sm' ? 'w-8 h-8 text-xs' : 'w-11 h-11 text-sm';
   const initials = client.name.slice(0, 2).toUpperCase();

@@ -8,10 +8,22 @@ export interface ClientsParams {
   limit?: number;
 }
 
+export interface Pagination {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export const clientsApi = {
   getAll: async (params?: ClientsParams): Promise<Client[]> => {
-    const { data } = await apiClient.get<{ data: Client[]; pagination: unknown }>('/clients', { params });
+    const { data } = await apiClient.get<{ data: Client[]; pagination: Pagination }>('/clients', { params });
     return data.data;
+  },
+
+  getPaged: async (params?: ClientsParams): Promise<{ data: Client[]; pagination: Pagination }> => {
+    const { data } = await apiClient.get<{ data: Client[]; pagination: Pagination }>('/clients', { params });
+    return data;
   },
 
   getOne: async (id: string): Promise<Client> => {
