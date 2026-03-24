@@ -172,12 +172,11 @@ export function CredentialsPage() {
       )}
 
       {/* Modal: nowy */}
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Nowe dane dostępowe" size="xl">
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} size="xl" noPadding>
         <CredentialForm
           onSuccess={() => {
             setShowCreate(false);
             qc.invalidateQueries({ queryKey: ['credentials'] });
-            toast.success('Dane dostępowe dodane');
           }}
           onCancel={() => setShowCreate(false)}
         />
@@ -185,13 +184,12 @@ export function CredentialsPage() {
 
       {/* Modal: edycja */}
       {editTarget && (
-        <Modal open={!!editTarget} onClose={() => setEditTarget(null)} title="Edytuj dane dostępowe" size="xl">
+        <Modal open={!!editTarget} onClose={() => setEditTarget(null)} size="xl" noPadding>
           <CredentialForm
             credential={editTarget}
             onSuccess={() => {
               setEditTarget(null);
               qc.invalidateQueries({ queryKey: ['credentials'] });
-              toast.success('Dane zaktualizowane');
             }}
             onCancel={() => setEditTarget(null)}
           />

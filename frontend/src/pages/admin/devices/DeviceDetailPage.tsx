@@ -435,13 +435,12 @@ export function DeviceDetailPage() {
         </div>
       </div>
 
-      <Modal open={showEdit} onClose={() => setShowEdit(false)} title="Edytuj urządzenie" size="2xl">
+      <Modal open={showEdit} onClose={() => setShowEdit(false)} size="2xl" noPadding>
         <DeviceForm
           device={device}
           onSuccess={() => {
             setShowEdit(false);
             qc.invalidateQueries({ queryKey: ['devices', id] });
-            toast.success('Urządzenie zaktualizowane');
           }}
           onCancel={() => setShowEdit(false)}
         />

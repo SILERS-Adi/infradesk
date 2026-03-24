@@ -11,6 +11,7 @@ import {
 import { clsx } from 'clsx';
 import { devicesApi } from '../../api/devices';
 import { clientsApi } from '../../api/clients';
+import { useClientSearch } from '../../hooks/useClientSearch';
 import { locationsApi } from '../../api/locations';
 import { usersApi } from '../../api/users';
 import { Input } from '../ui/Input';
@@ -110,19 +111,11 @@ export function DeviceForm({ device, defaultClientId, onSuccess, onCancel }: Pro
     if (defaultClient && !selectedClient) setSelectedClient(defaultClient);
   }, [defaultClient]);
 
-  // Clients list for search
-  const { data: allClients = [] } = useQuery({
-    queryKey: ['clients'],
-    queryFn: () => clientsApi.getAll(),
-    enabled: step === 'client',
-  });
-
-  const filteredClients = clientSearch
-    ? allClients.filter(c =>
-        c.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
-        (c.taxId ?? '').includes(clientSearch)
-      )
-    : allClients.slice(0, 8);
+  // Clients list — server-side search with debounce
+  const { clients: filteredClients, isLoading: clientsLoading } = useClientSearch(
+    clientSearch,
+    step === 'client',
+  );
 
   // Locations
   const { data: locations = [], refetch: refetchLocations } = useQuery({
@@ -345,7 +338,10 @@ export function DeviceForm({ device, defaultClientId, onSuccess, onCancel }: Pro
                   <ChevronRight className="h-4 w-4 text-gray-300 flex-shrink-0" />
                 </button>
               ))}
-              {filteredClients.length === 0 && (
+              {clientsLoading && (
+                <p className="text-sm text-gray-400 text-center py-6">Wyszukiwanie...</p>
+              )}
+              {!clientsLoading && filteredClients.length === 0 && (
                 <p className="text-sm text-gray-400 text-center py-6">Brak wyników</p>
               )}
             </div>

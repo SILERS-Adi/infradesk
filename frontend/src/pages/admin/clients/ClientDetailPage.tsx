@@ -582,7 +582,7 @@ export function ClientDetailPage() {
       </Modal>
 
       {/* Modal: dodaj urządzenie */}
-      <Modal open={showAddDevice} onClose={() => setShowAddDevice(false)} title="Nowe urządzenie" size="xl">
+      <Modal open={showAddDevice} onClose={() => setShowAddDevice(false)} size="xl" noPadding>
         <DeviceForm
           defaultClientId={id!}
           onSuccess={() => {
@@ -595,7 +595,7 @@ export function ClientDetailPage() {
       </Modal>
 
       {/* Modal: dodaj użytkownika portalu */}
-      <Modal open={showAddUser} onClose={() => setShowAddUser(false)} title="Nowy użytkownik portalu" size="lg">
+      <Modal open={showAddUser} onClose={() => setShowAddUser(false)} size="lg" noPadding>
         <UserForm
           defaultClientId={id}
           defaultRole="CLIENT"

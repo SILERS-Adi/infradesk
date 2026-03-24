@@ -108,25 +108,23 @@ export function UsersPage() {
         />
       </div>
 
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Nowy użytkownik" size="lg">
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} size="lg" noPadding>
         <UserForm
           onSuccess={() => {
             setShowCreate(false);
             qc.invalidateQueries({ queryKey: ['users'] });
-            toast.success('Użytkownik dodany');
           }}
           onCancel={() => setShowCreate(false)}
         />
       </Modal>
 
       {editTarget && (
-        <Modal open={!!editTarget} onClose={() => setEditTarget(null)} title="Edytuj użytkownika" size="lg">
+        <Modal open={!!editTarget} onClose={() => setEditTarget(null)} size="lg" noPadding>
           <UserForm
             user={editTarget}
             onSuccess={() => {
               setEditTarget(null);
               qc.invalidateQueries({ queryKey: ['users'] });
-              toast.success('Użytkownik zaktualizowany');
             }}
             onCancel={() => setEditTarget(null)}
           />

@@ -11,6 +11,7 @@ import {
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import { clientsApi } from '../../api/clients';
+import { useClientSearch } from '../../hooks/useClientSearch';
 import { locationsApi } from '../../api/locations';
 import { devicesApi } from '../../api/devices';
 import { usersApi } from '../../api/users';
@@ -117,19 +118,11 @@ export function NewOrderWizard({ onClose, defaultClientId }: Props) {
     }
   }, [defaultClient]);
 
-  // Clients search
-  const { data: clients = [] } = useQuery({
-    queryKey: ['clients'],
-    queryFn: () => clientsApi.getAll(),
-    enabled: step === 'client',
-  });
-
-  const filteredClients = clientSearch.length > 0
-    ? clients.filter(c =>
-        c.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
-        (c.taxId ?? '').includes(clientSearch)
-      )
-    : clients.slice(0, 8);
+  // Clients search — server-side with debounce
+  const { clients: filteredClients, isLoading: clientsLoading } = useClientSearch(
+    clientSearch,
+    step === 'client',
+  );
 
   // Locations for selected client
   const { data: locations = [] } = useQuery({
@@ -314,7 +307,10 @@ export function NewOrderWizard({ onClose, defaultClientId }: Props) {
                   <ChevronRight className="h-4 w-4 text-gray-300 flex-shrink-0" />
                 </button>
               ))}
-              {filteredClients.length === 0 && (
+              {clientsLoading && (
+                <p className="text-sm text-gray-400 text-center py-6">Wyszukiwanie...</p>
+              )}
+              {!clientsLoading && filteredClients.length === 0 && (
                 <p className="text-sm text-gray-400 text-center py-6">Brak wyników</p>
               )}
             </div>

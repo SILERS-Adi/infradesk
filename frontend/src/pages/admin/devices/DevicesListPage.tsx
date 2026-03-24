@@ -164,12 +164,11 @@ export function DevicesListPage() {
         />
       </div>
 
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Nowe urządzenie" size="2xl">
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} size="2xl" noPadding>
         <DeviceForm
           onSuccess={() => {
             setShowCreate(false);
             qc.invalidateQueries({ queryKey: ['devices'] });
-            toast.success('Urządzenie dodane');
           }}
           onCancel={() => setShowCreate(false)}
         />

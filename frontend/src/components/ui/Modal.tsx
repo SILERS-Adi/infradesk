@@ -53,7 +53,7 @@ export function Modal({ open, onClose, title, children, size = 'md', footer, noP
             </button>
           </div>
         )}
-        <div className={clsx('overflow-y-auto flex-1', noPadding ? '' : 'p-6')}>{children}</div>
+        <div className={clsx('flex-1 min-h-0', noPadding ? 'flex flex-col' : 'overflow-y-auto p-6')}>{children}</div>
         {footer && (
           <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">{footer}</div>
         )}
