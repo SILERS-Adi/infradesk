@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.local
+*.tar.gz
+*.zip
+frontend/dist/
+backend/dist/
+android-tv/app/build/
+android-tv/.gradle/
+android-tv/local.properties

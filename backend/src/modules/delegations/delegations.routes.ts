@@ -1,0 +1,11 @@
+import { Router } from 'express';
+import { authenticate, authorize } from '../../middleware/auth';
+import * as ctrl from './delegations.controller';
+const router = Router();
+router.use(authenticate);
+router.get('/', ctrl.list);
+router.get('/:id', ctrl.get);
+router.post('/', authorize('ADMIN', 'TECHNICIAN'), ctrl.create);
+router.patch('/:id', authorize('ADMIN', 'TECHNICIAN'), ctrl.update);
+router.delete('/:id', authorize('ADMIN'), ctrl.remove);
+export default router;

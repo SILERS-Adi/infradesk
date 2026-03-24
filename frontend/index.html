@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>InfraDesk</title>
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#4f46e5" />
+
+    <!-- Apple PWA (iOS "Add to Home Screen") -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="InfraDesk" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+
+    <!-- Windows tile -->
+    <meta name="msapplication-TileColor" content="#4f46e5" />
+    <meta name="msapplication-TileImage" content="/logo.png" />
+
+    <meta name="description" content="InfraDesk – zarządzanie infrastrukturą IT" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
