@@ -7,6 +7,7 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', ctrl.listTasks);
+router.post('/', ctrl.createTask);
 router.get('/:id', ctrl.getTask);
 router.post('/:id/status', ctrl.changeStatus);
 router.patch('/:id', ctrl.updateTask);

@@ -1,11 +1,19 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Clock, Loader2 } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { CheckCircle2, Clock, Loader2, Plus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { tasksApi } from '../../../api/tasks';
+import { usersApi } from '../../../api/users';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { PriorityBadge } from '../../../components/ui/PriorityBadge';
+import { Modal } from '../../../components/ui/Modal';
+import { Input } from '../../../components/ui/Input';
+import { Textarea } from '../../../components/ui/Textarea';
+import { Button } from '../../../components/ui/Button';
 import { useAuth } from '../../../store/authStore';
 import { formatDate, getErrorMessage } from '../../../utils/helpers';
 import type { Task, TaskStatus } from '../../../types';
@@ -13,8 +21,8 @@ import type { Task, TaskStatus } from '../../../types';
 type TabKey = 'NEW' | 'IN_PROGRESS' | 'DONE';
 
 const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
-  { key: 'NEW',         label: 'Nowe',       icon: <Clock className="h-4 w-4" /> },
-  { key: 'IN_PROGRESS', label: 'W trakcie',  icon: <Loader2 className="h-4 w-4" /> },
+  { key: 'NEW',         label: 'Nowe',         icon: <Clock className="h-4 w-4" /> },
+  { key: 'IN_PROGRESS', label: 'W trakcie',    icon: <Loader2 className="h-4 w-4" /> },
   { key: 'DONE',        label: 'Zrealizowane', icon: <CheckCircle2 className="h-4 w-4" /> },
 ];
 
@@ -24,6 +32,17 @@ const STATUS_NEXT: Record<TabKey, { label: string; status: TaskStatus } | null> 
   DONE:        null,
 };
 
+// ── New task form schema ───────────────────────────────────────────────────────
+const newTaskSchema = z.object({
+  title:            z.string().min(1, 'Tytuł jest wymagany'),
+  description:      z.string().optional(),
+  assignedToUserId: z.string().min(1, 'Wybierz osobę'),
+  dueAt:            z.string().optional(),
+  notes:            z.string().optional(),
+});
+type NewTaskForm = z.infer<typeof newTaskSchema>;
+
+// ── Task card ─────────────────────────────────────────────────────────────────
 function TaskCard({ task, onChangeStatus }: { task: Task; onChangeStatus: (id: string, status: TaskStatus) => void }) {
   const next = STATUS_NEXT[task.status as TabKey];
 
@@ -69,10 +88,12 @@ function TaskCard({ task, onChangeStatus }: { task: Task; onChangeStatus: (id: s
   );
 }
 
+// ── Main page ─────────────────────────────────────────────────────────────────
 export function TasksPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabKey>('NEW');
+  const [showCreate, setShowCreate] = useState(false);
   const isAdmin = user?.role === 'ADMIN';
 
   const { data: tasks = [], isLoading } = useQuery({
@@ -80,6 +101,13 @@ export function TasksPage() {
     queryFn: () => tasksApi.getAll({ all: isAdmin }),
     refetchInterval: 30_000,
   });
+
+  const { data: allUsers = [] } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => usersApi.getAll(),
+    enabled: showCreate,
+  });
+  const workers = allUsers.filter(u => u.role !== 'CLIENT' && u.isActive);
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: TaskStatus }) =>
@@ -91,6 +119,28 @@ export function TasksPage() {
     onError: (err) => toast.error(getErrorMessage(err)),
   });
 
+  const form = useForm<NewTaskForm>({
+    resolver: zodResolver(newTaskSchema),
+    defaultValues: { title: '', description: '', assignedToUserId: '', dueAt: '', notes: '' },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (d: NewTaskForm) => tasksApi.create({
+      title:            d.title,
+      description:      d.description || undefined,
+      assignedToUserId: d.assignedToUserId,
+      dueAt:            d.dueAt ? new Date(d.dueAt).toISOString() : undefined,
+      notes:            d.notes || undefined,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tasks'] });
+      toast.success('Zadanie dodane');
+      setShowCreate(false);
+      form.reset();
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+
   const tabTasks = tasks.filter(t => t.status === activeTab);
 
   return (
@@ -98,6 +148,15 @@ export function TasksPage() {
       <PageHeader
         title="Zadania"
         subtitle={`${tasks.filter(t => t.status !== 'DONE').length} aktywnych`}
+        actions={isAdmin && (
+          <button
+            onClick={() => setShowCreate(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Nowe zadanie
+          </button>
+        )}
       />
 
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm mb-6">
@@ -149,6 +208,43 @@ export function TasksPage() {
           ))}
         </div>
       )}
+
+      {/* Modal: nowe zadanie */}
+      <Modal open={showCreate} onClose={() => { setShowCreate(false); form.reset(); }} title="Nowe zadanie" size="md">
+        <form onSubmit={form.handleSubmit(d => createMutation.mutate(d))} className="space-y-4">
+          <Input
+            label="Tytuł *"
+            {...form.register('title')}
+            error={form.formState.errors.title?.message}
+          />
+          <Textarea label="Opis" rows={2} {...form.register('description')} />
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Przypisz do *</label>
+            <select
+              {...form.register('assignedToUserId')}
+              className="block w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            >
+              <option value="">— Wybierz osobę —</option>
+              {workers.map(u => (
+                <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
+              ))}
+            </select>
+            {form.formState.errors.assignedToUserId && (
+              <p className="text-xs text-red-500 mt-1">{form.formState.errors.assignedToUserId.message}</p>
+            )}
+          </div>
+          <Input label="Termin" type="date" {...form.register('dueAt')} />
+          <Textarea label="Notatki" rows={2} {...form.register('notes')} />
+          <div className="flex justify-end gap-3 pt-1">
+            <Button variant="secondary" type="button" onClick={() => { setShowCreate(false); form.reset(); }}>
+              Anuluj
+            </Button>
+            <Button type="submit" loading={createMutation.isPending}>
+              Dodaj zadanie
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

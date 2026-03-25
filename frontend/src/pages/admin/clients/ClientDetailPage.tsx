@@ -539,7 +539,7 @@ export function ClientDetailPage() {
       )}
 
       {/* Modal: edycja */}
-      <Modal open={showEdit} onClose={() => setShowEdit(false)} title={`Edytuj: ${client.name}`} size="xl">
+      <Modal open={showEdit} onClose={() => setShowEdit(false)} size="xl" noPadding>
         <ClientForm
           client={client}
           onSuccess={() => {

@@ -1,7 +1,7 @@
 import prisma from '../../lib/prisma';
 import { AppError } from '../../middleware/errorHandler';
 import { logActivity } from '../../utils/activityLogger';
-import { ChangeTaskStatusInput, UpdateTaskInput } from './tasks.validation';
+import { CreateTaskInput, ChangeTaskStatusInput, UpdateTaskInput } from './tasks.validation';
 import { TaskStatus } from '@prisma/client';
 import { completeTicket } from '../tickets/tickets.service';
 
@@ -36,6 +36,37 @@ export async function generateTaskNumber(): Promise<string> {
     where: { taskNumber: { startsWith: `TSK-${year}-` } },
   });
   return `TSK-${year}-${String(count + 1).padStart(4, '0')}`;
+}
+
+export async function createTask(
+  data: CreateTaskInput,
+  requestingUser: { id: string; role: string }
+) {
+  const taskNumber = await generateTaskNumber();
+  const task = await prisma.task.create({
+    data: {
+      taskNumber,
+      title:            data.title,
+      description:      data.description,
+      assignedToUserId: data.assignedToUserId,
+      createdByUserId:  requestingUser.id,
+      dueAt:            data.dueAt ? new Date(data.dueAt) : undefined,
+      notes:            data.notes,
+      status:           TaskStatus.NEW,
+    } as any,
+    select: taskSelect,
+  });
+
+  await logActivity(prisma, {
+    entityType: 'Task',
+    entityId:   task.id,
+    actionType: 'CREATE',
+    description: `Task ${taskNumber} created`,
+    performedByUserId: requestingUser.id,
+    metadata: { title: data.title },
+  });
+
+  return task;
 }
 
 export async function listTasks(params: {

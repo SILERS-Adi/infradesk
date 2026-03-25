@@ -1,7 +1,18 @@
 import { Request, Response, NextFunction } from 'express';
 import * as tasksService from './tasks.service';
-import { changeTaskStatusSchema, updateTaskSchema } from './tasks.validation';
+import { createTaskSchema, changeTaskStatusSchema, updateTaskSchema } from './tasks.validation';
 import { TaskStatus } from '@prisma/client';
+
+export async function createTask(req: Request, res: Response, next: NextFunction) {
+  try {
+    const data = createTaskSchema.parse(req.body);
+    const task = await tasksService.createTask(data, {
+      id:   req.user!.userId,
+      role: req.user!.role,
+    });
+    res.status(201).json(task);
+  } catch (err) { next(err); }
+}
 
 export async function listTasks(req: Request, res: Response, next: NextFunction) {
   try {

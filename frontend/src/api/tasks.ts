@@ -11,6 +11,17 @@ export const tasksApi = {
     return data;
   },
 
+  create: async (payload: {
+    title: string;
+    description?: string;
+    assignedToUserId: string;
+    dueAt?: string;
+    notes?: string;
+  }): Promise<Task> => {
+    const { data } = await apiClient.post<Task>('/tasks', payload);
+    return data;
+  },
+
   getOne: async (id: string): Promise<Task> => {
     const { data } = await apiClient.get<Task>(`/tasks/${id}`);
     return data;

@@ -249,7 +249,7 @@ export function ClientsListPage() {
       )}
 
       {/* Modal: nowy klient */}
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Nowy klient" size="xl">
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} size="xl" noPadding>
         <ClientForm
           onSuccess={() => {
             setShowCreate(false);

@@ -515,7 +515,7 @@ enum TaskStatus {
 model Task {
   id               String     @id @default(uuid())
   taskNumber       String     @unique
-  ticketId         String
+  ticketId         String?
   assignedToUserId String
   createdByUserId  String
   title            String
@@ -527,9 +527,9 @@ model Task {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
-  ticket     Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  assignedTo User   @relation("TaskAssignedTo", fields: [assignedToUserId], references: [id])
-  createdBy  User   @relation("TaskCreatedBy", fields: [createdByUserId], references: [id])
+  ticket     Ticket? @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  assignedTo User    @relation("TaskAssignedTo", fields: [assignedToUserId], references: [id])
+  createdBy  User    @relation("TaskCreatedBy", fields: [createdByUserId], references: [id])
 }
 
 model ClientFavorite {
