@@ -216,6 +216,18 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
             </p>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
+            {reg.rustdeskId && (
+              <a
+                href={`rustdesk://id=${reg.rustdeskId}`}
+                className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all active:scale-[0.97]"
+                style={{ background: 'rgba(16,185,129,0.08)', borderColor: 'rgba(16,185,129,0.2)', color: '#10B981' }}
+                title={`Połącz RustDesk: ${reg.rustdeskId}`}
+                onClick={e => e.stopPropagation()}
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                RustDesk
+              </a>
+            )}
             {reg.status === 'PENDING' && (
               reg.clientId
                 ? (
