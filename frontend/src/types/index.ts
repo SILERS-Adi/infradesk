@@ -261,7 +261,11 @@ export interface Task {
     title: string;
     priority: TicketPriority;
     serviceMode?: 'REMOTE' | 'ONSITE' | null;
-    client?: { id: string; name: string };
+    client?: {
+      id: string; name: string;
+      hasContract?: boolean; contractHours?: number; contractMonthlyValue?: number;
+      hourlyRate?: number; contractHourlyRateOverLimit?: number; billingIntervalMinutes?: number;
+    };
     location?: { id: string; name: string };
     device?: { id: string; name: string; rustdeskId?: string };
   };

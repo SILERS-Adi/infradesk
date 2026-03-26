@@ -137,12 +137,26 @@ function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPause
                   <MapPin className="h-3 w-3" /> Na miejscu
                 </span>
               )}
-              {completedMin > 0 && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5"
-                  style={{ background: 'rgba(139,92,246,0.12)', color: '#A78BFA' }}>
-                  <Timer className="h-3 w-3" /> {formatDurationShort(completedMin)}
-                </span>
-              )}
+              {completedMin > 0 && (() => {
+                const cl = task.ticket?.client;
+                const isCon = cl?.hasContract ?? false;
+                const rate = cl?.hourlyRate ?? 0;
+                const interval = cl?.billingIntervalMinutes ?? 30;
+                const bh = Math.ceil(completedMin / interval) * (interval / 60);
+                const earn = isCon ? 0 : bh * rate;
+                return (
+                  <>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5"
+                      style={{ background: 'rgba(139,92,246,0.12)', color: '#A78BFA' }}>
+                      <Timer className="h-3 w-3" /> {formatDurationShort(completedMin)}
+                    </span>
+                    <span className="inline-flex items-center text-[10px] font-semibold rounded-full px-2 py-0.5"
+                      style={{ background: isCon ? 'rgba(96,165,250,0.12)' : 'rgba(34,197,94,0.12)', color: isCon ? '#60A5FA' : '#4ADE80' }}>
+                      {isCon ? 'abonament' : rate > 0 ? `${earn.toFixed(0)} zł` : '—'}
+                    </span>
+                  </>
+                );
+              })()}
             </div>
             <p className="font-medium text-white/85 truncate">{task.title}</p>
             {task.ticket?.client && (
@@ -284,37 +298,66 @@ function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPause
         </span>
       </div>
 
-      {/* ── Session history ── */}
-      {expanded && taskSessions.length > 0 && (
-        <div className="px-4 pb-3" style={{ background: 'rgba(255,255,255,0.015)' }}>
-          <div className="space-y-1">
-            {taskSessions.map(s => (
-              <div key={s.id} className="flex items-center gap-3 text-[11px] py-1.5 px-2 rounded-lg"
-                style={{ background: 'rgba(255,255,255,0.02)' }}>
-                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${s.status === 'ACTIVE' ? 'bg-emerald-500 animate-pulse' : s.status === 'PAUSED' ? 'bg-amber-400' : ''}`}
-                  style={s.status === 'COMPLETED' ? { background: 'rgba(255,255,255,0.15)' } : {}} />
-                <span style={{ color: 'rgba(255,255,255,0.5)' }}>
-                  {formatDateTime(s.startedAt)}
-                </span>
-                {s.endedAt && (
-                  <span style={{ color: 'rgba(255,255,255,0.3)' }}>
-                    → {formatDateTime(s.endedAt)}
-                  </span>
-                )}
-                <span className="font-semibold" style={{ color: 'rgba(255,255,255,0.7)' }}>
-                  {s.durationMin ? formatDurationShort(s.durationMin) : s.status === 'ACTIVE' ? 'w toku...' : '—'}
+      {/* ── Session history + billing ── */}
+      {expanded && taskSessions.length > 0 && (() => {
+        const client = task.ticket?.client;
+        const isContract = client?.hasContract ?? false;
+        const hourlyRate = client?.hourlyRate ?? 0;
+        const billingInterval = client?.billingIntervalMinutes ?? 30;
+        const totalMin = completedMin + (isThisTaskSession ? Math.floor(liveSeconds / 60) : 0);
+        const billableHours = Math.ceil(totalMin / billingInterval) * (billingInterval / 60);
+        const earnings = isContract ? 0 : billableHours * hourlyRate;
+
+        return (
+          <div className="px-4 pb-3" style={{ background: 'rgba(255,255,255,0.015)' }}>
+            <div className="space-y-1">
+              {taskSessions.map(s => {
+                const sMin = s.durationMin ?? 0;
+                const sBillable = Math.ceil(sMin / billingInterval) * (billingInterval / 60);
+                const sEarnings = isContract ? 0 : sBillable * hourlyRate;
+                return (
+                  <div key={s.id} className="flex items-center gap-3 text-[11px] py-1.5 px-2 rounded-lg"
+                    style={{ background: 'rgba(255,255,255,0.02)' }}>
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${s.status === 'ACTIVE' ? 'bg-emerald-500 animate-pulse' : s.status === 'PAUSED' ? 'bg-amber-400' : ''}`}
+                      style={s.status === 'COMPLETED' ? { background: 'rgba(255,255,255,0.15)' } : {}} />
+                    <span style={{ color: 'rgba(255,255,255,0.5)' }}>
+                      {formatDateTime(s.startedAt)}
+                    </span>
+                    {s.endedAt && (
+                      <span style={{ color: 'rgba(255,255,255,0.3)' }}>
+                        → {formatDateTime(s.endedAt)}
+                      </span>
+                    )}
+                    <span className="font-semibold" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                      {sMin ? formatDurationShort(sMin) : s.status === 'ACTIVE' ? 'w toku...' : '—'}
+                    </span>
+                    <span className="ml-auto font-semibold" style={{ color: isContract ? '#60A5FA' : '#4ADE80' }}>
+                      {s.status === 'COMPLETED' ? (isContract ? 'abonament' : `${sEarnings.toFixed(2)} zł`) : ''}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex items-center justify-between mt-2 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+              <div className="flex items-center gap-2">
+                <Timer className="h-3.5 w-3.5" style={{ color: '#A78BFA' }} />
+                <span className="text-xs font-bold" style={{ color: '#A78BFA' }}>
+                  Łącznie: {formatDurationShort(totalMin)}
                 </span>
               </div>
-            ))}
+              <div className="text-xs font-bold" style={{ color: isContract ? '#60A5FA' : '#4ADE80' }}>
+                {isContract ? (
+                  <span>W ramach abonamentu ({client?.contractHours}h/{client?.contractMonthlyValue} zł/mies.)</span>
+                ) : hourlyRate > 0 ? (
+                  <span>{earnings.toFixed(2)} zł ({hourlyRate} zł/h × {billableHours.toFixed(1)}h)</span>
+                ) : (
+                  <span style={{ color: 'rgba(255,255,255,0.3)' }}>Brak stawki</span>
+                )}
+              </div>
+            </div>
           </div>
-          <div className="flex items-center justify-end gap-2 mt-2 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-            <Timer className="h-3.5 w-3.5" style={{ color: '#A78BFA' }} />
-            <span className="text-xs font-bold" style={{ color: '#A78BFA' }}>
-              Łącznie: {formatDurationShort(completedMin + (isThisTaskSession ? Math.floor(liveSeconds / 60) : 0))}
-            </span>
-          </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
