@@ -16,7 +16,14 @@ export function BottomNav() {
 
   return (
     <>
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 safe-area-pb">
+      <nav
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t safe-area-pb"
+        style={{
+          background: 'rgba(8,14,28,0.95)',
+          backdropFilter: 'blur(16px)',
+          borderColor: 'rgba(255,255,255,0.06)',
+        }}
+      >
         <div className="flex items-stretch h-16">
           {mainItems.map(({ to, label, icon: Icon }) => (
             <NavLink
@@ -25,11 +32,12 @@ export function BottomNav() {
               className={({ isActive }) =>
                 clsx(
                   'flex-1 flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors',
-                  isActive
-                    ? 'text-brand-600'
-                    : 'text-gray-400 hover:text-gray-700'
+                  isActive && 'text-violet-400'
                 )
               }
+              style={({ isActive }) => ({
+                color: isActive ? undefined : 'rgba(255,255,255,0.35)',
+              })}
             >
               {({ isActive }) => (
                 <>
@@ -43,7 +51,8 @@ export function BottomNav() {
           {/* Więcej */}
           <button
             onClick={() => setMenuOpen(true)}
-            className="flex-1 flex flex-col items-center justify-center gap-0.5 text-xs font-medium text-gray-400 hover:text-gray-700 transition-colors"
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors"
+            style={{ color: 'rgba(255,255,255,0.35)' }}
           >
             <MoreHorizontal className="h-5 w-5" />
             <span className="leading-none">Więcej</span>

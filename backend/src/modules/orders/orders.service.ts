@@ -21,18 +21,24 @@ async function generateOrderNumber(): Promise<string> {
 }
 
 export async function listOrders(params: {
-  clientId?: string; status?: OrderStatus; requestingUser: { id: string; role: string };
+  clientId?: string; status?: OrderStatus; requestingUser: { id: string; role: string; clientId?: string | null };
 }) {
-  const { clientId, status } = params;
+  const { clientId, status, requestingUser } = params;
   const where: Record<string, unknown> = {};
   if (clientId) where.clientId = clientId;
   if (status) where.status = status;
+  if (requestingUser.role === 'CLIENT') {
+    where.clientId = requestingUser.clientId;
+  }
   return prisma.order.findMany({ where, orderBy: { createdAt: 'desc' }, select: orderSelect });
 }
 
-export async function getOrderById(id: string) {
+export async function getOrderById(id: string, requestingUser?: { id: string; role: string; clientId?: string | null }) {
   const order = await prisma.order.findUnique({ where: { id }, select: orderSelect });
   if (!order) throw new AppError('Order not found', 404);
+  if (requestingUser?.role === 'CLIENT' && order.clientId !== requestingUser.clientId) {
+    throw new AppError('Access denied', 403);
+  }
   return order;
 }
 

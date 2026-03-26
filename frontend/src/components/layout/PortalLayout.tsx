@@ -2,7 +2,7 @@ import { type ReactNode, useState } from 'react';
 import { Navigate, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../store/authStore';
 import {
-  LayoutDashboard, MapPin, Monitor, Ticket, Plus, LogOut, ShoppingCart, Menu, X,
+  LayoutDashboard, MapPin, Monitor, Ticket, Plus, LogOut, ShoppingCart, Menu, X, Receipt,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { getInitials } from '../../utils/helpers';
@@ -13,6 +13,7 @@ const navItems = [
   { to: '/portal/devices', label: 'Urządzenia', icon: Monitor },
   { to: '/portal/locations', label: 'Lokalizacje', icon: MapPin },
   { to: '/portal/orders', label: 'Zamówienia', icon: ShoppingCart },
+  { to: '/portal/billing', label: 'Rozliczenia', icon: Receipt },
 ];
 
 export function PortalLayout({ children }: { children: ReactNode }) {

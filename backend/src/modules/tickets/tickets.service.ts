@@ -514,6 +514,28 @@ export async function changeTicketStatus(
     sendPushToUser(ticket.assignedToUserId, statusPush).catch(() => {});
   }
 
+  // Auto-create CRM activity when ticket is resolved/completed/closed
+  if (['RESOLVED', 'COMPLETED', 'CLOSED'].includes(newStatus)) {
+    const ticketData = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+      select: { clientId: true, locationId: true, deviceId: true, title: true, ticketNumber: true, resolutionSummary: true },
+    });
+    if (ticketData?.clientId) {
+      await prisma.crmActivity.create({
+        data: {
+          clientId: ticketData.clientId,
+          locationId: ticketData.locationId,
+          deviceId: ticketData.deviceId,
+          createdByUserId: performedByUserId,
+          type: 'MEETING',
+          title: `Ticket ${ticketData.ticketNumber} zamknięty`,
+          notes: ticketData.resolutionSummary || `Zgłoszenie "${ticketData.title}" zostało rozwiązane.`,
+          occurredAt: new Date(),
+        },
+      });
+    }
+  }
+
   return updated;
 }
 

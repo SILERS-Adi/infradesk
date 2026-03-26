@@ -8,7 +8,7 @@ export async function listOrders(req: Request, res: Response, next: NextFunction
     const { clientId, status } = req.query as Record<string, string>;
     const orders = await ordersService.listOrders({
       clientId, status: status as OrderStatus | undefined,
-      requestingUser: { id: req.user!.userId, role: req.user!.role },
+      requestingUser: { id: req.user!.userId, role: req.user!.role, clientId: req.user!.clientId },
     });
     res.json(orders);
   } catch (err) { next(err); }
@@ -16,7 +16,7 @@ export async function listOrders(req: Request, res: Response, next: NextFunction
 
 export async function getOrder(req: Request, res: Response, next: NextFunction) {
   try {
-    res.json(await ordersService.getOrderById(req.params.id));
+    res.json(await ordersService.getOrderById(req.params.id, { id: req.user!.userId, role: req.user!.role, clientId: req.user!.clientId }));
   } catch (err) { next(err); }
 }
 

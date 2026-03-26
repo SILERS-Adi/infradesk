@@ -45,6 +45,7 @@ import { PortalTicketsPage } from './pages/portal/PortalTicketsPage';
 import { PortalNewRequestPage } from './pages/portal/PortalNewRequestPage';
 import { PortalTicketDetailPage } from './pages/portal/PortalTicketDetailPage';
 import { PortalOrdersPage } from './pages/portal/PortalOrdersPage';
+import { PortalBillingPage } from './pages/portal/PortalBillingPage';
 
 // QR
 import { QrPage } from './pages/qr/QrPage';
@@ -127,6 +128,7 @@ function PortalRoutes() {
         <Route path="tickets/:id" element={<PortalTicketDetailPage />} />
         <Route path="new-request" element={<PortalNewRequestPage />} />
         <Route path="orders" element={<PortalOrdersPage />} />
+        <Route path="billing" element={<PortalBillingPage />} />
         <Route path="account" element={<div className="text-sm text-gray-500">Moje konto — wkrótce</div>} />
         <Route path="*" element={<Navigate to="/portal" replace />} />
       </Routes>

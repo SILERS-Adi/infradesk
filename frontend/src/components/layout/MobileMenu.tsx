@@ -29,10 +29,23 @@ export function MobileMenu({ open, onClose }: MobileMenuProps) {
       />
 
       {/* Sheet */}
-      <div className="relative bg-white rounded-t-2xl shadow-xl pb-safe">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <span className="text-base font-semibold text-gray-900">Menu</span>
-          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-700">
+      <div
+        className="relative rounded-t-2xl shadow-xl pb-safe"
+        style={{
+          background: 'rgba(14,20,38,0.97)',
+          backdropFilter: 'blur(24px)',
+        }}
+      >
+        <div
+          className="flex items-center justify-between px-5 py-4 border-b"
+          style={{ borderColor: 'rgba(255,255,255,0.06)' }}
+        >
+          <span className="text-base font-semibold text-white/85">Menu</span>
+          <button
+            onClick={onClose}
+            className="p-1 transition-colors"
+            style={{ color: 'rgba(255,255,255,0.35)' }}
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -45,15 +58,24 @@ export function MobileMenu({ open, onClose }: MobileMenuProps) {
               className={({ isActive }) =>
                 clsx(
                   'flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-brand-50 text-brand-600'
-                    : 'text-gray-700 hover:bg-gray-50'
+                  isActive && 'text-violet-400'
                 )
               }
+              style={({ isActive }) => ({
+                background: isActive
+                  ? 'rgba(139,92,246,0.12)'
+                  : undefined,
+                color: isActive ? undefined : 'rgba(255,255,255,0.7)',
+              })}
             >
               {({ isActive }) => (
                 <>
-                  <Icon className={clsx('h-5 w-5', isActive ? 'text-brand-600' : 'text-gray-400')} />
+                  <Icon
+                    className="h-5 w-5"
+                    style={{
+                      color: isActive ? undefined : 'rgba(255,255,255,0.35)',
+                    }}
+                  />
                   {label}
                 </>
               )}

@@ -61,8 +61,13 @@ enum TicketPriority {
 }
 
 enum TicketStatus {
+  NEW
   PENDING
   ASSIGNED
+  IN_PROGRESS
+  WAITING_FOR_CLIENT
+  RESOLVED
+  CLOSED
   COMPLETED
   CANCELLED
 }
@@ -371,10 +376,11 @@ model Ticket {
   device      Device?   @relation(fields: [deviceId], references: [id])
   createdBy   User      @relation("TicketCreatedBy", fields: [createdByUserId], references: [id])
   assignedTo  User?     @relation("TicketAssignedTo", fields: [assignedToUserId], references: [id])
-  comments     TicketComment[]
-  tasks        Task[]
-  orders       Order[]
-  workSessions WorkSession[]
+  comments       TicketComment[]
+  tasks          Task[]
+  orders         Order[]
+  workSessions   WorkSession[]
+  crmActivities  CrmActivity[] @relation("CrmLinkedTicket")
 }
 
 model TicketComment {
@@ -442,8 +448,9 @@ model CrmActivity {
   client     Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
   location   Location? @relation(fields: [locationId], references: [id])
   device     Device?   @relation(fields: [deviceId], references: [id])
-  createdBy  User      @relation("CrmCreatedBy", fields: [createdByUserId], references: [id])
-  assignedTo User?     @relation("CrmAssignedTo", fields: [assignedToUserId], references: [id])
+  createdBy     User      @relation("CrmCreatedBy", fields: [createdByUserId], references: [id])
+  assignedTo    User?     @relation("CrmAssignedTo", fields: [assignedToUserId], references: [id])
+  linkedTicket  Ticket?   @relation("CrmLinkedTicket", fields: [linkedTicketId], references: [id])
 
   @@index([clientId])
   @@index([type])
