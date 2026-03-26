@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { startSession, endSession, getSessionsByClient, startMobileSession, pauseSession, resumeSession, getActiveTechSession } from './sessions.service';
+import { startSession, endSession, getSessionsByClient, startMobileSession, pauseSession, resumeSession, getActiveTechSession, listAllSessions } from './sessions.service';
 
 export async function postStart(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -45,6 +45,18 @@ export async function postResume(req: Request, res: Response, next: NextFunction
   try {
     const session = await resumeSession(req.params.id, req.user!.userId);
     res.json(session);
+  } catch (err) { next(err); }
+}
+
+export async function getAll(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { techId, clientId, from, to, page, limit } = req.query as Record<string, string>;
+    const result = await listAllSessions({
+      techId, clientId, from, to,
+      page: page ? parseInt(page) : 1,
+      limit: limit ? parseInt(limit) : 50,
+    });
+    res.json(result);
   } catch (err) { next(err); }
 }
 

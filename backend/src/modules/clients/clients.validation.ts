@@ -30,6 +30,11 @@ export const createClientSchema = z.object({
   contractAttachmentUrl:       z.string().optional().nullable(),
   hourlyRate:                  z.number().positive().optional().nullable(),
   managerId:                   z.string().uuid().optional().nullable(),
+  // Usługi dodatkowe
+  enableSecurityAudit:         z.boolean().optional(),
+  enableNetworkScan:           z.boolean().optional(),
+  enableManagedBackup:         z.boolean().optional(),
+  enableMonthlyReport:         z.boolean().optional(),
 });
 
 export const updateClientSchema = createClientSchema.partial();

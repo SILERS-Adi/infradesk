@@ -67,6 +67,10 @@ export interface Client {
   contractScope?: string;
   contractAttachmentUrl?: string;
   hourlyRate?: number;
+  enableSecurityAudit?: boolean;
+  enableNetworkScan?: boolean;
+  enableManagedBackup?: boolean;
+  enableMonthlyReport?: boolean;
   createdAt: string;
   updatedAt: string;
   _count?: {

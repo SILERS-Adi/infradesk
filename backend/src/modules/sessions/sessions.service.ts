@@ -20,6 +20,42 @@ function calcWorkMinutes(entries: { startedAt: Date; endedAt: Date | null }[]): 
   return Math.round(totalMs / 60000);
 }
 
+// ── List all sessions (admin view) ───────────────────────────────────────────
+
+export async function listAllSessions(params: {
+  techId?: string;
+  clientId?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  limit?: number;
+}) {
+  const { techId, clientId, from, to, page = 1, limit = 50 } = params;
+  const skip = (page - 1) * limit;
+  const where: Record<string, unknown> = {};
+  if (techId) where.techId = techId;
+  if (clientId) where.clientId = clientId;
+  if (from || to) {
+    where.startedAt = {};
+    if (from) (where.startedAt as any).gte = new Date(from);
+    if (to) (where.startedAt as any).lte = new Date(to);
+  }
+
+  const [data, total] = await Promise.all([
+    prisma.workSession.findMany({
+      where, skip, take: limit,
+      orderBy: { startedAt: 'desc' },
+      include: {
+        ...sessionInclude,
+        tech: { select: { id: true, firstName: true, lastName: true } },
+      },
+    }),
+    prisma.workSession.count({ where }),
+  ]);
+
+  return { data, pagination: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+}
+
 // ── Agent session (legacy) ───────────────────────────────────────────────────
 
 export async function startSession(techId: string, agentRegId: string) {

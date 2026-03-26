@@ -188,6 +188,10 @@ model Client {
   contractScope                String?
   contractAttachmentUrl        String?
   hourlyRate                   Float?
+  enableSecurityAudit          Boolean   @default(false)
+  enableNetworkScan            Boolean   @default(false)
+  enableManagedBackup          Boolean   @default(false)
+  enableMonthlyReport          Boolean   @default(false)
   managerId     String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
@@ -535,6 +539,7 @@ model AgentRegistration {
   diskInfo            Json?
   networkIfaces       Json?
   installedSoftware   Json?
+  serverMetrics       Json?
   managerId      String?
   appVersion     String?
   lastSeen       DateTime?

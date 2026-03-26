@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Mail, Phone, Globe, MapPin, Building2, Plus, Pencil, Trash2, ChevronRight, FileText, ExternalLink, Clock, CheckCircle2, XCircle, DollarSign, Calendar, AlertCircle, Wrench } from 'lucide-react';
+import { Mail, Phone, Globe, MapPin, Building2, Plus, Pencil, Trash2, ChevronRight, FileText, ExternalLink, Clock, CheckCircle2, XCircle, DollarSign, Calendar, AlertCircle, Wrench, Shield, Wifi, Database } from 'lucide-react';
 import { clientsApi } from '../../../api/clients';
 import { locationsApi } from '../../../api/locations';
 import { devicesApi } from '../../../api/devices';
@@ -109,6 +109,15 @@ export function ClientDetailPage() {
       qc.invalidateQueries({ queryKey: ['clients', id] });
     },
     onError: () => toast.error('B\u0142\u0105d zapisu opiekuna'),
+  });
+
+  const toggleServiceMutation = useMutation({
+    mutationFn: (data: Record<string, boolean>) => clientsApi.update(id!, data as any),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['clients', id] });
+      toast.success('Usługa zaktualizowana');
+    },
+    onError: () => toast.error('Błąd zapisu'),
   });
 
   const deactivateMutation = useMutation({
@@ -423,6 +432,38 @@ export function ClientDetailPage() {
               </div>
             )
           )}
+
+          {/* Usługi dodatkowe */}
+          <div className="mt-6 rounded-[16px] p-5" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <h3 className="text-[14px] font-semibold text-white/70 mb-4">Usługi dodatkowe</h3>
+            <div className="space-y-3">
+              {[
+                { key: 'enableSecurityAudit', label: 'Audyt bezpieczeństwa', desc: 'Security Score, 20 checków, rekomendacje', icon: Shield, color: '#4ADE80' },
+                { key: 'enableNetworkScan', label: 'Skanowanie sieci', desc: 'Odkrywanie urządzeń, mapa sieci, alerty', icon: Wifi, color: '#60A5FA' },
+                { key: 'enableManagedBackup', label: 'Zarządzany backup', desc: 'Status backupów, historia, weryfikacja', icon: Database, color: '#A78BFA' },
+                { key: 'enableMonthlyReport', label: 'Raport miesięczny', desc: 'Automatyczny PDF z podsumowaniem', icon: FileText, color: '#FB923C' },
+              ].map(svc => (
+                <div key={svc.key} className="flex items-center justify-between p-3.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${svc.color}15` }}>
+                      <svc.icon className="h-4.5 w-4.5" style={{ color: svc.color }} />
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-semibold text-white/80">{svc.label}</p>
+                      <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{svc.desc}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => toggleServiceMutation.mutate({ [svc.key]: !(client as any)[svc.key] })}
+                    className="relative w-11 h-6 rounded-full transition-colors duration-200"
+                    style={{ background: (client as any)[svc.key] ? `${svc.color}80` : 'rgba(255,255,255,0.1)' }}>
+                    <div className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+                      style={{ transform: (client as any)[svc.key] ? 'translateX(20px)' : 'translateX(0)' }} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

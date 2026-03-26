@@ -71,6 +71,7 @@ export const metricsSchema = z.object({
   diskInfo:          na,
   networkIfaces:     na,
   installedSoftware: na,
+  serverMetrics:     z.any().optional(),
 });
 
 export const agentTicketSchema = z.object({

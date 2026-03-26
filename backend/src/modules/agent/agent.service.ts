@@ -115,6 +115,7 @@ function hardwareFields(data: Partial<RegisterInput & MetricsInput>) {
     diskInfo:          data.diskInfo          as any,
     networkIfaces:     data.networkIfaces     as any,
     installedSoftware: data.installedSoftware as any,
+    serverMetrics:     (data as any).serverMetrics ?? undefined,
     appVersion:        (data as any).appVersion,
   };
 }

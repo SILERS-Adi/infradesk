@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
 import {
-  Download, Smartphone, Monitor, ArrowRight, Mail, Lock,
+  Download, Smartphone, Monitor, Server, ArrowRight, Mail, Lock,
   ScreenShare, FileText,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -50,6 +50,15 @@ const DOWNLOADS = [
     showVersion: true,
   },
   {
+    icon: <Server className="h-5 w-5" />,
+    name: 'Server Agent',
+    desc: 'Windows Server',
+    url: '/downloads/InfraDesk%20Server%20Agent.exe',
+    color: '#A78BFA',
+    bg: 'rgba(167,139,250,0.08)',
+    border: 'rgba(167,139,250,0.12)',
+  },
+  {
     icon: <ScreenShare className="h-5 w-5" />,
     name: 'RustDesk',
     desc: 'Zdalny pulpit',
@@ -57,15 +66,6 @@ const DOWNLOADS = [
     color: '#FB923C',
     bg: 'rgba(251,146,60,0.08)',
     border: 'rgba(251,146,60,0.12)',
-  },
-  {
-    icon: <Smartphone className="h-5 w-5" />,
-    name: 'InfraDesk TV',
-    desc: 'Android TV',
-    url: '/downloads/InfraDesk-TV.apk',
-    color: '#22D3EE',
-    bg: 'rgba(34,211,238,0.08)',
-    border: 'rgba(34,211,238,0.12)',
   },
 ];
 

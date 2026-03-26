@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
-  Download, Monitor, Smartphone, ScreenShare, CheckCircle,
+  Download, Monitor, Server, Smartphone, ScreenShare, CheckCircle,
   ExternalLink, ArrowLeft, KeyRound, Mail, Loader2,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -112,12 +112,17 @@ export function PublicDownloadsPage() {
   };
 
   const APPS: AppCard[] = [
-    { icon: <Monitor className="h-6 w-6" />, name: 'InfraDesk Agent', description: 'Aplikacja agenta dla systemu Windows. Zdalne zarządzanie, zgłoszenia serwisowe i WoL.', color: 'violet',
+    { icon: <Monitor className="h-6 w-6" />, name: 'InfraDesk Agent', description: 'Agent monitorujący dla komputerów. Zgłoszenia, RustDesk, backup, Security Audit.', color: 'violet',
       files: [
-        { label: 'Instalator (zalecany)', url: '/downloads/InfraDesk%20Agent.exe', badge: versionBadge, primary: true, size: '~39 MB' },
-        { label: 'Wersja Beta (v4.1.0 — auto-diagnostyka, backup)', url: '/downloads/InfraDesk-Agent-beta.exe', badge: 'Beta 4.1', size: '~39 MB' },
+        { label: 'InfraDesk Agent — Windows', url: '/downloads/InfraDesk%20Agent.exe', badge: versionBadge, primary: true, size: '~40 MB' },
       ],
-      notes: ['Wymaga Windows 10 lub nowszego', 'Przy pierwszym uruchomieniu wpisz kod rejestracji', 'Uruchamia się automatycznie z Windows'],
+      notes: ['Wymaga Windows 10 lub nowszego', 'Przy pierwszym uruchomieniu wpisz kod rejestracji', 'Uruchamia się automatycznie z Windows', 'Security Audit, skanowanie sieci, monitoring'],
+    },
+    { icon: <Server className="h-6 w-6" />, name: 'InfraDesk Server Agent', description: 'Agent dla serwerów Windows. Usługa Windows, monitoring S.M.A.R.T., RAID, Event Log, Hyper-V.', color: 'violet',
+      files: [
+        { label: 'InfraDesk Server Agent — Windows', url: '/downloads/InfraDesk%20Server%20Agent.exe', badge: 'v1.0.0', primary: true, size: '~40 MB' },
+      ],
+      notes: ['Działa jako usługa Windows (bez logowania)', 'S.M.A.R.T., RAID, Event Log, certyfikaty SSL', 'Security Audit 0-100, skanowanie sieci', 'Instalacja: agent.exe --install-service'],
     },
     { icon: <Smartphone className="h-6 w-6" />, name: 'InfraDesk TV — Android', description: 'Dashboard dla Android TV. Statystyki i zgłoszenia na dużym ekranie.', color: 'cyan',
       files: [{ label: 'APK — Android TV', url: '/downloads/InfraDesk-TV.apk', primary: true, size: '~5 MB' }],

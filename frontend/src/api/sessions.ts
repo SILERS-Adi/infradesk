@@ -41,7 +41,17 @@ export function calcWorkSeconds(entries: TimeEntry[]): number {
   return Math.max(0, Math.floor(totalMs / 1000));
 }
 
+interface SessionListResponse {
+  data: WorkSession[];
+  pagination: { total: number; page: number; limit: number; totalPages: number };
+}
+
 export const sessionsApi = {
+  getAll: async (params?: { techId?: string; clientId?: string; from?: string; to?: string }): Promise<WorkSession[]> => {
+    const { data } = await api.get<SessionListResponse>('/sessions', { params: { ...params, limit: 200 } });
+    return data.data;
+  },
+
   start: (agentRegId: string): Promise<WorkSession> =>
     api.post('/sessions', { agentRegId }).then(r => r.data),
 

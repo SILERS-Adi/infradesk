@@ -699,8 +699,9 @@ def do_register(form):
     return api_post("/agent/register", body)
 
 
-def do_metrics(token):
-    data = metrics()
+def do_metrics(token, data=None):
+    if data is None:
+        data = metrics()
     api_post("/agent/metrics", data, token=token)
 
 
@@ -2167,10 +2168,29 @@ class App:
             requests.post(f"{API_BASE}/agent/metrics", json=full_inventory(),
                           headers={"Authorization": f"Bearer {token}"}, timeout=15)
         except Exception: pass
+        cycle = 0
         while True:
             time.sleep(60)
-            try: do_metrics(token)
+            try:
+                data = metrics()
+                if cycle % 5 == 0:
+                    try:
+                        srv = server_metrics()
+                        if srv: data["serverMetrics"] = srv
+                    except Exception: pass
+                if cycle % 60 == 0:
+                    try:
+                        audit = security_audit()
+                        data.setdefault("serverMetrics", {})["securityAudit"] = audit
+                    except Exception: pass
+                if cycle % 30 == 0:
+                    try:
+                        scan = network_scan()
+                        data.setdefault("serverMetrics", {})["networkScan"] = scan
+                    except Exception: pass
+                do_metrics(token, data)
             except Exception: pass
+            cycle += 1
 
     def _update_check_loop(self):
         """Sprawdza aktualizację przy starcie, potem co 6 godzin."""
@@ -2583,10 +2603,33 @@ class _BackgroundServices:
             requests.post(f"{API_BASE}/agent/metrics", json=full_inventory(),
                           headers={"Authorization": f"Bearer {self.token}"}, timeout=15)
         except Exception: pass
+        cycle = 0
         while True:
             time.sleep(60)
-            try: do_metrics(self.token)
+            try:
+                data = metrics()
+                # Server metrics every 5 min
+                if cycle % 5 == 0:
+                    try:
+                        srv = server_metrics()
+                        if srv: data["serverMetrics"] = srv
+                    except Exception: pass
+                # Security audit every hour
+                if cycle % 60 == 0:
+                    try:
+                        audit = security_audit()
+                        data.setdefault("serverMetrics", {})["securityAudit"] = audit
+                        log.info("Security audit: score=%s", audit.get("score"))
+                    except Exception: pass
+                # Network scan every 30 min
+                if cycle % 30 == 0:
+                    try:
+                        scan = network_scan()
+                        data.setdefault("serverMetrics", {})["networkScan"] = scan
+                    except Exception: pass
+                do_metrics(self.token, data)
             except Exception: pass
+            cycle += 1
 
     def _update_check_loop(self):
         while True:
@@ -2967,6 +3010,163 @@ def server_metrics():
     return result
 
 
+def security_audit():
+    """Run 20 security checks and return score + details."""
+    WEIGHTS = {"critical": 15, "high": 10, "medium": 5, "low": 2, "info": 0}
+    checks = []
+    total_weight = 0
+
+    def _ck(cid, name, sev, cmd, pass_fn, detail_fn=None):
+        nonlocal total_weight
+        total_weight += WEIGHTS.get(sev, 0)
+        try:
+            r = subprocess.run(["powershell", "-ExecutionPolicy", "Bypass", "-Command", cmd],
+                capture_output=True, text=True, timeout=30, creationflags=_NO_WINDOW)
+            o = (r.stdout or "").strip()
+            ok = pass_fn(o)
+            detail = detail_fn(o) if detail_fn else (o[:150] if o else "")
+            checks.append({"id": cid, "name": name, "status": "pass" if ok else "fail", "severity": sev, "detail": detail})
+        except Exception as e:
+            checks.append({"id": cid, "name": name, "status": "error", "severity": sev, "detail": str(e)[:100]})
+
+    _ck("firewall", "Firewall Windows", "critical",
+        "Get-NetFirewallProfile | Select-Object -ExpandProperty Enabled",
+        lambda o: "False" not in o, lambda o: "Włączony" if "False" not in o else "Profil wyłączony!")
+    _ck("defender", "Windows Defender", "critical",
+        "(Get-MpComputerStatus).RealTimeProtectionEnabled",
+        lambda o: o == "True", lambda o: "Aktywny" if o == "True" else "Wyłączony!")
+    _ck("defender_defs", "Definicje antywirusa", "critical",
+        "((Get-Date) - (Get-MpComputerStatus).AntivirusSignatureLastUpdated).Days",
+        lambda o: o.isdigit() and int(o) < 7, lambda o: f"{o} dni temu" if o.isdigit() else "Brak danych")
+    _ck("updates", "Aktualizacje Windows (<30d)", "critical",
+        "(Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 1).InstalledOn.ToString('yyyy-MM-dd')",
+        lambda o: len(o) >= 10 and (datetime.now() - datetime.strptime(o[:10], '%Y-%m-%d')).days < 30,
+        lambda o: f"Ostatnia: {o[:10]}" if len(o) >= 10 else "Brak danych")
+    _ck("smb1", "SMBv1 wyłączony", "critical",
+        "(Get-SmbServerConfiguration).EnableSMB1Protocol",
+        lambda o: o == "False", lambda o: "Wyłączony" if o == "False" else "WŁĄCZONY!")
+    _ck("guest", "Konto Guest wyłączone", "critical",
+        "(Get-LocalUser Guest).Enabled",
+        lambda o: o == "False", lambda o: "Wyłączone" if o == "False" else "AKTYWNE!")
+    _ck("rdp_nla", "RDP NLA", "high",
+        "(Get-ItemProperty 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp' -EA SilentlyContinue).UserAuthentication",
+        lambda o: o == "1", lambda o: "NLA włączone" if o == "1" else "NLA wyłączone")
+    _ck("bitlocker", "Szyfrowanie dysków", "high",
+        "Get-BitLockerVolume -EA SilentlyContinue | Select-Object -ExpandProperty ProtectionStatus",
+        lambda o: "1" in o or "On" in o, lambda o: "Zaszyfrowane" if "1" in o or "On" in o else "Brak BitLocker")
+    _ck("password_policy", "Polityka haseł (min 8)", "high",
+        "net accounts 2>$null | Select-String 'Minimum password length'",
+        lambda o: any(c.isdigit() and int(c) >= 8 for c in re.findall(r'\d+', o)),
+        lambda o: o.strip() if o else "Brak danych")
+    _ck("lockout_policy", "Blokada konta", "high",
+        "net accounts 2>$null | Select-String 'Lockout threshold'",
+        lambda o: any(c.isdigit() and 0 < int(c) <= 10 for c in re.findall(r'\d+', o)),
+        lambda o: o.strip() if o else "Brak blokady")
+    _ck("admin_count", "Administratorzy (max 3)", "high",
+        "(Get-LocalGroupMember Administrators -EA SilentlyContinue).Count",
+        lambda o: o.isdigit() and int(o) <= 3, lambda o: f"{o} kont" if o.isdigit() else "Brak danych")
+    _ck("autorun", "Autorun wyłączony", "medium",
+        "(Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer' -Name NoDriveTypeAutoRun -EA SilentlyContinue).NoDriveTypeAutoRun",
+        lambda o: o != "" and o != "0", lambda o: "Wyłączony" if o and o != "0" else "Włączony")
+    _ck("ps_policy", "PowerShell policy", "medium",
+        "Get-ExecutionPolicy", lambda o: o in ("Restricted", "AllSigned", "RemoteSigned"), lambda o: o)
+    _ck("open_shares", "Udziały sieciowe (max 3)", "medium",
+        "(Get-SmbShare | Where-Object { $_.Name -notmatch '\\$$' }).Count",
+        lambda o: o.isdigit() and int(o) <= 3, lambda o: f"{o} udziałów" if o.isdigit() else "0")
+    _ck("event_errors", "Błędy Event Log (24h)", "medium",
+        "(Get-WinEvent -FilterHashtable @{LogName='System';Level=1,2;StartTime=(Get-Date).AddDays(-1)} -EA SilentlyContinue).Count",
+        lambda o: not o.isdigit() or int(o) < 10, lambda o: f"{o} zdarzeń" if o.isdigit() else "0")
+    _ck("cert_expiry", "Certyfikaty (30 dni)", "medium",
+        "(Get-ChildItem Cert:\\LocalMachine\\My -EA SilentlyContinue | Where-Object { $_.NotAfter -lt (Get-Date).AddDays(30) }).Count",
+        lambda o: o in ("", "0"), lambda o: f"{o} wygasa" if o and o != "0" else "OK")
+    _ck("pending_updates", "Oczekujące aktualizacje", "medium",
+        "if (Get-Command Get-WindowsUpdate -EA SilentlyContinue) { (Get-WindowsUpdate).Count } else { '0' }",
+        lambda o: o in ("0", ""), lambda o: f"{o} czeka" if o.isdigit() and o != "0" else "OK")
+
+    # Uptime
+    try:
+        days = int((time.time() - psutil.boot_time()) / 86400)
+        total_weight += WEIGHTS["low"]
+        checks.append({"id": "uptime", "name": "Uptime (<30 dni)", "severity": "low",
+            "status": "pass" if days < 30 else "fail", "detail": f"{days} dni"})
+    except: pass
+
+    # Backup
+    has_bk = load_config().get("backupMode", False)
+    total_weight += WEIGHTS["high"]
+    checks.append({"id": "backup_status", "name": "Backup InfraDesk", "severity": "high",
+        "status": "pass" if has_bk else "fail", "detail": "Aktywny" if has_bk else "Brak konfiguracji"})
+
+    # RDP
+    _ck("remote_desktop", "Remote Desktop", "info",
+        "(Get-ItemProperty 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server' -EA SilentlyContinue).fDenyTSConnections",
+        lambda o: True, lambda o: "Wyłączony" if o == "1" else "Włączony")
+
+    fail_w = sum(WEIGHTS.get(c["severity"], 0) for c in checks if c["status"] == "fail")
+    score = max(0, min(100, round(100 - (fail_w / max(total_weight, 1)) * 100)))
+    return {"score": score, "checks": checks, "timestamp": datetime.now().isoformat()[:19]}
+
+
+def network_scan():
+    """Scan local network for devices via ARP + ping + port scan."""
+    result = {"scannedAt": datetime.now().isoformat()[:19], "subnet": "", "gateway": "", "devices": []}
+    try:
+        # Gateway
+        ps = subprocess.run(["powershell", "-Command",
+            "(Get-NetRoute -DestinationPrefix '0.0.0.0/0' -EA SilentlyContinue | Select-Object -First 1).NextHop"],
+            capture_output=True, text=True, timeout=10, creationflags=_NO_WINDOW)
+        gw = ps.stdout.strip()
+        if not gw:
+            return result
+        result["gateway"] = gw
+        parts = gw.split(".")
+        if len(parts) != 4: return result
+        subnet = f"{parts[0]}.{parts[1]}.{parts[2]}"
+        result["subnet"] = f"{subnet}.0/24"
+
+        # Ping sweep + ARP
+        subprocess.run(["powershell", "-Command",
+            f"1..254 | ForEach-Object {{ Test-Connection -ComputerName '{subnet}.$_' -Count 1 -TimeoutSeconds 1 -EA SilentlyContinue | Out-Null }}"],
+            capture_output=True, timeout=120, creationflags=_NO_WINDOW)
+
+        # Parse ARP
+        arp_out = subprocess.run(["arp", "-a"], capture_output=True, text=True, timeout=10, creationflags=_NO_WINDOW).stdout
+        devices = []
+        for line in arp_out.split("\n"):
+            m = re.match(r'\s*(\d+\.\d+\.\d+\.\d+)\s+([\da-f-]+)\s+(\w+)', line.strip())
+            if m and m.group(3) == "dynamic" and m.group(1).startswith(subnet + "."):
+                ip = m.group(1)
+                mac = m.group(2).replace("-", ":").upper()
+                if mac == "FF:FF:FF:FF:FF:FF": continue
+                hostname = ""
+                try: hostname = socket.gethostbyaddr(ip)[0]
+                except: pass
+                # Quick port scan
+                open_ports = []
+                for port in [22, 80, 443, 445, 3389, 5900, 8080, 9100]:
+                    try:
+                        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        s.settimeout(0.3)
+                        if s.connect_ex((ip, port)) == 0: open_ports.append(port)
+                        s.close()
+                    except: pass
+                # Type detection
+                dtype = "unknown"
+                if ip == gw: dtype = "router"
+                elif 9100 in open_ports: dtype = "printer"
+                elif 3389 in open_ports and 445 in open_ports: dtype = "server"
+                elif 3389 in open_ports: dtype = "windows"
+                elif 22 in open_ports: dtype = "linux"
+                elif 80 in open_ports or 443 in open_ports: dtype = "network"
+                devices.append({"ip": ip, "mac": mac, "hostname": hostname, "ports": open_ports, "type": dtype})
+
+        result["devices"] = sorted(devices, key=lambda d: [int(x) for x in d["ip"].split(".")])
+        log.info("Network scan: %d devices in %s", len(devices), result["subnet"])
+    except Exception as e:
+        log.error("Network scan error: %s", e)
+    return result
+
+
 class ServerServiceLoop:
     """Headless background loop for server mode (Windows Service or --service CLI)."""
 
@@ -3080,6 +3280,21 @@ class ServerServiceLoop:
                     srv = server_metrics()
                     if srv:
                         data["serverMetrics"] = srv
+                # Security audit every 60th cycle (every hour)
+                if cycle % 60 == 0 or cycle == 0:
+                    try:
+                        audit = security_audit()
+                        data.setdefault("serverMetrics", {})["securityAudit"] = audit
+                        log.info("Security audit: score=%s", audit.get("score"))
+                    except Exception as e:
+                        log.warning("Security audit error: %s", e)
+                # Network scan every 30th cycle (every 30 min)
+                if cycle % 30 == 0:
+                    try:
+                        scan = network_scan()
+                        data.setdefault("serverMetrics", {})["networkScan"] = scan
+                    except Exception as e:
+                        log.warning("Network scan error: %s", e)
                 do_metrics(self.token, data)
             except Exception as e:
                 log.warning("Metrics error: %s", e)

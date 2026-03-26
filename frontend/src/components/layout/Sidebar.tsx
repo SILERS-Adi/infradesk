@@ -2,7 +2,8 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Building2, Monitor,
   Ticket, ChevronLeft, ChevronRight, X, MessageSquare, Bot, Briefcase, ClipboardList,
-  ShoppingCart, HelpCircle, Download, Settings, HardDrive,
+  ShoppingCart, HelpCircle, Download, Settings, HardDrive, KeyRound, Timer,
+  Receipt, Plane, Users,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useQuery } from '@tanstack/react-query';
@@ -38,7 +39,8 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
       { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-[18px] w-[18px]" /> },
     ]},
     { label: 'KLIENCI', items: [
-      { to: '/clients', label: 'Klienci', icon: <Building2 className="h-[18px] w-[18px]" /> },
+      { to: '/clients',     label: 'Klienci',    icon: <Building2 className="h-[18px] w-[18px]" /> },
+      { to: '/credentials', label: 'Dostępy',    icon: <KeyRound className="h-[18px] w-[18px]" /> },
     ]},
     { label: 'URZĄDZENIA', items: [
       { to: '/devices', label: 'Urządzenia', icon: <Monitor className="h-[18px] w-[18px]" /> },
@@ -48,7 +50,12 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
       { to: '/tickets', label: 'Zgłoszenia',  icon: <Ticket className="h-[18px] w-[18px]" />, badge: queueCount > 0 ? queueCount : undefined },
       { to: '/tasks',   label: 'Zadania',     icon: <ClipboardList className="h-[18px] w-[18px]" />, badge: myActiveTasksCount > 0 ? myActiveTasksCount : undefined },
       { to: '/orders',  label: 'Zamówienia',  icon: <ShoppingCart className="h-[18px] w-[18px]" /> },
-      { to: '/crm',     label: 'Sesje pracy', icon: <MessageSquare className="h-[18px] w-[18px]" /> },
+      { to: '/delegations', label: 'Delegacje', icon: <Plane className="h-[18px] w-[18px]" /> },
+    ]},
+    { label: 'CRM', items: [
+      { to: '/crm',      label: 'Aktywności', icon: <MessageSquare className="h-[18px] w-[18px]" /> },
+      { to: '/sessions', label: 'Sesje pracy', icon: <Timer className="h-[18px] w-[18px]" /> },
+      { to: '/billing',  label: 'Rozliczenia', icon: <Receipt className="h-[18px] w-[18px]" /> },
     ]},
     { label: 'SYSTEM', items: [
       { to: '/backups',    label: 'Kopie zapasowe', icon: <HardDrive className="h-[18px] w-[18px]" /> },
@@ -56,8 +63,8 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
       { to: '/settings',   label: 'Ustawienia',     icon: <Settings className="h-[18px] w-[18px]" /> },
     ]},
     { label: 'FIRMA', items: [
-      { to: '/my-company',           label: 'Dane firmy', icon: <Building2 className="h-[18px] w-[18px]" /> },
-      { to: '/my-company/employees', label: 'Pracownicy', icon: <Briefcase className="h-[18px] w-[18px]" /> },
+      { to: '/my-company',           label: 'Dane firmy',  icon: <Building2 className="h-[18px] w-[18px]" /> },
+      { to: '/my-company/employees', label: 'Pracownicy',  icon: <Users className="h-[18px] w-[18px]" /> },
     ]},
   ];
 

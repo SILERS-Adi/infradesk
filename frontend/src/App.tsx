@@ -34,6 +34,8 @@ import { EmployeesPage } from './pages/admin/company/EmployeesPage';
 import { TasksPage } from './pages/admin/tasks/TasksPage';
 import { OrdersPage } from './pages/admin/orders/OrdersPage';
 import { DelegationsPage } from './pages/admin/delegations/DelegationsPage';
+import { SessionsPage } from './pages/admin/sessions/SessionsPage';
+import { BillingPage } from './pages/admin/billing/BillingPage';
 
 // Portal pages
 import { PortalDashboardPage } from './pages/portal/PortalDashboardPage';
@@ -98,6 +100,8 @@ function AdminRoutes() {
         <Route path="orders" element={<OrdersPage />} />
         <Route path="delegations" element={<DelegationsPage />} />
         <Route path="crm" element={<CrmPage />} />
+        <Route path="sessions" element={<SessionsPage />} />
+        <Route path="billing" element={<BillingPage />} />
         <Route path="agents" element={<WaitingRoomPage />} />
         <Route path="faq" element={<FaqPage />} />
         <Route path="rustdesk" element={<RustDeskPage />} />

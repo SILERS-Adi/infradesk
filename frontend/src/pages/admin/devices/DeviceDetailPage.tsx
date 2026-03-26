@@ -5,10 +5,12 @@ import {
   Monitor, Copy, Check, QrCode, ExternalLink,
   Edit2, Download, User, MapPin, Wifi, Plus,
   Building2, Laptop, Cpu, CircuitBoard, HardDrive,
-  Thermometer, Clock, Radio, Activity
+  Thermometer, Clock, Radio, Activity,
+  Shield, CheckCircle2, XCircle, AlertTriangle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { devicesApi } from '../../../api/devices';
+import { agentsApi } from '../../../api/agents';
 import { credentialsApi } from '../../../api/credentials';
 import { ticketsApi } from '../../../api/tickets';
 import { activityLogsApi } from '../../../api/activityLogs';
@@ -322,10 +324,19 @@ function LocationAddress({ address, label }: { address: string; label?: string }
   );
 }
 
+type TabId = 'info' | 'security' | 'network';
+
+const TABS: { id: TabId; label: string }[] = [
+  { id: 'info', label: 'Informacje' },
+  { id: 'security', label: 'Bezpieczeństwo' },
+  { id: 'network', label: 'Sieć' },
+];
+
 export function DeviceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const qc = useQueryClient();
+  const [tab, setTab] = useState<TabId>('info');
   const [showEdit, setShowEdit] = useState(false);
   const [qrBase64, setQrBase64] = useState<string | null>(null);
   const [loadingQr, setLoadingQr] = useState(false);
@@ -360,6 +371,18 @@ export function DeviceDetailPage() {
     queryFn: () => usersApi.getAll(),
     select: (data) => data.filter(u => u.role === 'ADMIN' || u.role === 'TECHNICIAN'),
   });
+
+  const { data: agentData } = useQuery({
+    queryKey: ['agent-server-metrics', id],
+    queryFn: async () => {
+      const agents = await agentsApi.getAll();
+      const agent = agents.find(a => a.deviceId === id);
+      return agent;
+    },
+    enabled: !!id && (tab === 'security' || tab === 'network'),
+  });
+  const securityAudit = (agentData as any)?.serverMetrics?.securityAudit;
+  const networkScan = (agentData as any)?.serverMetrics?.networkScan;
 
   const updateManagerMutation = useMutation({
     mutationFn: (managerId: string | null) => devicesApi.update(id!, { managerId } as any),
@@ -433,6 +456,26 @@ export function DeviceDetailPage() {
         }
       />
 
+      {/* Tabs */}
+      <div className="flex gap-0 mb-5 rounded-2xl overflow-x-auto" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        {TABS.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className="flex-1 px-3 py-3 text-sm font-medium whitespace-nowrap transition-colors"
+            style={tab === t.id
+              ? { background: 'rgba(139,92,246,0.12)', color: '#A78BFA', borderBottom: '2px solid #A78BFA' }
+              : { color: 'rgba(255,255,255,0.4)', borderBottom: '2px solid transparent' }
+            }
+            onMouseEnter={(e) => { if (tab !== t.id) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
+            onMouseLeave={(e) => { if (tab !== t.id) e.currentTarget.style.color = 'rgba(255,255,255,0.4)'; }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'info' && (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* LEFT COLUMN */}
         <div className="lg:col-span-2 space-y-6">
@@ -786,6 +829,135 @@ export function DeviceDetailPage() {
           </Card>
         </div>
       </div>
+      )}
+
+      {tab === 'security' && (
+        <div className="space-y-5">
+          {securityAudit ? (
+            <>
+              <div className="flex items-center gap-6 p-6 rounded-[18px]" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                {/* Big circular score */}
+                <div className="relative w-[120px] h-[120px] flex-shrink-0">
+                  <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
+                    <circle cx="60" cy="60" r="52" fill="none"
+                      stroke={securityAudit.score >= 80 ? '#4ADE80' : securityAudit.score >= 50 ? '#FBBF24' : '#F87171'}
+                      strokeWidth="8" strokeLinecap="round"
+                      strokeDasharray={2 * Math.PI * 52}
+                      strokeDashoffset={2 * Math.PI * 52 * (1 - securityAudit.score / 100)}
+                      style={{ transition: 'stroke-dashoffset 0.8s ease' }} />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-[32px] font-bold text-white">{securityAudit.score}</span>
+                    <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.35)' }}>/ 100</span>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-[18px] font-bold" style={{ color: securityAudit.score >= 80 ? '#4ADE80' : securityAudit.score >= 50 ? '#FBBF24' : '#F87171' }}>
+                    {securityAudit.score >= 80 ? 'Bezpieczny' : securityAudit.score >= 50 ? 'Wymaga uwagi' : 'Zagrożony'}
+                  </h3>
+                  <p className="text-[12px] mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                    {securityAudit.checks.filter((c: any) => c.status === 'pass').length} / {securityAudit.checks.length} testów zaliczonych
+                  </p>
+                  <p className="text-[11px] mt-0.5" style={{ color: 'rgba(255,255,255,0.25)' }}>
+                    Ostatni audyt: {securityAudit.timestamp}
+                  </p>
+                </div>
+              </div>
+
+              {/* Checks list */}
+              <div className="rounded-[18px] overflow-hidden" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="px-5 py-3.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                  <h3 className="text-[13px] font-semibold text-white/70">Wyniki audytu</h3>
+                </div>
+                <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.03)' }}>
+                  {securityAudit.checks.map((check: any) => (
+                    <div key={check.id} className="flex items-center gap-3 px-5 py-3">
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ background: check.status === 'pass' ? 'rgba(34,197,94,0.12)' : check.status === 'fail' ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)' }}>
+                        {check.status === 'pass' ? <CheckCircle2 className="h-3.5 w-3.5" style={{ color: '#4ADE80' }} />
+                         : check.status === 'fail' ? <XCircle className="h-3.5 w-3.5" style={{ color: '#F87171' }} />
+                         : <AlertTriangle className="h-3.5 w-3.5" style={{ color: '#FBBF24' }} />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[13px] font-medium text-white/80">{check.name}</span>
+                          <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded"
+                            style={{ background: check.severity === 'critical' ? 'rgba(239,68,68,0.12)' : check.severity === 'high' ? 'rgba(251,146,60,0.1)' : 'rgba(255,255,255,0.04)',
+                                     color: check.severity === 'critical' ? '#F87171' : check.severity === 'high' ? '#FB923C' : 'rgba(255,255,255,0.35)' }}>
+                            {check.severity}
+                          </span>
+                        </div>
+                        <p className="text-[11px] mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{check.detail}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-16 rounded-[18px]" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <Shield className="h-10 w-10 mx-auto mb-3" style={{ color: 'rgba(255,255,255,0.1)' }} />
+              <p className="text-[13px]" style={{ color: 'rgba(255,255,255,0.4)' }}>Brak danych audytu bezpieczeństwa</p>
+              <p className="text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.2)' }}>Agent zbiera dane — pojawią się w ciągu godziny</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'network' && (
+        <div className="space-y-5">
+          {networkScan && networkScan.devices?.length > 0 ? (
+            <>
+              <div className="flex items-center gap-4 p-4 rounded-[18px]" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <Wifi className="h-5 w-5" style={{ color: '#A78BFA' }} />
+                <div>
+                  <p className="text-[14px] font-semibold text-white/80">Sieć: {networkScan.subnet}</p>
+                  <p className="text-[12px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                    {networkScan.devices.length} urządzeń · Brama: {networkScan.gateway} · Skan: {networkScan.scannedAt}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-[18px] overflow-hidden" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>IP</th>
+                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Hostname</th>
+                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>MAC</th>
+                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Typ</th>
+                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Porty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {networkScan.devices.map((d: any, i: number) => (
+                      <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                        <td className="px-4 py-2.5 text-[13px] font-mono text-white/70">{d.ip}</td>
+                        <td className="px-4 py-2.5 text-[13px] text-white/60">{d.hostname || '—'}</td>
+                        <td className="px-4 py-2.5 text-[11px] font-mono" style={{ color: 'rgba(255,255,255,0.35)' }}>{d.mac}</td>
+                        <td className="px-4 py-2.5">
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{
+                            background: d.type === 'server' ? 'rgba(139,92,246,0.12)' : d.type === 'router' ? 'rgba(96,165,250,0.12)' : d.type === 'printer' ? 'rgba(251,146,60,0.12)' : 'rgba(255,255,255,0.04)',
+                            color: d.type === 'server' ? '#A78BFA' : d.type === 'router' ? '#60A5FA' : d.type === 'printer' ? '#FB923C' : 'rgba(255,255,255,0.4)',
+                          }}>{d.type}</span>
+                        </td>
+                        <td className="px-4 py-2.5 text-[11px] font-mono" style={{ color: 'rgba(255,255,255,0.3)' }}>{d.ports?.join(', ') || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-16 rounded-[18px]" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <Wifi className="h-10 w-10 mx-auto mb-3" style={{ color: 'rgba(255,255,255,0.1)' }} />
+              <p className="text-[13px]" style={{ color: 'rgba(255,255,255,0.4)' }}>Brak danych skanowania sieci</p>
+              <p className="text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.2)' }}>Agent skanuje sieć co 30 minut</p>
+            </div>
+          )}
+        </div>
+      )}
 
       <Modal open={showEdit} onClose={() => setShowEdit(false)} size="2xl" noPadding>
         <DeviceForm

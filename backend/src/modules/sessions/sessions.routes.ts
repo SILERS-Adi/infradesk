@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { authenticate, authorize } from '../../middleware/auth';
-import { postStart, patchEnd, getByClient, postStartMobile, postPause, postResume, getActive } from './sessions.controller';
+import { postStart, patchEnd, getByClient, postStartMobile, postPause, postResume, getActive, getAll } from './sessions.controller';
 
 const router = Router();
 
+router.get('/', authenticate, authorize('ADMIN', 'TECHNICIAN'), getAll);
 router.post('/', authenticate, authorize('ADMIN', 'TECHNICIAN'), postStart);
 router.post('/mobile', authenticate, authorize('ADMIN', 'TECHNICIAN'), postStartMobile);
 router.get('/active', authenticate, authorize('ADMIN', 'TECHNICIAN'), getActive);
