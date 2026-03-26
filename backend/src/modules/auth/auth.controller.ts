@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { loginService, refreshTokenService, getMeService } from './auth.service';
+import prisma from '../../lib/prisma';
+import { signAccessToken, signRefreshToken, JwtPayload } from '../../utils/jwt';
 
 export async function login(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -18,6 +20,50 @@ export async function refresh(req: Request, res: Response, next: NextFunction): 
   } catch (err) {
     next(err);
   }
+}
+
+export async function autoLogin(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const agentToken = req.query.token as string;
+    if (!agentToken) { res.status(400).json({ error: 'token required' }); return; }
+
+    // Find agent registration by token
+    const reg = await prisma.agentRegistration.findUnique({
+      where: { agentToken },
+      select: { clientId: true, status: true, contactEmail: true },
+    });
+    if (!reg || reg.status !== 'ACTIVE' || !reg.clientId) {
+      res.status(401).json({ error: 'Invalid agent token' }); return;
+    }
+
+    // Find a user linked to this client
+    let user = reg.contactEmail
+      ? await prisma.user.findUnique({ where: { email: reg.contactEmail } })
+      : null;
+
+    if (!user) {
+      // Find any active user for this client
+      user = await prisma.user.findFirst({
+        where: { clientId: reg.clientId, isActive: true },
+        orderBy: { role: 'asc' }, // CLIENT first
+      });
+    }
+
+    if (!user) { res.status(401).json({ error: 'No user found for this client' }); return; }
+
+    const payload: JwtPayload = {
+      userId: user.id, email: user.email, role: user.role, clientId: user.clientId,
+    };
+    const accessToken = signAccessToken(payload);
+    const refreshToken = signRefreshToken(payload);
+
+    // Redirect to portal with tokens in URL hash (not query — safer)
+    const redirect = user.role === 'CLIENT' ? '/portal' : '/dashboard';
+    res.redirect(`${redirect}#autologin=${encodeURIComponent(JSON.stringify({
+      accessToken, refreshToken,
+      user: { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role, clientId: user.clientId },
+    }))}`);
+  } catch (err) { next(err); }
 }
 
 export async function me(req: Request, res: Response, next: NextFunction): Promise<void> {

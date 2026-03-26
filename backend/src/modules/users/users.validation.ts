@@ -42,6 +42,8 @@ export const updateUserSchema = z.object({
     emailOnTicketUpdate: z.boolean().optional(),
     emailOnAssignment:   z.boolean().optional(),
   }).optional(),
+  downloadPin: z.string().max(50).optional().nullable(),
+  avatarUrl: z.string().optional().nullable(),
 });
 
 export const listUsersQuerySchema = z.object({

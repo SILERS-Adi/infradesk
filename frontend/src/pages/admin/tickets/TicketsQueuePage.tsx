@@ -12,13 +12,13 @@ const PRIORITY_ORDER: Record<string, number> = {
   CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3,
 };
 
-const SOURCE_LABELS: Record<string, { label: string; icon: React.ReactNode; cls: string }> = {
-  AGENT:         { label: 'Agent',   icon: <Bot className="h-3 w-3" />,    cls: 'bg-violet-100 text-violet-700' },
-  CLIENT_PORTAL: { label: 'Portal',  icon: <Globe className="h-3 w-3" />,  cls: 'bg-blue-100 text-blue-700' },
-  PHONE:         { label: 'Telefon', icon: <Phone className="h-3 w-3" />,  cls: 'bg-green-100 text-green-700' },
-  EMAIL:         { label: 'E-mail',  icon: <Mail className="h-3 w-3" />,   cls: 'bg-amber-100 text-amber-700' },
-  QR_SCAN:       { label: 'QR',      icon: <QrCode className="h-3 w-3" />, cls: 'bg-gray-100 text-gray-600' },
-  INTERNAL:      { label: 'Wewnątr.', icon: null,                           cls: 'bg-gray-100 text-gray-600' },
+const SOURCE_LABELS: Record<string, { label: string; icon: React.ReactNode; bg: string; color: string }> = {
+  AGENT:         { label: 'Agent',   icon: <Bot className="h-3 w-3" />,    bg: 'rgba(139,92,246,0.12)',  color: '#A78BFA' },
+  CLIENT_PORTAL: { label: 'Portal',  icon: <Globe className="h-3 w-3" />,  bg: 'rgba(59,130,246,0.12)',  color: '#60A5FA' },
+  PHONE:         { label: 'Telefon', icon: <Phone className="h-3 w-3" />,  bg: 'rgba(34,197,94,0.12)',   color: '#4ADE80' },
+  EMAIL:         { label: 'E-mail',  icon: <Mail className="h-3 w-3" />,   bg: 'rgba(245,158,11,0.12)',  color: '#FBBF24' },
+  QR_SCAN:       { label: 'QR',      icon: <QrCode className="h-3 w-3" />, bg: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)' },
+  INTERNAL:      { label: 'Wewnątr.', icon: null,                           bg: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)' },
 };
 
 function timeAgo(date: string): string {
@@ -51,29 +51,32 @@ function TicketCard({ ticket, technicians }: { ticket: Ticket; technicians: User
   });
 
   const src = SOURCE_LABELS[ticket.source] ?? SOURCE_LABELS.INTERNAL;
-  const border = PRIORITY_BORDER[ticket.priority] ?? 'border-l-gray-300';
+  const border = PRIORITY_BORDER[ticket.priority] ?? 'border-l-gray-600';
 
   return (
-    <div className={`bg-white rounded-xl shadow-sm border border-gray-200 border-l-4 ${border} p-4 flex flex-col gap-3`}>
+    <div className={`rounded-xl border-l-4 ${border} p-4 flex flex-col gap-3`} style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', borderLeftWidth: '4px' }}>
       {/* Top row */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className="font-mono text-xs text-indigo-600 font-semibold">{ticket.ticketNumber}</span>
+            <span className="font-mono text-xs text-violet-400 font-semibold">{ticket.ticketNumber}</span>
             <PriorityBadge priority={ticket.priority} />
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${src.cls}`}>
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+              style={{ background: src.bg, color: src.color }}
+            >
               {src.icon}{src.label}
             </span>
           </div>
           <button
             onClick={() => navigate(`/tickets/${ticket.id}`)}
-            className="text-sm font-semibold text-gray-900 hover:text-indigo-600 text-left line-clamp-2"
+            className="text-sm font-semibold text-white/85 hover:text-violet-400 text-left line-clamp-2 transition-colors"
           >
             {ticket.title}
           </button>
         </div>
         <div className="text-right flex-shrink-0">
-          <div className="text-xs text-gray-500 flex items-center gap-1">
+          <div className="text-xs flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
             <Clock className="h-3 w-3" />
             {timeAgo(ticket.createdAt)}
           </div>
@@ -81,21 +84,22 @@ function TicketCard({ ticket, technicians }: { ticket: Ticket; technicians: User
       </div>
 
       {/* Meta */}
-      <div className="flex items-center gap-3 text-xs text-gray-500 flex-wrap">
-        <span className="font-medium text-gray-700">{ticket.client?.name ?? '—'}</span>
+      <div className="flex items-center gap-3 text-xs flex-wrap" style={{ color: 'rgba(255,255,255,0.4)' }}>
+        <span className="font-medium" style={{ color: 'rgba(255,255,255,0.6)' }}>{ticket.client?.name ?? '—'}</span>
         {ticket.device && <span>🖥 {ticket.device.name}</span>}
         {ticket.description && (
-          <span className="truncate max-w-xs text-gray-400">{ticket.description.substring(0, 80)}…</span>
+          <span className="truncate max-w-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{ticket.description.substring(0, 80)}…</span>
         )}
       </div>
 
       {/* Assign */}
-      <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
-        <UserCheck className="h-4 w-4 text-gray-400 flex-shrink-0" />
+      <div className="flex items-center gap-2 pt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+        <UserCheck className="h-4 w-4 flex-shrink-0" style={{ color: 'rgba(255,255,255,0.3)' }} />
         {assigning ? (
           <select
             autoFocus
-            className="flex-1 text-sm border border-indigo-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            className="flex-1 text-sm rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-violet-500"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
             defaultValue=""
             onBlur={() => setAssigning(false)}
             onChange={e => {
@@ -114,7 +118,7 @@ function TicketCard({ ticket, technicians }: { ticket: Ticket; technicians: User
           <button
             onClick={() => setAssigning(true)}
             disabled={assignMutation.isPending}
-            className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+            className="text-sm text-violet-400 hover:text-violet-300 font-medium transition-colors"
           >
             {assignMutation.isPending ? 'Przydzielam…' : 'Przydziel pracownika'}
           </button>
@@ -149,24 +153,25 @@ export function TicketsQueuePage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Inbox className="h-6 w-6 text-indigo-500" />
+          <h1 className="text-2xl font-bold text-white/85 flex items-center gap-2">
+            <Inbox className="h-6 w-6 text-violet-400" />
             Poczekalnia zgłoszeń
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <p className="text-sm mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
             Nowe zgłoszenia bez przydzielonego pracownika
           </p>
         </div>
         <div className="flex items-center gap-3">
           {tickets.length > 0 && (
-            <span className="bg-red-100 text-red-700 text-sm font-bold px-3 py-1 rounded-full">
+            <span className="text-sm font-bold px-3 py-1 rounded-full" style={{ background: 'rgba(239,68,68,0.12)', color: '#F87171' }}>
               {tickets.length} oczekuje
             </span>
           )}
           <button
             onClick={() => refetch()}
             disabled={isFetching}
-            className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+            className="p-2 rounded-lg transition-colors hover:text-violet-400 hover:bg-white/[0.03]"
+            style={{ color: 'rgba(255,255,255,0.4)' }}
             title="Odśwież"
           >
             <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
@@ -176,12 +181,12 @@ export function TicketsQueuePage() {
 
       {/* Content */}
       {isLoading ? (
-        <div className="flex items-center justify-center h-48 text-gray-400">Ładowanie…</div>
+        <div className="flex items-center justify-center h-48" style={{ color: 'rgba(255,255,255,0.3)' }}>Ładowanie…</div>
       ) : sorted.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-64 text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">
-          <Inbox className="h-12 w-12 mb-3 text-gray-300" />
-          <p className="font-medium text-gray-500">Brak oczekujących zgłoszeń</p>
-          <p className="text-sm mt-1">Wszystkie nowe zgłoszenia zostały przydzielone</p>
+        <div className="flex flex-col items-center justify-center h-64 rounded-xl" style={{ background: 'rgba(255,255,255,0.025)', border: '1px dashed rgba(255,255,255,0.08)' }}>
+          <Inbox className="h-12 w-12 mb-3" style={{ color: 'rgba(255,255,255,0.15)' }} />
+          <p className="font-medium" style={{ color: 'rgba(255,255,255,0.4)' }}>Brak oczekujących zgłoszeń</p>
+          <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>Wszystkie nowe zgłoszenia zostały przydzielone</p>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">

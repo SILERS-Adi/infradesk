@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { startSession, endSession, getSessionsByClient } from './sessions.service';
+import { startSession, endSession, getSessionsByClient, startMobileSession, pauseSession, resumeSession, getActiveTechSession } from './sessions.service';
 
 export async function postStart(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -24,5 +24,33 @@ export async function getByClient(req: Request, res: Response, next: NextFunctio
   try {
     const sessions = await getSessionsByClient(req.params.clientId);
     res.json(sessions);
+  } catch (err) { next(err); }
+}
+
+export async function postStartMobile(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const session = await startMobileSession(req.user!.userId, req.body);
+    res.status(201).json(session);
+  } catch (err) { next(err); }
+}
+
+export async function postPause(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const session = await pauseSession(req.params.id, req.user!.userId);
+    res.json(session);
+  } catch (err) { next(err); }
+}
+
+export async function postResume(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const session = await resumeSession(req.params.id, req.user!.userId);
+    res.json(session);
+  } catch (err) { next(err); }
+}
+
+export async function getActive(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const session = await getActiveTechSession(req.user!.userId);
+    res.json(session);
   } catch (err) { next(err); }
 }

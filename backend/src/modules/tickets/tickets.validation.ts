@@ -1,16 +1,17 @@
 import { z } from 'zod';
 
 export const createTicketSchema = z.object({
-  clientId: z.string().uuid(),
-  locationId: z.string().uuid(),
+  clientId: z.string().uuid().optional(),
+  locationId: z.string().uuid().optional(),
   deviceId: z.string().uuid().optional().nullable(),
-  type: z.enum(['INCIDENT', 'REQUEST', 'MAINTENANCE', 'INSTALLATION', 'OTHER']).default('INCIDENT'),
+  type: z.enum(['INCIDENT', 'REQUEST', 'MAINTENANCE', 'INSTALLATION', 'REKLAMACJA', 'OTHER']).default('INCIDENT'),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).default('MEDIUM'),
   source: z.enum(['CLIENT_PORTAL', 'INTERNAL', 'PHONE', 'EMAIL', 'QR_SCAN', 'AGENT', 'IN_PERSON', 'MESSAGE']).default('INTERNAL'),
   title: z.string().min(1).max(500),
   description: z.string().min(1),
   dueAt: z.string().datetime().optional().nullable(),
   billedInContract: z.boolean().optional().default(false),
+  serviceMode: z.enum(['REMOTE', 'ONSITE']).optional().nullable(),
   assignedToUserId: z.string().uuid().optional().nullable(),
   reporterName: z.string().optional(),
   reporterPhone: z.string().optional(),
@@ -35,6 +36,7 @@ export const addCommentSchema = z.object({
 
 export const assignTicketSchema = z.object({
   assignedToUserId: z.string().uuid().nullable(),
+  serviceMode: z.enum(['REMOTE', 'ONSITE']).optional().nullable(),
 });
 
 export const changeStatusSchema = z.object({

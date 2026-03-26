@@ -12,10 +12,10 @@ const userSelect = {
   email: true,
   phone: true,
   role: true,
-  roles: true,
   clientId: true,
-  permissions: true,
   isActive: true,
+  downloadPin: true,
+  avatarUrl: true,
   lastLoginAt: true,
   createdAt: true,
   updatedAt: true,
@@ -86,8 +86,6 @@ export async function createUser(data: CreateUserInput, performedByUserId: strin
 
   const passwordHash = await bcrypt.hash(data.password, 12);
 
-  const roles = data.roles?.length ? data.roles as Role[] : [data.role as Role];
-
   const user = await prisma.user.create({
     data: {
       firstName: data.firstName,
@@ -96,10 +94,8 @@ export async function createUser(data: CreateUserInput, performedByUserId: strin
       phone: data.phone,
       passwordHash,
       role: data.role as Role,
-      roles,
       clientId: data.clientId,
       isActive: data.isActive,
-      permissions: data.permissions ?? undefined,
     },
     select: userSelect,
   });
@@ -136,30 +132,14 @@ export async function updateUser(id: string, data: UpdateUserInput, performedByU
   if (data.phone     !== undefined) updateData.phone     = data.phone;
   if (data.clientId  !== undefined) updateData.clientId  = data.clientId;
   if (data.isActive  !== undefined) updateData.isActive  = data.isActive;
-  if (data.permissions !== undefined) updateData.permissions = data.permissions;
   if (data.notificationSettings !== undefined) updateData.notificationSettings = data.notificationSettings;
+  if (data.downloadPin !== undefined) updateData.downloadPin = data.downloadPin;
+  if (data.avatarUrl !== undefined) updateData.avatarUrl = data.avatarUrl;
+  if (data.role !== undefined) updateData.role = data.role as Role;
 
   if (data.password) {
     updateData.passwordHash = await bcrypt.hash(data.password, 12);
   }
-
-  // Determine final roles — Prisma requires { set: [...] } for array update
-  let finalRoles: Role[];
-  if (data.roles?.length) {
-    finalRoles = data.roles as Role[];
-  } else if (data.role) {
-    finalRoles = [data.role as Role];
-  } else {
-    finalRoles = existing.roles as Role[];
-  }
-  // Primary role: highest privilege in finalRoles
-  const priority: Role[] = ['ADMIN', 'TECHNICIAN', 'CLIENT'];
-  const primaryRole = data.role as Role | undefined
-    ?? priority.find(r => finalRoles.includes(r))
-    ?? finalRoles[0];
-
-  updateData.role  = primaryRole;
-  updateData.roles = { set: finalRoles };
 
   const user = await prisma.user.update({
     where: { id },

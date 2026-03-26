@@ -84,6 +84,40 @@ export async function postPushUpdate(req: Request, res: Response, next: NextFunc
   } catch (err) { next(err); }
 }
 
+export async function postWindowsUpdate(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { notifyAgent } = await import('../../utils/websocket');
+    const reg = await prisma.agentRegistration.findUnique({ where: { id: req.params.id } });
+    if (!reg) { res.status(404).json({ error: 'Not found' }); return; }
+    const { scheduleTime } = req.body as { scheduleTime?: string };
+    notifyAgent(reg.agentToken, { type: 'windows_update', scheduleTime: scheduleTime || null });
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+}
+
+export async function postRestartService(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { notifyAgent } = await import('../../utils/websocket');
+    const reg = await prisma.agentRegistration.findUnique({ where: { id: req.params.id } });
+    if (!reg) { res.status(404).json({ error: 'Not found' }); return; }
+    const { serviceName } = req.body as { serviceName: string };
+    if (!serviceName) { res.status(400).json({ error: 'serviceName required' }); return; }
+    notifyAgent(reg.agentToken, { type: 'restart_service', serviceName });
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+}
+
+export async function postSystemReboot(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { notifyAgent } = await import('../../utils/websocket');
+    const reg = await prisma.agentRegistration.findUnique({ where: { id: req.params.id } });
+    if (!reg) { res.status(404).json({ error: 'Not found' }); return; }
+    const { delay } = req.body as { delay?: number };
+    notifyAgent(reg.agentToken, { type: 'system_reboot', delay: delay ?? 60 });
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+}
+
 export async function deleteReg(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     await deleteRegistration(req.params.id);

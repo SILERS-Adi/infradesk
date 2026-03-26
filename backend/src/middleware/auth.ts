@@ -33,7 +33,7 @@ export function authorize(...roles: string[]) {
       return;
     }
     if (!roles.includes(req.user.role)) {
-      res.status(403).json({ error: 'Insufficient permissions' });
+      res.status(403).json({ error: `Insufficient permissions — your role: ${req.user.role}, required: ${roles.join(' or ')}` });
       return;
     }
     next();

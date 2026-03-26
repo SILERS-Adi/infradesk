@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { HelpCircle, Plus, Trash2, Save, GripVertical, ChevronDown, ChevronUp, Monitor, Bot } from 'lucide-react';
 import apiClient from '../../../api/client';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 
 type Visibility = 'panel' | 'agent' | 'both';
@@ -16,10 +17,10 @@ const VISIBILITY_OPTIONS: { value: Visibility; label: string; icon: React.ReactN
   { value: 'both',   label: 'Panel i Agent', icon: <><Monitor className="h-3.5 w-3.5" /><Bot className="h-3.5 w-3.5" /></>, desc: 'Widoczne wszędzie' },
 ];
 
-const VISIBILITY_BADGE: Record<Visibility, { label: string; cls: string }> = {
-  panel: { label: 'Panel',        cls: 'bg-indigo-50 text-indigo-700' },
-  agent: { label: 'Agent',        cls: 'bg-emerald-50 text-emerald-700' },
-  both:  { label: 'Panel+Agent',  cls: 'bg-amber-50 text-amber-700' },
+const VISIBILITY_BADGE: Record<Visibility, { label: string; bg: string; color: string }> = {
+  panel: { label: 'Panel',       bg: 'rgba(99,102,241,0.12)', color: '#818CF8' },
+  agent: { label: 'Agent',       bg: 'rgba(16,185,129,0.12)', color: '#34D399' },
+  both:  { label: 'Panel+Agent', bg: 'rgba(234,179,8,0.12)',  color: '#FBBF24' },
 };
 
 function useFaq() {
@@ -31,7 +32,6 @@ function useFaq() {
         ? data
         : data?.value ? (() => { try { return JSON.parse(data.value); } catch { return []; } })()
         : [];
-      // migrate old entries without visibility
       return arr.map(it => ({ ...it, visibility: it.visibility ?? 'both' }));
     },
   });
@@ -95,15 +95,15 @@ export function FaqPage() {
         subtitle="Baza wiedzy widoczna w panelu i/lub aplikacji agenta"
       />
 
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+      <Card>
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-            <HelpCircle className="h-5 w-5 text-brand-500" />
+          <h2 className="text-[14px] font-semibold text-white/80 flex items-center gap-2">
+            <HelpCircle className="h-5 w-5 text-violet-400" />
             Wpisy FAQ
           </h2>
           <button
             onClick={addItem}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:text-brand-700 transition-colors"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-violet-400 hover:text-violet-300 transition-colors"
           >
             <Plus className="h-4 w-4" />
             Dodaj wpis
@@ -111,9 +111,9 @@ export function FaqPage() {
         </div>
 
         {isLoading ? (
-          <p className="text-sm text-gray-400 py-4 text-center">Ładowanie...</p>
+          <p className="text-sm py-4 text-center" style={{ color: 'rgba(255,255,255,0.4)' }}>Ładowanie...</p>
         ) : list.length === 0 ? (
-          <div className="text-center py-10 text-gray-400">
+          <div className="text-center py-10" style={{ color: 'rgba(255,255,255,0.3)' }}>
             <HelpCircle className="h-10 w-10 mx-auto mb-2 opacity-30" />
             <p className="text-sm">Brak wpisów — kliknij "Dodaj wpis"</p>
           </div>
@@ -122,58 +122,61 @@ export function FaqPage() {
             {list.map((item, idx) => {
               const badge = VISIBILITY_BADGE[item.visibility ?? 'both'];
               return (
-                <div key={idx} className="border border-gray-200 rounded-xl overflow-hidden">
+                <div key={idx} className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
                   {/* Header */}
                   <div
-                    className="flex items-center gap-2 px-4 py-3 bg-gray-50 cursor-pointer select-none hover:bg-gray-100 transition-colors"
+                    className="flex items-center gap-2 px-4 py-3 cursor-pointer select-none transition-colors"
+                    style={{ background: 'rgba(255,255,255,0.02)' }}
                     onClick={() => setExpanded(expanded === idx ? null : idx)}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}
                   >
-                    <GripVertical className="h-4 w-4 text-gray-300 flex-shrink-0" />
-                    <span className="flex-1 text-sm font-medium text-gray-800 truncate">
-                      {item.q || <span className="text-gray-400 italic">Nowe pytanie</span>}
+                    <GripVertical className="h-4 w-4 flex-shrink-0" style={{ color: 'rgba(255,255,255,0.15)' }} />
+                    <span className="flex-1 text-sm font-medium truncate" style={{ color: 'rgba(255,255,255,0.8)' }}>
+                      {item.q || <span style={{ color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>Nowe pytanie</span>}
                     </span>
-                    {/* Visibility badge */}
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${badge.cls}`}>
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0"
+                      style={{ background: badge.bg, color: badge.color }}>
                       {badge.label}
                     </span>
                     <div className="flex items-center gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
                       <button onClick={() => moveUp(idx)} disabled={idx === 0}
-                        className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 transition-colors">
-                        <ChevronUp className="h-3.5 w-3.5 text-gray-500" />
+                        className="p-1 rounded transition-colors hover:bg-white/[0.06] disabled:opacity-30">
+                        <ChevronUp className="h-3.5 w-3.5" style={{ color: 'rgba(255,255,255,0.4)' }} />
                       </button>
                       <button onClick={() => moveDown(idx)} disabled={idx === list.length - 1}
-                        className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 transition-colors">
-                        <ChevronDown className="h-3.5 w-3.5 text-gray-500" />
+                        className="p-1 rounded transition-colors hover:bg-white/[0.06] disabled:opacity-30">
+                        <ChevronDown className="h-3.5 w-3.5" style={{ color: 'rgba(255,255,255,0.4)' }} />
                       </button>
                       <button onClick={() => remove(idx)}
-                        className="p-1 rounded hover:bg-red-100 text-red-400 hover:text-red-600 transition-colors">
-                        <Trash2 className="h-3.5 w-3.5" />
+                        className="p-1 rounded transition-colors hover:bg-red-500/10">
+                        <Trash2 className="h-3.5 w-3.5" style={{ color: 'rgba(239,68,68,0.6)' }} />
                       </button>
                     </div>
                     {expanded === idx
-                      ? <ChevronUp className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                      : <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      ? <ChevronUp className="h-4 w-4 flex-shrink-0" style={{ color: 'rgba(255,255,255,0.3)' }} />
+                      : <ChevronDown className="h-4 w-4 flex-shrink-0" style={{ color: 'rgba(255,255,255,0.3)' }} />
                     }
                   </div>
 
                   {/* Edit form */}
                   {expanded === idx && (
-                    <div className="p-4 space-y-4 border-t border-gray-100">
-
+                    <div className="p-4 space-y-4" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
                       {/* Visibility selector */}
                       <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-2">Widoczność</label>
+                        <label className="block text-xs font-medium mb-2" style={{ color: 'rgba(255,255,255,0.4)' }}>Widoczność</label>
                         <div className="flex gap-2">
                           {VISIBILITY_OPTIONS.map(opt => (
                             <button
                               key={opt.value}
                               type="button"
                               onClick={() => update(idx, 'visibility', opt.value)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+                              style={
                                 item.visibility === opt.value
-                                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                                  : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
-                              }`}
+                                  ? { background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.3)', color: '#A78BFA' }
+                                  : { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)' }
+                              }
                               title={opt.desc}
                             >
                               {opt.icon}
@@ -184,23 +187,25 @@ export function FaqPage() {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Pytanie</label>
+                        <label className="block text-xs font-medium mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Pytanie</label>
                         <input
                           type="text"
                           value={item.q}
                           onChange={e => update(idx, 'q', e.target.value)}
                           placeholder="np. Co zrobić gdy komputer się zawiesił?"
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                          className="w-full px-3 py-2 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+                          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Odpowiedź</label>
+                        <label className="block text-xs font-medium mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Odpowiedź</label>
                         <textarea
                           value={item.a}
                           onChange={e => update(idx, 'a', e.target.value)}
                           rows={4}
                           placeholder="Szczegółowa odpowiedź / instrukcja..."
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 resize-none"
+                          className="w-full px-3 py-2 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 resize-none"
+                          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
                         />
                       </div>
                     </div>
@@ -212,7 +217,7 @@ export function FaqPage() {
         )}
 
         {(isDirty || list.length > 0) && (
-          <div className="flex justify-end pt-4 mt-2 border-t border-gray-100">
+          <div className="flex justify-end pt-4 mt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
             <Button
               onClick={() => saveMutation.mutate(list)}
               loading={saveMutation.isPending}
@@ -223,7 +228,7 @@ export function FaqPage() {
             </Button>
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

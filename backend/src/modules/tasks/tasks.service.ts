@@ -15,6 +15,7 @@ const taskSelect = {
   dueAt: true,
   completedAt: true,
   notes: true,
+  travelKm: true,
   createdAt: true,
   updatedAt: true,
   ticket: {
@@ -23,7 +24,9 @@ const taskSelect = {
       ticketNumber: true,
       title: true,
       priority: true,
+      serviceMode: true,
       client: { select: { id: true, name: true } },
+      device: { select: { id: true, name: true, rustdeskId: true } },
     },
   },
   assignedTo: { select: { id: true, firstName: true, lastName: true, email: true } },

@@ -1,7 +1,8 @@
+import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
-import { AuthProvider } from './store/authStore';
+import { AuthProvider, useAuth } from './store/authStore';
 
 // Layouts
 import { AppLayout } from './components/layout/AppLayout';
@@ -41,6 +42,7 @@ import { PortalDevicesPage } from './pages/portal/PortalDevicesPage';
 import { PortalTicketsPage } from './pages/portal/PortalTicketsPage';
 import { PortalNewRequestPage } from './pages/portal/PortalNewRequestPage';
 import { PortalTicketDetailPage } from './pages/portal/PortalTicketDetailPage';
+import { PortalOrdersPage } from './pages/portal/PortalOrdersPage';
 
 // QR
 import { QrPage } from './pages/qr/QrPage';
@@ -50,6 +52,21 @@ import { TvDashboardPage } from './pages/tv/TvDashboardPage';
 
 // Downloads
 import { DownloadsPage } from './pages/admin/DownloadsPage';
+import { SettingsPage } from './pages/admin/SettingsPage';
+import { BackupPage } from './pages/admin/BackupPage';
+import { PublicDownloadsPage } from './pages/public/PublicDownloadsPage';
+
+// Mobile pages
+import { MobileLayout } from './components/layout/MobileLayout';
+import { MobileDashboardPage } from './pages/mobile/MobileDashboardPage';
+import { MobileTicketsPage } from './pages/mobile/MobileTicketsPage';
+import { MobileTicketDetailPage } from './pages/mobile/MobileTicketDetailPage';
+import { MobileScanPage } from './pages/mobile/MobileScanPage';
+import { MobileDevicesPage } from './pages/mobile/MobileDevicesPage';
+import { MobileOrdersPage } from './pages/mobile/MobileOrdersPage';
+import { MobileSearchPage } from './pages/mobile/MobileSearchPage';
+import { MobileTasksPage } from './pages/mobile/MobileTasksPage';
+import { MobileAgentsPage } from './pages/mobile/MobileAgentsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -84,9 +101,10 @@ function AdminRoutes() {
         <Route path="agents" element={<WaitingRoomPage />} />
         <Route path="faq" element={<FaqPage />} />
         <Route path="rustdesk" element={<RustDeskPage />} />
-        <Route path="settings" element={<div className="text-sm text-gray-500 p-6">Ustawienia — wkrótce dostępne</div>} />
+        <Route path="settings" element={<SettingsPage />} />
         <Route path="my-company" element={<MyCompanyPage />} />
         <Route path="my-company/employees" element={<EmployeesPage />} />
+        <Route path="backups" element={<BackupPage />} />
         <Route path="downloads" element={<DownloadsPage />} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />
       </Routes>
@@ -104,11 +122,52 @@ function PortalRoutes() {
         <Route path="tickets" element={<PortalTicketsPage />} />
         <Route path="tickets/:id" element={<PortalTicketDetailPage />} />
         <Route path="new-request" element={<PortalNewRequestPage />} />
+        <Route path="orders" element={<PortalOrdersPage />} />
         <Route path="account" element={<div className="text-sm text-gray-500">Moje konto — wkrótce</div>} />
         <Route path="*" element={<Navigate to="/portal" replace />} />
       </Routes>
     </PortalLayout>
   );
+}
+
+function MobileRoutes() {
+  return (
+    <MobileLayout>
+      <Routes>
+        <Route index element={<MobileDashboardPage />} />
+        <Route path="tasks" element={<MobileTasksPage />} />
+        <Route path="tickets" element={<MobileTicketsPage />} />
+        <Route path="tickets/:id" element={<MobileTicketDetailPage />} />
+        <Route path="devices" element={<MobileDevicesPage />} />
+        <Route path="orders" element={<MobileOrdersPage />} />
+        <Route path="search" element={<MobileSearchPage />} />
+        <Route path="scan" element={<MobileScanPage />} />
+        <Route path="agents" element={<MobileAgentsPage />} />
+        <Route path="*" element={<Navigate to="/m" replace />} />
+      </Routes>
+    </MobileLayout>
+  );
+}
+
+function AutoLoginHandler() {
+  const { setTokens, setUser } = useAuth();
+  const processed = React.useRef(false);
+  React.useEffect(() => {
+    if (processed.current) return;
+    const hash = window.location.hash;
+    if (hash.startsWith('#autologin=')) {
+      processed.current = true;
+      try {
+        const data = JSON.parse(decodeURIComponent(hash.slice('#autologin='.length)));
+        if (data.accessToken && data.refreshToken && data.user) {
+          setTokens(data.accessToken, data.refreshToken);
+          setUser(data.user);
+          window.location.hash = '';
+        }
+      } catch (e) { console.error('Auto-login parse error:', e); }
+    }
+  }, [setTokens, setUser]);
+  return null;
 }
 
 export default function App() {
@@ -123,11 +182,14 @@ export default function App() {
               style: { fontSize: '14px' },
             }}
           />
+          <AutoLoginHandler />
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/pobieranie" element={<PublicDownloadsPage />} />
             <Route path="/tv" element={<TvDashboardPage />} />
             <Route path="/qr/:qrCodeValue" element={<QrPage />} />
             <Route path="/portal/*" element={<PortalRoutes />} />
+            <Route path="/m/*" element={<MobileRoutes />} />
             <Route path="/*" element={<AdminRoutes />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Routes>

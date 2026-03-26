@@ -16,9 +16,18 @@ import { Textarea } from '../../components/ui/Textarea';
 import { Button } from '../../components/ui/Button';
 import { getErrorMessage } from '../../utils/helpers';
 
+const TICKET_TYPE_OPTIONS = [
+  { value: 'REQUEST', label: 'Zgłoszenie serwisowe' },
+  { value: 'INCIDENT', label: 'Awaria / Incydent' },
+  { value: 'REKLAMACJA', label: 'Reklamacja' },
+  { value: 'MAINTENANCE', label: 'Konserwacja' },
+  { value: 'OTHER', label: 'Inne' },
+];
+
 const schema = z.object({
   locationId: z.string().min(1, 'Wybierz lokalizację'),
   deviceId: z.string().optional(),
+  type: z.string().min(1, 'Wybierz typ zgłoszenia'),
   title: z.string().min(3, 'Tytuł jest wymagany (min 3 znaki)'),
   description: z.string().min(10, 'Opis jest wymagany (min 10 znaków)'),
 });
@@ -30,6 +39,7 @@ export function PortalNewRequestPage() {
 
   const { register, handleSubmit, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
+    defaultValues: { type: 'REQUEST' },
   });
   const locationId = watch('locationId');
 
@@ -48,7 +58,7 @@ export function PortalNewRequestPage() {
     mutationFn: (data: FormData) => ticketsApi.create({
       ...data,
       clientId: user?.clientId,
-      type: 'REQUEST',
+      type: data.type as any,
       priority: 'MEDIUM',
       source: 'CLIENT_PORTAL',
       deviceId: data.deviceId || undefined,
@@ -65,6 +75,13 @@ export function PortalNewRequestPage() {
       <PageHeader title="Nowe zgłoszenie" back="/portal" />
       <Card>
         <form onSubmit={handleSubmit(d => mutation.mutate(d))} className="space-y-4">
+          <Select
+            label="Typ zgłoszenia *"
+            placeholder="Wybierz typ"
+            options={TICKET_TYPE_OPTIONS}
+            {...register('type')}
+            error={errors.type?.message}
+          />
           <Select
             label="Lokalizacja *"
             placeholder="Wybierz lokalizację"

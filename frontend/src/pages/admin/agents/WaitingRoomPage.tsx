@@ -2,26 +2,31 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
-import { Monitor, Check, Trash2, Wifi, WifiOff, Clock, Download, ChevronDown, ChevronUp, Cpu, HardDrive, Network, Package, RefreshCw } from 'lucide-react';
-import api from '../../../api/client';
+import { Monitor, Check, Trash2, Wifi, WifiOff, Clock, ChevronDown, ChevronUp, Cpu, HardDrive, Network, Package, RefreshCw, Search } from 'lucide-react';
 import { agentsApi, AgentRegistration, InstalledSoftware, DiskInfo, NetworkIface } from '../../../api/agents';
-import { sessionsApi, WorkSession } from '../../../api/sessions';
 import { clientsApi } from '../../../api/clients';
 import { devicesApi } from '../../../api/devices';
 import { Button } from '../../../components/ui/Button';
 import { Select } from '../../../components/ui/Select';
-import { FloatingSessionTimer } from '../../../components/ui/FloatingSessionTimer';
 import { getErrorMessage } from '../../../utils/helpers';
 import { clsx } from 'clsx';
 
+/* ── helper: dark glass card ─────────────────────────────── */
+const glass = 'rounded-xl border' as const;
+const glassStyle: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.025)',
+  borderColor: 'rgba(255,255,255,0.06)',
+};
+
+/* ── MetricBar ───────────────────────────────────────────── */
 function MetricBar({ value, label }: { value?: number; label: string }) {
   if (value == null) return null;
   const pct = Math.round(value);
   const color = pct > 90 ? 'bg-red-500' : pct > 70 ? 'bg-amber-400' : 'bg-emerald-500';
   return (
-    <div className="flex items-center gap-2 text-xs text-gray-600">
+    <div className="flex items-center gap-2 text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
       <span className="w-12 shrink-0">{label}</span>
-      <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
         <div className={clsx('h-full rounded-full transition-all', color)} style={{ width: `${pct}%` }} />
       </div>
       <span className="w-8 text-right font-medium">{pct}%</span>
@@ -29,68 +34,91 @@ function MetricBar({ value, label }: { value?: number; label: string }) {
   );
 }
 
+/* ── InfoRow ─────────────────────────────────────────────── */
 function InfoRow({ label, value }: { label: string; value?: string | number | null }) {
   if (!value && value !== 0) return null;
   return (
     <div className="flex gap-2 text-xs">
-      <span className="text-gray-400 w-28 shrink-0">{label}</span>
-      <span className="text-gray-800 font-medium break-all">{value}</span>
+      <span className="w-28 shrink-0" style={{ color: 'rgba(255,255,255,0.3)' }}>{label}</span>
+      <span className="font-medium break-all" style={{ color: 'rgba(255,255,255,0.8)' }}>{value}</span>
     </div>
   );
 }
 
-function ConnectButton({ regId, rustdeskId, hostname, onSessionStart }: {
-  regId: string;
-  rustdeskId: string;
-  hostname?: string;
-  onSessionStart: (session: WorkSession, hostname: string) => void;
-}) {
-  const [loading, setLoading] = useState(false);
-
-  const connect = async () => {
-    setLoading(true);
-    try {
-      const [connectRes, session] = await Promise.all([
-        api.post(`/agent/${regId}/connect`),
-        sessionsApi.start(regId),
-      ]);
-      const { password } = connectRes.data;
-      window.open(`rustdesk://connect/${rustdeskId}?password=${password}`, '_blank');
-      onSessionStart(session, hostname ?? rustdeskId);
-    } catch {
-      toast.error('Błąd połączenia RustDesk');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+/* ── Version Badge ───────────────────────────────────────── */
+function VersionBadge({ appVersion, latestVersion }: { appVersion?: string | null; latestVersion?: string }) {
+  if (!appVersion) {
+    return (
+      <span
+        className="inline-flex items-center text-[10px] font-semibold rounded-full px-2 py-0.5 border"
+        style={{ background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)' }}
+      >
+        Brak wersji
+      </span>
+    );
+  }
+  const isCurrent = !latestVersion || appVersion === latestVersion;
+  if (isCurrent) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 border"
+        style={{ background: 'rgba(34,197,94,0.12)', borderColor: 'rgba(34,197,94,0.25)', color: '#4ADE80' }}
+      >
+        v{appVersion} &#10003;
+      </span>
+    );
+  }
   return (
-    <button
-      onClick={connect}
-      disabled={loading}
-      className="inline-flex items-center gap-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+    <span
+      className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 border"
+      style={{ background: 'rgba(239,68,68,0.12)', borderColor: 'rgba(239,68,68,0.25)', color: '#F87171' }}
     >
-      <Monitor className="h-3.5 w-3.5" />
-      {loading ? 'Łączenie...' : 'Połącz'}
-    </button>
+      v{appVersion} &#10007; (akt. {latestVersion})
+    </span>
   );
 }
 
-function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete, onSessionStart }: {
+/* ── AgentRow ────────────────────────────────────────────── */
+function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
   reg: AgentRegistration;
   latestVersion?: string;
   onApprove: (reg: AgentRegistration) => void;
   onQuickApprove: (reg: AgentRegistration) => void;
   onDelete: (id: string) => void;
-  onSessionStart: (session: WorkSession, hostname: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [softwareSearch, setSoftwareSearch] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showWinUpdate, setShowWinUpdate] = useState(false);
+  const [winUpdateMode, setWinUpdateMode] = useState<'reboot' | 'schedule'>('reboot');
+  const [winUpdateTime, setWinUpdateTime] = useState('02:00');
+
+  const qc = useQueryClient();
+  const [updateSent, setUpdateSent] = useState(false);
 
   const pushUpdateMutation = useMutation({
     mutationFn: () => agentsApi.pushUpdate(reg.id),
-    onSuccess: () => toast.success('Komenda aktualizacji wysłana'),
+    onSuccess: () => {
+      setUpdateSent(true);
+      toast.success('Komenda aktualizacji wysłana — agent restartuje się za chwilę');
+      // Po 30s odśwież listę żeby zobaczyć nową wersję
+      setTimeout(() => {
+        qc.invalidateQueries({ queryKey: ['agents'] });
+        setUpdateSent(false);
+      }, 30_000);
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+
+  const winUpdateMutation = useMutation({
+    mutationFn: () => agentsApi.windowsUpdate(reg.id, winUpdateMode === 'schedule' ? winUpdateTime : undefined),
+    onSuccess: () => { toast.success('Aktualizacja Windows wysłana'); setShowWinUpdate(false); },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+
+  const wakeMutation = useMutation({
+    mutationFn: () => agentsApi.wake(reg.id),
+    onSuccess: () => toast.success('Pakiet WoL wysłany — komputer powinien się obudzić'),
     onError: (err) => toast.error(getErrorMessage(err)),
   });
 
@@ -112,51 +140,79 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete, onS
     (s.publisher ?? '').toLowerCase().includes(softwareSearch.toLowerCase())
   );
 
+  const needsUpdate = latestVersion && reg.appVersion && reg.appVersion !== latestVersion;
+
   return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-      {/* Nagłówek */}
+    <div className={glass} style={glassStyle}>
+      {/* Header */}
       <div className="p-4 space-y-3">
         <div className="flex items-start gap-3">
-          <div className={clsx(
-            'w-9 h-9 rounded-lg flex items-center justify-center shrink-0',
-            reg.status === 'ACTIVE' ? 'bg-emerald-100' : reg.status === 'PENDING' ? 'bg-amber-100' : 'bg-gray-100'
-          )}>
-            <Monitor className={clsx('h-5 w-5', reg.status === 'ACTIVE' ? 'text-emerald-600' : reg.status === 'PENDING' ? 'text-amber-600' : 'text-gray-400')} />
+          <div
+            className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+            style={{
+              background: reg.status === 'ACTIVE' ? 'rgba(34,197,94,0.12)' : reg.status === 'PENDING' ? 'rgba(251,191,36,0.12)' : 'rgba(255,255,255,0.04)',
+            }}
+          >
+            <Monitor className="h-5 w-5" style={{
+              color: reg.status === 'ACTIVE' ? '#4ADE80' : reg.status === 'PENDING' ? '#FBBF24' : 'rgba(255,255,255,0.3)',
+            }} />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="font-medium text-gray-900 text-sm truncate">{reg.hostname ?? 'Nieznany komputer'}</p>
+              <p className="font-medium text-sm truncate" style={{ color: 'rgba(255,255,255,0.85)' }}>
+                {reg.hostname ?? 'Nieznany komputer'}
+              </p>
               {isOnline
-                ? <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5"><Wifi className="h-3 w-3" />Online</span>
-                : <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-500 bg-gray-50 border border-gray-200 rounded-full px-2 py-0.5"><WifiOff className="h-3 w-3" />Offline</span>
+                ? (
+                  <span
+                    className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 border"
+                    style={{ background: 'rgba(34,197,94,0.12)', borderColor: 'rgba(34,197,94,0.25)', color: '#4ADE80' }}
+                  >
+                    <Wifi className="h-3 w-3" />Online
+                  </span>
+                )
+                : (
+                  <span
+                    className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 border"
+                    style={{ background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)' }}
+                  >
+                    <WifiOff className="h-3 w-3" />Offline
+                  </span>
+                )
               }
               {reg.status === 'PENDING' && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5"><Clock className="h-3 w-3" />Oczekuje</span>
+                <span
+                  className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 border"
+                  style={{ background: 'rgba(251,191,36,0.12)', borderColor: 'rgba(251,191,36,0.25)', color: '#FBBF24' }}
+                >
+                  <Clock className="h-3 w-3" />Oczekuje
+                </span>
               )}
-              {reg.appVersion && (() => {
-                const isOutdated = latestVersion && reg.appVersion !== latestVersion;
-                return (
-                  <span className={`inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 border ${
-                    isOutdated
-                      ? 'text-amber-700 bg-amber-50 border-amber-200'
-                      : 'text-gray-500 bg-gray-50 border-gray-200'
-                  }`}>
-                    v{reg.appVersion}{isOutdated ? ' ⚠ nieaktualna' : ''}
-                  </span>
-                );
-              })()}
+              {updateSent ? (
+                <span
+                  className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 border animate-pulse"
+                  style={{ background: 'rgba(139,92,246,0.12)', borderColor: 'rgba(139,92,246,0.25)', color: '#A78BFA' }}
+                >
+                  <RefreshCw className="h-3 w-3 animate-spin" />Aktualizacja...
+                </span>
+              ) : (
+                <VersionBadge appVersion={reg.appVersion} latestVersion={latestVersion} />
+              )}
               {reg.client && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-full px-2 py-0.5">
-                  {reg.status === 'PENDING' && <Check className="h-3 w-3 text-emerald-500" />}
+                <span
+                  className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 border"
+                  style={{ background: 'rgba(139,92,246,0.12)', borderColor: 'rgba(139,92,246,0.25)', color: '#A78BFA' }}
+                >
+                  {reg.status === 'PENDING' && <Check className="h-3 w-3" style={{ color: '#4ADE80' }} />}
                   {reg.client.name}
                 </span>
               )}
             </div>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {reg.ipAddress && <span>{reg.ipAddress} · </span>}
-              {reg.osInfo && <span>{reg.osInfo} · </span>}
-              {reg.currentUser && <span>👤 {reg.currentUser}</span>}
-              {reg.domain && reg.domain !== reg.hostname && <span> · 🏢 {reg.domain}</span>}
+            <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              {reg.ipAddress && <span>{reg.ipAddress} &middot; </span>}
+              {reg.osInfo && <span>{reg.osInfo} &middot; </span>}
+              {reg.currentUser && <span>{reg.currentUser}</span>}
+              {reg.domain && reg.domain !== reg.hostname && <span> &middot; {reg.domain}</span>}
             </p>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
@@ -165,7 +221,7 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete, onS
                 ? (
                   <Button size="sm" onClick={() => onQuickApprove(reg)} className="bg-emerald-600 hover:bg-emerald-700">
                     <Check className="h-4 w-4" />
-                    Zatwierdź
+                    Zatwierdz
                   </Button>
                 )
                 : (
@@ -175,21 +231,19 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete, onS
                   </Button>
                 )
             )}
-            {reg.status === 'ACTIVE' && reg.rustdeskId && (
-              <ConnectButton
-                regId={reg.id}
-                rustdeskId={reg.rustdeskId}
-                hostname={reg.hostname}
-                onSessionStart={onSessionStart}
-              />
-            )}
-            <button onClick={() => setExpanded(e => !e)} className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
+            <button
+              onClick={() => setExpanded(e => !e)}
+              className="p-1.5 rounded-lg transition-colors"
+              style={{ color: 'rgba(255,255,255,0.3)' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#A78BFA'; (e.currentTarget as HTMLElement).style.background = 'rgba(139,92,246,0.12)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.3)'; (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+            >
               {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </button>
           </div>
         </div>
 
-        {/* Metryki bieżące */}
+        {/* Metrics */}
         <div className="space-y-1.5 pl-12">
           <MetricBar value={reg.cpuUsage} label="CPU" />
           <MetricBar value={reg.ramUsage} label="RAM" />
@@ -199,130 +253,247 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete, onS
         </div>
       </div>
 
-      {/* Szczegóły rozwijane */}
+      {/* Expanded details */}
       {expanded && (
-        <div className="border-t border-gray-100 bg-gray-50 p-4 space-y-4">
+        <div className="p-4 space-y-4" style={{ borderTop: '1px solid rgba(255,255,255,0.04)', background: 'rgba(255,255,255,0.02)' }}>
 
-          {/* Sprzęt */}
+          {/* Hardware */}
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5 mb-2"><Cpu className="h-3.5 w-3.5" />Sprzęt</p>
+            <p className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5 mb-2" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              <Cpu className="h-3.5 w-3.5" />Sprzet
+            </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
               <InfoRow label="CPU" value={reg.cpuModel} />
-              <InfoRow label="Rdzenie / wątki" value={reg.cpuCores != null ? `${reg.cpuCores} / ${reg.cpuThreads ?? '?'}` : null} />
-              <InfoRow label="RAM całkowita" value={reg.ramTotalGb != null ? `${reg.ramTotalGb} GB` : null} />
+              <InfoRow label="Rdzenie / watki" value={reg.cpuCores != null ? `${reg.cpuCores} / ${reg.cpuThreads ?? '?'}` : null} />
+              <InfoRow label="RAM calkowita" value={reg.ramTotalGb != null ? `${reg.ramTotalGb} GB` : null} />
               <InfoRow label="GPU" value={reg.gpuModel} />
-              <InfoRow label="Płyta główna" value={reg.motherboard} />
+              <InfoRow label="Plyta glowna" value={reg.motherboard} />
               <InfoRow label="Nr seryjny" value={reg.serialNumber} />
               <InfoRow label="Windows" value={reg.windowsVersion} />
               <InfoRow label="Uptime" value={uptime} />
             </div>
           </div>
 
-          {/* Dyski */}
+          {/* Disks */}
           {(reg.diskInfo ?? []).length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5 mb-2"><HardDrive className="h-3.5 w-3.5" />Dyski</p>
+              <p className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5 mb-2" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                <HardDrive className="h-3.5 w-3.5" />Dyski
+              </p>
               <div className="space-y-1.5">
                 {(reg.diskInfo as DiskInfo[]).map(d => (
                   <div key={d.mountpoint} className="flex items-center gap-3 text-xs">
-                    <span className="w-10 text-gray-500 shrink-0">{d.mountpoint}</span>
-                    <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                    <span className="w-10 shrink-0" style={{ color: 'rgba(255,255,255,0.4)' }}>{d.mountpoint}</span>
+                    <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
                       <div className={clsx('h-full rounded-full', d.usedPct > 90 ? 'bg-red-500' : d.usedPct > 70 ? 'bg-amber-400' : 'bg-emerald-500')} style={{ width: `${d.usedPct}%` }} />
                     </div>
-                    <span className="text-gray-600 w-36 shrink-0">{d.freeGb.toFixed(1)} GB wolne / {d.totalGb.toFixed(1)} GB · {d.fstype}</span>
+                    <span className="w-36 shrink-0" style={{ color: 'rgba(255,255,255,0.5)' }}>{d.freeGb.toFixed(1)} GB wolne / {d.totalGb.toFixed(1)} GB &middot; {d.fstype}</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Sieć */}
+          {/* Network */}
           {(reg.networkIfaces ?? []).filter((i: NetworkIface) => i.ip).length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5 mb-2"><Network className="h-3.5 w-3.5" />Sieć</p>
+              <p className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5 mb-2" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                <Network className="h-3.5 w-3.5" />Siec
+              </p>
               <div className="space-y-1">
                 {(reg.networkIfaces as NetworkIface[]).filter(i => i.ip).map(i => (
                   <div key={i.name} className="flex gap-4 text-xs">
-                    <span className={clsx('w-2 h-2 rounded-full mt-0.5 shrink-0', i.isUp ? 'bg-emerald-500' : 'bg-gray-300')} />
-                    <span className="text-gray-500 w-40 truncate shrink-0">{i.name}</span>
-                    <span className="text-gray-800 font-mono">{i.ip}</span>
-                    {i.mac && <span className="text-gray-400 font-mono">{i.mac}</span>}
+                    <span className={clsx('w-2 h-2 rounded-full mt-0.5 shrink-0', i.isUp ? 'bg-emerald-500' : '')} style={!i.isUp ? { background: 'rgba(255,255,255,0.15)' } : {}} />
+                    <span className="w-40 truncate shrink-0" style={{ color: 'rgba(255,255,255,0.4)' }}>{i.name}</span>
+                    <span className="font-mono" style={{ color: 'rgba(255,255,255,0.8)' }}>{i.ip}</span>
+                    {i.mac && <span className="font-mono" style={{ color: 'rgba(255,255,255,0.3)' }}>{i.mac}</span>}
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Zainstalowane programy */}
+          {/* Software */}
           {(reg.installedSoftware ?? []).length > 0 && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5"><Package className="h-3.5 w-3.5" />Programy ({reg.installedSoftware!.length})</p>
+                <p className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                  <Package className="h-3.5 w-3.5" />Programy ({reg.installedSoftware!.length})
+                </p>
                 <input
                   type="text"
                   placeholder="Szukaj..."
                   value={softwareSearch}
                   onChange={e => setSoftwareSearch(e.target.value)}
-                  className="text-xs border border-gray-200 rounded-lg px-2 py-1 w-40 focus:outline-none focus:border-indigo-400"
+                  className="text-xs rounded-lg px-2 py-1 w-40 focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
                 />
               </div>
-              <div className="max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white divide-y divide-gray-100">
+              <div
+                className="max-h-48 overflow-y-auto rounded-lg"
+                style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}
+              >
                 {filteredSoftware.map((s: InstalledSoftware, i) => (
-                  <div key={i} className="flex items-center gap-3 px-3 py-1.5 text-xs hover:bg-gray-50">
-                    <span className="flex-1 text-gray-800 font-medium truncate">{s.name}</span>
-                    {s.version && <span className="text-gray-400 shrink-0">{s.version}</span>}
-                    {s.publisher && <span className="text-gray-400 shrink-0 hidden sm:block truncate max-w-[120px]">{s.publisher}</span>}
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 px-3 py-1.5 text-xs"
+                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+                  >
+                    <span className="flex-1 font-medium truncate" style={{ color: 'rgba(255,255,255,0.8)' }}>{s.name}</span>
+                    {s.version && <span className="shrink-0" style={{ color: 'rgba(255,255,255,0.3)' }}>{s.version}</span>}
+                    {s.publisher && <span className="shrink-0 hidden sm:block truncate max-w-[120px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{s.publisher}</span>}
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Akcje */}
-          <div className="border-t border-gray-200 pt-3 flex items-center gap-2 flex-wrap">
-            {reg.status === 'ACTIVE' && (
-              <button
-                onClick={() => pushUpdateMutation.mutate()}
-                disabled={pushUpdateMutation.isPending}
-                className="flex items-center gap-2 text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-3 py-2 rounded-lg transition-colors disabled:opacity-50"
-              >
-                <RefreshCw className={`h-3.5 w-3.5 ${pushUpdateMutation.isPending ? 'animate-spin' : ''}`} />
-                Wyślij aktualizację
-              </button>
-            )}
-            <div className="flex-1" />
-            {confirmDelete ? (
-              <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-                <p className="text-sm text-red-700 flex-1 font-medium">Na pewno usunąć tego agenta?</p>
-                <button
-                  onClick={() => { onDelete(reg.id); setConfirmDelete(false); }}
-                  className="text-xs font-semibold text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg transition-colors"
-                >
-                  Tak, usuń
+          {/* Windows Update popup */}
+          {showWinUpdate && (
+            <div className="p-4 rounded-xl space-y-3" style={{ background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)' }}>
+              <p className="text-[12px] font-semibold" style={{ color: '#60A5FA' }}>Aktualizacja Windows</p>
+              <div className="flex gap-2">
+                <button onClick={() => setWinUpdateMode('reboot')}
+                  className="flex-1 py-2 rounded-lg text-[11px] font-semibold transition-all"
+                  style={winUpdateMode === 'reboot'
+                    ? { background: 'rgba(96,165,250,0.15)', color: '#60A5FA', border: '1px solid rgba(96,165,250,0.25)' }
+                    : { background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.06)' }
+                  }>
+                  Przy ponownym uruchomieniu
                 </button>
-                <button
-                  onClick={() => setConfirmDelete(false)}
-                  className="text-xs font-semibold text-gray-600 hover:text-gray-900 px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-white transition-colors"
-                >
+                <button onClick={() => setWinUpdateMode('schedule')}
+                  className="flex-1 py-2 rounded-lg text-[11px] font-semibold transition-all"
+                  style={winUpdateMode === 'schedule'
+                    ? { background: 'rgba(96,165,250,0.15)', color: '#60A5FA', border: '1px solid rgba(96,165,250,0.25)' }
+                    : { background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.06)' }
+                  }>
+                  Zaplanuj restart
+                </button>
+              </div>
+              {winUpdateMode === 'schedule' && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.4)' }}>Restart o:</span>
+                  <input type="time" value={winUpdateTime} onChange={e => setWinUpdateTime(e.target.value)}
+                    className="px-2 py-1.5 rounded-lg text-[12px] focus:outline-none"
+                    style={{ background: '#0E1425', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)' }} />
+                </div>
+              )}
+              <div className="flex gap-2">
+                <button onClick={() => winUpdateMutation.mutate()} disabled={winUpdateMutation.isPending}
+                  className="flex-1 py-2 rounded-lg text-[11px] font-semibold text-white transition-all active:scale-[0.97] disabled:opacity-50"
+                  style={{ background: 'linear-gradient(145deg, #2563EB, #1D4ED8)' }}>
+                  {winUpdateMutation.isPending ? 'Wysyłam...' : 'Uruchom aktualizację'}
+                </button>
+                <button onClick={() => setShowWinUpdate(false)}
+                  className="px-3 py-2 rounded-lg text-[11px] font-medium transition-colors"
+                  style={{ color: 'rgba(255,255,255,0.4)' }}>
                   Anuluj
                 </button>
               </div>
-            ) : (
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Footer — always visible actions ─────────────────────── */}
+      {reg.status === 'ACTIVE' && (
+        <div className="flex items-center gap-1 px-3 py-2" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+          {/* RustDesk */}
+          {reg.rustdeskId && (
+            <a
+              href={`rustdesk://id=${reg.rustdeskId}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-colors"
+              style={{ color: '#10B981' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.1)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+              title={`RustDesk: ${reg.rustdeskId}`}
+            >
+              <Monitor className="h-3.5 w-3.5" />
+              RD: {reg.rustdeskId}
+            </a>
+          )}
+
+          {/* WoL — offline only */}
+          {!isOnline && (
+            <button
+              onClick={() => wakeMutation.mutate()}
+              disabled={wakeMutation.isPending}
+              className="flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+              style={{ color: '#4ADE80' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(34,197,94,0.08)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+              title="Wake-on-LAN"
+            >
+              <Wifi className="h-3.5 w-3.5" />{wakeMutation.isPending ? 'Budzę...' : 'WoL'}
+            </button>
+          )}
+
+          {/* Aktualizuj agenta */}
+          <button
+            onClick={() => pushUpdateMutation.mutate()}
+            disabled={pushUpdateMutation.isPending || updateSent}
+            className="flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+            style={{ color: updateSent ? '#4ADE80' : needsUpdate ? '#F87171' : '#A78BFA' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = needsUpdate ? 'rgba(239,68,68,0.08)' : 'rgba(139,92,246,0.08)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${pushUpdateMutation.isPending || updateSent ? 'animate-spin' : ''}`} />
+            {updateSent ? 'Aktualizacja...' : needsUpdate ? 'Aktualizuj!' : 'Aktualizuj'}
+          </button>
+
+          {/* Aktualizuj Windows */}
+          <button
+            onClick={() => setShowWinUpdate(!showWinUpdate)}
+            className="flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-colors"
+            style={{ color: '#60A5FA' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(96,165,250,0.08)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+          >
+            <Monitor className="h-3.5 w-3.5" />
+            Windows
+          </button>
+
+          <div className="flex-1" />
+
+          {/* Usuń */}
+          {confirmDelete ? (
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-medium" style={{ color: '#F87171' }}>Usunąć?</span>
               <button
-                onClick={() => setConfirmDelete(true)}
-                className="flex items-center gap-2 text-xs font-medium text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-2 rounded-lg transition-colors"
+                onClick={() => { onDelete(reg.id); setConfirmDelete(false); }}
+                className="text-[11px] font-semibold text-white bg-red-600 hover:bg-red-700 px-2.5 py-1 rounded-lg transition-colors"
               >
-                <Trash2 className="h-3.5 w-3.5" />
-                Usuń agenta
+                Tak
               </button>
-            )}
-          </div>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="text-[11px] font-medium px-2.5 py-1 rounded-lg transition-colors"
+                style={{ color: 'rgba(255,255,255,0.5)' }}
+              >
+                Nie
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="p-1.5 rounded-lg transition-colors"
+              style={{ color: 'rgba(255,255,255,0.2)' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)'; (e.currentTarget as HTMLElement).style.color = '#F87171'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.2)'; }}
+              title="Usuń agenta"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       )}
     </div>
   );
 }
 
+/* ── ApproveModal (dark glass) ───────────────────────────── */
 interface ApproveForm {
   clientId: string;
   deviceId?: string;
@@ -342,19 +513,17 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
   const qc = useQueryClient();
   const [mode, setMode] = useState<'existing' | 'new'>('existing');
 
-  // Istniejący klient
   const { register: regExisting, handleSubmit: handleExisting, watch } = useForm<ApproveForm>({
     defaultValues: { clientId: reg.clientId ?? '', deviceId: '' },
   });
   const clientId = watch('clientId');
 
-  // Nowy klient — pre-fill z danych rejestracji
   const { register: regNew, handleSubmit: handleNew } = useForm<NewClientForm>({
     defaultValues: {
-      name:         reg.companyName ?? '',
-      taxId:        reg.nip ?? '',
-      phone:        reg.contactPhone ?? '',
-      email:        reg.contactEmail ?? '',
+      name:  reg.companyName ?? '',
+      taxId: reg.nip ?? '',
+      phone: reg.contactPhone ?? '',
+      email: reg.contactEmail ?? '',
     },
   });
 
@@ -385,43 +554,70 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
     onError: (err) => toast.error(getErrorMessage(err)),
   });
 
-  const inputCls = 'w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500';
-  const labelCls = 'block text-xs font-medium text-gray-600 mb-1';
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    fontSize: '0.875rem',
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '0.5rem',
+    padding: '0.5rem 0.75rem',
+    color: 'rgba(255,255,255,0.85)',
+    outline: 'none',
+  };
+
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontSize: '0.75rem',
+    fontWeight: 500,
+    color: 'rgba(255,255,255,0.5)',
+    marginBottom: '0.25rem',
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-        <h2 className="text-lg font-bold text-gray-900">Zatwierdź urządzenie</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}>
+      <div
+        className="rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto"
+        style={{ background: 'rgba(14,20,38,0.97)', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(24px)' }}
+      >
+        <h2 className="text-lg font-bold" style={{ color: 'rgba(255,255,255,0.85)' }}>Zatwierdz urzadzenie</h2>
 
-        {/* Info z rejestracji */}
-        <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-600 space-y-1">
-          {reg.companyName && <div><span className="font-medium">Firma:</span> {reg.companyName}</div>}
+        {/* Registration info */}
+        <div className="rounded-xl p-3 text-xs space-y-1" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)' }}>
+          {reg.companyName && <div><span className="font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>Firma:</span> {reg.companyName}</div>}
           {(reg.contactFirstName || reg.contactLastName) && (
-            <div><span className="font-medium">Kontakt:</span> {[reg.contactFirstName, reg.contactLastName].filter(Boolean).join(' ')}</div>
+            <div><span className="font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>Kontakt:</span> {[reg.contactFirstName, reg.contactLastName].filter(Boolean).join(' ')}</div>
           )}
-          {reg.contactEmail && <div><span className="font-medium">E-mail:</span> {reg.contactEmail}</div>}
-          {reg.nip          && <div><span className="font-medium">NIP:</span> {reg.nip}</div>}
-          <div className="border-t border-gray-200 pt-1 mt-1">
-            {reg.hostname  && <div><span className="font-medium">Komputer:</span> {reg.hostname}</div>}
-            {reg.ipAddress && <div><span className="font-medium">IP:</span> {reg.ipAddress}</div>}
+          {reg.contactEmail && <div><span className="font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>E-mail:</span> {reg.contactEmail}</div>}
+          {reg.nip          && <div><span className="font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>NIP:</span> {reg.nip}</div>}
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.25rem', marginTop: '0.25rem' }}>
+            {reg.hostname  && <div><span className="font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>Komputer:</span> {reg.hostname}</div>}
+            {reg.ipAddress && <div><span className="font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>IP:</span> {reg.ipAddress}</div>}
           </div>
         </div>
 
-        {/* Przełącznik trybu */}
-        <div className="flex rounded-xl overflow-hidden border border-gray-200 text-sm font-medium">
+        {/* Mode toggle */}
+        <div className="flex rounded-xl overflow-hidden text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
           <button
             type="button"
             onClick={() => setMode('existing')}
-            className={`flex-1 py-2.5 transition-colors ${mode === 'existing' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+            className="flex-1 py-2.5 transition-colors"
+            style={{
+              background: mode === 'existing' ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.02)',
+              color: mode === 'existing' ? '#A78BFA' : 'rgba(255,255,255,0.5)',
+            }}
           >
-            Przypisz do istniejącej firmy
+            Przypisz do istniejacej firmy
           </button>
           <button
             type="button"
             onClick={() => setMode('new')}
-            className={`flex-1 py-2.5 transition-colors ${mode === 'new' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+            className="flex-1 py-2.5 transition-colors"
+            style={{
+              background: mode === 'new' ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.02)',
+              color: mode === 'new' ? '#A78BFA' : 'rgba(255,255,255,0.5)',
+            }}
           >
-            Utwórz nową firmę
+            Utworz nowa firme
           </button>
         </div>
 
@@ -435,10 +631,10 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
             />
             {clientId && (
               <Select
-                label="Urządzenie (opcjonalne)"
-                placeholder="— auto-utwórz nowe —"
+                label="Urzadzenie (opcjonalne)"
+                placeholder="--- auto-utworz nowe ---"
                 options={[
-                  { value: '', label: '— auto-utwórz nowe urządzenie —' },
+                  { value: '', label: '--- auto-utworz nowe urzadzenie ---' },
                   ...devices.map((d: any) => ({ value: d.id, label: d.name })),
                 ]}
                 {...regExisting('deviceId')}
@@ -446,44 +642,44 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
             )}
             <div className="flex justify-end gap-3 pt-2">
               <Button variant="secondary" type="button" onClick={onClose}>Anuluj</Button>
-              <Button type="submit" loading={existingMutation.isPending} disabled={!clientId}>Zatwierdź</Button>
+              <Button type="submit" loading={existingMutation.isPending} disabled={!clientId}>Zatwierdz</Button>
             </div>
           </form>
         ) : (
           <form onSubmit={handleNew(d => newClientMutation.mutate(d))} className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
-                <label className={labelCls}>Nazwa firmy *</label>
-                <input className={inputCls} placeholder="np. ACME Sp. z o.o." {...regNew('name', { required: true })} />
+                <label style={labelStyle}>Nazwa firmy *</label>
+                <input style={inputStyle} placeholder="np. ACME Sp. z o.o." {...regNew('name', { required: true })} />
               </div>
               <div>
-                <label className={labelCls}>NIP</label>
-                <input className={inputCls} placeholder="0000000000" {...regNew('taxId')} />
+                <label style={labelStyle}>NIP</label>
+                <input style={inputStyle} placeholder="0000000000" {...regNew('taxId')} />
               </div>
               <div>
-                <label className={labelCls}>Telefon</label>
-                <input className={inputCls} placeholder="+48 000 000 000" {...regNew('phone')} />
+                <label style={labelStyle}>Telefon</label>
+                <input style={inputStyle} placeholder="+48 000 000 000" {...regNew('phone')} />
               </div>
               <div className="col-span-2">
-                <label className={labelCls}>E-mail</label>
-                <input className={inputCls} type="email" placeholder="firma@email.pl" {...regNew('email')} />
+                <label style={labelStyle}>E-mail</label>
+                <input style={inputStyle} type="email" placeholder="firma@email.pl" {...regNew('email')} />
               </div>
               <div className="col-span-2">
-                <label className={labelCls}>Adres</label>
-                <input className={inputCls} placeholder="ul. Przykładowa 1" {...regNew('addressLine1')} />
+                <label style={labelStyle}>Adres</label>
+                <input style={inputStyle} placeholder="ul. Przykladowa 1" {...regNew('addressLine1')} />
               </div>
               <div>
-                <label className={labelCls}>Kod pocztowy</label>
-                <input className={inputCls} placeholder="00-000" {...regNew('postalCode')} />
+                <label style={labelStyle}>Kod pocztowy</label>
+                <input style={inputStyle} placeholder="00-000" {...regNew('postalCode')} />
               </div>
               <div>
-                <label className={labelCls}>Miasto</label>
-                <input className={inputCls} placeholder="Warszawa" {...regNew('city')} />
+                <label style={labelStyle}>Miasto</label>
+                <input style={inputStyle} placeholder="Warszawa" {...regNew('city')} />
               </div>
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <Button variant="secondary" type="button" onClick={onClose}>Anuluj</Button>
-              <Button type="submit" loading={newClientMutation.isPending}>Utwórz firmę i zatwierdź</Button>
+              <Button type="submit" loading={newClientMutation.isPending}>Utworz firme i zatwierdz</Button>
             </div>
           </form>
         )}
@@ -492,10 +688,13 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
   );
 }
 
+/* ── Main Page ───────────────────────────────────────────── */
 export function WaitingRoomPage() {
   const qc = useQueryClient();
   const [approveTarget, setApproveTarget] = useState<AgentRegistration | null>(null);
-  const [activeSession, setActiveSession] = useState<{ session: WorkSession; hostname: string } | null>(null);
+  const [filterClientId, setFilterClientId] = useState('');
+  const [search, setSearch] = useState('');
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   const { data: registrations = [], isLoading } = useQuery({
     queryKey: ['agents'],
@@ -512,7 +711,7 @@ export function WaitingRoomPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => agentsApi.delete(id),
-    onSuccess: () => { toast.success('Usunięto agenta'); qc.invalidateQueries({ queryKey: ['agents'] }); },
+    onSuccess: () => { toast.success('Usunieto agenta'); qc.invalidateQueries({ queryKey: ['agents'] }); },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
 
@@ -520,56 +719,134 @@ export function WaitingRoomPage() {
     mutationFn: (reg: AgentRegistration) =>
       agentsApi.approve(reg.id, undefined, undefined),
     onSuccess: () => {
-      toast.success('Agent zatwierdzony — urządzenie dodane automatycznie');
+      toast.success('Agent zatwierdzony --- urzadzenie dodane automatycznie');
       qc.invalidateQueries({ queryKey: ['agents'] });
       qc.invalidateQueries({ queryKey: ['devices'] });
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
 
-  const pending = registrations.filter(r => r.status === 'PENDING');
-  const active = registrations.filter(r => r.status === 'ACTIVE');
+  const { data: allClients = [] } = useQuery({ queryKey: ['clients'], queryFn: () => clientsApi.getAll() });
+
+  const clientsWithAgents = allClients.filter(c => registrations.some(r => r.clientId === c.id));
+
+  const filtered = registrations.filter(r => {
+    if (filterClientId && r.clientId !== filterClientId) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      if (!(r.hostname ?? '').toLowerCase().includes(q) &&
+          !(r.contactFirstName ?? '').toLowerCase().includes(q) &&
+          !(r.contactLastName ?? '').toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  const pending = filtered.filter(r => r.status === 'PENDING');
+  const active  = filtered.filter(r => r.status === 'ACTIVE');
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Agenty systemowe</h1>
-          <div className="flex items-center gap-3 mt-1">
-            <p className="text-sm text-gray-500">Zarządzaj aplikacjami monitorującymi zainstalowanymi u klientów.</p>
-            {latestVersion?.version && (
-              <span className="inline-flex items-center gap-1 text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full px-2.5 py-0.5">
-                Aktualna wersja: v{latestVersion.version}
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="flex gap-2 shrink-0">
-          <a
-            href="/downloads/InfraDesk-Agent.zip"
-            download
-            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
-            title="Zalecane — przeglądarka nie blokuje ZIP"
-          >
-            <Download className="h-4 w-4" />
-            Pobierz (.zip)
-          </a>
-          <a
-            href="/downloads/InfraDesk%20Agent.exe"
-            download
-            className="inline-flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 text-sm font-medium px-3 py-2 rounded-xl transition-colors"
-            title="Bezpośredni EXE — przeglądarka może ostrzec"
-          >
-            .exe
-          </a>
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold" style={{ color: 'rgba(255,255,255,0.85)' }}>Agenty systemowe</h1>
+        <div className="flex items-center gap-3 mt-1">
+          <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            {registrations.length} {registrations.length === 1 ? 'agent' : 'agentow'} zarejestrowanych
+          </p>
+          {latestVersion?.version && (() => {
+            const activeRegs = registrations.filter(r => r.status === 'ACTIVE');
+            const upToDate = activeRegs.filter(r => r.appVersion === latestVersion.version).length;
+            const outdated = activeRegs.filter(r => r.appVersion && r.appVersion !== latestVersion.version).length;
+            const noVersion = activeRegs.filter(r => !r.appVersion).length;
+            return (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span
+                  className="inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-0.5 border"
+                  style={{ background: 'rgba(139,92,246,0.12)', borderColor: 'rgba(139,92,246,0.25)', color: '#A78BFA' }}
+                >
+                  Aktualna: v{latestVersion.version}
+                </span>
+                {upToDate > 0 && (
+                  <span className="text-xs font-medium" style={{ color: '#4ADE80' }}>
+                    {upToDate} aktualnych
+                  </span>
+                )}
+                {outdated > 0 && (
+                  <button
+                    className="text-xs font-medium flex items-center gap-1 transition-colors hover:underline"
+                    style={{ color: '#F87171' }}
+                    disabled={bulkUpdating}
+                    onClick={async () => {
+                      setBulkUpdating(true);
+                      const outdatedRegs = activeRegs.filter(r => r.appVersion && r.appVersion !== latestVersion.version);
+                      try {
+                        await Promise.all(outdatedRegs.map(r => agentsApi.pushUpdate(r.id)));
+                        toast.success(`Aktualizacja wysłana do ${outdatedRegs.length} agentów`);
+                        setTimeout(() => {
+                          qc.invalidateQueries({ queryKey: ['agents'] });
+                          setBulkUpdating(false);
+                        }, 30_000);
+                      } catch {
+                        toast.error('Błąd wysyłania aktualizacji');
+                        setBulkUpdating(false);
+                      }
+                    }}
+                  >
+                    {bulkUpdating ? (
+                      <><RefreshCw className="h-3 w-3 animate-spin" />{outdated} aktualizowanie...</>
+                    ) : (
+                      <>{outdated} do aktualizacji — kliknij aby zaktualizować</>
+                    )}
+                  </button>
+                )}
+                {noVersion > 0 && (
+                  <span className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                    {noVersion} bez wersji
+                  </span>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
 
-      {isLoading && <p className="text-sm text-gray-500">Ładowanie...</p>}
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 items-center">
+        <div className="relative flex-1 min-w-[180px] max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'rgba(255,255,255,0.3)' }} />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Szukaj (hostname, uzytkownik)..."
+            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg focus:outline-none"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
+          />
+        </div>
+        <select
+          value={filterClientId}
+          onChange={e => setFilterClientId(e.target.value)}
+          className="text-sm rounded-lg px-3 py-2 focus:outline-none"
+          style={{ background: '#0E1425', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)' }}
+        >
+          <option value="">Wszystkie firmy</option>
+          {clientsWithAgents.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        {(filterClientId || search) && (
+          <button
+            onClick={() => { setFilterClientId(''); setSearch(''); }}
+            className="text-xs underline"
+            style={{ color: 'rgba(255,255,255,0.4)' }}
+          >
+            Wyczysc filtry
+          </button>
+        )}
+      </div>
+
+      {isLoading && <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Ladowanie...</p>}
 
       {pending.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-amber-700 uppercase tracking-wide flex items-center gap-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wide flex items-center gap-2" style={{ color: '#FBBF24' }}>
             <Clock className="h-4 w-4" />
             Poczekalnia ({pending.length})
           </h2>
@@ -581,7 +858,6 @@ export function WaitingRoomPage() {
               onApprove={setApproveTarget}
               onQuickApprove={r => quickApproveMutation.mutate(r)}
               onDelete={id => deleteMutation.mutate(id)}
-              onSessionStart={(s, h) => setActiveSession({ session: s, hostname: h })}
             />
           ))}
         </section>
@@ -589,7 +865,7 @@ export function WaitingRoomPage() {
 
       {active.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-emerald-700 uppercase tracking-wide flex items-center gap-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wide flex items-center gap-2" style={{ color: '#4ADE80' }}>
             <Wifi className="h-4 w-4" />
             Aktywne ({active.length})
           </h2>
@@ -601,30 +877,21 @@ export function WaitingRoomPage() {
               onApprove={setApproveTarget}
               onQuickApprove={r => quickApproveMutation.mutate(r)}
               onDelete={id => deleteMutation.mutate(id)}
-              onSessionStart={(s, h) => setActiveSession({ session: s, hostname: h })}
             />
           ))}
         </section>
       )}
 
       {!isLoading && registrations.length === 0 && (
-        <div className="text-center py-16 text-gray-400">
+        <div className="text-center py-16" style={{ color: 'rgba(255,255,255,0.3)' }}>
           <Monitor className="h-12 w-12 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">Brak agentów</p>
-          <p className="text-sm mt-1">Zainstaluj aplikację na komputerach klientów, aby monitorować sprzęt.</p>
+          <p className="font-medium">Brak agentow</p>
+          <p className="text-sm mt-1">Zainstaluj aplikacje na komputerach klientow, aby monitorowac sprzet.</p>
         </div>
       )}
 
       {approveTarget && (
         <ApproveModal reg={approveTarget} onClose={() => setApproveTarget(null)} />
-      )}
-
-      {activeSession && (
-        <FloatingSessionTimer
-          session={activeSession.session}
-          hostname={activeSession.hostname}
-          onEnded={() => setActiveSession(null)}
-        />
       )}
     </div>
   );

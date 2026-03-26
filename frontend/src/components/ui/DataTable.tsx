@@ -21,51 +21,34 @@ interface DataTableProps<T> {
 }
 
 export function DataTable<T extends object>({
-  columns,
-  data,
-  loading,
-  onRowClick,
-  keyExtractor,
-  emptyTitle,
-  emptyDescription,
-  emptyAction,
+  columns, data, loading, onRowClick, keyExtractor, emptyTitle, emptyDescription, emptyAction,
 }: DataTableProps<T>) {
   if (loading) return <LoadingSpinner />;
-
-  if (!data.length) {
-    return (
-      <EmptyState
-        title={emptyTitle}
-        description={emptyDescription}
-        action={emptyAction}
-      />
-    );
-  }
+  if (!data.length) return <EmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />;
 
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
+    <div className="overflow-x-auto rounded-[14px]" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+      <table className="min-w-full">
         <thead>
-          <tr>
+          <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
             {columns.map(col => (
-              <th
-                key={col.key}
-                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50"
-              >
+              <th key={col.key} className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.08em]"
+                style={{ color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.02)' }}>
                 {col.header}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-100">
+        <tbody>
           {data.map((row, idx) => (
-            <tr
-              key={keyExtractor ? keyExtractor(row) : idx}
+            <tr key={keyExtractor ? keyExtractor(row) : idx}
               onClick={() => onRowClick?.(row)}
-              className={onRowClick ? 'cursor-pointer hover:bg-gray-50 transition-colors' : ''}
-            >
+              className={`transition-colors duration-150 ${onRowClick ? 'cursor-pointer' : ''}`}
+              style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}
+              onMouseEnter={(e) => { if (onRowClick) e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
               {columns.map(col => (
-                <td key={col.key} className={`px-4 py-3 text-sm text-gray-700 ${col.className ?? ''}`}>
+                <td key={col.key} className={`px-4 py-3 text-[13px] ${col.className ?? ''}`} style={{ color: 'rgba(255,255,255,0.7)' }}>
                   {col.render ? col.render(row) : ((row as Record<string, unknown>)[col.key] as ReactNode)}
                 </td>
               ))}

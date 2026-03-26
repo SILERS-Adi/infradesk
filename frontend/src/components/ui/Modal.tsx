@@ -12,13 +12,7 @@ interface ModalProps {
   noPadding?: boolean;
 }
 
-const sizeMap = {
-  sm: 'max-w-sm',
-  md: 'max-w-md',
-  lg: 'max-w-lg',
-  xl: 'max-w-xl',
-  '2xl': 'max-w-2xl',
-};
+const sizeMap = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-xl', '2xl': 'max-w-2xl' };
 
 export function Modal({ open, onClose, title, children, size = 'md', footer, noPadding }: ModalProps) {
   useEffect(() => {
@@ -32,30 +26,21 @@ export function Modal({ open, onClose, title, children, size = 'md', footer, noP
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/50"
-        onClick={onClose}
-      />
-      <div
-        className={clsx(
-          'relative bg-white rounded-xl shadow-xl w-full flex flex-col max-h-[90vh]',
-          sizeMap[size]
-        )}
-      >
+      <div className="absolute inset-0" onClick={onClose}
+        style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} />
+      <div className={clsx('relative w-full flex flex-col max-h-[90vh] rounded-[18px] overflow-hidden', sizeMap[size])}
+        style={{ background: 'rgba(14,20,38,0.97)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.07)', boxShadow: '0 24px 80px rgba(0,0,0,0.5)' }}>
         {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-            <h2 className="text-base font-semibold text-gray-900">{title}</h2>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100"
-            >
+          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <h2 className="text-[15px] font-semibold text-white/85">{title}</h2>
+            <button onClick={onClose} className="text-white/25 hover:text-white/50 p-1 rounded-lg hover:bg-white/[0.04] transition-colors">
               <X className="h-5 w-5" />
             </button>
           </div>
         )}
-        <div className={clsx('flex-1 min-h-0', noPadding ? 'flex flex-col' : 'overflow-y-auto p-6')}>{children}</div>
+        <div className={clsx('flex-1 min-h-0', noPadding ? 'flex flex-col' : 'overflow-y-auto p-5')}>{children}</div>
         {footer && (
-          <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">{footer}</div>
+          <div className="px-5 py-4 flex justify-end gap-2.5" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>{footer}</div>
         )}
       </div>
     </div>

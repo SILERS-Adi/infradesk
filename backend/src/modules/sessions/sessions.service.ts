@@ -1,4 +1,26 @@
 import prisma from '../../lib/prisma';
+import { AppError } from '../../middleware/errorHandler';
+import { notifyTicketWorkStarted, notifyTicketWorkCompleted } from '../../utils/ticketNotifications';
+
+const sessionInclude = {
+  client: { select: { id: true, name: true } },
+  ticket: { select: { id: true, ticketNumber: true, title: true } },
+  location: { select: { id: true, name: true } },
+  device: { select: { id: true, name: true } },
+  timeEntries: { orderBy: { startedAt: 'asc' as const } },
+};
+
+/** Oblicz sumaryczny czas pracy (w minutach) z time entries */
+function calcWorkMinutes(entries: { startedAt: Date; endedAt: Date | null }[]): number {
+  let totalMs = 0;
+  for (const e of entries) {
+    const end = e.endedAt ?? new Date();
+    totalMs += end.getTime() - e.startedAt.getTime();
+  }
+  return Math.round(totalMs / 60000);
+}
+
+// ── Agent session (legacy) ───────────────────────────────────────────────────
 
 export async function startSession(techId: string, agentRegId: string) {
   const reg = await prisma.agentRegistration.findUnique({
@@ -7,40 +29,178 @@ export async function startSession(techId: string, agentRegId: string) {
   });
   if (!reg?.clientId) throw new Error('Agent nie jest przypisany do klienta');
 
-  return prisma.workSession.create({
+  const session = await prisma.workSession.create({
     data: {
       techId,
       agentRegId,
       clientId: reg.clientId,
       deviceId: reg.deviceId ?? undefined,
       startedAt: new Date(),
+      status: 'ACTIVE',
     },
-    include: {
-      client: { select: { id: true, name: true } },
-      device: { select: { id: true, name: true } },
-    },
+    include: { client: { select: { id: true, name: true } }, device: { select: { id: true, name: true } } },
   });
+
+  // Pierwszy wpis czasu
+  await prisma.sessionTimeEntry.create({
+    data: { workSessionId: session.id },
+  });
+
+  return session;
 }
+
+// ── End session ──────────────────────────────────────────────────────────────
 
 export async function endSession(id: string, techId: string, notes?: string) {
   const session = await prisma.workSession.findFirst({
     where: { id, techId },
+    include: { timeEntries: true },
   });
-  if (!session) throw Object.assign(new Error('Sesja nie znaleziona'), { status: 404 });
-  if (session.endedAt) throw Object.assign(new Error('Sesja już zakończona'), { status: 400 });
+  if (!session) throw new AppError('Sesja nie znaleziona', 404);
+  if (session.status === 'COMPLETED') throw new AppError('Sesja już zakończona', 400);
 
-  const endedAt = new Date();
-  const durationMin = Math.round((endedAt.getTime() - session.startedAt.getTime()) / 60000);
+  const now = new Date();
+
+  // Zamknij otwarty wpis czasu (jeśli jest)
+  const openEntry = session.timeEntries.find(e => !e.endedAt);
+  if (openEntry) {
+    const entryDuration = Math.round((now.getTime() - openEntry.startedAt.getTime()) / 60000);
+    await prisma.sessionTimeEntry.update({
+      where: { id: openEntry.id },
+      data: { endedAt: now, durationMin: entryDuration },
+    });
+  }
+
+  // Oblicz łączny czas pracy
+  const allEntries = await prisma.sessionTimeEntry.findMany({ where: { workSessionId: id } });
+  const totalWork = calcWorkMinutes(allEntries.map(e => ({ startedAt: e.startedAt, endedAt: e.endedAt ?? now })));
+
+  const updated = await prisma.workSession.update({
+    where: { id },
+    data: { endedAt: now, durationMin: totalWork, notes, status: 'COMPLETED' },
+    include: sessionInclude,
+  });
+
+  // Powiadom klienta
+  if (session.ticketId) {
+    const tech = await prisma.user.findUnique({ where: { id: techId }, select: { firstName: true, lastName: true } });
+    if (tech) notifyTicketWorkCompleted(session.ticketId, `${tech.firstName} ${tech.lastName}`);
+  }
+
+  return updated;
+}
+
+// ── Mobile session ───────────────────────────────────────────────────────────
+
+export async function startMobileSession(techId: string, data: {
+  clientId: string;
+  ticketId?: string;
+  locationId?: string;
+  deviceId?: string;
+  notes?: string;
+}) {
+  const existing = await prisma.workSession.findFirst({
+    where: { techId, status: { in: ['ACTIVE', 'PAUSED'] } },
+  });
+  if (existing) throw new AppError('Already have an active session', 409);
+
+  const session = await prisma.workSession.create({
+    data: {
+      clientId: data.clientId,
+      techId,
+      ticketId: data.ticketId ?? null,
+      locationId: data.locationId ?? null,
+      deviceId: data.deviceId ?? null,
+      notes: data.notes ?? null,
+      status: 'ACTIVE',
+    },
+    include: sessionInclude,
+  });
+
+  // Pierwszy wpis czasu
+  await prisma.sessionTimeEntry.create({
+    data: { workSessionId: session.id },
+  });
+
+  // Powiadom klienta
+  if (data.ticketId) {
+    const tech = await prisma.user.findUnique({ where: { id: techId }, select: { firstName: true, lastName: true } });
+    if (tech) notifyTicketWorkStarted(data.ticketId, `${tech.firstName} ${tech.lastName}`);
+  }
+
+  // Ponownie pobierz z entries
+  return prisma.workSession.findUnique({ where: { id: session.id }, include: sessionInclude });
+}
+
+// ── Pause ────────────────────────────────────────────────────────────────────
+
+export async function pauseSession(id: string, techId: string) {
+  const session = await prisma.workSession.findFirst({
+    where: { id, techId, status: 'ACTIVE' },
+    include: { timeEntries: true },
+  });
+  if (!session) throw new AppError('Active session not found', 404);
+
+  const now = new Date();
+
+  // Zamknij bieżący wpis czasu
+  const openEntry = session.timeEntries.find(e => !e.endedAt);
+  if (openEntry) {
+    const entryDuration = Math.round((now.getTime() - openEntry.startedAt.getTime()) / 60000);
+    await prisma.sessionTimeEntry.update({
+      where: { id: openEntry.id },
+      data: { endedAt: now, durationMin: entryDuration },
+    });
+  }
 
   return prisma.workSession.update({
     where: { id },
-    data: { endedAt, durationMin, notes },
-    include: {
-      client: { select: { id: true, name: true } },
-      device: { select: { id: true, name: true } },
-    },
+    data: { status: 'PAUSED', pausedAt: now },
+    include: sessionInclude,
   });
 }
+
+// ── Resume ───────────────────────────────────────────────────────────────────
+
+export async function resumeSession(id: string, techId: string) {
+  const session = await prisma.workSession.findFirst({
+    where: { id, techId, status: 'PAUSED' },
+  });
+  if (!session) throw new AppError('Paused session not found', 404);
+
+  const now = new Date();
+
+  // Nowy wpis czasu
+  await prisma.sessionTimeEntry.create({
+    data: { workSessionId: id },
+  });
+
+  // Oblicz czas pauzy i dodaj do totalPausedMin
+  const pausedMs = session.pausedAt ? now.getTime() - session.pausedAt.getTime() : 0;
+  const pausedMin = Math.round(pausedMs / 60000);
+
+  return prisma.workSession.update({
+    where: { id },
+    data: {
+      status: 'ACTIVE',
+      pausedAt: null,
+      totalPausedMin: { increment: pausedMin },
+    },
+    include: sessionInclude,
+  });
+}
+
+// ── Get active session ───────────────────────────────────────────────────────
+
+export async function getActiveTechSession(techId: string) {
+  return prisma.workSession.findFirst({
+    where: { techId, status: { in: ['ACTIVE', 'PAUSED'] } },
+    include: sessionInclude,
+    orderBy: { startedAt: 'desc' },
+  });
+}
+
+// ── Sessions by client ───────────────────────────────────────────────────────
 
 export async function getSessionsByClient(clientId: string) {
   return prisma.workSession.findMany({
@@ -50,6 +210,7 @@ export async function getSessionsByClient(clientId: string) {
     include: {
       tech: { select: { id: true, firstName: true, lastName: true } },
       device: { select: { id: true, name: true } },
+      timeEntries: { orderBy: { startedAt: 'asc' } },
     },
   });
 }

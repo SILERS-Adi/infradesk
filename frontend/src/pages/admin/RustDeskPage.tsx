@@ -3,16 +3,17 @@ export function RustDeskPage() {
 
   return (
     <div className="flex flex-col h-full -m-6">
-      <div className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200 shrink-0">
+      <div className="flex items-center justify-between px-6 py-3 shrink-0"
+        style={{ background: 'rgba(255,255,255,0.035)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div>
-          <h1 className="text-lg font-bold text-gray-900">Panel RustDesk</h1>
-          <p className="text-xs text-gray-500">Zdalny pulpit — zarządzanie sesjami</p>
+          <h1 className="text-lg font-bold text-white/90">Panel RustDesk</h1>
+          <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>Zdalny pulpit — zarządzanie sesjami</p>
         </div>
         <a
           href={url}
           target="_blank"
           rel="noreferrer"
-          className="text-xs text-indigo-600 hover:underline"
+          className="text-xs text-violet-400 hover:underline"
         >
           Otwórz w nowej karcie
         </a>

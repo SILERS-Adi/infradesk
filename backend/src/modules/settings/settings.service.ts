@@ -1,4 +1,5 @@
 import prisma from '../../lib/prisma';
+import { sendMail } from '../../lib/mailer';
 
 const DEFAULT_CONTACT = JSON.stringify({
   infolinia: '+48 575 662 664',
@@ -53,6 +54,54 @@ export async function getContactInfo(): Promise<Record<string, string>> {
   if (!setting) return JSON.parse(DEFAULT_CONTACT);
   try { return JSON.parse(setting.value); }
   catch { return JSON.parse(DEFAULT_CONTACT); }
+}
+
+// ── SMTP settings ──────────────────────────────────────────────────────────────
+
+const SMTP_KEYS = ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from'] as const;
+
+export async function getSmtpSettings(): Promise<Record<string, string>> {
+  const settings = await prisma.setting.findMany({
+    where: { key: { in: [...SMTP_KEYS] } },
+  });
+  const result: Record<string, string> = {};
+  for (const s of settings) {
+    result[s.key] = s.value;
+  }
+  return result;
+}
+
+export async function saveSmtpSettings(data: {
+  smtp_host?: string;
+  smtp_port?: string | number;
+  smtp_user?: string;
+  smtp_pass?: string;
+  smtp_from?: string;
+}): Promise<Record<string, string>> {
+  const entries: [string, string][] = [];
+  if (data.smtp_host !== undefined) entries.push(['smtp_host', String(data.smtp_host)]);
+  if (data.smtp_port !== undefined) entries.push(['smtp_port', String(data.smtp_port)]);
+  if (data.smtp_user !== undefined) entries.push(['smtp_user', String(data.smtp_user)]);
+  if (data.smtp_pass !== undefined) entries.push(['smtp_pass', String(data.smtp_pass)]);
+  if (data.smtp_from !== undefined) entries.push(['smtp_from', String(data.smtp_from)]);
+
+  for (const [key, value] of entries) {
+    await prisma.setting.upsert({
+      where: { key },
+      update: { value },
+      create: { key, value },
+    });
+  }
+
+  return getSmtpSettings();
+}
+
+export async function testSmtp(email: string): Promise<void> {
+  await sendMail(
+    email,
+    'InfraDesk — test konfiguracji SMTP',
+    '<p>Ta wiadomość potwierdza poprawność konfiguracji SMTP w systemie InfraDesk.</p>'
+  );
 }
 
 export async function getFaqItems(forAgent = false): Promise<Array<{ q: string; a: string; visibility?: string }>> {

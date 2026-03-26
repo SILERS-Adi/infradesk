@@ -4,7 +4,7 @@ import prisma from '../../lib/prisma';
 import { AppError } from '../../middleware/errorHandler';
 import { logActivity } from '../../utils/activityLogger';
 import { CreateDeviceInput, UpdateDeviceInput } from './devices.validation';
-import { DeviceStatus, DeviceCriticality } from '@prisma/client';
+import { DeviceStatus, DeviceCriticality, AgentStatus } from '@prisma/client';
 
 const deviceSelect = {
   id: true,
@@ -42,9 +42,15 @@ const deviceSelect = {
   createdAt: true,
   updatedAt: true,
   client:       { select: { id: true, name: true } },
-  location:     { select: { id: true, name: true, city: true } },
+  location:     { select: { id: true, name: true, addressLine1: true, postalCode: true, city: true, country: true } },
   deviceType:   { select: { id: true, name: true, icon: true } },
   assignedUser: { select: { id: true, firstName: true, lastName: true, email: true } },
+  agents: {
+    where:   { status: AgentStatus.ACTIVE },
+    orderBy: { lastSeen: 'desc' as const },
+    take:    1,
+    select:  { lastSeen: true, currentUser: true },
+  },
 };
 
 const deviceSelectWithInternalNotes = {
@@ -126,7 +132,22 @@ export async function getDeviceById(
     throw new AppError('Access denied', 403);
   }
 
-  return device;
+  // Dołącz dane z najnowszej rejestracji agenta
+  const agent = await prisma.agentRegistration.findFirst({
+    where: { deviceId: id, status: AgentStatus.ACTIVE },
+    orderBy: { lastSeen: 'desc' },
+    select: {
+      cpuModel: true, cpuCores: true, cpuThreads: true,
+      ramTotalGb: true, gpuModel: true, motherboard: true,
+      cpuUsage: true, ramUsage: true,
+      diskFree: true, diskTotal: true, cpuTempC: true,
+      diskInfo: true, networkIfaces: true,
+      lastSeen: true,
+      windowsVersion: true, lastBootTime: true,
+    },
+  }) as any;
+
+  return { ...device, agentInfo: agent ?? null };
 }
 
 export async function getDeviceByQrValue(qrCodeValue: string) {
@@ -143,7 +164,7 @@ export async function getDeviceByQrValue(qrCodeValue: string) {
       criticality: true,
       clientVisibleNotes: true,
       client: { select: { id: true, name: true } },
-      location: { select: { id: true, name: true, city: true } },
+      location: { select: { id: true, name: true, addressLine1: true, postalCode: true, city: true, country: true } },
       deviceType: { select: { id: true, name: true, icon: true } },
     },
   });

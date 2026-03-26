@@ -55,6 +55,8 @@ export interface AgentRegistration {
   gpuModel?: string;
   motherboard?: string;
   rustdeskId?: string;
+  anydeskId?: string;
+  teamviewerId?: string;
   // Metryki bieżące
   cpuUsage?: number;
   ramUsage?: number;
@@ -87,6 +89,18 @@ export const agentsApi = {
 
   pushUpdate: (id: string): Promise<void> =>
     api.post(`/agent/${id}/push-update`).then(() => undefined),
+
+  windowsUpdate: (id: string, scheduleTime?: string): Promise<void> =>
+    api.post(`/agent/${id}/windows-update`, { scheduleTime }).then(() => undefined),
+
+  wake: (id: string): Promise<void> =>
+    api.post(`/agent/${id}/wake`).then(() => undefined),
+
+  restartService: (id: string, serviceName: string): Promise<void> =>
+    api.post(`/agent/${id}/restart-service`, { serviceName }).then(() => undefined),
+
+  systemReboot: (id: string, delay?: number): Promise<void> =>
+    api.post(`/agent/${id}/system-reboot`, { delay: delay ?? 60 }).then(() => undefined),
 
   delete: (id: string): Promise<void> =>
     api.delete(`/agent/${id}`).then(() => undefined),

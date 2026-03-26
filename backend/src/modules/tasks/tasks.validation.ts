@@ -16,6 +16,7 @@ export const changeTaskStatusSchema = z.object({
 export const updateTaskSchema = z.object({
   notes: z.string().optional(),
   dueAt: z.string().optional(),
+  travelKm: z.number().optional().nullable(),
 });
 
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;

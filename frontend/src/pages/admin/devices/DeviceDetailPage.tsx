@@ -3,7 +3,9 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Monitor, Copy, Check, QrCode, ExternalLink,
-  Edit2, Plus, Download, User
+  Edit2, Download, User, MapPin, Wifi, Plus,
+  Building2, Laptop, Cpu, CircuitBoard, HardDrive,
+  Thermometer, Clock, Radio, Activity
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { devicesApi } from '../../../api/devices';
@@ -35,22 +37,288 @@ function CopyButton({ value, label }: { value: string; label?: string }) {
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <button onClick={handle} className="text-gray-400 hover:text-indigo-600 transition-colors p-0.5" title="Kopiuj">
+    <button onClick={handle} className="transition-colors p-0.5" style={{ color: 'rgba(255,255,255,0.3)' }} title="Kopiuj">
       {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
     </button>
   );
 }
 
-function InfoRow({ label, value, mono }: { label: string; value?: string | null; mono?: boolean }) {
-  if (!value) return null;
+function InfoRow({ label, value, mono, children }: { label: string; value?: string | null; mono?: boolean; children?: React.ReactNode }) {
+  if (!value && !children) return null;
   return (
     <div className="flex items-start gap-2">
-      <span className="text-xs font-medium text-gray-500 w-32 flex-shrink-0 mt-0.5">{label}</span>
-      <span className={`text-sm text-gray-800 flex items-center gap-1 ${mono ? 'font-mono' : ''}`}>
-        {value}
-        {mono && <CopyButton value={value} label={`${label} skopiowane`} />}
-      </span>
+      <span className="text-xs font-medium w-32 flex-shrink-0 mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>{label}</span>
+      {children ?? (
+        <span className={`text-sm text-white/80 flex items-center gap-1 ${mono ? 'font-mono' : ''}`}>
+          {value}
+          {mono && value && <CopyButton value={value} label={`${label} skopiowane`} />}
+        </span>
+      )}
     </div>
+  );
+}
+
+// ── Konfiguracja narzędzi zdalnych ────────────────────────────────────────────
+const REMOTE_TOOLS = [
+  {
+    key: 'rustdeskId' as const,
+    label: 'RustDesk',
+    color: 'border rounded-xl',
+    colorStyle: { background: 'rgba(16,185,129,0.12)', borderColor: 'rgba(16,185,129,0.2)' },
+    labelColor: 'text-emerald-400',
+    btnColor: 'bg-emerald-600 hover:bg-emerald-700',
+    href: (id: string) => `rustdesk://id=${id}`,
+    connectLabel: 'Połącz',
+  },
+  {
+    key: 'anydeskId' as const,
+    label: 'AnyDesk',
+    color: 'border rounded-xl',
+    colorStyle: { background: 'rgba(239,68,68,0.12)', borderColor: 'rgba(239,68,68,0.2)' },
+    labelColor: 'text-red-400',
+    btnColor: 'bg-red-500 hover:bg-red-600',
+    href: (id: string) => `anydesk:${id}`,
+    connectLabel: 'Połącz',
+  },
+  {
+    key: 'teamviewerId' as const,
+    label: 'TeamViewer',
+    color: 'border rounded-xl',
+    colorStyle: { background: 'rgba(59,130,246,0.12)', borderColor: 'rgba(59,130,246,0.2)' },
+    labelColor: 'text-blue-400',
+    btnColor: 'bg-blue-600 hover:bg-blue-700',
+    href: (id: string) => `teamviewer10://control?device=${id}`,
+    connectLabel: 'Połącz',
+  },
+  {
+    key: 'rdpAddress' as const,
+    label: 'RDP',
+    color: 'border rounded-xl',
+    colorStyle: { background: 'rgba(99,102,241,0.12)', borderColor: 'rgba(99,102,241,0.2)' },
+    labelColor: 'text-indigo-400',
+    btnColor: 'bg-indigo-600 hover:bg-indigo-700',
+    href: (id: string) => `rdp://${id}`,
+    connectLabel: 'Połącz',
+  },
+  {
+    key: 'sshAddress' as const,
+    label: 'SSH',
+    color: 'border rounded-xl',
+    colorStyle: { background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.08)' },
+    labelColor: 'text-white/60',
+    btnColor: 'bg-gray-600 hover:bg-gray-700',
+    href: (id: string) => `ssh://${id}`,
+    connectLabel: 'Połącz',
+  },
+  {
+    key: 'customRemoteLink' as const,
+    label: 'Własny link',
+    color: 'border rounded-xl',
+    colorStyle: { background: 'rgba(168,85,247,0.12)', borderColor: 'rgba(168,85,247,0.2)' },
+    labelColor: 'text-purple-400',
+    btnColor: 'bg-purple-600 hover:bg-purple-700',
+    href: (id: string) => id,
+    connectLabel: 'Otwórz',
+  },
+] as const;
+
+// ── Pasek zasobu ─────────────────────────────────────────────────────────────
+function ResourceBar({ pct, color }: { pct: number; color: string }) {
+  return (
+    <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+      <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${Math.min(pct, 100)}%` }} />
+    </div>
+  );
+}
+
+// ── Box: Parametry z agenta ───────────────────────────────────────────────────
+function AgentStatsBox({ agent }: { agent: NonNullable<import('../../../types').Device['agentInfo']> }) {
+  const ramUsedGb = agent.ramTotalGb && agent.ramUsage != null
+    ? ((agent.ramUsage / 100) * agent.ramTotalGb).toFixed(1)
+    : null;
+
+  const cpuColor  = (agent.cpuUsage  ?? 0) > 85 ? 'bg-red-500'    : (agent.cpuUsage  ?? 0) > 60 ? 'bg-amber-400' : 'bg-emerald-500';
+  const ramColor  = (agent.ramUsage  ?? 0) > 85 ? 'bg-red-500'    : (agent.ramUsage  ?? 0) > 60 ? 'bg-amber-400' : 'bg-blue-500';
+  const diskUsed  = agent.diskTotal && agent.diskFree != null ? agent.diskTotal - agent.diskFree : null;
+  const diskPct   = agent.diskTotal && diskUsed != null ? (diskUsed / agent.diskTotal) * 100 : null;
+  const diskColor = (diskPct ?? 0) > 90 ? 'bg-red-500' : (diskPct ?? 0) > 75 ? 'bg-amber-400' : 'bg-indigo-500';
+  const tempColor = (agent.cpuTempC ?? 0) > 85 ? 'text-red-400' : (agent.cpuTempC ?? 0) > 65 ? 'text-amber-400' : 'text-emerald-400';
+
+  const isOnline = agent.lastSeen
+    ? (Date.now() - new Date(agent.lastSeen).getTime()) < 5 * 60 * 1000
+    : false;
+
+  return (
+    <div className="space-y-4">
+      {/* Status agenta */}
+      <div className="flex items-center justify-between text-xs">
+        <div className="flex items-center gap-1.5">
+          <span className={`inline-block w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : ''}`} style={!isOnline ? { background: 'rgba(255,255,255,0.15)' } : {}} />
+          <span className={isOnline ? 'text-emerald-400 font-medium' : ''} style={!isOnline ? { color: 'rgba(255,255,255,0.3)' } : {}}>
+            {isOnline ? 'Online' : 'Offline'}
+          </span>
+          {agent.appVersion && <span className="ml-1" style={{ color: 'rgba(255,255,255,0.3)' }}>v{agent.appVersion}</span>}
+        </div>
+        {agent.lastSeen && (
+          <span className="flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.3)' }}>
+            <Clock className="h-3 w-3" />
+            {new Date(agent.lastSeen).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' })}
+          </span>
+        )}
+      </div>
+
+      {/* CPU */}
+      {agent.cpuUsage != null && (
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'rgba(255,255,255,0.5)' }}>
+              <Cpu className="h-3.5 w-3.5" />
+              <span>CPU</span>
+              {agent.cpuModel && <span className="font-normal truncate max-w-[200px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{agent.cpuModel}</span>}
+              {agent.cpuCores && <span style={{ color: 'rgba(255,255,255,0.3)' }}>· {agent.cpuCores}C/{agent.cpuThreads}T</span>}
+            </div>
+            <div className="flex items-center gap-2">
+              {agent.cpuTempC != null && (
+                <span className={`text-xs font-semibold flex items-center gap-0.5 ${tempColor}`}>
+                  <Thermometer className="h-3 w-3" />
+                  {agent.cpuTempC}°C
+                </span>
+              )}
+              <span className="text-xs font-bold" style={{ color: 'rgba(255,255,255,0.6)' }}>{agent.cpuUsage.toFixed(1)}%</span>
+            </div>
+          </div>
+          <ResourceBar pct={agent.cpuUsage} color={cpuColor} />
+        </div>
+      )}
+
+      {/* RAM */}
+      {agent.ramUsage != null && (
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'rgba(255,255,255,0.5)' }}>
+              <CircuitBoard className="h-3.5 w-3.5" />
+              <span>RAM</span>
+              {agent.ramTotalGb && <span className="font-normal" style={{ color: 'rgba(255,255,255,0.3)' }}>· {agent.ramTotalGb} GB</span>}
+            </div>
+            <span className="text-xs font-bold" style={{ color: 'rgba(255,255,255,0.6)' }}>
+              {ramUsedGb && `${ramUsedGb} / ${agent.ramTotalGb} GB`} ({agent.ramUsage.toFixed(1)}%)
+            </span>
+          </div>
+          <ResourceBar pct={agent.ramUsage} color={ramColor} />
+        </div>
+      )}
+
+      {/* Dysk C: */}
+      {diskPct != null && (
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'rgba(255,255,255,0.5)' }}>
+              <HardDrive className="h-3.5 w-3.5" />
+              <span>Dysk C:</span>
+            </div>
+            <span className="text-xs font-bold" style={{ color: 'rgba(255,255,255,0.6)' }}>
+              {diskUsed != null && agent.diskTotal
+                ? `${diskUsed.toFixed(1)} / ${agent.diskTotal.toFixed(1)} GB`
+                : ''} ({diskPct.toFixed(1)}%)
+            </span>
+          </div>
+          <ResourceBar pct={diskPct} color={diskColor} />
+        </div>
+      )}
+
+      {/* Dodatkowe dyski z diskInfo */}
+      {Array.isArray(agent.diskInfo) && agent.diskInfo.filter(d => d.mountpoint !== 'C:\\').map(disk => (
+        <div key={disk.mountpoint}>
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              <HardDrive className="h-3 w-3" />
+              <span>{disk.mountpoint}</span>
+              <span className="font-normal" style={{ color: 'rgba(255,255,255,0.3)' }}>· {disk.totalGb} GB</span>
+            </div>
+            <span className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
+              {(disk.totalGb - disk.freeGb).toFixed(1)} / {disk.totalGb} GB ({disk.usedPct}%)
+            </span>
+          </div>
+          <ResourceBar
+            pct={disk.usedPct}
+            color={disk.usedPct > 90 ? 'bg-red-500' : disk.usedPct > 75 ? 'bg-amber-400' : 'bg-indigo-400'}
+          />
+        </div>
+      ))}
+
+      {/* Sieć */}
+      {Array.isArray(agent.networkIfaces) && agent.networkIfaces.filter(n => n.ip && n.isUp).length > 0 && (
+        <div className="pt-1">
+          <div className="flex items-center gap-1.5 text-xs font-medium mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>
+            <Radio className="h-3.5 w-3.5" />
+            Sieć
+          </div>
+          <div className="grid grid-cols-1 gap-1">
+            {agent.networkIfaces.filter(n => n.ip && n.isUp).map(iface => (
+              <div key={iface.name} className="flex items-center justify-between text-xs rounded-lg px-3 py-1.5" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                <span className="font-medium truncate max-w-[160px]" style={{ color: 'rgba(255,255,255,0.6)' }}>{iface.name}</span>
+                <div className="flex items-center gap-2" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                  <span className="font-mono">{iface.ip}</span>
+                  {iface.mac && <span className="font-mono" style={{ color: 'rgba(255,255,255,0.3)' }}>{iface.mac}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Ostatni rozruch */}
+      {agent.lastBootTime && (
+        <div className="flex items-center gap-1.5 text-xs pt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
+          <Activity className="h-3.5 w-3.5" />
+          <span>Ostatni rozruch:</span>
+          <span className="font-medium" style={{ color: 'rgba(255,255,255,0.6)' }}>{new Date(agent.lastBootTime).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' })}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Mała mapka OpenStreetMap ───────────────────────────────────────────────────
+function LocationMap({ lat, lon, label }: { lat: number; lon: number; label?: string }) {
+  const delta = 0.008;
+  const bbox = `${lon - delta},${lat - delta},${lon + delta},${lat + delta}`;
+  const src = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lon}`;
+  return (
+    <div className="mt-3 rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
+      <iframe
+        src={src}
+        title={label ?? 'Lokalizacja'}
+        className="w-full h-40 block"
+        loading="lazy"
+        referrerPolicy="no-referrer"
+      />
+      <a
+        href={`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=16/${lat}/${lon}`}
+        target="_blank"
+        rel="noreferrer"
+        className="flex items-center justify-center gap-1 py-1.5 text-xs text-violet-400 hover:bg-white/[0.03] transition-colors"
+      >
+        <ExternalLink className="h-3 w-3" />
+        Otwórz w mapach
+      </a>
+    </div>
+  );
+}
+
+// ── Mapka z adresu (link do Google Maps) ──────────────────────────────────────
+function LocationAddress({ address, label }: { address: string; label?: string }) {
+  const mapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(address)}`;
+  return (
+    <a
+      href={mapsUrl}
+      target="_blank"
+      rel="noreferrer"
+      className="mt-2 flex items-center gap-1.5 text-xs text-violet-400 hover:underline"
+    >
+      <MapPin className="h-3.5 w-3.5" />
+      {label ?? address}
+    </a>
   );
 }
 
@@ -103,20 +371,14 @@ export function DeviceDetailPage() {
   });
 
   if (isLoading) return <LoadingSpinner />;
-  if (!device) return <div className="text-sm text-gray-500">Nie znaleziono urządzenia</div>;
+  if (!device) return <div className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Nie znaleziono urządzenia</div>;
 
   const isAdmin = user?.role === 'ADMIN';
   const isTech = user?.role === 'TECHNICIAN';
   const canSeeInternal = isAdmin || isTech;
 
-  const remoteLinks = [
-    device.rustdeskId && { label: 'RustDesk', value: device.rustdeskId, href: `rustdesk://id=${device.rustdeskId}`, color: 'bg-green-50 text-green-700 border-green-200' },
-    device.rdpAddress && { label: 'RDP', value: device.rdpAddress, href: `rdp://${device.rdpAddress}`, color: 'bg-blue-50 text-blue-700 border-blue-200' },
-    device.sshAddress && { label: 'SSH', value: device.sshAddress, href: `ssh://${device.sshAddress}`, color: 'bg-gray-50 text-gray-700 border-gray-200' },
-    device.anydeskId && { label: 'AnyDesk', value: device.anydeskId, href: `anydesk://${device.anydeskId}`, color: 'bg-orange-50 text-orange-700 border-orange-200' },
-    device.teamviewerId && { label: 'TeamViewer', value: device.teamviewerId, href: `teamviewer://id=${device.teamviewerId}`, color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-    device.customRemoteLink && { label: 'Własny link', value: device.customRemoteLink, href: device.customRemoteLink, color: 'bg-purple-50 text-purple-700 border-purple-200' },
-  ].filter(Boolean) as { label: string; value: string; href: string; color: string }[];
+  // Aktywne narzędzia zdalne (tylko te z ID)
+  const activeRemoteTools = REMOTE_TOOLS.filter(t => !!(device as any)[t.key]);
 
   const handleLoadQr = async () => {
     if (qrBase64) return;
@@ -142,6 +404,11 @@ export function DeviceDetailPage() {
   const openTickets = tickets.filter(t => !['RESOLVED', 'CLOSED'].includes(t.status));
   const closedTickets = tickets.filter(t => ['RESOLVED', 'CLOSED'].includes(t.status));
 
+  // Adres lokalizacji do mapki
+  const loc = device.location;
+  const locationAddress = [loc?.addressLine1, loc?.postalCode && loc?.city ? `${loc.postalCode} ${loc.city}` : loc?.city, loc?.country]
+    .filter(Boolean).join(', ');
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -155,7 +422,8 @@ export function DeviceDetailPage() {
             {canSeeInternal && (
               <button
                 onClick={() => setShowEdit(true)}
-                className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-indigo-600 border border-gray-300 px-3 py-1.5 rounded-lg hover:border-indigo-300 transition-colors"
+                className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors hover:text-violet-400"
+                style={{ color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.08)' }}
               >
                 <Edit2 className="h-3.5 w-3.5" />
                 Edytuj
@@ -169,88 +437,173 @@ export function DeviceDetailPage() {
         {/* LEFT COLUMN */}
         <div className="lg:col-span-2 space-y-6">
 
-          {/* Basic Info */}
+          {/* ── Informacje podstawowe ── */}
           <Card title="Informacje podstawowe">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <InfoRow label="Klient" value={device.client?.name} />
-              <InfoRow label="Lokalizacja" value={device.location?.name} />
-              <InfoRow label="Typ" value={device.deviceType?.name} />
-              <InfoRow label="Asset Tag" value={device.assetTag} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+              {/* Klient */}
+              <InfoRow label="Klient">
+                {device.client ? (
+                  <Link to={`/clients/${device.client.id}`} className="text-sm text-violet-400 hover:underline flex items-center gap-1">
+                    <Building2 className="h-3.5 w-3.5 flex-shrink-0" />
+                    {device.client.name}
+                  </Link>
+                ) : null}
+              </InfoRow>
+
+              {/* Użytkownik */}
+              <InfoRow label="Użytkownik">
+                {device.assignedUser ? (
+                  <span className="text-sm text-white/80 flex items-center gap-1">
+                    <User className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'rgba(255,255,255,0.3)' }} />
+                    {device.assignedUser.firstName} {device.assignedUser.lastName}
+                  </span>
+                ) : (
+                  <span className="text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>— nie przypisano —</span>
+                )}
+              </InfoRow>
+
+              {/* Typ + Asset Tag */}
+              <InfoRow label="Typ urządzenia" value={device.deviceType?.name} />
+              <InfoRow label="Asset Tag" value={device.assetTag} mono />
             </div>
+
+            {/* Lokalizacja + mapka */}
+            {loc && (
+              <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                <div className="flex items-start gap-1.5">
+                  <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: 'rgba(255,255,255,0.3)' }} />
+                  <div>
+                    <p className="text-sm font-medium text-white/80">{loc.name}</p>
+                    {locationAddress && (
+                      <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>{locationAddress}</p>
+                    )}
+                  </div>
+                </div>
+                {/* Mapka GPS jeśli są współrzędne */}
+                {device.gpsLat && device.gpsLon ? (
+                  <LocationMap lat={device.gpsLat} lon={device.gpsLon} label={loc.name} />
+                ) : locationAddress ? (
+                  <LocationAddress address={`${loc.name}, ${locationAddress}`} label="Zobacz na mapie" />
+                ) : null}
+              </div>
+            )}
           </Card>
 
-          {/* Technical */}
+          {/* ── Dane techniczne ── */}
           <Card title="Dane techniczne">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <InfoRow label="Producent" value={device.manufacturer} />
+              <InfoRow label="Model" value={device.model} />
               <InfoRow label="Hostname" value={device.hostname} mono />
               <InfoRow label="Adres IP" value={device.ipAddress} mono />
               <InfoRow label="MAC" value={device.macAddress} mono />
               <InfoRow label="System" value={device.operatingSystem} />
               <InfoRow label="Wersja OS" value={device.osVersion} />
-              <InfoRow label="Producent" value={device.manufacturer} />
-              <InfoRow label="Model" value={device.model} />
               <InfoRow label="Numer seryjny" value={device.serialNumber} mono />
               <InfoRow label="Data zakupu" value={device.purchaseDate ? formatDate(device.purchaseDate) : null} />
               <div className="flex items-start gap-2">
-                <span className="text-xs font-medium text-gray-500 w-32 flex-shrink-0 mt-0.5">Gwarancja do</span>
+                <span className="text-xs font-medium w-32 flex-shrink-0 mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Gwarancja do</span>
                 {device.warrantyUntil ? (
-                  <span className={`text-sm font-medium ${isExpired(device.warrantyUntil) ? 'text-red-600' : 'text-green-600'}`}>
+                  <span className={`text-sm font-medium ${isExpired(device.warrantyUntil) ? 'text-red-400' : 'text-green-400'}`}>
                     {formatDate(device.warrantyUntil)}
                     {isExpired(device.warrantyUntil) && ' (wygasła)'}
                   </span>
-                ) : <span className="text-sm text-gray-400">—</span>}
+                ) : <span className="text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>—</span>}
               </div>
             </div>
           </Card>
 
-          {/* Remote Access */}
-          {remoteLinks.length > 0 && (
-            <Card title="Zdalny dostęp">
-              <div className="flex flex-wrap gap-3">
-                {remoteLinks.map(link => (
-                  <a
-                    key={link.label}
-                    href={link.href}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-opacity hover:opacity-80 ${link.color}`}
+          {/* ── Parametry z agenta ── */}
+          {device.agentInfo && (
+            <Card title="Parametry urządzenia (Agent)">
+              <AgentStatsBox agent={device.agentInfo} />
+            </Card>
+          )}
+
+          {/* ── Połączenia zdalne ── */}
+          {activeRemoteTools.length > 0 && (
+            <Card
+              title="Połączenia zdalne"
+              action={
+                canSeeInternal ? (
+                  <button
+                    onClick={() => setShowEdit(true)}
+                    className="flex items-center gap-1 text-xs text-violet-400 hover:underline"
                   >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    {link.label}
-                    <span className="text-xs opacity-60 font-mono ml-1">{link.value}</span>
-                  </a>
-                ))}
-                {device.rustdeskId && (
-                  <a
-                    href={`rustdesk://connect/${device.rustdeskId}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-opacity hover:opacity-80 bg-blue-50 text-blue-700 border-blue-200"
-                  >
-                    <Monitor className="h-3.5 w-3.5" />
-                    Połącz RustDesk
-                  </a>
-                )}
+                    <Plus className="h-3 w-3" />
+                    Dodaj
+                  </button>
+                ) : null
+              }
+            >
+              <div className="space-y-3">
+                {activeRemoteTools.map(tool => {
+                  const toolId = (device as any)[tool.key] as string;
+                  return (
+                    <div
+                      key={tool.key}
+                      className={`flex items-center justify-between gap-3 px-4 py-3 ${tool.color}`}
+                      style={tool.colorStyle}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Wifi className={`h-4 w-4 flex-shrink-0 ${tool.labelColor}`} />
+                        <div className="min-w-0">
+                          <p className={`text-sm font-semibold ${tool.labelColor}`}>{tool.label}</p>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <span className="text-xs font-mono truncate" style={{ color: 'rgba(255,255,255,0.5)' }}>{toolId}</span>
+                            <CopyButton value={toolId} label={`${tool.label} ID skopiowane`} />
+                          </div>
+                        </div>
+                      </div>
+                      <a
+                        href={tool.href(toolId)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={`flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold text-white px-3 py-1.5 rounded-lg transition-colors ${tool.btnColor}`}
+                      >
+                        <Monitor className="h-3.5 w-3.5" />
+                        {tool.connectLabel}
+                      </a>
+                    </div>
+                  );
+                })}
               </div>
             </Card>
           )}
 
-          {/* Notes */}
+          {/* Brak narzędzi — placeholder z przyciskiem dodaj */}
+          {activeRemoteTools.length === 0 && canSeeInternal && (
+            <Card title="Połączenia zdalne">
+              <div className="flex flex-col items-center py-6 gap-3">
+                <Laptop className="h-8 w-8" style={{ color: 'rgba(255,255,255,0.15)' }} />
+                <p className="text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>Brak skonfigurowanych połączeń</p>
+                <button
+                  onClick={() => setShowEdit(true)}
+                  className="flex items-center gap-1.5 text-xs text-violet-400 hover:underline"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Dodaj RustDesk / AnyDesk / TeamViewer
+                </button>
+              </div>
+            </Card>
+          )}
+
+          {/* ── Notatki ── */}
           {(canSeeInternal && device.internalNotes) || device.clientVisibleNotes ? (
             <Card title="Notatki">
               <div className="space-y-4">
                 {canSeeInternal && device.internalNotes && (
                   <div>
-                    <div className="text-xs font-semibold text-gray-500 uppercase mb-1.5">Notatki wewnętrzne</div>
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-gray-700 whitespace-pre-wrap">
+                    <div className="text-xs font-semibold uppercase mb-1.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Notatki wewnętrzne</div>
+                    <div className="rounded-lg p-3 text-sm whitespace-pre-wrap" style={{ background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.2)', color: 'rgba(255,255,255,0.6)' }}>
                       {device.internalNotes}
                     </div>
                   </div>
                 )}
                 {device.clientVisibleNotes && (
                   <div>
-                    <div className="text-xs font-semibold text-gray-500 uppercase mb-1.5">Notatki publiczne</div>
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-700 whitespace-pre-wrap">
+                    <div className="text-xs font-semibold uppercase mb-1.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Notatki publiczne</div>
+                    <div className="rounded-lg p-3 text-sm whitespace-pre-wrap" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)' }}>
                       {device.clientVisibleNotes}
                     </div>
                   </div>
@@ -259,36 +612,33 @@ export function DeviceDetailPage() {
             </Card>
           ) : null}
 
-          {/* Credentials */}
+          {/* ── Dane dostępowe ── */}
           {canSeeInternal && (
             <Card
               title={`Dane dostępowe (${credentials.length})`}
               action={
-                <Link
-                  to={`/credentials?deviceId=${device.id}`}
-                  className="text-xs text-indigo-600 hover:underline"
-                >
+                <Link to={`/credentials?deviceId=${device.id}`} className="text-xs text-violet-400 hover:underline">
                   Zarządzaj
                 </Link>
               }
             >
               {credentials.length === 0 ? (
-                <p className="text-sm text-gray-500">Brak zapisanych danych dostępowych</p>
+                <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Brak zapisanych danych dostępowych</p>
               ) : (
-                <div className="divide-y divide-gray-100">
-                  {credentials.map((cred: Credential) => (
-                    <div key={cred.id} className="py-3 flex items-center justify-between gap-4">
+                <div>
+                  {credentials.map((cred: Credential, idx: number) => (
+                    <div key={cred.id} className="py-3 flex items-center justify-between gap-4" style={idx < credentials.length - 1 ? { borderBottom: '1px solid rgba(255,255,255,0.04)' } : {}}>
                       <div>
-                        <div className="text-sm font-medium text-gray-800">{cred.name}</div>
+                        <div className="text-sm font-medium text-white/80">{cred.name}</div>
                         <div className="flex items-center gap-2 mt-0.5">
                           <Badge color="gray">{cred.category}</Badge>
                           {cred.username && (
-                            <span className="text-xs font-mono text-gray-500 flex items-center gap-1">
+                            <span className="text-xs font-mono flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
                               {cred.username}
                               <CopyButton value={cred.username} label="Login skopiowany" />
                             </span>
                           )}
-                          {cred.urlOrHost && <span className="text-xs text-gray-400">{cred.urlOrHost}</span>}
+                          {cred.urlOrHost && <span className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{cred.urlOrHost}</span>}
                         </div>
                       </div>
                       <PasswordRevealField
@@ -302,28 +652,29 @@ export function DeviceDetailPage() {
             </Card>
           )}
 
-          {/* Open Tickets */}
+          {/* ── Otwarte zgłoszenia ── */}
           <Card
             title={`Otwarte zgłoszenia (${openTickets.length})`}
             action={
-              <Link to={`/tickets?deviceId=${device.id}`} className="text-xs text-indigo-600 hover:underline">
+              <Link to={`/tickets?deviceId=${device.id}`} className="text-xs text-violet-400 hover:underline">
                 + Nowe
               </Link>
             }
           >
             {openTickets.length === 0 ? (
-              <p className="text-sm text-gray-500">Brak otwartych zgłoszeń</p>
+              <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Brak otwartych zgłoszeń</p>
             ) : (
               <div className="space-y-2">
                 {openTickets.map((t: Ticket) => (
                   <Link
                     key={t.id}
                     to={`/tickets/${t.id}`}
-                    className="flex items-center justify-between p-2.5 rounded-lg border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50/30 transition-colors"
+                    className="flex items-center justify-between p-2.5 rounded-lg hover:bg-white/[0.03] transition-colors"
+                    style={{ border: '1px solid rgba(255,255,255,0.04)' }}
                   >
                     <div>
-                      <span className="text-xs font-mono text-indigo-600">{t.ticketNumber}</span>
-                      <span className="text-sm text-gray-800 ml-2">{t.title}</span>
+                      <span className="text-xs font-mono text-violet-400">{t.ticketNumber}</span>
+                      <span className="text-sm text-white/80 ml-2">{t.title}</span>
                     </div>
                     <div className="flex gap-2">
                       <PriorityBadge priority={t.priority} />
@@ -335,7 +686,7 @@ export function DeviceDetailPage() {
             )}
           </Card>
 
-          {/* Ticket History */}
+          {/* ── Historia zgłoszeń ── */}
           {closedTickets.length > 0 && (
             <Card title={`Historia zgłoszeń (${closedTickets.length})`}>
               <div className="space-y-2">
@@ -343,14 +694,14 @@ export function DeviceDetailPage() {
                   <Link
                     key={t.id}
                     to={`/tickets/${t.id}`}
-                    className="flex items-center justify-between p-2.5 rounded-lg hover:bg-gray-50 transition-colors"
+                    className="flex items-center justify-between p-2.5 rounded-lg hover:bg-white/[0.03] transition-colors"
                   >
                     <div>
-                      <span className="text-xs font-mono text-gray-400">{t.ticketNumber}</span>
-                      <span className="text-sm text-gray-600 ml-2">{t.title}</span>
+                      <span className="text-xs font-mono" style={{ color: 'rgba(255,255,255,0.3)' }}>{t.ticketNumber}</span>
+                      <span className="text-sm ml-2" style={{ color: 'rgba(255,255,255,0.5)' }}>{t.title}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-400">{formatDate(t.reportedAt)}</span>
+                      <span className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{formatDate(t.reportedAt)}</span>
                       <TicketStatusBadge status={t.status} />
                     </div>
                   </Link>
@@ -362,14 +713,14 @@ export function DeviceDetailPage() {
 
         {/* RIGHT COLUMN */}
         <div className="space-y-6">
-          {/* QR Code */}
+          {/* ── Kod QR ── */}
           <Card title="Kod QR" action={
             !qrBase64 ? (
-              <button onClick={handleLoadQr} disabled={loadingQr} className="text-xs text-indigo-600 hover:underline">
+              <button onClick={handleLoadQr} disabled={loadingQr} className="text-xs text-violet-400 hover:underline">
                 {loadingQr ? 'Ładowanie...' : 'Wygeneruj'}
               </button>
             ) : (
-              <button onClick={handleDownloadQr} className="flex items-center gap-1 text-xs text-indigo-600 hover:underline">
+              <button onClick={handleDownloadQr} className="flex items-center gap-1 text-xs text-violet-400 hover:underline">
                 <Download className="h-3 w-3" />
                 Pobierz
               </button>
@@ -378,22 +729,22 @@ export function DeviceDetailPage() {
             {qrBase64 ? (
               <div className="flex flex-col items-center gap-3">
                 <img src={`data:image/png;base64,${qrBase64}`} alt="QR Code" className="w-40 h-40" />
-                <div className="text-xs text-gray-500 font-mono text-center break-all">{device.qrCodeValue}</div>
+                <div className="text-xs font-mono text-center break-all" style={{ color: 'rgba(255,255,255,0.4)' }}>{device.qrCodeValue}</div>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-3 py-4">
-                <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                  <QrCode className="h-8 w-8 text-gray-300" />
+                <div className="w-20 h-20 border-2 border-dashed rounded-lg flex items-center justify-center" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+                  <QrCode className="h-8 w-8" style={{ color: 'rgba(255,255,255,0.15)' }} />
                 </div>
-                <p className="text-xs text-gray-500 text-center">Kliknij "Wygeneruj" aby zobaczyć kod QR</p>
+                <p className="text-xs text-center" style={{ color: 'rgba(255,255,255,0.4)' }}>Kliknij "Wygeneruj" aby zobaczyć kod QR</p>
               </div>
             )}
           </Card>
 
-          {/* Opiekun */}
+          {/* ── Opiekun ── */}
           <Card title="Opiekun urządzenia">
             <div className="space-y-2">
-              <label className="text-xs text-gray-500 flex items-center gap-1.5">
+              <label className="text-xs flex items-center gap-1.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
                 <User className="h-3.5 w-3.5" />
                 Przypisany opiekun
               </label>
@@ -401,7 +752,8 @@ export function DeviceDetailPage() {
                 value={(device as any).managerId ?? ''}
                 onChange={(e) => updateManagerMutation.mutate(e.target.value || null)}
                 disabled={updateManagerMutation.isPending}
-                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
+                className="w-full text-sm rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
               >
                 <option value="">— brak opiekuna —</option>
                 {staffUsers.map(u => (
@@ -411,18 +763,18 @@ export function DeviceDetailPage() {
             </div>
           </Card>
 
-          {/* Activity Log */}
+          {/* ── Historia aktywności ── */}
           <Card title="Historia aktywności">
             {logs.length === 0 ? (
-              <p className="text-sm text-gray-500">Brak wpisów</p>
+              <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Brak wpisów</p>
             ) : (
               <div className="space-y-3">
                 {logs.slice(0, 10).map(log => (
                   <div key={log.id} className="flex gap-2.5">
-                    <div className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1.5" />
+                    <div className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-violet-400 mt-1.5" />
                     <div className="min-w-0">
-                      <p className="text-xs text-gray-700">{log.description}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
+                      <p className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>{log.description}</p>
+                      <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>
                         {log.performedBy ? `${log.performedBy.firstName} ${log.performedBy.lastName} · ` : ''}
                         {formatDateTime(log.createdAt)}
                       </p>

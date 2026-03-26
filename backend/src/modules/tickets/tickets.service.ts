@@ -2,6 +2,8 @@ import prisma from '../../lib/prisma';
 import { AppError } from '../../middleware/errorHandler';
 import { logActivity } from '../../utils/activityLogger';
 import { notifyAgent } from '../../utils/websocket';
+import { notifyTicketAssigned } from '../../utils/ticketNotifications';
+import { sendPushToUser } from '../../lib/webpush';
 import {
   CreateTicketInput,
   UpdateTicketInput,
@@ -39,11 +41,12 @@ const ticketSelect = {
   resolvedAt: true,
   closedAt: true,
   billedInContract: true,
+  serviceMode: true,
   createdAt: true,
   updatedAt: true,
   client: { select: { id: true, name: true } },
   location: { select: { id: true, name: true, city: true } },
-  device: { select: { id: true, name: true, manufacturer: true, model: true } },
+  device: { select: { id: true, name: true, manufacturer: true, model: true, rustdeskId: true } },
   createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
   assignedTo: { select: { id: true, firstName: true, lastName: true, email: true } },
 };
@@ -165,16 +168,31 @@ export async function createTicket(
   data: CreateTicketInput,
   requestingUser: { userId: string; role: string; clientId?: string | null }
 ) {
-  // CLIENT can only create tickets for their own client
+  // Auto-fill clientId for CLIENT users
   if (requestingUser.role === 'CLIENT') {
+    if (!data.clientId) data.clientId = requestingUser.clientId!;
     if (data.clientId !== requestingUser.clientId) {
       throw new AppError('Cannot create ticket for another client', 403);
     }
   }
 
+  if (!data.clientId) throw new AppError('clientId is required', 400);
+
   const client = await prisma.client.findUnique({ where: { id: data.clientId } });
-  if (!client) {
-    throw new AppError('Client not found', 404);
+  if (!client) throw new AppError('Client not found', 404);
+
+  // Auto-fill locationId — find first location for client if not provided
+  if (!data.locationId) {
+    const loc = await prisma.location.findFirst({ where: { clientId: data.clientId }, select: { id: true } });
+    if (loc) {
+      data.locationId = loc.id;
+    } else {
+      // Create default location
+      const newLoc = await prisma.location.create({
+        data: { clientId: data.clientId, name: 'Główna', type: 'OFFICE', addressLine1: '-', postalCode: '', city: client.city ?? '' },
+      });
+      data.locationId = newLoc.id;
+    }
   }
 
   const location = await prisma.location.findUnique({ where: { id: data.locationId } });
@@ -206,6 +224,7 @@ export async function createTicket(
       reporterPhone: data.reporterPhone,
       dueAt: data.dueAt ? new Date(data.dueAt) : undefined,
       billedInContract: data.billedInContract ?? false,
+      serviceMode: data.serviceMode ?? null,
     },
     select: ticketSelect,
   });
@@ -339,6 +358,21 @@ export async function addTicketComment(
     }).catch(() => {});
   }
 
+  // Push notification — nowy komentarz
+  const pushPayload = {
+    title: `Komentarz — ${ticket.ticketNumber}`,
+    body: data.comment.slice(0, 100),
+    url: `/tickets/${ticketId}`,
+  };
+  // Notify creator (if commenter is not the creator)
+  if (ticket.createdByUserId && ticket.createdByUserId !== requestingUser.userId) {
+    sendPushToUser(ticket.createdByUserId, pushPayload).catch(() => {});
+  }
+  // Notify assigned tech (if commenter is not the assignee)
+  if (ticket.assignedToUserId && ticket.assignedToUserId !== requestingUser.userId) {
+    sendPushToUser(ticket.assignedToUserId, pushPayload).catch(() => {});
+  }
+
   return comment;
 }
 
@@ -359,12 +393,15 @@ export async function assignTicket(
     }
   }
 
+  const updateData: Record<string, unknown> = {
+    assignedToUserId: data.assignedToUserId,
+    status: data.assignedToUserId ? TicketStatus.ASSIGNED : TicketStatus.PENDING,
+  };
+  if (data.serviceMode) updateData.serviceMode = data.serviceMode;
+
   const updated = await prisma.ticket.update({
     where: { id: ticketId },
-    data: {
-      assignedToUserId: data.assignedToUserId,
-      status: data.assignedToUserId ? TicketStatus.ASSIGNED : TicketStatus.PENDING,
-    },
+    data: updateData,
     select: ticketSelect,
   });
 
@@ -403,6 +440,17 @@ export async function assignTicket(
         },
       });
     }
+
+    // Powiadom klienta o przypisaniu
+    const tech = await prisma.user.findUnique({ where: { id: data.assignedToUserId }, select: { firstName: true, lastName: true } });
+    if (tech) notifyTicketAssigned(ticketId, `${tech.firstName} ${tech.lastName}`);
+
+    // Push do przypisanego technika
+    sendPushToUser(data.assignedToUserId, {
+      title: 'Nowe przypisane zgłoszenie',
+      body: `${ticket.ticketNumber}: ${ticket.title}`,
+      url: `/tickets/${ticketId}`,
+    }).catch(() => {});
   }
 
   return updated;
@@ -456,6 +504,15 @@ export async function changeTicketStatus(
       });
     }
   }).catch(() => {});
+
+  // Push — zmiana statusu
+  const statusPush = { title: `Zgłoszenie ${ticket.ticketNumber}`, body: `Status: ${statusLabels[newStatus] ?? newStatus}`, url: `/tickets/${ticketId}` };
+  if (ticket.createdByUserId && ticket.createdByUserId !== performedByUserId) {
+    sendPushToUser(ticket.createdByUserId, statusPush).catch(() => {});
+  }
+  if (ticket.assignedToUserId && ticket.assignedToUserId !== performedByUserId) {
+    sendPushToUser(ticket.assignedToUserId, statusPush).catch(() => {});
+  }
 
   return updated;
 }

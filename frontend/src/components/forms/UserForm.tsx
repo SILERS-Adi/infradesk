@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
-  ChevronLeft, X, CheckCircle2, Eye, EyeOff, Search,
+  ChevronLeft, X, CheckCircle2, Eye, EyeOff, Search, Upload, Camera,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { usersApi } from '../../api/users';
@@ -14,6 +14,7 @@ import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { getErrorMessage } from '../../utils/helpers';
 import type { User } from '../../types';
+import apiClient from '../../api/client';
 
 // ── Step types ─────────────────────────────────────────────────────────────────
 type Step = 'type' | 'details' | 'role' | 'done';
@@ -33,12 +34,13 @@ const PERMISSIONS: { key: 'viewAll' | 'orders' | 'billing'; label: string; desc:
 
 // ── Schemas ────────────────────────────────────────────────────────────────────
 const detailsSchema = z.object({
-  firstName: z.string().min(1, 'Imię jest wymagane'),
-  lastName:  z.string().min(1, 'Nazwisko jest wymagane'),
-  email:     z.string().email('Podaj poprawny email'),
-  phone:     z.string().optional(),
-  password:  z.string().optional(),
-  isActive:  z.boolean().default(true),
+  firstName:   z.string().min(1, 'Imię jest wymagane'),
+  lastName:    z.string().min(1, 'Nazwisko jest wymagane'),
+  email:       z.string().email('Podaj poprawny email'),
+  phone:       z.string().optional(),
+  password:    z.string().optional(),
+  isActive:    z.boolean().default(true),
+  downloadPin: z.string().max(50).optional(),
 });
 type DetailsForm = z.infer<typeof detailsSchema>;
 
@@ -59,9 +61,12 @@ export function UserForm({ user, defaultClientId, defaultRole, onSuccess, onCanc
   const isClientUser = user?.role === 'CLIENT' || defaultRole === 'CLIENT';
   const initialKind: UserKind = isClientUser ? 'client' : 'employee';
 
+  // When adding from within a client page — show everything on one page, no wizard
+  const inlineMode = !!(defaultClientId && defaultRole === 'CLIENT' && !isEdit);
+
   // Wizard state
   const firstStep: Step = isEdit ? 'details' : (defaultRole ? 'details' : 'type');
-  const [step, setStep]     = useState<Step>(firstStep);
+  const [step, setStep]     = useState<Step>(inlineMode ? 'details' : firstStep);
   const [kind, setKind]     = useState<UserKind>(initialKind);
 
   // Employee roles
@@ -90,6 +95,24 @@ export function UserForm({ user, defaultClientId, defaultRole, onSuccess, onCanc
     step === 'role' && kind === 'client',
   );
 
+  // Avatar
+  const [avatarUrl, setAvatarUrl] = useState<string>(user?.avatarUrl ?? '');
+  const [uploading, setUploading] = useState(false);
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const { data } = await apiClient.post<{ url: string }>('/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setAvatarUrl(data.url);
+      toast.success('Zdjęcie przesłane');
+    } catch (err) { toast.error(getErrorMessage(err)); }
+    finally { setUploading(false); }
+  };
+
   // Show password
   const [showPassword, setShowPassword] = useState(false);
 
@@ -97,12 +120,13 @@ export function UserForm({ user, defaultClientId, defaultRole, onSuccess, onCanc
   const detailsForm = useForm<DetailsForm>({
     resolver: zodResolver(detailsSchema),
     defaultValues: {
-      firstName: user?.firstName ?? '',
-      lastName:  user?.lastName  ?? '',
-      email:     user?.email     ?? '',
-      phone:     user?.phone     ?? '',
-      password:  '',
-      isActive:  user?.isActive  ?? true,
+      firstName:   user?.firstName ?? '',
+      lastName:    user?.lastName  ?? '',
+      email:       user?.email     ?? '',
+      phone:       user?.phone     ?? '',
+      password:    '',
+      isActive:    user?.isActive  ?? true,
+      downloadPin: user?.downloadPin ?? '',
     },
   });
 
@@ -133,6 +157,8 @@ export function UserForm({ user, defaultClientId, defaultRole, onSuccess, onCanc
         clientId:    kind === 'client' ? selectedClientId : undefined,
         isActive:    d.isActive,
         permissions: kind === 'client' ? perms : undefined,
+        downloadPin: d.downloadPin || null,
+        avatarUrl:   avatarUrl || null,
       };
       if (d.password) payload.password = d.password;
 
@@ -149,9 +175,11 @@ export function UserForm({ user, defaultClientId, defaultRole, onSuccess, onCanc
   });
 
   // ── Step dots ─────────────────────────────────────────────────────────────────
-  const STEPS: Step[] = isEdit
-    ? ['details', 'role']
-    : (defaultRole ? ['details', 'role'] : ['type', 'details', 'role']);
+  const STEPS: Step[] = inlineMode
+    ? ['details']
+    : isEdit
+      ? ['details', 'role']
+      : (defaultRole ? ['details', 'role'] : ['type', 'details', 'role']);
   const stepIdx = STEPS.indexOf(step === 'done' ? 'role' : step);
 
   const goBack = () => {
@@ -258,9 +286,38 @@ export function UserForm({ user, defaultClientId, defaultRole, onSuccess, onCanc
         {/* ── STEP 2: DETAILS ───────────────────────────────────────────────────── */}
         {step === 'details' && (
           <form id="user-details-form"
-            onSubmit={detailsForm.handleSubmit(() => setStep('role'))}
+            onSubmit={detailsForm.handleSubmit(d => {
+              if (inlineMode) saveMutation.mutate(d);
+              else setStep('role');
+            })}
             className="space-y-4"
           >
+            {/* Avatar upload */}
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="Avatar" className="w-16 h-16 rounded-full object-cover"
+                    style={{ border: '2px solid rgba(255,255,255,0.1)' }} />
+                ) : (
+                  <div className="w-16 h-16 rounded-full flex items-center justify-center"
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '2px dashed rgba(255,255,255,0.1)' }}>
+                    <Camera className="h-6 w-6" style={{ color: 'rgba(255,255,255,0.25)' }} />
+                  </div>
+                )}
+                <label className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center cursor-pointer"
+                  style={{ background: 'linear-gradient(145deg, #6D28D9, #2563EB)' }}>
+                  <Upload className="h-3.5 w-3.5 text-white" />
+                  <input type="file" accept="image/*" className="sr-only" onChange={handleAvatarUpload} disabled={uploading} />
+                </label>
+              </div>
+              <div>
+                <p className="text-[12px] font-medium" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                  {avatarUrl ? 'Zmień zdjęcie' : 'Dodaj zdjęcie'}
+                </p>
+                <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>JPG, PNG — max 5 MB</p>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input label="Imię *"     {...detailsForm.register('firstName')} error={detailsForm.formState.errors.firstName?.message} />
               <Input label="Nazwisko *" {...detailsForm.register('lastName')}  error={detailsForm.formState.errors.lastName?.message}  />
@@ -282,7 +339,40 @@ export function UserForm({ user, defaultClientId, defaultRole, onSuccess, onCanc
                   className="rounded border-gray-300 text-indigo-600" />
                 <label htmlFor="isActive" className="text-sm text-gray-700">Konto aktywne</label>
               </div>
+              <Input
+                label="PIN do pobrań (opcjonalny)"
+                placeholder="np. SECRET123"
+                {...detailsForm.register('downloadPin')}
+                error={detailsForm.formState.errors.downloadPin?.message}
+              />
             </div>
+
+            {/* ── Inline mode: permissions directly below fields ─────────── */}
+            {inlineMode && (
+              <div className="border-t border-gray-100 pt-4 mt-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Uprawnienia</p>
+                <p className="text-xs text-gray-400 mb-3">Domyślnie użytkownik widzi tylko własne zgłoszenia</p>
+                <div className="space-y-2">
+                  {PERMISSIONS.map(p => (
+                    <label key={p.key} className={clsx(
+                      'flex items-start gap-3 px-4 py-3 rounded-xl border-2 cursor-pointer transition-all',
+                      perms[p.key] ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300',
+                      p.disabled && 'opacity-50 cursor-not-allowed'
+                    )}>
+                      <input type="checkbox"
+                        checked={perms[p.key]}
+                        onChange={() => !p.disabled && setPerms(prev => ({ ...prev, [p.key]: !prev[p.key] }))}
+                        disabled={p.disabled}
+                        className="mt-0.5 rounded border-gray-300 text-indigo-600" />
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{p.label}</div>
+                        <div className="text-xs text-gray-500">{p.desc}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </form>
         )}
 
@@ -420,8 +510,8 @@ export function UserForm({ user, defaultClientId, defaultRole, onSuccess, onCanc
       {step === 'details' && (
         <div className="px-5 pb-4 pt-3 border-t border-gray-100 flex-shrink-0 flex justify-end gap-3">
           <Button variant="secondary" type="button" onClick={onCancel}>Anuluj</Button>
-          <Button type="submit" form="user-details-form">
-            Dalej
+          <Button type="submit" form="user-details-form" loading={inlineMode ? saveMutation.isPending : false}>
+            {inlineMode ? 'Utwórz użytkownika' : 'Dalej'}
           </Button>
         </div>
       )}

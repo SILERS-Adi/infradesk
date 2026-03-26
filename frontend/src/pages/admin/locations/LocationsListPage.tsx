@@ -49,7 +49,7 @@ export function LocationsListPage() {
     {
       key: 'name',
       header: 'Nazwa',
-      render: (row) => <span className="font-medium text-gray-900">{row.name}</span>,
+      render: (row) => <span className="font-medium text-white/85">{row.name}</span>,
     },
     { key: 'client', header: 'Klient', render: (row) => row.client?.name ?? '—' },
     { key: 'type', header: 'Typ', render: (row) => <Badge color="indigo">{row.type}</Badge> },
@@ -57,7 +57,7 @@ export function LocationsListPage() {
     {
       key: 'contact',
       header: 'Kontakt',
-      render: (row) => row.contactPersonName ?? <span className="text-gray-400 text-xs">—</span>,
+      render: (row) => row.contactPersonName ?? <span style={{ color: 'rgba(255,255,255,0.3)' }} className="text-xs">—</span>,
     },
     { key: 'devices', header: 'Urządzenia', render: (row) => row._count?.devices ?? 0 },
     {
@@ -84,21 +84,23 @@ export function LocationsListPage() {
         }
       />
 
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-        <div className="p-4 border-b border-gray-100 flex gap-3 items-center">
+      <div className="rounded-lg" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="p-4 flex gap-3 items-center" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
           <div className="relative flex-1 min-w-[200px] max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'rgba(255,255,255,0.3)' }} />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Szukaj lokalizacji..."
-              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full pl-9 pr-3 py-2 text-sm rounded-lg text-white/85 placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-violet-500/40"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
             />
           </div>
           <select
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
-            className="text-sm border border-gray-300 rounded-lg px-3 py-2"
+            className="text-sm rounded-lg px-3 py-2 text-white/85 focus:outline-none focus:ring-2 focus:ring-violet-500/40"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
           >
             <option value="">Wszyscy klienci</option>
             {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}

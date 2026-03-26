@@ -348,6 +348,7 @@ export function ClientForm({ client, onSuccess, onCancel }: Props) {
       toast.success(isEdit ? 'Klient zaktualizowany' : 'Klient dodany');
       setStep('done');
     } catch (err) {
+      console.error('Client save error:', err, (err as any)?.response?.data);
       toast.error(getErrorMessage(err));
     } finally {
       setSaving(false);

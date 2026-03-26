@@ -6,7 +6,7 @@ import { authenticate, authorize } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import {
   agentAuth, postRegister, postMetrics, postTicket,
-  getRegistrations, postApprove, postApproveNewClient, postPushUpdate, postWakeDevice, deleteReg, getStatus, getConnectPassword,
+  getRegistrations, postApprove, postApproveNewClient, postPushUpdate, postWindowsUpdate, postRestartService, postSystemReboot, postWakeDevice, deleteReg, getStatus, getConnectPassword,
 } from './agent.controller';
 import {
   registerSchema, metricsSchema, agentTicketSchema, approveSchema,
@@ -48,13 +48,23 @@ router.post('/upload',  agentAuth, upload.single('file'), (req: Request, res: Re
   } catch (err) { next(err); }
 });
 
+// Agent backup endpoints
+import { agentGetConfigs, agentReportStart, agentReportComplete, agentReportFailed } from '../backup/backup.controller';
+router.get('/backup-configs',    agentAuth, agentGetConfigs);
+router.post('/backup/start',     agentAuth, agentReportStart);
+router.post('/backup/complete',  agentAuth, agentReportComplete);
+router.post('/backup/failed',    agentAuth, agentReportFailed);
+
 // Admin auth — waiting room management
 router.get('/',                     authenticate, authorize('ADMIN', 'TECHNICIAN'), getRegistrations);
 router.post('/:id/approve',         authenticate, authorize('ADMIN'), validate(approveSchema), postApprove);
-router.post('/:id/approve-new-client', authenticate, authorize('ADMIN'), postApproveNewClient);
+router.post('/:id/approve-new-client', authenticate, authorize('ADMIN', 'TECHNICIAN'), postApproveNewClient);
 router.post('/:id/connect',         authenticate, authorize('ADMIN', 'TECHNICIAN'), getConnectPassword);
 router.post('/:id/push-update',     authenticate, authorize('ADMIN'), postPushUpdate);
-router.post('/:id/wake',            authenticate, authorize('ADMIN', 'TECHNICIAN'), postWakeDevice);
+router.post('/:id/windows-update',   authenticate, authorize('ADMIN'), postWindowsUpdate);
+router.post('/:id/restart-service',  authenticate, authorize('ADMIN'), postRestartService);
+router.post('/:id/system-reboot',    authenticate, authorize('ADMIN'), postSystemReboot);
+router.post('/:id/wake',             authenticate, authorize('ADMIN', 'TECHNICIAN'), postWakeDevice);
 router.delete('/:id',               authenticate, authorize('ADMIN'), deleteReg);
 
 export default router;

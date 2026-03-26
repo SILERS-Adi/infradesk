@@ -15,7 +15,7 @@ from PIL import Image, ImageGrab, ImageDraw
 # ─── Config ──────────────────────────────────────────────────────────────────
 
 APP_NAME    = "InfraDesk Agent"
-APP_VERSION = "1.5.3"
+APP_VERSION = "4.2.0"
 INSTALL_DIR = os.path.join(os.environ.get("APPDATA", ""), "InfraDesk")
 INSTALL_EXE = os.path.join(INSTALL_DIR, "InfraDesk Agent.exe")
 CONFIG_FILE = os.path.join(INSTALL_DIR, "config.json")
@@ -23,7 +23,7 @@ API_BASE     = "https://infradesk.pl/api"
 PORTAL_URL   = "https://infradesk.pl/portal"
 WS_BASE      = "wss://infradesk.pl/api/agent/ws"
 VERSION_URL  = "https://infradesk.pl/downloads/version.json"
-RUSTDESK_URL = "https://rustdesk.com/build/tasks/8c0348ed-a46f-48a9-88d9-1d81eca0bd7f/files/silers.exe"
+SILERS_MSI_URL = "https://infradesk.pl/downloads/silers.msi"
 
 os.makedirs(os.path.join(os.environ.get("APPDATA", ""), "InfraDesk"), exist_ok=True)
 _log_file = os.path.join(os.environ.get("APPDATA", ""), "InfraDesk", "agent.log")
@@ -39,17 +39,20 @@ log = logging.getLogger("infradesk")
 
 # ─── Kolory ──────────────────────────────────────────────────────────────────
 
-BG      = "#060B1A"
-SURF    = "#0f1525"
-SURF2   = "#1a2035"
-PRI     = "#6366f1"
-PRI_H   = "#4f52cc"
-TXT     = "#e2e8f0"
-TXT_DIM = "#6b7280"
+BG      = "#080D19"
+SURF    = "#0C1220"
+SURF2   = "#131B2E"
+PRI     = "#6D28D9"
+PRI_H   = "#5B21B6"
+SEC     = "#2563EB"
+TXT     = "#F3F4F6"
+TXT_DIM = "#71717A"
+TXT_MUT = "#52525B"
 OK_C    = "#10b981"
 ERR_C   = "#ef4444"
 WARN_C  = "#f59e0b"
-BORDER  = "#1a2540"
+BORDER  = "#1E293B"
+ACC     = "#22D3EE"
 FONT    = "Segoe UI"
 
 # ─── Zasoby ──────────────────────────────────────────────────────────────────
@@ -76,8 +79,22 @@ def load_config() -> dict:
 
 def save_config(data: dict):
     os.makedirs(INSTALL_DIR, exist_ok=True)
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+    tmp = CONFIG_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
+    # Atomic replace
+    try:
+        if os.path.exists(CONFIG_FILE):
+            os.replace(tmp, CONFIG_FILE)
+        else:
+            os.rename(tmp, CONFIG_FILE)
+    except Exception:
+        shutil.copy2(tmp, CONFIG_FILE)
+        try: os.remove(tmp)
+        except Exception: pass
+    log.info("Config SAVED: %s (size=%d keys=%s)", CONFIG_FILE, os.path.getsize(CONFIG_FILE), list(data.keys()))
 
 
 # ─── Instalacja ──────────────────────────────────────────────────────────────
@@ -126,56 +143,81 @@ def _get_desktop_path() -> str:
 
 
 def create_desktop_shortcut():
-    """Tworzy skrót na pulpicie uruchamiający nowe zgłoszenie serwisowe."""
+    """Tworzy skrót 'InfraDesk' na pulpicie — uruchamia agenta."""
     try:
         desktop = _get_desktop_path()
-        lnk_name = "Zgloszenie serwisowe.lnk"
-        lnk      = os.path.join(desktop, lnk_name)
-        target   = INSTALL_EXE
-        log.info("Creating shortcut: desktop=%s target=%s", desktop, target)
+        log.info("Desktop path: %s", desktop)
 
-        # Upewnij się, że target istnieje (agent może być uruchomiony spoza INSTALL_DIR)
+        # Usuń stary skrót
+        for old_name in ["Zgloszenie serwisowe.lnk", "InfraDesk.lnk"]:
+            old_p = os.path.join(desktop, old_name)
+            if os.path.exists(old_p):
+                try: os.remove(old_p); log.info("Removed old shortcut: %s", old_p)
+                except Exception: pass
+
+        lnk = os.path.join(desktop, "InfraDesk.lnk")
+        target = INSTALL_EXE
         if not os.path.exists(target):
             target = sys.executable
-            log.info("INSTALL_EXE not found, using sys.executable: %s", target)
+        log.info("Shortcut target: %s (exists=%s)", target, os.path.exists(target))
 
-        ps1 = os.path.join(tempfile.gettempdir(), "infradesk_shortcut.ps1")
-        # Użyj ASCII-safe nazwy pliku LNK, żeby uniknąć problemów z kodowaniem
-        with open(ps1, "w", encoding="utf-8") as f:
-            f.write('$s = New-Object -ComObject WScript.Shell\n')
-            f.write(f'$l = $s.CreateShortcut("{lnk}")\n')
-            f.write(f'$l.TargetPath       = "{target}"\n')
-            f.write( '$l.Arguments        = "--ticket"\n')
-            f.write(f'$l.WorkingDirectory = "{INSTALL_DIR}"\n')
-            f.write( '$l.Description      = "Nowe zgloszenie serwisowe InfraDesk"\n')
-            f.write(f'$l.IconLocation     = "{target},0"\n')
-            f.write( '$l.Save()\n')
+        icon_file = os.path.join(INSTALL_DIR, "icon.ico")
+        icon_loc = f"{icon_file},0" if os.path.exists(icon_file) else f"{target},0"
 
+        # Metoda 1: PowerShell inline (nie plik .ps1)
+        ps_cmd = (
+            f'$s=(New-Object -ComObject WScript.Shell).CreateShortcut("{lnk}");'
+            f'$s.TargetPath="{target}";'
+            f'$s.WorkingDirectory="{INSTALL_DIR}";'
+            f'$s.Description="InfraDesk";'
+            f'$s.IconLocation="{icon_loc}";'
+            f'$s.Save()'
+        )
         result = subprocess.run(
-            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps1],
-            creationflags=_NO_WINDOW, timeout=20,
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
+            creationflags=_NO_WINDOW, timeout=15,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         )
-        try: os.remove(ps1)
-        except Exception: pass
 
         if result.returncode == 0 and os.path.exists(lnk):
-            log.info("Desktop shortcut created: %s", lnk)
+            log.info("Desktop shortcut created (PS inline): %s", lnk)
+            return
+
+        log.warning("PS inline failed: rc=%s err=%s", result.returncode, result.stderr.decode(errors="replace"))
+
+        # Metoda 2: VBScript fallback
+        vbs = os.path.join(tempfile.gettempdir(), "infradesk_shortcut.vbs")
+        with open(vbs, "w") as f:
+            f.write(f'Set s = CreateObject("WScript.Shell").CreateShortcut("{lnk}")\n')
+            f.write(f's.TargetPath = "{target}"\n')
+            f.write(f's.WorkingDirectory = "{INSTALL_DIR}"\n')
+            f.write(f's.Description = "InfraDesk"\n')
+            f.write(f's.IconLocation = "{icon_loc}"\n')
+            f.write('s.Save\n')
+
+        result2 = subprocess.run(
+            ["cscript", "//Nologo", vbs],
+            creationflags=_NO_WINDOW, timeout=15,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        try: os.remove(vbs)
+        except Exception: pass
+
+        if os.path.exists(lnk):
+            log.info("Desktop shortcut created (VBS): %s", lnk)
         else:
-            err = result.stderr.decode(errors="replace")
-            log.warning("Shortcut PS returncode=%s err=%s", result.returncode, err)
-            # Fallback: spróbuj przez win32com jeśli dostępne
+            log.warning("VBS fallback failed: rc=%s err=%s", result2.returncode, result2.stderr.decode(errors="replace"))
+            # Metoda 3: win32com
             try:
                 import win32com.client as wc
                 shell = wc.Dispatch("WScript.Shell")
                 sc = shell.CreateShortcut(lnk)
                 sc.TargetPath = target
-                sc.Arguments  = "--ticket"
                 sc.WorkingDirectory = INSTALL_DIR
-                sc.Description = "Nowe zgloszenie serwisowe InfraDesk"
-                sc.IconLocation = f"{target},0"
+                sc.Description = "InfraDesk"
+                sc.IconLocation = icon_loc
                 sc.Save()
-                log.info("Desktop shortcut created via win32com: %s", lnk)
+                log.info("Desktop shortcut created (win32com): %s", lnk)
             except Exception as e2:
                 log.warning("win32com shortcut fallback failed: %s", e2)
     except Exception as e:
@@ -216,6 +258,15 @@ def install_and_restart():
             sys.exit(0)
     _set_autostart(True)
     _register_in_add_remove()
+    # Kopiuj zasoby (ikona, logo, tło) do INSTALL_DIR
+    for fname in ["icon.ico", "ikona.png", "logo.png", "tlo.png"]:
+        try:
+            src_f = res(fname)
+            dst_f = os.path.join(INSTALL_DIR, fname)
+            if src_f and os.path.exists(src_f) and src_f != dst_f:
+                shutil.copy2(src_f, dst_f)
+                log.info("Copied resource: %s", fname)
+        except Exception: pass
     create_desktop_shortcut()
     subprocess.Popen([INSTALL_EXE], close_fds=True,
                      creationflags=_NO_WINDOW)
@@ -233,14 +284,137 @@ def _wmic(q: str) -> str:
     except Exception: return ""
 
 
-def _rustdesk_id() -> str | None:
-    toml = os.path.join(os.environ.get("APPDATA", ""), "RustDesk", "config", "RustDesk.toml")
+def _read_rustdesk_toml(path: str) -> str | None:
     try:
-        with open(toml) as f:
+        with open(path, encoding="utf-8", errors="ignore") as f:
             for line in f:
-                if line.strip().startswith("id ="):
-                    return line.split("=", 1)[1].strip().strip('"')
-    except Exception: pass
+                s = line.strip()
+                if s.startswith("id =") or s.startswith("id="):
+                    val = s.split("=", 1)[1].strip().strip('"').strip("'").strip()
+                    if val and val != "0":
+                        return val
+    except Exception:
+        pass
+    return None
+
+
+def _rustdesk_id() -> str | None:
+    # 1. Znane ścieżki stałe
+    fixed = [
+        os.path.join(os.environ.get("APPDATA", ""), "RustDesk", "config", "RustDesk.toml"),
+        r"C:\ProgramData\RustDesk\config\RustDesk.toml",
+        r"C:\Program Files\SILERS\config\RustDesk.toml",
+        r"C:\Program Files\SILERS\RustDesk\config\RustDesk.toml",
+        r"C:\Program Files\SILERS\RustDesk.toml",
+        r"C:\Windows\System32\config\systemprofile\AppData\Roaming\RustDesk\config\RustDesk.toml",
+        r"C:\Windows\ServiceProfiles\LocalService\AppData\Roaming\RustDesk\config\RustDesk.toml",
+        r"C:\Windows\ServiceProfiles\NetworkService\AppData\Roaming\RustDesk\config\RustDesk.toml",
+    ]
+    for path in fixed:
+        val = _read_rustdesk_toml(path)
+        if val:
+            return val
+
+    # 2. Wszystkie profile użytkowników w C:\Users\
+    try:
+        users_dir = r"C:\Users"
+        for user in os.listdir(users_dir):
+            path = os.path.join(users_dir, user, "AppData", "Roaming",
+                                "RustDesk", "config", "RustDesk.toml")
+            val = _read_rustdesk_toml(path)
+            if val:
+                return val
+    except Exception:
+        pass
+
+    # 3. Rejestr Windows
+    try:
+        for hive in [winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER]:
+            for subkey in [r"SOFTWARE\RustDesk", r"SOFTWARE\WOW6432Node\RustDesk"]:
+                try:
+                    with winreg.OpenKey(hive, subkey) as k:
+                        val = str(winreg.QueryValueEx(k, "id")[0]).strip()
+                        if val and val != "0":
+                            return val
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    # 4. rustdesk.exe / SILERS.exe --get-id
+    try:
+        for exe in [r"C:\Program Files\SILERS\SILERS.exe",
+                    r"C:\Program Files\SILERS\rustdesk.exe",
+                    r"C:\Program Files\SILERS\RustDesk\rustdesk.exe",
+                    r"C:\Program Files\RustDesk\rustdesk.exe",
+                    r"C:\Program Files (x86)\RustDesk\rustdesk.exe"]:
+            if os.path.exists(exe):
+                r = subprocess.run([exe, "--get-id"], capture_output=True, text=True,
+                                   timeout=6, creationflags=_NO_WINDOW)
+                val = (r.stdout.strip() or r.stderr.strip())
+                if val and not val.lower().startswith("error") and len(val) > 3:
+                    return val
+    except Exception:
+        pass
+
+    # 5. PowerShell — szukaj we wszystkich profilach
+    try:
+        ps = (
+            "$id = $null; "
+            "Get-ChildItem 'C:\\Users' -Directory -ErrorAction SilentlyContinue | ForEach-Object { "
+            "  $p = Join-Path $_.FullName 'AppData\\Roaming\\RustDesk\\config\\RustDesk.toml'; "
+            "  if (Test-Path $p) { "
+            "    $l = Get-Content $p -ErrorAction SilentlyContinue | Where-Object { $_ -match '^id\\s*=' } | Select-Object -First 1; "
+            "    if ($l) { $id = ($l -split '=',2)[1].Trim().Trim('\"') } "
+            "  } "
+            "}; "
+            "if (-not $id) { "
+            "  $p2 = 'C:\\ProgramData\\RustDesk\\config\\RustDesk.toml'; "
+            "  if (Test-Path $p2) { "
+            "    $l = Get-Content $p2 -ErrorAction SilentlyContinue | Where-Object { $_ -match '^id\\s*=' } | Select-Object -First 1; "
+            "    if ($l) { $id = ($l -split '=',2)[1].Trim().Trim('\"') } "
+            "  } "
+            "}; "
+            "if ($id) { Write-Output $id }"
+        )
+        r = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+            capture_output=True, text=True, timeout=10, creationflags=_NO_WINDOW)
+        val = r.stdout.strip()
+        if val and len(val) > 3:
+            return val
+    except Exception:
+        pass
+
+    return None
+
+
+def _anydesk_id() -> str | None:
+    paths = [
+        os.path.join(os.environ.get("PROGRAMDATA", ""), "AnyDesk", "system.conf"),
+        os.path.join(os.environ.get("APPDATA", ""),    "AnyDesk", "system.conf"),
+    ]
+    for p in paths:
+        try:
+            with open(p) as f:
+                for line in f:
+                    if line.strip().startswith("ad.anynet.id"):
+                        return line.split("=", 1)[1].strip()
+        except Exception: pass
+    return None
+
+
+def _teamviewer_id() -> str | None:
+    paths = [
+        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\TeamViewer"),
+        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\TeamViewer"),
+    ]
+    for hive, path in paths:
+        try:
+            with winreg.OpenKey(hive, path) as k:
+                val = winreg.QueryValueEx(k, "ClientID")[0]
+                if val: return str(val)
+        except Exception: pass
     return None
 
 
@@ -343,11 +517,16 @@ def machine_info() -> dict:
     except Exception: pass
     rd = _rustdesk_id()
     if rd: info["rustdeskId"] = rd
+    ad = _anydesk_id()
+    if ad: info["anydeskId"] = ad
+    tv = _teamviewer_id()
+    if tv: info["teamviewerId"] = tv
     return info
 
 
 def metrics() -> dict:
     d = machine_info()
+    d["appVersion"] = APP_VERSION
     try:
         c = psutil.disk_usage("C:\\")
         d["diskFree"]  = round(c.free /(1024**3), 2)
@@ -370,14 +549,15 @@ def full_inventory() -> dict:
 # ─── RustDesk ─────────────────────────────────────────────────────────────────
 
 def is_rustdesk_installed() -> bool:
-    for p in [r"C:\Program Files\RustDesk\rustdesk.exe",
+    for p in [r"C:\Program Files\SILERS\SILERS.exe",
+              r"C:\Program Files\RustDesk\rustdesk.exe",
               r"C:\Program Files (x86)\RustDesk\rustdesk.exe"]:
         if os.path.exists(p): return True
     return False
 
 
 def install_rustdesk(notify_fn=None) -> bool:
-    exe = os.path.join(tempfile.gettempdir(), "rustdesk_silers.exe")
+    msi = os.path.join(tempfile.gettempdir(), "silers.msi")
 
     def _notify(msg):
         log.info(msg)
@@ -387,40 +567,34 @@ def install_rustdesk(notify_fn=None) -> bool:
 
     try:
         if is_rustdesk_installed():
-            _notify("RustDesk już zainstalowany.")
+            _notify("SILERS już zainstalowany.")
             return True
 
-        _notify("Pobieranie RustDesk… (może potrwać chwilę)")
+        _notify("Pobieranie SILERS… (może potrwać chwilę)")
         import ssl
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
-        with urllib.request.urlopen(RUSTDESK_URL, context=ctx, timeout=120) as resp:
-            with open(exe, "wb") as f:
+        with urllib.request.urlopen(SILERS_MSI_URL, context=ctx, timeout=120) as resp:
+            with open(msi, "wb") as f:
                 f.write(resp.read())
-        log.info("RustDesk downloaded: %s bytes", os.path.getsize(exe))
+        log.info("SILERS MSI downloaded: %s bytes", os.path.getsize(msi))
 
-        _notify("Instalowanie RustDesk — zaakceptuj monit UAC…")
-        import ctypes
-        ret = ctypes.windll.shell32.ShellExecuteW(None, "runas", exe, "/S", None, 1)
-        log.info("ShellExecute ret=%s", ret)
+        _notify("Instalowanie SILERS… (może potrwać kilka minut)")
+        proc = subprocess.Popen(
+            ["msiexec", "/i", msi, "/qn", "/norestart"],
+            creationflags=_NO_WINDOW,
+        )
+        proc.wait(timeout=300)
+        log.info("msiexec exit code: %s", proc.returncode)
 
-        if ret <= 32:
-            # Brak uprawnień lub odmowa UAC — spróbuj bez podnoszenia
-            _notify("Brak uprawnień administratora — próba bez UAC…")
-            subprocess.Popen([exe, "/S"], creationflags=_NO_WINDOW)
+        if is_rustdesk_installed():
+            _notify("SILERS zainstalowany pomyślnie.")
+            try: os.remove(msi)
+            except Exception: pass
+            return True
 
-        # Czekaj do 3 minut na zakończenie instalacji
-        for _ in range(180):
-            time.sleep(1)
-            if is_rustdesk_installed():
-                _notify("RustDesk zainstalowany pomyślnie.")
-                # Usuń plik po instalacji
-                try: os.remove(exe)
-                except Exception: pass
-                return True
-
-        _notify("RustDesk nie został wykryty po instalacji.")
+        _notify("SILERS nie został wykryty po instalacji.")
         return False
     except Exception as e:
         log.error("RustDesk install error: %s", e)
@@ -471,22 +645,10 @@ def do_self_update(download_url, notify_fn=None):
                 f.write(resp.read())
         log.info("Update downloaded: %d bytes", os.path.getsize(new_exe))
 
-        current_exe = sys.executable
-        updater = os.path.join(tempfile.gettempdir(), "infradesk_updater.bat")
-        with open(updater, "w") as f:
-            f.write("@echo off\n")
-            f.write("ping 127.0.0.1 -n 4 > nul\n")          # czekaj ~3s aż stary proces zakończy
-            f.write(f'copy /y "{new_exe}" "{current_exe}"\n')
-            f.write(f'start "" "{current_exe}"\n')
-            f.write(f'del "{new_exe}"\n')
-            f.write('del "%~f0"\n')
-
         _notify("Restartuję agenta…")
-        subprocess.Popen(
-            ["cmd.exe", "/c", updater],
-            creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
-            close_fds=True,
-        )
+        # Uruchom nowy exe bezpośrednio z temp — sam się zainstaluje przez install_and_restart()
+        # Ten sam mechanizm co ręczne uruchomienie z Downloads — wiemy że działa
+        subprocess.Popen([new_exe], close_fds=True, creationflags=_NO_WINDOW)
         os._exit(0)
     except Exception as e:
         log.error("Self-update error: %s", e)
@@ -539,7 +701,6 @@ def do_register(form):
 
 def do_metrics(token):
     data = metrics()
-    data["appVersion"] = APP_VERSION
     api_post("/agent/metrics", data, token=token)
 
 
@@ -621,9 +782,9 @@ def _apply_style():
     s.configure("TLabel",    background=BG, foreground=TXT)
     s.configure("TEntry",    fieldbackground=SURF2, foreground=TXT,
                              bordercolor=BORDER, insertcolor=TXT,
-                             lightcolor=SURF2, darkcolor=SURF2, padding=8)
+                             lightcolor=SURF2, darkcolor=SURF2, padding=10)
     s.map("TEntry", bordercolor=[("focus", PRI)],
-                    fieldbackground=[("focus", SURF2)])
+                    fieldbackground=[("focus", SURF)])
     s.configure("TScrollbar", background=SURF2, troughcolor=BG,
                                bordercolor=BG, arrowcolor=TXT_DIM)
     s.configure("Prog.Horizontal.TProgressbar",
@@ -631,6 +792,11 @@ def _apply_style():
     s.configure("TCheckbutton", background=BG, foreground=TXT,
                                 selectcolor=SURF2)
     s.configure("TOptionMenu",  background=SURF2, foreground=TXT)
+    s.configure("TCombobox", fieldbackground=SURF2, background=SURF2,
+                             foreground=TXT, bordercolor=BORDER,
+                             arrowcolor=TXT_DIM, padding=10)
+    s.map("TCombobox", bordercolor=[("focus", PRI)],
+                       fieldbackground=[("focus", SURF)])
 
 
 def lbl(parent, text, size=11, color=TXT, bold=False, **kw):
@@ -666,23 +832,30 @@ def get_val(e: ttk.Entry) -> str:
     return v.strip()
 
 
-def btn(parent, text, cmd, bg=PRI, hover=PRI_H, height=2, **kw):
+def btn(parent, text, cmd, bg=PRI, hover=PRI_H, height=5, **kw):
     b = tk.Button(parent, text=text, command=cmd,
                   bg=bg, fg=TXT, activebackground=hover, activeforeground=TXT,
-                  relief="flat", bd=0, font=(FONT, 11, "bold"),
-                  cursor="hand2", pady=height, **kw)
+                  relief="flat", bd=0, font=(FONT, 10, "bold"),
+                  cursor="hand2", pady=height, padx=14, **kw)
+    def _enter(e): b.config(bg=hover)
+    def _leave(e): b.config(bg=bg)
+    b.bind("<Enter>", _enter)
+    b.bind("<Leave>", _leave)
     return b
+
+def btn_secondary(parent, text, cmd, **kw):
+    return btn(parent, text, cmd, bg=SURF2, hover=BORDER, height=6, **kw)
 
 
 def sep(parent):
-    tk.Frame(parent, bg=BORDER, height=1).pack(fill="x", pady=8)
+    tk.Frame(parent, bg=BORDER, height=1).pack(fill="x", pady=12)
 
 
 def section_lbl(parent, text):
     f = tk.Frame(parent, bg=BG)
-    f.pack(fill="x", pady=(12, 4))
+    f.pack(fill="x", pady=(16, 6))
     tk.Frame(f, bg=BORDER, height=1).pack(fill="x")
-    lbl(f, text, size=10, color=TXT_DIM).pack(anchor="w", pady=(4, 0))
+    lbl(f, text, size=9, color=TXT_DIM).pack(anchor="w", pady=(6, 0))
 
 
 def _scrollable(parent, height=400):
@@ -758,64 +931,90 @@ def password_strength(pwd):
 def show_login(root, on_login, on_register):
     _clear(root)
     root.title(APP_NAME)
-    root.geometry("600x860")
+
+    # ── Ekran wyboru: Zaloguj / Zarejestruj ──────────────────────────────────
+    W, H = 520, 480
+    root.update_idletasks()
+    sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
+    x, y = max(0, (sw - W) // 2), max(0, (sh - H) // 2)
+    root.geometry(f"{W}x{H}+{x}+{y}")
     root.resizable(False, False)
 
-    hdr = tk.Frame(root, bg=BG)
-    hdr.pack(fill="x")
+    f = tk.Frame(root, bg=BG, padx=40, pady=30)
+    f.pack(fill="both", expand=True)
+
+    # Logo
     try:
         from PIL import ImageTk
         img = Image.open(res("logo.png")).convert("RGBA")
-        img.thumbnail((160, 160), Image.LANCZOS)
+        img.thumbnail((60, 60), Image.LANCZOS)
+        bg_rgb = tuple(int(BG.lstrip("#")[i:i+2], 16) for i in (0, 2, 4))
+        bg_img_pil = Image.new("RGBA", img.size, bg_rgb + (255,))
+        bg_img_pil.paste(img, mask=img.split()[3])
+        _img = ImageTk.PhotoImage(bg_img_pil.convert("RGB"))
+        lbl_img = tk.Label(f, image=_img, bg=BG, bd=0)
+        lbl_img.image = _img
+        lbl_img.pack(pady=(0, 8))
+    except Exception: pass
+
+    lbl(f, APP_NAME, size=18, bold=True).pack()
+    lbl(f, "Zarządzanie infrastrukturą IT", size=10, color=TXT_DIM).pack(pady=(2, 20))
+    tk.Frame(f, bg=BORDER, height=1).pack(fill="x", pady=(0, 20))
+
+    lbl(f, "Wybierz opcję", size=12, color=TXT_DIM).pack(pady=(0, 16))
+
+    def _show_login_form():
+        _show_login_panel(root, on_login, on_register)
+
+    def _show_register_form():
+        _show_register_panel(root, on_login, on_register)
+
+    btn(f, "  Zaloguj się  ", _show_login_form).pack(fill="x", pady=(0, 8))
+    lbl(f, "Masz konto — zaloguj się danymi od administratora", size=9, color=TXT_DIM).pack(pady=(0, 16))
+
+    btn(f, "  Zarejestruj nowe urządzenie  ", _show_register_form, bg=SURF2, hover=BORDER).pack(fill="x", pady=(0, 8))
+    lbl(f, "Pierwszy raz — zarejestruj firmę i komputer", size=9, color=TXT_DIM).pack()
+
+    lbl(f, f"v{APP_VERSION}", size=8, color=TXT_MUT).pack(side="bottom", pady=(16, 0))
+
+
+def _show_login_panel(root, on_login, on_register):
+    _clear(root)
+    root.title(f"{APP_NAME} — Logowanie")
+    W, H = 480, 440
+    root.update_idletasks()
+    sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
+    root.geometry(f"{W}x{H}+{(sw-W)//2}+{(sh-H)//2}")
+    root.resizable(False, False)
+
+    f = tk.Frame(root, bg=BG, padx=36, pady=24)
+    f.pack(fill="both", expand=True)
+
+    # Header
+    hdr = tk.Frame(f, bg=BG)
+    hdr.pack(fill="x", pady=(0, 8))
+    try:
+        from PIL import ImageTk
+        img = Image.open(res("logo.png")).convert("RGBA")
+        img.thumbnail((36, 36), Image.LANCZOS)
         bg_rgb = tuple(int(BG.lstrip("#")[i:i+2], 16) for i in (0, 2, 4))
         bg_img = Image.new("RGBA", img.size, bg_rgb + (255,))
         bg_img.paste(img, mask=img.split()[3])
         _img = ImageTk.PhotoImage(bg_img.convert("RGB"))
-        lbl_img = tk.Label(hdr, image=_img, bg=BG, bd=0, highlightthickness=0)
+        lbl_img = tk.Label(hdr, image=_img, bg=BG, bd=0)
         lbl_img.image = _img
-        lbl_img.pack(pady=(18, 0))
+        lbl_img.pack(side="left", padx=(0, 8))
     except Exception: pass
+    lbl(hdr, APP_NAME, size=14, bold=True).pack(side="left")
 
-    tab_bar = tk.Frame(root, bg=BG)
-    tab_bar.pack(fill="x", padx=40, pady=(14, 0))
-    tk.Frame(root, bg=PRI, height=2).pack(fill="x", padx=40)
+    tk.Frame(f, bg=BORDER, height=1).pack(fill="x", pady=(0, 16))
 
-    panel_login = tk.Frame(root, bg=BG)
-    panel_reg_wrap = tk.Frame(root, bg=BG)
-    _tab = [0]
-
-    btn_l = tk.Button(tab_bar, text="Logowanie", relief="flat", bd=0,
-                      bg=BG, fg=TXT, font=(FONT, 12, "bold"),
-                      activebackground=BG, activeforeground=TXT, cursor="hand2")
-    btn_r = tk.Button(tab_bar, text="Nowy użytkownik", relief="flat", bd=0,
-                      bg=BG, fg=TXT_DIM, font=(FONT, 12),
-                      activebackground=BG, activeforeground=TXT, cursor="hand2")
-    btn_l.pack(side="left", padx=(0, 20), pady=4)
-    btn_r.pack(side="left", pady=4)
-
-    def switch(idx):
-        if _tab[0] == idx: return
-        _tab[0] = idx
-        if idx == 0:
-            btn_l.configure(fg=TXT, font=(FONT, 12, "bold"))
-            btn_r.configure(fg=TXT_DIM, font=(FONT, 12))
-            panel_reg_wrap.pack_forget()
-            panel_login.pack(fill="both", expand=True, padx=40, pady=16)
-        else:
-            btn_r.configure(fg=TXT, font=(FONT, 12, "bold"))
-            btn_l.configure(fg=TXT_DIM, font=(FONT, 12))
-            panel_login.pack_forget()
-            panel_reg_wrap.pack(fill="both", expand=True)
-
-    btn_l.configure(command=lambda: switch(0))
-    btn_r.configure(command=lambda: switch(1))
-
-    # ── Logowanie ──────────────────────────────────────────────────────────────
-    lbl(panel_login, "E-mail", size=11, color=TXT_DIM).pack(anchor="w")
-    e_mail = entry(panel_login, "adres@firma.pl")
+    lbl(f, "Logowanie", size=13, bold=True).pack(anchor="w", pady=(0, 12))
+    lbl(f, "E-MAIL", size=9, color=TXT_DIM).pack(anchor="w")
+    e_mail = entry(f, "adres@firma.pl")
     e_mail.pack(fill="x", ipady=4, pady=(2, 10))
-    lbl(panel_login, "Hasło", size=11, color=TXT_DIM).pack(anchor="w")
-    prow_l = tk.Frame(panel_login, bg=BG); prow_l.pack(fill="x", pady=(2, 4))
+    lbl(f, "HASŁO", size=9, color=TXT_DIM).pack(anchor="w")
+    prow_l = tk.Frame(f, bg=BG); prow_l.pack(fill="x", pady=(2, 4))
     e_lpwd = ttk.Entry(prow_l, show="•", font=(FONT, 11))
     e_lpwd.pack(side="left", fill="x", expand=True, ipady=4)
     _sh = [False]
@@ -824,26 +1023,56 @@ def show_login(root, on_login, on_register):
     tk.Button(prow_l, text="👁", command=tshow,
               bg=SURF2, fg=TXT_DIM, activebackground=SURF, activeforeground=TXT,
               relief="flat", bd=0, padx=8, cursor="hand2").pack(side="left", padx=(4, 0))
-    tk.Button(panel_login, text="Nie pamiętam hasła", command=lambda: _forgot(root),
-              bg=BG, fg=TXT_DIM, activebackground=BG, activeforeground=TXT_DIM,
-              relief="flat", bd=0, font=(FONT, 10), cursor="hand2").pack(anchor="e")
     lerr_v = tk.StringVar()
-    lbl(panel_login, "", size=11, color=ERR_C, textvariable=lerr_v).pack(pady=(4, 0))
+    lbl(f, "", size=11, color=ERR_C, textvariable=lerr_v).pack(pady=(4, 0))
     def do_login():
         mail = get_val(e_mail); pwd = e_lpwd.get()
         if not mail or not pwd: lerr_v.set("Wpisz e-mail i hasło."); return
         lerr_v.set("Logowanie…")
         threading.Thread(target=_login_thread, args=(root, mail, pwd, on_login, lerr_v), daemon=True).start()
-    btn(panel_login, "ZALOGUJ SIĘ", do_login).pack(fill="x", pady=(12, 0))
+    btn(f, "Zaloguj się", do_login).pack(fill="x", pady=(12, 0))
     e_mail.bind("<Return>", lambda _: e_lpwd.focus())
     e_lpwd.bind("<Return>", lambda _: do_login())
 
-    # ── Rejestracja (compact, bez scrolla) ────────────────────────────────────
-    rf = tk.Frame(panel_reg_wrap, bg=BG, padx=20)
-    rf.pack(fill="both", expand=True, pady=(10, 0))
+    # Przycisk wstecz
+    btn(f, "← Wróć", lambda: show_login(root, on_login, on_register), bg=SURF2, hover=BORDER).pack(fill="x", pady=(8, 0))
+
+    e_mail.focus()
+
+
+def _show_register_panel(root, on_login, on_register):
+    """Formularz rejestracji nowego urządzenia."""
+    _clear(root)
+    root.title(f"{APP_NAME} — Rejestracja")
+    W, H = 600, 700
+    root.update_idletasks()
+    sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
+    root.geometry(f"{W}x{H}+{(sw-W)//2}+{(sh-H)//2}")
+    root.resizable(True, True)
+    root.minsize(500, 600)
+
+    # Scrollable frame
+    outer = tk.Frame(root, bg=BG)
+    outer.pack(fill="both", expand=True)
+    canvas = tk.Canvas(outer, bg=BG, highlightthickness=0)
+    sb = ttk.Scrollbar(outer, orient="vertical", command=canvas.yview)
+    canvas.configure(yscrollcommand=sb.set)
+    sb.pack(side="right", fill="y")
+    canvas.pack(side="left", fill="both", expand=True)
+    right = tk.Frame(canvas, bg=BG, padx=36, pady=20)
+    win = canvas.create_window((0, 0), window=right, anchor="nw")
+    def _rc(e): canvas.itemconfig(win, width=canvas.winfo_width())
+    def _ri(e): canvas.configure(scrollregion=canvas.bbox("all"))
+    canvas.bind("<Configure>", _rc)
+    right.bind("<Configure>", _ri)
+    canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(-1 * (e.delta // 120), "units"))
+
+    lbl(right, "Rejestracja urządzenia", size=16, bold=True).pack(anchor="w", pady=(0, 4))
+    lbl(right, "Podaj dane firmy i utworzymy konto", size=10, color=TXT_DIM).pack(anchor="w", pady=(0, 12))
+    tk.Frame(right, bg=BORDER, height=1).pack(fill="x", pady=(0, 12))
 
     def _row2(parent, l1, l2):
-        r = tk.Frame(parent, bg=BG); r.pack(fill="x", pady=(6, 0))
+        r = tk.Frame(parent, bg=BG); r.pack(fill="x", pady=(4, 0))
         c1 = tk.Frame(r, bg=BG); c1.pack(side="left", fill="x", expand=True, padx=(0, 6))
         c2 = tk.Frame(r, bg=BG); c2.pack(side="left", fill="x", expand=True)
         lbl(c1, l1, size=10, color=TXT_DIM).pack(anchor="w")
@@ -853,7 +1082,7 @@ def show_login(root, on_login, on_register):
         return e1, e2
 
     # Firma + NIP
-    r_fn = tk.Frame(rf, bg=BG); r_fn.pack(fill="x", pady=(8, 0))
+    r_fn = tk.Frame(right, bg=BG); r_fn.pack(fill="x")
     c_co = tk.Frame(r_fn, bg=BG); c_co.pack(side="left", fill="x", expand=True, padx=(0, 6))
     c_ni = tk.Frame(r_fn, bg=BG); c_ni.pack(side="left", fill="x", expand=True)
     lbl(c_co, "Nazwa firmy *", size=10, color=TXT_DIM).pack(anchor="w")
@@ -861,60 +1090,43 @@ def show_login(root, on_login, on_register):
     lbl(c_ni, "NIP", size=10, color=TXT_DIM).pack(anchor="w")
     e_nip = entry(c_ni); e_nip.pack(fill="x", ipady=3, pady=(1, 0))
 
-    # Imię + Nazwisko
-    e_fname, e_lname = _row2(rf, "Imię *", "Nazwisko *")
+    e_fname, e_lname = _row2(right, "Imię *", "Nazwisko *")
+    e_phone, e_remail = _row2(right, "Telefon", "E-mail *")
 
-    # Telefon + E-mail
-    e_phone, e_remail = _row2(rf, "Telefon", "E-mail *")
-
-    # Hasło + Powtórz
-    rp = tk.Frame(rf, bg=BG); rp.pack(fill="x", pady=(6, 0))
+    # Hasła
+    rp = tk.Frame(right, bg=BG); rp.pack(fill="x", pady=(4, 0))
     cp1 = tk.Frame(rp, bg=BG); cp1.pack(side="left", fill="x", expand=True, padx=(0, 6))
     cp2 = tk.Frame(rp, bg=BG); cp2.pack(side="left", fill="x", expand=True)
     lbl(cp1, "Hasło *", size=10, color=TXT_DIM).pack(anchor="w")
-    pr1 = tk.Frame(cp1, bg=BG); pr1.pack(fill="x", pady=(1, 0))
-    e_rpwd = ttk.Entry(pr1, show="•", font=(FONT, 11))
-    e_rpwd.pack(side="left", fill="x", expand=True, ipady=3)
-    _sp = [False]
-    def tpwd():
-        _sp[0] = not _sp[0]; e_rpwd.configure(show="" if _sp[0] else "•")
-    tk.Button(pr1, text="👁", command=tpwd, bg=SURF2, fg=TXT_DIM,
-              activebackground=SURF, activeforeground=TXT, relief="flat", bd=0,
-              padx=6, cursor="hand2").pack(side="left", padx=(2, 0))
+    e_rpwd = ttk.Entry(cp1, show="•", font=(FONT, 11))
+    e_rpwd.pack(fill="x", ipady=3, pady=(1, 0))
     lbl(cp2, "Powtórz hasło *", size=10, color=TXT_DIM).pack(anchor="w")
     e_rpwd2 = ttk.Entry(cp2, show="•", font=(FONT, 11))
     e_rpwd2.pack(fill="x", ipady=3, pady=(1, 0))
 
-    str_bar = ttk.Progressbar(rf, style="Prog.Horizontal.TProgressbar",
-                               orient="horizontal", mode="determinate", maximum=100)
-    str_bar.pack(fill="x", pady=(4, 0))
-    str_lbl = lbl(rf, "", size=9, color=TXT_DIM); str_lbl.pack(anchor="e")
-    def _upd(*_):
-        pct, txt, col = password_strength(e_rpwd.get())
-        str_bar["value"] = pct * 100; str_lbl.configure(text=txt, fg=col)
-    e_rpwd.bind("<KeyRelease>", _upd)
-
     # Uwagi
-    lbl(rf, "Uwagi dla administratora", size=10, color=TXT_DIM).pack(anchor="w", pady=(6, 0))
-    e_notes = tk.Text(rf, height=2, bg=SURF2, fg=TXT, insertbackground=TXT,
-                      font=(FONT, 11), relief="flat", padx=8, pady=6, wrap="word")
-    e_notes.pack(fill="x", pady=(2, 0))
+    lbl(right, "Uwagi", size=10, color=TXT_DIM).pack(anchor="w", pady=(8, 0))
+    e_notes = tk.Text(right, height=2, bg=SURF2, fg=TXT, insertbackground=TXT,
+                      font=(FONT, 11), relief="flat", padx=8, pady=4, wrap="word",
+                      highlightbackground=BORDER, highlightcolor=PRI, highlightthickness=1)
+    e_notes.pack(fill="x", pady=(1, 0))
 
-    # Zgody (poziomo)
-    zg = tk.Frame(rf, bg=BG); zg.pack(fill="x", pady=(10, 0))
+    # Zgody
+    zg = tk.Frame(right, bg=BG); zg.pack(fill="x", pady=(8, 0))
     def _consent(parent, title, subtitle):
-        fr = tk.Frame(parent, bg=SURF, padx=10, pady=8)
+        fr = tk.Frame(parent, bg=SURF, padx=8, pady=6)
         fr.pack(side="left", fill="x", expand=True, padx=(0, 4))
         t = Toggle(fr); t.pack(side="right")
         tf = tk.Frame(fr, bg=SURF); tf.pack(side="left", fill="x", expand=True)
         lbl(tf, title, size=10, bold=True).pack(anchor="w")
         lbl(tf, subtitle, size=9, color=TXT_DIM).pack(anchor="w")
         return t
-    t_rd  = _consent(zg, "RustDesk", "Zdalne wsparcie IT")
-    t_mon = _consent(zg, "Monitorowanie", "CPU, RAM, dysk")
+    t_rd  = _consent(zg, "RustDesk", "Zdalne wsparcie")
+    t_mon = _consent(zg, "Monitoring", "CPU, RAM, dysk")
+    t_bak = _consent(zg, "Backup", "Kopie SQL / folderów")
 
     rerr_v = tk.StringVar()
-    lbl(rf, "", size=11, color=ERR_C, textvariable=rerr_v).pack(pady=(6, 0))
+    lbl(right, "", size=11, color=ERR_C, textvariable=rerr_v).pack(pady=(6, 0))
 
     def submit():
         company = get_val(e_company); fname = get_val(e_fname); lname = get_val(e_lname)
@@ -931,13 +1143,14 @@ def show_login(root, on_login, on_register):
             "contactPhone": get_val(e_phone) or None,
             "contactEmail": email, "email": email, "password": pwd,
             "registrationNotes": e_notes.get("1.0", "end").strip() or None,
-            "allowRustdesk": t_rd.get(), "allowMonitoring": t_mon.get(),
+            "allowRustdesk": t_rd.get(), "allowMonitoring": t_mon.get(), "backupMode": t_bak.get(),
         }
         threading.Thread(target=_register_thread, args=(root, form, on_register, rerr_v), daemon=True).start()
 
-    btn(rf, "ZAREJESTRUJ URZĄDZENIE", submit).pack(fill="x", pady=(10, 16))
+    btn(right, "Zarejestruj urządzenie", submit).pack(fill="x", pady=(10, 0))
+    btn(right, "← Wróć", lambda: show_login(root, on_login, on_register), bg=SURF2, hover=BORDER).pack(fill="x", pady=(6, 0))
 
-    panel_login.pack(fill="both", expand=True, padx=40, pady=16)
+
 
 
 def open_about_window(root):
@@ -964,7 +1177,7 @@ def open_about_window(root):
     except Exception: pass
 
     lbl(f, APP_NAME, size=15, bold=True).pack()
-    lbl(f, f"Wersja {APP_VERSION}  ·  2026-03-24", size=10, color=TXT_DIM).pack(pady=(2, 16))
+    lbl(f, f"Wersja {APP_VERSION}  ·  2026-03-26", size=10, color=TXT_DIM).pack(pady=(2, 16))
 
     tk.Frame(f, bg=PRI, height=1).pack(fill="x", pady=(0, 14))
 
@@ -1286,57 +1499,101 @@ def open_ticket_window(root, token, on_done):
     win.configure(bg=BG)
     win.resizable(False, False)
 
-    W, H = 560, 640
+    W, H = 520, 620
     win.update_idletasks()
     sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
     win.geometry(f"{W}x{H}+{(sw-W)//2}+{(sh-H)//2}")
     win.grab_set(); win.lift()
 
-    f = tk.Frame(win, bg=BG, padx=28, pady=18)
+    f = tk.Frame(win, bg=BG, padx=28, pady=20)
     f.pack(fill="both", expand=True)
 
-    lbl(f, "Nowe zgłoszenie", size=17, bold=True).pack(anchor="w")
-    tk.Frame(f, bg=BORDER, height=1).pack(fill="x", pady=(6, 10))
+    lbl(f, "Nowe zgłoszenie", size=16, bold=True).pack(anchor="w")
+    lbl(f, "Wybierz kategorię i opisz problem", size=9, color=TXT_DIM).pack(anchor="w", pady=(2, 0))
+    tk.Frame(f, bg=BORDER, height=1).pack(fill="x", pady=(8, 12))
 
-    lbl(f, "Temat *", size=11, color=TXT_DIM).pack(anchor="w")
+    # ── Category quick-select ─────────────────────────────────────────────────
+    CATEGORIES = [
+        ("💻", "Komputer"),
+        ("🌐", "Internet / sieć"),
+        ("🖨️", "Drukarka"),
+        ("📦", "Program"),
+        ("🔥", "Awaria pilna"),
+        ("📋", "Inne"),
+    ]
+    CAT_PRIORITY = {"Awaria pilna": "HIGH"}
+
+    selected_cat = [None]
+    cat_btns = []
     e_title = ttk.Entry(f, font=(FONT, 11))
+
+    def _select_cat(idx):
+        icon, name = CATEGORIES[idx]
+        selected_cat[0] = idx
+        e_title.delete(0, "end")
+        e_title.insert(0, name)
+        e_title.configure(foreground=TXT)
+        for i, b in enumerate(cat_btns):
+            if i == idx:
+                b.configure(bg=PRI, fg="#fff")
+            else:
+                b.configure(bg=SURF2, fg=TXT_DIM)
+
+    cat_frame = tk.Frame(f, bg=BG)
+    cat_frame.pack(fill="x", pady=(0, 10))
+    for i, (icon, name) in enumerate(CATEGORIES):
+        b = tk.Button(cat_frame, text=f"{icon} {name}", command=lambda idx=i: _select_cat(idx),
+                      bg=SURF2, fg=TXT_DIM, activebackground=PRI, activeforeground="#fff",
+                      relief="flat", bd=0, font=(FONT, 9), cursor="hand2",
+                      padx=8, pady=5)
+        b.pack(side="left", padx=(0, 4), pady=2)
+        cat_btns.append(b)
+
+    # ── Subject (auto-filled by category, editable) ───────────────────────────
+    lbl(f, "TEMAT", size=9, color=TXT_DIM).pack(anchor="w")
     e_title.pack(fill="x", ipady=4, pady=(2, 8))
 
-    # ── Priorytet + Data ───────────────────────────────────────────────────────
-    row = tk.Frame(f, bg=BG); row.pack(fill="x", pady=(0, 8))
-    pf  = tk.Frame(row, bg=BG); pf.pack(side="left", fill="x", expand=True, padx=(0, 8))
-    df  = tk.Frame(row, bg=BG); df.pack(side="left", fill="x", expand=True)
-
-    lbl(pf, "Priorytet", size=11, color=TXT_DIM).pack(anchor="w")
-    pri_label_v = tk.StringVar(value="Średni")
-    pri_m = tk.OptionMenu(pf, pri_label_v, *_PRI_LABELS)
-    pri_m.configure(bg=SURF2, fg=TXT, activebackground=SURF, activeforeground=TXT,
-                    relief="flat", bd=0, font=(FONT, 11), highlightthickness=0, width=10)
-    pri_m["menu"].configure(bg=SURF2, fg=TXT, activebackground=PRI, activeforeground=TXT)
-    pri_m.pack(fill="x", pady=(2, 0))
-
-    lbl(df, "Do kiedy należy realizować (opcja)", size=11, color=TXT_DIM).pack(anchor="w")
-    date_row = tk.Frame(df, bg=BG); date_row.pack(fill="x", pady=(2, 0))
-    e_due = entry(date_row, "dd.mm.rrrr")
-    e_due.pack(side="left", fill="x", expand=True, ipady=4)
-    tk.Button(date_row, text="📅", bg=SURF2, fg=TXT, relief="flat", bd=0,
-              font=(FONT, 12), cursor="hand2", padx=6,
-              activebackground=PRI, activeforeground=TXT,
-              command=lambda: _open_calendar(win, e_due)).pack(side="left", padx=(4, 0))
-
-    lbl(f, "Opis", size=11, color=TXT_DIM).pack(anchor="w", pady=(0, 2))
+    # ── Main description ──────────────────────────────────────────────────────
+    lbl(f, "CO SIĘ DZIEJE?", size=9, color=TXT_DIM).pack(anchor="w", pady=(0, 2))
     e_desc = tk.Text(f, height=5, bg=SURF2, fg=TXT, insertbackground=TXT,
-                     font=(FONT, 11), relief="flat", padx=8, pady=8, wrap="word")
+                     font=(FONT, 11), relief="flat", padx=10, pady=10, wrap="word",
+                     highlightbackground=BORDER, highlightcolor=PRI, highlightthickness=1)
+    e_desc.insert("1.0", "Opisz problem, np. nie działa drukarka...")
+    e_desc.configure(foreground=TXT_DIM)
+    def _desc_focus_in(ev):
+        if e_desc.get("1.0", "end").strip() == "Opisz problem, np. nie działa drukarka...":
+            e_desc.delete("1.0", "end"); e_desc.configure(foreground=TXT)
+    def _desc_focus_out(ev):
+        if not e_desc.get("1.0", "end").strip():
+            e_desc.insert("1.0", "Opisz problem, np. nie działa drukarka..."); e_desc.configure(foreground=TXT_DIM)
+    e_desc.bind("<FocusIn>", _desc_focus_in)
+    e_desc.bind("<FocusOut>", _desc_focus_out)
     e_desc.pack(fill="x")
 
-    # ── Zrzuty ekranu ─────────────────────────────────────────────────────────
-    lbl(f, "Zrób zrzut ekranu (max 3)", size=11, color=TXT_DIM).pack(anchor="w", pady=(10, 6))
-    shots     = [None, None, None]
+    # ── Priority: simple toggle ───────────────────────────────────────────────
+    pri_frame = tk.Frame(f, bg=BG)
+    pri_frame.pack(fill="x", pady=(8, 0))
+    is_urgent = [False]
+    urgent_btn = tk.Button(pri_frame, text="⚡ Pilne", bg=SURF2, fg=TXT_DIM,
+                           activebackground=ERR_C, activeforeground="#fff",
+                           relief="flat", bd=0, font=(FONT, 10), cursor="hand2", padx=12, pady=4)
+    def _toggle_urgent():
+        is_urgent[0] = not is_urgent[0]
+        if is_urgent[0]:
+            urgent_btn.configure(bg=ERR_C, fg="#fff", text="⚡ PILNE — priorytet wysoki")
+        else:
+            urgent_btn.configure(bg=SURF2, fg=TXT_DIM, text="⚡ Pilne")
+    urgent_btn.configure(command=_toggle_urgent)
+    urgent_btn.pack(side="left")
+
+    # ── Screenshots — compact row ─────────────────────────────────────────────
+    lbl(f, "ZRZUTY EKRANU", size=9, color=TXT_DIM).pack(anchor="w", pady=(10, 4))
+    shots = [None, None, None]
     shot_btns = []
 
     def _make_shot(idx):
         def do():
-            win.iconify()          # minimalizuj do paska zadań (bezpieczniejsze niż withdraw)
+            win.iconify()
             win.after(900, lambda: _capture(idx))
         return do
 
@@ -1348,77 +1605,63 @@ def open_ticket_window(root, token, on_done):
             os.makedirs(INSTALL_DIR, exist_ok=True)
             img.save(p, "JPEG", quality=55)
             shots[idx] = p
-            shot_btns[idx].configure(text=f"✓ Zrzut {idx+1}", bg=OK_C, fg="#fff",
-                                     font=(FONT, 10, "bold"))
+            shot_btns[idx].configure(text=f"✓ {idx+1}", bg=OK_C, fg="#fff")
         except Exception as e:
-            shot_btns[idx].configure(text="✗ Błąd", bg=ERR_C, fg="#fff")
+            shot_btns[idx].configure(text="✗", bg=ERR_C, fg="#fff")
             log.error("Screenshot %d: %s", idx+1, e)
         finally:
-            # Zawsze przywróć okno — nawet jeśli wystąpił błąd
-            try:
-                win.deiconify()
-                win.lift()
-                win.focus_force()
-                win.after(50, win.grab_set)
-            except Exception:
-                pass
+            try: win.deiconify(); win.lift(); win.focus_force(); win.after(50, win.grab_set)
+            except Exception: pass
 
     sr = tk.Frame(f, bg=BG); sr.pack(fill="x")
     for i in range(3):
-        bf = tk.Frame(sr, bg=SURF2, cursor="hand2")
-        bf.pack(side="left", padx=(0, 8))
-        tk.Label(bf, text="📷", bg=SURF2, fg=TXT,
-                 font=(FONT, 22)).pack(pady=(8, 2))
-        tk.Label(bf, text=f"Zrób zrzut {i+1}", bg=SURF2, fg=TXT,
-                 font=(FONT, 9, "bold")).pack()
-        tk.Label(bf, text="(Print Screen)", bg=SURF2, fg=TXT_DIM,
-                 font=(FONT, 8)).pack(pady=(0, 8), padx=10)
-        cmd = _make_shot(i)
-        bf.bind("<Button-1>", lambda e, c=cmd: c())
-        for child in bf.winfo_children():
-            child.bind("<Button-1>", lambda e, c=cmd: c())
-        shot_btns.append(bf)
+        b = tk.Button(sr, text=f"📷 Zrzut {i+1}", command=_make_shot(i),
+                      bg=SURF2, fg=TXT_DIM, activebackground=SURF, activeforeground=TXT,
+                      relief="flat", bd=0, font=(FONT, 9), cursor="hand2", padx=10, pady=4)
+        b.pack(side="left", padx=(0, 4))
+        shot_btns.append(b)
 
+    # ── Error / status ────────────────────────────────────────────────────────
     err_v = tk.StringVar()
-    lbl(f, "", size=11, color=ERR_C, textvariable=err_v).pack(pady=(8, 0))
+    lbl(f, "", size=10, color=ERR_C, textvariable=err_v).pack(pady=(6, 0))
 
+    # ── Submit ────────────────────────────────────────────────────────────────
     def submit():
         title = e_title.get().strip()
-        if not title: err_v.set("Podaj temat zgłoszenia."); return
-        due_raw = get_val(e_due)
-        due_iso = None
-        if due_raw:
-            try:
-                dt = datetime.strptime(due_raw, "%d.%m.%Y")
-                due_iso = dt.strftime("%Y-%m-%dT23:59:59+00:00")
-            except ValueError:
-                err_v.set("Błędny format daty (dd.mm.rrrr)"); return
-        desc      = e_desc.get("1.0", "end").strip()
-        taken     = [p for p in shots if p]
-        pri_api   = _PRI_VALUES[_PRI_LABELS.index(pri_label_v.get())]
+        if not title: err_v.set("Wybierz kategorię lub wpisz temat."); return
+        desc_text = e_desc.get("1.0", "end").strip()
+        if desc_text == "Opisz problem, np. nie działa drukarka...": desc_text = ""
+
+        # Priority from category or toggle
+        if is_urgent[0]:
+            pri_api = "HIGH"
+        elif selected_cat[0] is not None:
+            cat_name = CATEGORIES[selected_cat[0]][1]
+            pri_api = CAT_PRIORITY.get(cat_name, "MEDIUM")
+        else:
+            pri_api = "MEDIUM"
+
         err_v.set("Wysyłanie…")
         win.update()
 
         def _send():
             try:
-                full_desc = desc
+                full_desc = desc_text
+                taken = [p for p in shots if p]
                 if taken:
                     err_v.set("Przesyłanie zrzutów…")
                     urls = [u for p in taken for u in [upload_screenshot(p, token)] if u]
                     if urls:
                         full_desc += "\n\n📷 Zrzuty ekranu:\n" + "\n".join(urls)
-                do_ticket(token, title, full_desc, pri_api, due_iso)
+                do_ticket(token, title, full_desc, pri_api, None)
                 win.after(0, lambda: (on_done(True), win.destroy()))
             except Exception as e:
                 win.after(0, lambda: err_v.set(f"Błąd: {e}"))
 
         threading.Thread(target=_send, daemon=True).start()
 
-    ab = tk.Frame(f, bg=BG); ab.pack(fill="x", pady=(10, 0))
-    btn(ab, "Anuluj", win.destroy, bg=SURF2, hover=SURF).pack(side="right", padx=(6, 0))
-    btn(ab, "WYŚLIJ ZGŁOSZENIE", submit).pack(side="right")
-
-    e_title.focus()
+    btn(f, "  Wyślij zgłoszenie  ", submit).pack(fill="x", pady=(8, 0))
+    btn(f, "Anuluj", win.destroy, bg=SURF2, hover=BORDER).pack(fill="x", pady=(4, 0))
 
 
 # ─── Helper clear ────────────────────────────────────────────────────────────
@@ -1426,6 +1669,347 @@ def open_ticket_window(root, token, on_done):
 def _clear(root):
     for w in root.winfo_children():
         w.destroy()
+
+
+# ─── Auto-Diagnostics ─────────────────────────────────────────────────────────
+
+class AutoDiagnostics:
+    """Automatyczne wykrywanie problemów i tworzenie zgłoszeń."""
+
+    DISK_LOW_THRESHOLD = 10  # procent wolnego miejsca
+    CHECK_INTERVAL = 300     # co 5 minut
+
+    def __init__(self, token):
+        self.token = token
+        self._alerted = set()  # Zapobiega duplikatom alertów
+
+    def run_checks(self):
+        """Wykonaj wszystkie diagnostyki."""
+        self._check_disk_space()
+        self._check_windows_updates()
+        self._check_services()
+
+    def _check_disk_space(self):
+        """Sprawdź wolne miejsce na wszystkich dyskach."""
+        try:
+            for p in psutil.disk_partitions():
+                try:
+                    u = psutil.disk_usage(p.mountpoint)
+                    free_pct = 100 - u.percent
+                    if free_pct < self.DISK_LOW_THRESHOLD:
+                        alert_key = f"disk_low_{p.device}"
+                        if alert_key not in self._alerted:
+                            self._alerted.add(alert_key)
+                            free_gb = round(u.free / (1024**3), 1)
+                            total_gb = round(u.total / (1024**3), 1)
+                            self._create_ticket(
+                                title=f"Mało miejsca na dysku {p.device}",
+                                desc=f"Dysk {p.device} ma tylko {free_gb} GB wolnego z {total_gb} GB ({free_pct:.0f}% wolnego).\n\n"
+                                     f"Wymagane działanie: zwolnienie miejsca lub rozszerzenie dysku.",
+                                priority="HIGH"
+                            )
+                            log.warning("ALERT: Low disk space on %s: %.1f GB free (%.0f%%)", p.device, free_gb, free_pct)
+                    elif free_pct > self.DISK_LOW_THRESHOLD + 5:
+                        # Reset alert gdy problem rozwiązany
+                        self._alerted.discard(f"disk_low_{p.device}")
+                except Exception:
+                    pass
+        except Exception as e:
+            log.debug("Disk check error: %s", e)
+
+    def _check_windows_updates(self):
+        """Sprawdź czy są oczekujące aktualizacje Windows."""
+        try:
+            alert_key = "win_updates"
+            if alert_key in self._alerted:
+                return  # Sprawdzaj raz na restart agenta
+
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-Command",
+                 "(New-Object -ComObject Microsoft.Update.AutoUpdate).DetectNow(); "
+                 "$s = New-Object -ComObject Microsoft.Update.Session; "
+                 "$u = $s.CreateUpdateSearcher(); "
+                 "try { $r = $u.Search('IsInstalled=0'); $r.Updates.Count } catch { 0 }"],
+                capture_output=True, text=True, timeout=60, creationflags=_NO_WINDOW
+            )
+            count = int(result.stdout.strip()) if result.stdout.strip().isdigit() else 0
+
+            if count > 5:
+                self._alerted.add(alert_key)
+                self._create_ticket(
+                    title=f"Oczekujące aktualizacje Windows ({count})",
+                    desc=f"Komputer ma {count} oczekujących aktualizacji Windows.\n\n"
+                         f"Zalecamy zaplanowanie aktualizacji w najbliższym oknie serwisowym.",
+                    priority="MEDIUM"
+                )
+                log.info("ALERT: %d pending Windows updates", count)
+        except Exception as e:
+            log.debug("Windows update check error: %s", e)
+
+    def _check_services(self):
+        """Sprawdź krytyczne usługi Windows."""
+        critical_services = ["Spooler", "BITS", "wuauserv", "Dhcp", "Dnscache"]
+        try:
+            import win32serviceutil
+            for svc in critical_services:
+                try:
+                    status = win32serviceutil.QueryServiceStatus(svc)[1]
+                    # 4 = running, 1 = stopped
+                    if status == 1:
+                        alert_key = f"svc_stopped_{svc}"
+                        if alert_key not in self._alerted:
+                            self._alerted.add(alert_key)
+                            # Próba auto-restartu
+                            try:
+                                win32serviceutil.StartService(svc)
+                                log.info("Auto-restarted service: %s", svc)
+                            except Exception:
+                                self._create_ticket(
+                                    title=f"Usługa {svc} zatrzymana",
+                                    desc=f"Krytyczna usługa Windows '{svc}' jest zatrzymana.\n"
+                                         f"Próba automatycznego restartu nie powiodła się.",
+                                    priority="HIGH"
+                                )
+                except Exception:
+                    pass
+        except ImportError:
+            pass  # win32serviceutil nie dostępny
+        except Exception as e:
+            log.debug("Service check error: %s", e)
+
+    def _create_ticket(self, title, desc, priority="MEDIUM"):
+        """Utwórz automatyczne zgłoszenie."""
+        try:
+            hostname = os.environ.get("COMPUTERNAME", "Unknown")
+            full_desc = f"[Auto-diagnostyka — {hostname}]\n\n{desc}"
+            do_ticket(self.token, title, full_desc, priority, None)
+            log.info("Auto-ticket created: %s", title)
+        except Exception as e:
+            log.error("Auto-ticket failed: %s", e)
+
+
+# ─── Backup Scheduler ─────────────────────────────────────────────────────────
+
+class BackupScheduler:
+    """Pobiera konfiguracje backupu z API i wykonuje je wg harmonogramu."""
+
+    def __init__(self, token):
+        self.token = token
+        self.configs = []
+        self._last_runs = {}  # configId → last run datetime
+
+    def sync_configs(self):
+        """Pobierz konfiguracje z API."""
+        try:
+            self.configs = api_get("/agent/backup-configs", self.token)
+            log.info("Backup configs synced: %d", len(self.configs))
+        except Exception as e:
+            log.warning("Backup config sync failed: %s", e)
+
+    def check_and_run(self):
+        """Sprawdź harmonogram i uruchom backup jeśli trzeba."""
+        from datetime import datetime as DT
+        now = DT.now()
+
+        for cfg in self.configs:
+            cfg_id = cfg.get("id")
+            cron = cfg.get("cronSchedule", "0 2 * * *")
+            if not self._should_run(cron, cfg_id, now):
+                continue
+            log.info("Starting backup: %s (%s)", cfg.get("name"), cfg.get("type"))
+            self._last_runs[cfg_id] = now
+            threading.Thread(target=self._run_backup, args=(cfg,), daemon=True).start()
+
+    def _should_run(self, cron_str, cfg_id, now):
+        """Prosty parser crona — sprawdza godzinę i minutę."""
+        try:
+            parts = cron_str.split()
+            minute, hour = int(parts[0]), int(parts[1])
+            if now.hour != hour or now.minute != minute:
+                return False
+            last = self._last_runs.get(cfg_id)
+            if last and (now - last).total_seconds() < 3500:
+                return False
+            return True
+        except Exception:
+            return False
+
+    def run_single(self, config_id):
+        """Uruchom backup natychmiast (z WebSocket)."""
+        for cfg in self.configs:
+            if cfg.get("id") == config_id:
+                threading.Thread(target=self._run_backup, args=(cfg,), daemon=True).start()
+                return
+
+    def _run_backup(self, cfg):
+        cfg_id = cfg.get("id")
+        try:
+            # Report start
+            resp = api_post("/agent/backup/start", {"configId": cfg_id}, self.token)
+            history_id = resp.get("historyId")
+
+            # Execute backup
+            btype = cfg.get("type", "")
+            if btype.startswith("SQL_"):
+                path = self._backup_sql(cfg)
+            elif btype == "FOLDER":
+                path = self._backup_folder(cfg)
+            else:
+                raise ValueError(f"Unknown backup type: {btype}")
+
+            # Encrypt if needed
+            if cfg.get("encryptBackups") and cfg.get("encryptionKey"):
+                path = self._encrypt(path, cfg["encryptionKey"])
+
+            # Upload to Google Drive
+            drive_id = None
+            drive_folder = cfg.get("googleDriveFolder")
+            if drive_folder:
+                drive_id = self._upload_gdrive(path, drive_folder)
+
+            file_size = os.path.getsize(path) if os.path.exists(path) else 0
+
+            # Report success
+            api_post("/agent/backup/complete", {
+                "historyId": history_id,
+                "sizeBytes": file_size,
+                "fileName": os.path.basename(path),
+                "googleDriveId": drive_id,
+            }, self.token)
+            log.info("Backup complete: %s (%d bytes)", cfg.get("name"), file_size)
+
+            # Cleanup local file
+            try: os.remove(path)
+            except Exception: pass
+
+        except Exception as e:
+            log.error("Backup failed: %s — %s", cfg.get("name"), e)
+            try:
+                api_post("/agent/backup/failed", {"configId": cfg_id, "error": str(e)}, self.token)
+            except Exception:
+                pass
+
+    def _backup_sql(self, cfg):
+        """Wykonaj backup SQL — mysqldump / pg_dump / sqlcmd."""
+        import subprocess, gzip
+        btype = cfg["type"]
+        host = cfg.get("sqlHost", "localhost")
+        port = cfg.get("sqlPort", 3306)
+        user = cfg.get("sqlUser", "root")
+        # Decrypt password
+        pwd = cfg.get("sqlPassEnc", "")
+        if pwd and ":" in pwd:
+            try:
+                from cryptography.fernet import Fernet
+                # Simple AES — for now just use as-is from server
+            except Exception:
+                pass
+        dbs = cfg.get("sqlDatabases", "").split(",")
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        results = []
+
+        for db in dbs:
+            db = db.strip()
+            if not db: continue
+            output = os.path.join(tempfile.gettempdir(), f"backup_{db}_{timestamp}.sql")
+
+            if btype == "SQL_MYSQL":
+                cmd = f'mysqldump -h {host} -P {port} -u {user} -p{pwd} {db}'
+            elif btype == "SQL_POSTGRES":
+                os.environ["PGPASSWORD"] = pwd
+                cmd = f'pg_dump -h {host} -p {port} -U {user} {db}'
+            elif btype == "SQL_MSSQL":
+                cmd = f'sqlcmd -S {host},{port} -U {user} -P {pwd} -Q "BACKUP DATABASE [{db}] TO DISK=\'{output}.bak\' WITH FORMAT"'
+                try:
+                    subprocess.run(cmd, shell=True, check=True, capture_output=True, timeout=3600)
+                    results.append(f"{output}.bak")
+                except Exception as e:
+                    raise RuntimeError(f"MSSQL backup failed for {db}: {e}")
+                continue
+            else:
+                continue
+
+            try:
+                with open(output, "w") as f:
+                    subprocess.run(cmd, shell=True, check=True, stdout=f, stderr=subprocess.PIPE, timeout=3600)
+                results.append(output)
+            except Exception as e:
+                raise RuntimeError(f"SQL backup failed for {db}: {e}")
+
+        if not results:
+            raise RuntimeError("No databases to backup")
+
+        # Compress all into one .tar.gz
+        import tarfile
+        archive = os.path.join(tempfile.gettempdir(), f"backup_sql_{timestamp}.tar.gz")
+        with tarfile.open(archive, "w:gz") as tar:
+            for r in results:
+                tar.add(r, arcname=os.path.basename(r))
+                try: os.remove(r)
+                except Exception: pass
+        return archive
+
+    def _backup_folder(self, cfg):
+        """Backup folder as ZIP."""
+        import zipfile
+        folder = cfg.get("folderPath", "")
+        if not os.path.isdir(folder):
+            raise RuntimeError(f"Folder not found: {folder}")
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        output = os.path.join(tempfile.gettempdir(), f"backup_folder_{timestamp}.zip")
+        with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as zf:
+            for root, dirs, files in os.walk(folder):
+                for file in files:
+                    fpath = os.path.join(root, file)
+                    arcname = os.path.relpath(fpath, folder)
+                    try: zf.write(fpath, arcname)
+                    except Exception: pass
+        return output
+
+    def _encrypt(self, path, key):
+        """Encrypt file with Fernet (AES-128-CBC)."""
+        try:
+            from cryptography.fernet import Fernet
+            import base64, hashlib
+            # Ensure key is valid Fernet key (32 bytes base64url)
+            if len(key) < 32:
+                key = base64.urlsafe_b64encode(hashlib.sha256(key.encode()).digest()).decode()
+            f = Fernet(key.encode() if isinstance(key, str) else key)
+            with open(path, "rb") as file:
+                data = file.read()
+            encrypted = f.encrypt(data)
+            enc_path = path + ".enc"
+            with open(enc_path, "wb") as file:
+                file.write(encrypted)
+            os.remove(path)
+            return enc_path
+        except ImportError:
+            log.warning("cryptography not installed, skipping encryption")
+            return path
+
+    def _upload_gdrive(self, path, folder_id):
+        """Upload file to Google Drive via service account."""
+        try:
+            from google.oauth2 import service_account
+            from googleapiclient.discovery import build
+            from googleapiclient.http import MediaFileUpload
+
+            # Get credentials from API
+            creds_data = api_get("/agent/backup/drive-credentials", self.token)
+            creds = service_account.Credentials.from_service_account_info(
+                creds_data, scopes=["https://www.googleapis.com/auth/drive.file"]
+            )
+            service = build("drive", "v3", credentials=creds)
+            media = MediaFileUpload(path, resumable=True)
+            file_meta = {"name": os.path.basename(path), "parents": [folder_id]}
+            result = service.files().create(body=file_meta, media_body=media, fields="id").execute()
+            return result.get("id")
+        except ImportError:
+            log.warning("google-api-python-client not installed, skipping Drive upload")
+            return None
+        except Exception as e:
+            log.error("Google Drive upload failed: %s", e)
+            raise
 
 
 # ─── Główna aplikacja ─────────────────────────────────────────────────────────
@@ -1459,6 +2043,9 @@ class App:
                 threading.Thread(target=self._install_rd, daemon=True).start()
             if self._open_ticket_on_start:
                 self.root.after(800, self._open_ticket)
+            else:
+                # Open full desktop panel in webview
+                self.root.after(500, self._open_main_window)
         else:
             show_waiting(self.root, token, self._on_activated, self._on_cancel)
 
@@ -1470,11 +2057,13 @@ class App:
         if result.get("deviceId"):
             self.cfg["deviceId"] = result["deviceId"]
         save_config(self.cfg)
+        log.info("Login OK — status=%s token saved", result["status"])
         if result["status"] == "ACTIVE":
             self.root.withdraw()
             self._start_bg()
             if not is_rustdesk_installed():
                 threading.Thread(target=self._install_rd, daemon=True).start()
+            self.root.after(500, self._open_main_window)
         else:
             show_waiting(self.root, result["token"], self._on_activated, self._on_cancel)
 
@@ -1495,6 +2084,7 @@ class App:
         self._start_bg()
         if self.cfg.get("allowRustdesk") and not is_rustdesk_installed():
             threading.Thread(target=self._install_rd, daemon=True).start()
+        self.root.after(500, self._open_main_window)
 
     def _on_cancel(self):
         save_config({})
@@ -1506,26 +2096,70 @@ class App:
     def _start_bg(self):
         token = self.cfg.get("token", "")
         self._update_info = None
+        self._backup_scheduler = None
+        self._diagnostics = None
         if self.cfg.get("allowMonitoring", True):
             threading.Thread(target=self._metrics_loop, daemon=True).start()
+            # Auto-diagnostyka
+            self._diagnostics = AutoDiagnostics(token)
+            threading.Thread(target=self._diagnostics_loop, daemon=True).start()
         threading.Thread(target=self._update_check_loop, daemon=True).start()
         threading.Thread(target=self._ensure_shortcut, daemon=True).start()
+        if self.cfg.get("backupMode") or self.cfg.get("allowMonitoring"):
+            self._backup_scheduler = BackupScheduler(token)
+            threading.Thread(target=self._backup_loop, daemon=True).start()
         self._ws = WS(token, self._on_ws)
         self._ws.start()
         self._start_tray()
 
+    def _diagnostics_loop(self):
+        """Auto-diagnostyka co 5 minut."""
+        time.sleep(120)
+        while True:
+            try:
+                if self._diagnostics: self._diagnostics.run_checks()
+            except Exception: pass
+            time.sleep(AutoDiagnostics.CHECK_INTERVAL)
+
     def _ensure_shortcut(self):
-        """Tworzy skrót na pulpicie jeśli nie istnieje + rejestruje w Dodaj/Usuń."""
+        """Tworzy skrót InfraDesk na pulpicie + rejestruje w Dodaj/Usuń + kopiuje ikonę."""
         try:
             _register_in_add_remove()
+
+            # Najpierw skopiuj icon.ico do INSTALL_DIR (potrzebny dla skrótu)
+            ico_dst = os.path.join(INSTALL_DIR, "icon.ico")
+            try:
+                ico_src = res("icon.ico")
+                if ico_src and os.path.exists(ico_src) and ico_src != ico_dst:
+                    import shutil
+                    os.makedirs(INSTALL_DIR, exist_ok=True)
+                    shutil.copy2(ico_src, ico_dst)
+                    log.info("Icon copied to: %s", ico_dst)
+            except Exception as e:
+                log.warning("Icon copy failed: %s", e)
+
+            # Twórz skrót na pulpicie
             desktop = _get_desktop_path()
-            lnk = os.path.join(desktop, "Zgloszenie serwisowe.lnk")
-            if not os.path.exists(lnk):
-                create_desktop_shortcut()
-            else:
-                log.info("Shortcut already exists: %s", lnk)
+            lnk = os.path.join(desktop, "InfraDesk.lnk")
+            log.info("Checking shortcut: %s exists=%s", lnk, os.path.exists(lnk))
+            create_desktop_shortcut()
+
         except Exception as e:
             log.warning("Ensure shortcut error: %s", e)
+
+    def _backup_loop(self):
+        """Synchronizuje konfiguracje co 5 min, sprawdza harmonogram co minutę."""
+        bs = self._backup_scheduler
+        if not bs: return
+        bs.sync_configs()
+        sync_counter = 0
+        while True:
+            time.sleep(60)
+            sync_counter += 1
+            if sync_counter >= 5:
+                bs.sync_configs()
+                sync_counter = 0
+            bs.check_and_run()
 
     def _metrics_loop(self):
         token = self.cfg.get("token", "")
@@ -1559,10 +2193,97 @@ class App:
         elif mtype == "update":
             # Admin wcisnął "Wyślij aktualizację" w panelu
             threading.Thread(target=self._start_update, daemon=True).start()
+        elif mtype == "backup_run":
+            config_id = msg.get("configId", "")
+            if config_id and self._backup_scheduler:
+                log.info("WS: backup_run triggered for %s", config_id)
+                self._backup_scheduler.run_single(config_id)
         elif mtype == "wake":
             mac = msg.get("mac", "")
             if mac:
                 threading.Thread(target=_send_wol, args=(mac,), daemon=True).start()
+        elif mtype == "windows_update":
+            schedule_time = msg.get("scheduleTime")
+            threading.Thread(target=self._run_windows_update, args=(schedule_time,), daemon=True).start()
+        elif mtype == "restart_service":
+            svc = msg.get("serviceName", "")
+            if svc:
+                def _rs():
+                    try:
+                        subprocess.run(["net", "stop", svc], capture_output=True, timeout=60, creationflags=_NO_WINDOW)
+                        time.sleep(2)
+                        subprocess.run(["net", "start", svc], capture_output=True, timeout=60, creationflags=_NO_WINDOW)
+                        log.info("Service %s restarted", svc)
+                        if self._tray:
+                            try: self._tray.notify(f"Usługa {svc} zrestartowana", APP_NAME)
+                            except: pass
+                    except Exception as e: log.error("Service restart error: %s", e)
+                threading.Thread(target=_rs, daemon=True).start()
+        elif mtype == "system_reboot":
+            delay = msg.get("delay", 60)
+            log.info("System reboot in %ds", delay)
+            if self._tray:
+                try: self._tray.notify(f"Restart serwera za {delay}s", APP_NAME)
+                except: pass
+            threading.Thread(target=lambda: subprocess.run(
+                ["shutdown", "/r", "/t", str(delay), "/c", "InfraDesk: restart serwera"],
+                capture_output=True, creationflags=_NO_WINDOW), daemon=True).start()
+
+    # ── Windows Update ────────────────────────────────────────────────
+    def _run_windows_update(self, schedule_time=None):
+        """Install Windows updates and optionally schedule a restart."""
+        try:
+            log.info("Windows Update: starting installation%s", f" (restart at {schedule_time})" if schedule_time else "")
+            if self._tray:
+                try: self._tray.notify("Rozpoczynam instalację aktualizacji Windows...", APP_NAME)
+                except Exception: pass
+
+            # Install updates via PSWindowsUpdate module
+            ps_cmd = (
+                '$ErrorActionPreference="SilentlyContinue"; '
+                'if (-not (Get-Module -ListAvailable -Name PSWindowsUpdate)) { '
+                '  Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Confirm:$false | Out-Null; '
+                '  Install-Module PSWindowsUpdate -Force -Confirm:$false | Out-Null '
+                '}; '
+                'Import-Module PSWindowsUpdate; '
+                'Get-WindowsUpdate -Install -AcceptAll -AutoReboot:$false -Confirm:$false 2>&1 | Out-String'
+            )
+            result = subprocess.run(
+                ["powershell", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
+                capture_output=True, text=True, timeout=7200
+            )
+            output = (result.stdout or "")[-800:]
+            log.info("Windows Update result: %s", output if output.strip() else "(no updates or empty output)")
+
+            # Schedule restart if time specified
+            if schedule_time:
+                subprocess.run([
+                    "schtasks", "/create", "/tn", "InfraDesk_WinUpdate_Restart",
+                    "/tr", 'shutdown /r /t 60 /c "InfraDesk: zaplanowany restart po aktualizacji Windows"',
+                    "/sc", "once", "/st", schedule_time, "/f"
+                ], capture_output=True, timeout=30)
+                log.info("Windows Update: restart scheduled at %s", schedule_time)
+
+            # Tray notification
+            if self._tray:
+                msg_txt = "Aktualizacje Windows zainstalowane"
+                if schedule_time:
+                    msg_txt += f". Restart o {schedule_time}"
+                else:
+                    msg_txt += ". Restart przy następnym uruchomieniu"
+                try: self._tray.notify(msg_txt, APP_NAME)
+                except Exception: pass
+
+        except subprocess.TimeoutExpired:
+            log.error("Windows Update: timeout (>2h)")
+            if self._tray:
+                try: self._tray.notify("Aktualizacja Windows: przekroczono limit czasu", APP_NAME)
+                except Exception: pass
+        except Exception as e:
+            log.error("Windows Update error: %s", e)
+            if self._tray:
+                try: self._tray.notify(f"Błąd aktualizacji Windows: {e}", APP_NAME)
+                except Exception: pass
 
     def _start_update(self):
         def _tray_notify(msg):
@@ -1593,10 +2314,16 @@ class App:
     # ── Tray ──────────────────────────────────────────────────────────────────
 
     def _start_tray(self):
+        # Wyłącz auto-ukrywanie ikon w zasobniku (EnableAutoTray=0)
         try:
-            icon_img = Image.open(res("ikona.png")).convert("RGBA")
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                                r"Software\Microsoft\Windows\CurrentVersion\Explorer",
+                                0, winreg.KEY_SET_VALUE) as k:
+                winreg.SetValueEx(k, "EnableAutoTray", 0, winreg.REG_DWORD, 0)
         except Exception:
-            icon_img = self._default_icon()
+            pass
+
+        icon_img = self._default_icon()
 
         def _menu_items():
             items = [
@@ -1613,10 +2340,10 @@ class App:
                     pystray.Menu.SEPARATOR,
                 ]
             items += [
+                pystray.MenuItem("🌐  Otwórz InfraDesk",   lambda i, it: self._open_main_window(), default=True),
                 pystray.MenuItem("📋  Nowe zgłoszenie", lambda i, it: self.root.after(0, self._open_ticket)),
                 pystray.MenuItem("❓  FAQ",              lambda i, it: self.root.after(0, self._open_faq)),
                 pystray.MenuItem("📞  Kontakt",         lambda i, it: self.root.after(0, self._open_contact)),
-                pystray.MenuItem("🌐  Mój panel",        lambda i, it: self._open_portal()),
                 pystray.MenuItem("(i) O programie",     lambda i, it: self.root.after(0, self._open_about)),
                 pystray.Menu.SEPARATOR,
                 pystray.MenuItem("❌  Zamknij",          lambda i, it: self._quit(i)),
@@ -1625,12 +2352,37 @@ class App:
 
         menu = pystray.Menu(_menu_items)
         self._tray = pystray.Icon(APP_NAME, icon_img, APP_NAME, menu)
-        threading.Thread(target=self._tray.run, daemon=True).start()
+        log.info("Starting tray icon…")
+
+        def _tray_run():
+            try:
+                self._tray.run()
+            except Exception as e:
+                log.error("Tray run error: %s", e)
+
+        threading.Thread(target=_tray_run, daemon=True).start()
 
     def _default_icon(self):
-        img = Image.new("RGBA", (64, 64), (99, 102, 241, 255))
+        """Ładuje kolorową ikonę z pliku ikona.png, fallback na generowaną."""
+        try:
+            icon_path = res("ikona.png")
+            if os.path.exists(icon_path):
+                img = Image.open(icon_path).convert("RGBA")
+                img = img.resize((128, 128), Image.LANCZOS)
+                return img
+        except Exception:
+            pass
+        # Fallback — generowana ikona
+        size = 128
+        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         d = ImageDraw.Draw(img)
-        d.ellipse([8, 8, 56, 56], fill=(255, 255, 255, 200))
+        d.rounded_rectangle([0, 0, size - 1, size - 1], radius=22, fill=(109, 40, 217, 255))
+        try:
+            from PIL import ImageFont
+            font = ImageFont.truetype("arialbd.ttf", 52)
+        except Exception:
+            font = ImageFont.load_default()
+        d.text((28, 30), "ID", fill=(255, 255, 255, 255), font=font)
         return img
 
     def _open_ticket(self):
@@ -1651,7 +2403,15 @@ class App:
         open_about_window(self.root)
 
     def _open_portal(self):
-        import webbrowser; webbrowser.open(PORTAL_URL)
+        self._open_main_window()
+
+    def _open_main_window(self):
+        """Otwiera panel InfraDesk w przeglądarce z auto-login."""
+        import webbrowser
+        token = self.cfg.get("token", "")
+        url = f"{API_BASE}/auth/auto-login?token={token}" if token else PORTAL_URL
+        log.info("Opening InfraDesk: %s", url)
+        webbrowser.open(url)
 
     def _quit(self, icon):
         icon.stop()
@@ -1677,16 +2437,830 @@ def _do_uninstall():
     root.destroy()
 
 
+def _check_internet(timeout=5):
+    """Sprawdza czy jest połączenie z internetem."""
+    try:
+        import urllib.request, ssl
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        urllib.request.urlopen("https://infradesk.pl/health", context=ctx, timeout=timeout)
+        return True
+    except Exception:
+        return False
+
+
+_OFFLINE_HTML = """
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>InfraDesk — Offline</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#080D19; color:#E5E7EB; font-family:-apple-system,Segoe UI,sans-serif;
+         display:flex; align-items:center; justify-content:center; height:100vh; text-align:center; }
+  .box { max-width:400px; padding:40px; }
+  .icon { font-size:64px; margin-bottom:24px; opacity:0.4; }
+  h1 { font-size:22px; font-weight:600; margin-bottom:8px; color:rgba(255,255,255,0.85); }
+  p { font-size:14px; color:rgba(255,255,255,0.4); line-height:1.6; margin-bottom:24px; }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:#F59E0B;
+         animation:pulse 1.5s ease infinite; margin-right:8px; }
+  @keyframes pulse { 0%,100%{opacity:0.3} 50%{opacity:1} }
+  .status { font-size:12px; color:rgba(255,255,255,0.3); }
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="icon">📡</div>
+  <h1>Brak połączenia</h1>
+  <p>Nie można połączyć się z serwerem InfraDesk.<br>Sprawdź połączenie internetowe.</p>
+  <div class="status"><span class="dot"></span>Ponawiam połączenie automatycznie...</div>
+</div>
+<script>
+  setInterval(function(){
+    fetch('https://infradesk.pl/health',{mode:'no-cors'}).then(function(){
+      window.location.href = '""" + PORTAL_URL + """';
+    }).catch(function(){});
+  }, 10000);
+</script>
+</body>
+</html>
+"""
+
+
+def _start_webview_app(url, token, cfg):
+    """Uruchamia InfraDesk jako pełnoekranową aplikację z webview (main thread).
+       Po zamknięciu okna — tray dalej działa w tle."""
+    try:
+        import webview
+
+        # Start background services (tray + monitoring + backup)
+        app_bg = _BackgroundServices(token, cfg)
+        app_bg.start()
+
+        # Skrót na pulpicie + ikona
+        threading.Thread(target=lambda: (
+            _copy_icon_to_install(),
+            create_desktop_shortcut(),
+        ), daemon=True).start()
+
+        # Check internet
+        if _check_internet():
+            webview.create_window(APP_NAME, url=url,
+                width=1280, height=860, min_size=(1024, 700),
+                resizable=True, text_select=True)
+        else:
+            log.warning("No internet — showing offline page")
+            webview.create_window(APP_NAME, html=_OFFLINE_HTML,
+                width=1280, height=860, min_size=(1024, 700),
+                resizable=True, text_select=True)
+
+        webview.start(debug=False)
+
+        # Webview zamknięte — NIE zabijaj procesu, tray dalej działa
+        log.info("Webview closed — keeping tray alive")
+        # Utrzymuj main thread żywy dopóki tray działa
+        while True:
+            time.sleep(60)
+
+    except ImportError:
+        log.warning("pywebview not installed — falling back to browser + tkinter")
+        import webbrowser
+        webbrowser.open(url)
+        return False
+    except Exception as e:
+        log.warning("Webview failed: %s — falling back to tkinter", e)
+        return False
+    return True
+
+
+def _copy_icon_to_install():
+    """Kopiuje icon.ico do INSTALL_DIR."""
+    try:
+        ico_dst = os.path.join(INSTALL_DIR, "icon.ico")
+        ico_src = res("icon.ico")
+        if ico_src and os.path.exists(ico_src) and ico_src != ico_dst:
+            os.makedirs(INSTALL_DIR, exist_ok=True)
+            import shutil
+            shutil.copy2(ico_src, ico_dst)
+            log.info("Icon copied: %s → %s", ico_src, ico_dst)
+    except Exception as e:
+        log.warning("Icon copy failed: %s", e)
+
+
+class _BackgroundServices:
+    """Tray + monitoring + backup — działa w wątkach."""
+    def __init__(self, token, cfg):
+        self.token = token
+        self.cfg = cfg
+        self._tray = None
+        self._update_info = None
+        self._backup_scheduler = None
+
+    def start(self):
+        if self.cfg.get("allowMonitoring", True):
+            threading.Thread(target=self._metrics_loop, daemon=True).start()
+            # Auto-diagnostyka
+            self._diagnostics = AutoDiagnostics(self.token)
+            threading.Thread(target=self._diagnostics_loop, daemon=True).start()
+        threading.Thread(target=self._update_check_loop, daemon=True).start()
+        if self.cfg.get("backupMode") or self.cfg.get("allowMonitoring"):
+            self._backup_scheduler = BackupScheduler(self.token)
+            threading.Thread(target=self._backup_loop, daemon=True).start()
+        ws = WS(self.token, self._on_ws)
+        ws.start()
+        threading.Thread(target=self._start_tray, daemon=True).start()
+
+    def _diagnostics_loop(self):
+        """Auto-diagnostyka co 5 minut."""
+        time.sleep(120)  # Poczekaj 2 min po starcie
+        while True:
+            try: self._diagnostics.run_checks()
+            except Exception as e: log.debug("Diagnostics error: %s", e)
+            time.sleep(AutoDiagnostics.CHECK_INTERVAL)
+
+    def _metrics_loop(self):
+        try:
+            requests.post(f"{API_BASE}/agent/metrics", json=full_inventory(),
+                          headers={"Authorization": f"Bearer {self.token}"}, timeout=15)
+        except Exception: pass
+        while True:
+            time.sleep(60)
+            try: do_metrics(self.token)
+            except Exception: pass
+
+    def _update_check_loop(self):
+        while True:
+            result = check_for_update()
+            if result: self._update_info = result
+            time.sleep(6 * 3600)
+
+    def _backup_loop(self):
+        bs = self._backup_scheduler
+        if not bs: return
+        bs.sync_configs()
+        c = 0
+        while True:
+            time.sleep(60)
+            c += 1
+            if c >= 5: bs.sync_configs(); c = 0
+            bs.check_and_run()
+
+    def _on_ws(self, msg):
+        mtype = msg.get("type")
+        if mtype in ("notification", "status_update") and self._tray:
+            try: self._tray.notify(msg.get("body", ""), msg.get("title", APP_NAME))
+            except Exception: pass
+        elif mtype == "update":
+            info = self._update_info or check_for_update()
+            if info:
+                _, url = info
+                do_self_update(url)
+        elif mtype == "backup_run":
+            cid = msg.get("configId", "")
+            if cid and self._backup_scheduler:
+                self._backup_scheduler.run_single(cid)
+        elif mtype == "wake":
+            mac = msg.get("mac", "")
+            if mac: threading.Thread(target=_send_wol, args=(mac,), daemon=True).start()
+        elif mtype == "windows_update":
+            schedule_time = msg.get("scheduleTime")
+            threading.Thread(target=self._run_windows_update, args=(schedule_time,), daemon=True).start()
+        elif mtype == "restart_service":
+            svc = msg.get("serviceName", "")
+            if svc:
+                def _rs():
+                    try:
+                        subprocess.run(["net", "stop", svc], capture_output=True, timeout=60, creationflags=_NO_WINDOW)
+                        time.sleep(2)
+                        subprocess.run(["net", "start", svc], capture_output=True, timeout=60, creationflags=_NO_WINDOW)
+                        log.info("Service %s restarted", svc)
+                    except Exception as e: log.error("Service restart error: %s", e)
+                threading.Thread(target=_rs, daemon=True).start()
+        elif mtype == "system_reboot":
+            delay = msg.get("delay", 60)
+            threading.Thread(target=lambda: subprocess.run(
+                ["shutdown", "/r", "/t", str(delay), "/c", "InfraDesk: restart serwera"],
+                capture_output=True, creationflags=_NO_WINDOW), daemon=True).start()
+
+    def _start_tray(self):
+        try:
+            # Load colorful icon
+            try:
+                icon_path = res("ikona.png")
+                if os.path.exists(icon_path):
+                    icon_img = Image.open(icon_path).convert("RGBA").resize((128, 128), Image.LANCZOS)
+                else:
+                    raise FileNotFoundError()
+            except Exception:
+                icon_img = Image.new("RGBA", (128, 128), (0, 0, 0, 0))
+                d = ImageDraw.Draw(icon_img)
+                d.rounded_rectangle([0, 0, 127, 127], radius=22, fill=(109, 40, 217, 255))
+                try:
+                    from PIL import ImageFont
+                    font = ImageFont.truetype("arialbd.ttf", 52)
+                except Exception:
+                    font = ImageFont.load_default()
+                d.text((28, 30), "ID", fill=(255, 255, 255, 255), font=font)
+
+            import webbrowser
+            menu = pystray.Menu(
+                pystray.MenuItem(f"● {APP_NAME} v{APP_VERSION}", None, enabled=False),
+                pystray.Menu.SEPARATOR,
+                pystray.MenuItem("🌐  Otwórz InfraDesk", lambda i, it: webbrowser.open(PORTAL_URL), default=True),
+                pystray.MenuItem("❌  Zamknij", lambda i, it: (i.stop(), os._exit(0))),
+            )
+            self._tray = pystray.Icon(APP_NAME, icon_img, APP_NAME, menu)
+            self._tray.run()
+        except Exception as e:
+            log.error("Tray error: %s", e)
+
+
+def _windows_auth_prompt():
+    """Pokazuje natywny dialog Windows Hello — PIN, odcisk palca, twarz lub hasło.
+       Automatycznie wykrywa dostępne metody uwierzytelniania."""
+
+    # Metoda 1: Windows Hello (PIN / biometria / twarz) — nowoczesna
+    try:
+        log.info("Trying Windows Hello verification...")
+        result = subprocess.run([
+            "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+            "[Windows.Security.Credentials.UI.UserConsentVerifier,"
+            "Windows.Security.Credentials.UI,ContentType=WindowsRuntime] | Out-Null; "
+            "$r = [Windows.Security.Credentials.UI.UserConsentVerifier]::"
+            "RequestVerificationAsync('InfraDesk — Potwierdź tożsamość').GetAwaiter().GetResult(); "
+            "Write-Output $r"
+        ], capture_output=True, text=True, timeout=120, creationflags=_NO_WINDOW)
+
+        out = result.stdout.strip()
+        log.info("Windows Hello result: %s", out)
+        if out == "Verified":
+            return True
+        if out == "Canceled":
+            return False
+        # DeviceNotPresent / NotConfiguredForUser / DisabledByPolicy → fallback
+        log.info("Windows Hello not available (%s) — falling back to credential dialog", out)
+    except Exception as e:
+        log.info("Windows Hello failed: %s — trying credential dialog", e)
+
+    # Metoda 2: Credential dialog (hasło Windows) — fallback
+    try:
+        import ctypes
+        import ctypes.wintypes as wt
+
+        class CREDUI_INFO(ctypes.Structure):
+            _fields_ = [
+                ("cbSize", wt.DWORD), ("hwndParent", wt.HWND),
+                ("pszMessageText", wt.LPCWSTR), ("pszCaptionText", wt.LPCWSTR),
+                ("hbmBanner", wt.HBITMAP),
+            ]
+
+        credui = ctypes.windll.credui
+        advapi32 = ctypes.windll.advapi32
+
+        ci = CREDUI_INFO()
+        ci.cbSize = ctypes.sizeof(CREDUI_INFO)
+        ci.pszMessageText = "Potwierdź swoją tożsamość aby uruchomić InfraDesk"
+        ci.pszCaptionText = "InfraDesk"
+
+        # Pre-fill current username
+        current_user = os.environ.get("USERNAME", "")
+        current_domain = os.environ.get("USERDOMAIN", "")
+        pre_fill = f"{current_domain}\\{current_user}" if current_domain else current_user
+
+        # Pack pre-filled credentials
+        in_buf = ctypes.c_void_p()
+        in_buf_size = wt.DWORD(0)
+        MAX_LEN = 256
+        credui.CredPackAuthenticationBufferW(
+            0,
+            pre_fill, "",  # username pre-filled, empty password
+            in_buf, ctypes.byref(in_buf_size),
+        )
+        # Allocate and pack
+        if in_buf_size.value > 0:
+            in_buf_data = (ctypes.c_byte * in_buf_size.value)()
+            credui.CredPackAuthenticationBufferW(
+                0, pre_fill, "",
+                in_buf_data, ctypes.byref(in_buf_size),
+            )
+            p_in = ctypes.cast(in_buf_data, ctypes.c_void_p)
+        else:
+            p_in = None
+            in_buf_size = wt.DWORD(0)
+
+        pAuthPackage = wt.DWORD(0)
+        pOutBuf = ctypes.c_void_p()
+        pOutSize = wt.DWORD(0)
+        pfSave = wt.BOOL(False)
+
+        err = credui.CredUIPromptForWindowsCredentialsW(
+            ctypes.byref(ci), 0, ctypes.byref(pAuthPackage),
+            p_in, in_buf_size,
+            ctypes.byref(pOutBuf), ctypes.byref(pOutSize),
+            ctypes.byref(pfSave),
+            0x200,  # CREDUIWIN_ENUMERATE_CURRENT_USER
+        )
+
+        if err != 0:
+            log.info("Credential dialog: cancelled (err=%s)", err)
+            return False
+
+        username = ctypes.create_unicode_buffer(MAX_LEN)
+        password = ctypes.create_unicode_buffer(MAX_LEN)
+        domain = ctypes.create_unicode_buffer(MAX_LEN)
+        ulen, plen, dlen = wt.DWORD(MAX_LEN), wt.DWORD(MAX_LEN), wt.DWORD(MAX_LEN)
+
+        credui.CredUnPackAuthenticationBufferW(
+            0, pOutBuf, pOutSize,
+            username, ctypes.byref(ulen),
+            domain, ctypes.byref(dlen),
+            password, ctypes.byref(plen),
+        )
+        ctypes.windll.ole32.CoTaskMemFree(pOutBuf)
+
+        token = wt.HANDLE()
+        ok = advapi32.LogonUserW(
+            username.value,
+            domain.value if domain.value else None,
+            password.value, 2, 0, ctypes.byref(token),
+        )
+        if ok:
+            ctypes.windll.kernel32.CloseHandle(token)
+            log.info("Credential dialog: verified OK (%s)", username.value)
+            return True
+
+        log.warning("Credential dialog: invalid credentials")
+        return False
+
+    except Exception as e:
+        log.warning("Credential dialog failed: %s — allowing access", e)
+        return True
+
+
+def _kill_other_agents():
+    """Zamknij inne instancje agenta (zapobiega duplikatom)."""
+    try:
+        my_pid = os.getpid()
+        for p in psutil.process_iter(['pid', 'name']):
+            if p.info['name'] and 'InfraDesk' in p.info['name'] and p.info['pid'] != my_pid:
+                try: p.kill(); log.info("Killed old agent process: %s", p.info['pid'])
+                except Exception: pass
+    except Exception: pass
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SERVER EDITION — Windows Service + Advanced Monitoring
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def server_metrics():
+    """Collect server-specific metrics: S.M.A.R.T., RAID, services, events, certs, top processes."""
+    result = {}
+    try:
+        # ── S.M.A.R.T. disk health ──────────────────────────────────────────
+        try:
+            ps = subprocess.run(
+                ["powershell", "-ExecutionPolicy", "Bypass", "-Command",
+                 "Get-PhysicalDisk | Select-Object DeviceId,FriendlyName,MediaType,HealthStatus,OperationalStatus,Size | ConvertTo-Json -Compress"],
+                capture_output=True, text=True, timeout=30, creationflags=_NO_WINDOW
+            )
+            if ps.stdout.strip():
+                disks = json.loads(ps.stdout)
+                if isinstance(disks, dict): disks = [disks]
+                result["smartDisks"] = [{
+                    "id": str(d.get("DeviceId", "")),
+                    "name": d.get("FriendlyName", ""),
+                    "type": d.get("MediaType", ""),
+                    "health": d.get("HealthStatus", "Unknown"),
+                    "status": d.get("OperationalStatus", "Unknown"),
+                    "sizeGb": round(d.get("Size", 0) / 1073741824, 1) if d.get("Size") else 0,
+                } for d in disks]
+        except Exception as e:
+            log.debug("S.M.A.R.T. collection error: %s", e)
+
+        # ── RAID / Storage Pool status ───────────────────────────────────────
+        try:
+            ps = subprocess.run(
+                ["powershell", "-ExecutionPolicy", "Bypass", "-Command",
+                 "Get-StoragePool | Where-Object IsPrimordial -eq $false | Select-Object FriendlyName,HealthStatus,OperationalStatus,Size | ConvertTo-Json -Compress"],
+                capture_output=True, text=True, timeout=30, creationflags=_NO_WINDOW
+            )
+            if ps.stdout.strip() and ps.stdout.strip() != "":
+                pools = json.loads(ps.stdout)
+                if isinstance(pools, dict): pools = [pools]
+                result["storagePools"] = [{
+                    "name": p.get("FriendlyName", ""),
+                    "health": p.get("HealthStatus", "Unknown"),
+                    "status": p.get("OperationalStatus", "Unknown"),
+                } for p in pools]
+        except Exception:
+            pass
+
+        # ── Critical Windows services ────────────────────────────────────────
+        try:
+            svc_list = "Spooler,BITS,wuauserv,Dhcp,Dnscache,W32Time,EventLog,Schedule,LanmanServer,LanmanWorkstation"
+            ps = subprocess.run(
+                ["powershell", "-ExecutionPolicy", "Bypass", "-Command",
+                 f"Get-Service -Name {svc_list} -ErrorAction SilentlyContinue | Select-Object Name,DisplayName,Status | ConvertTo-Json -Compress"],
+                capture_output=True, text=True, timeout=30, creationflags=_NO_WINDOW
+            )
+            if ps.stdout.strip():
+                svcs = json.loads(ps.stdout)
+                if isinstance(svcs, dict): svcs = [svcs]
+                result["services"] = [{
+                    "name": s.get("Name", ""),
+                    "displayName": s.get("DisplayName", ""),
+                    "status": "Running" if s.get("Status") == 4 else "Stopped" if s.get("Status") == 1 else str(s.get("Status", "")),
+                } for s in svcs]
+        except Exception:
+            pass
+
+        # ── Event Log critical errors (last 24h) ────────────────────────────
+        try:
+            ps = subprocess.run(
+                ["powershell", "-ExecutionPolicy", "Bypass", "-Command",
+                 "Get-WinEvent -FilterHashtable @{LogName='System','Application';Level=1,2;StartTime=(Get-Date).AddDays(-1)} -MaxEvents 20 -ErrorAction SilentlyContinue | "
+                 "Select-Object TimeCreated,LevelDisplayName,ProviderName,Message | ConvertTo-Json -Compress"],
+                capture_output=True, text=True, timeout=30, creationflags=_NO_WINDOW
+            )
+            if ps.stdout.strip():
+                events = json.loads(ps.stdout)
+                if isinstance(events, dict): events = [events]
+                result["criticalEvents"] = [{
+                    "time": str(e.get("TimeCreated", ""))[:19],
+                    "level": e.get("LevelDisplayName", ""),
+                    "source": e.get("ProviderName", ""),
+                    "message": (e.get("Message", "") or "")[:200],
+                } for e in events[:20]]
+        except Exception:
+            pass
+
+        # ── SSL Certificates expiring within 60 days ─────────────────────────
+        try:
+            ps = subprocess.run(
+                ["powershell", "-ExecutionPolicy", "Bypass", "-Command",
+                 "Get-ChildItem Cert:\\LocalMachine\\My | Where-Object { $_.NotAfter -lt (Get-Date).AddDays(60) } | "
+                 "Select-Object Subject,NotAfter,Thumbprint | ConvertTo-Json -Compress"],
+                capture_output=True, text=True, timeout=30, creationflags=_NO_WINDOW
+            )
+            if ps.stdout.strip():
+                certs = json.loads(ps.stdout)
+                if isinstance(certs, dict): certs = [certs]
+                result["expiringCerts"] = [{
+                    "subject": c.get("Subject", ""),
+                    "expiresAt": str(c.get("NotAfter", ""))[:10],
+                    "thumbprint": c.get("Thumbprint", "")[:16],
+                } for c in certs]
+        except Exception:
+            pass
+
+        # ── Top 5 CPU-consuming processes ────────────────────────────────────
+        try:
+            procs = []
+            for p in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent']):
+                try:
+                    info = p.info
+                    if info['cpu_percent'] and info['cpu_percent'] > 0:
+                        procs.append(info)
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+            procs.sort(key=lambda x: x.get('cpu_percent', 0), reverse=True)
+            result["topProcesses"] = [{
+                "pid": p['pid'], "name": p['name'],
+                "cpu": round(p.get('cpu_percent', 0), 1),
+                "ram": round(p.get('memory_percent', 0), 1),
+            } for p in procs[:5]]
+        except Exception:
+            pass
+
+        # ── Listening ports ──────────────────────────────────────────────────
+        try:
+            ports = set()
+            for conn in psutil.net_connections(kind='inet'):
+                if conn.status == 'LISTEN' and conn.laddr:
+                    ports.add(conn.laddr.port)
+            result["listeningPorts"] = sorted(ports)[:50]
+        except Exception:
+            pass
+
+        # ── Hyper-V VMs (if available) ───────────────────────────────────────
+        try:
+            ps = subprocess.run(
+                ["powershell", "-ExecutionPolicy", "Bypass", "-Command",
+                 "if (Get-Command Get-VM -ErrorAction SilentlyContinue) { Get-VM | Select-Object Name,State,CPUUsage,MemoryAssigned,Uptime | ConvertTo-Json -Compress }"],
+                capture_output=True, text=True, timeout=30, creationflags=_NO_WINDOW
+            )
+            if ps.stdout.strip():
+                vms = json.loads(ps.stdout)
+                if isinstance(vms, dict): vms = [vms]
+                result["hyperVMs"] = [{
+                    "name": v.get("Name", ""),
+                    "state": str(v.get("State", "")),
+                    "cpuUsage": v.get("CPUUsage"),
+                    "memoryMb": round(v.get("MemoryAssigned", 0) / 1048576) if v.get("MemoryAssigned") else 0,
+                } for v in vms]
+        except Exception:
+            pass
+
+    except Exception as e:
+        log.error("server_metrics error: %s", e)
+
+    return result
+
+
+class ServerServiceLoop:
+    """Headless background loop for server mode (Windows Service or --service CLI)."""
+
+    def __init__(self, token: str, cfg: dict):
+        self.token = token
+        self.cfg = cfg
+        self._running = True
+        self._ws = None
+
+    def _on_ws(self, msg):
+        mtype = msg.get("type")
+        if mtype in ("notification", "status_update"):
+            log.info("WS notification: %s — %s", msg.get("title", ""), msg.get("body", ""))
+        elif mtype == "update":
+            info = check_for_update()
+            if info:
+                _, url = info
+                threading.Thread(target=do_self_update, args=(url,), daemon=True).start()
+        elif mtype == "backup_run":
+            cid = msg.get("configId", "")
+            if cid and hasattr(self, '_backup') and self._backup:
+                self._backup.run_single(cid)
+        elif mtype == "wake":
+            mac = msg.get("mac", "")
+            if mac: threading.Thread(target=_send_wol, args=(mac,), daemon=True).start()
+        elif mtype == "windows_update":
+            schedule_time = msg.get("scheduleTime")
+            threading.Thread(target=self._run_windows_update, args=(schedule_time,), daemon=True).start()
+        elif mtype == "restart_service":
+            svc_name = msg.get("serviceName", "")
+            if svc_name:
+                threading.Thread(target=self._restart_win_service, args=(svc_name,), daemon=True).start()
+        elif mtype == "system_reboot":
+            delay = msg.get("delay", 60)
+            threading.Thread(target=self._schedule_reboot, args=(delay,), daemon=True).start()
+
+    def _run_windows_update(self, schedule_time=None):
+        """Reuse existing method pattern."""
+        try:
+            log.info("Windows Update: starting%s", f" (restart at {schedule_time})" if schedule_time else "")
+            ps_cmd = (
+                '$ErrorActionPreference="SilentlyContinue"; '
+                'if (-not (Get-Module -ListAvailable -Name PSWindowsUpdate)) { '
+                '  Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Confirm:$false | Out-Null; '
+                '  Install-Module PSWindowsUpdate -Force -Confirm:$false | Out-Null '
+                '}; '
+                'Import-Module PSWindowsUpdate; '
+                'Get-WindowsUpdate -Install -AcceptAll -AutoReboot:$false -Confirm:$false 2>&1 | Out-String'
+            )
+            result = subprocess.run(["powershell", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
+                capture_output=True, text=True, timeout=7200, creationflags=_NO_WINDOW)
+            log.info("Windows Update result: %s", (result.stdout or "")[-500:])
+            if schedule_time:
+                subprocess.run(["schtasks", "/create", "/tn", "InfraDesk_WinUpdate_Restart",
+                    "/tr", 'shutdown /r /t 60 /c "InfraDesk: restart po aktualizacji"',
+                    "/sc", "once", "/st", schedule_time, "/f"],
+                    capture_output=True, timeout=30, creationflags=_NO_WINDOW)
+                log.info("Restart scheduled at %s", schedule_time)
+        except Exception as e:
+            log.error("Windows Update error: %s", e)
+
+    def _restart_win_service(self, service_name):
+        """Restart a Windows service remotely."""
+        try:
+            log.info("Restarting service: %s", service_name)
+            subprocess.run(["net", "stop", service_name], capture_output=True, timeout=60, creationflags=_NO_WINDOW)
+            time.sleep(2)
+            result = subprocess.run(["net", "start", service_name], capture_output=True, text=True, timeout=60, creationflags=_NO_WINDOW)
+            log.info("Service %s restart: %s", service_name, "OK" if result.returncode == 0 else result.stderr)
+        except Exception as e:
+            log.error("Service restart error: %s", e)
+
+    def _schedule_reboot(self, delay_seconds):
+        """Schedule system reboot."""
+        try:
+            log.info("Scheduling system reboot in %ds", delay_seconds)
+            subprocess.run(["shutdown", "/r", "/t", str(delay_seconds), "/c", "InfraDesk: zaplanowany restart serwera"],
+                capture_output=True, timeout=10, creationflags=_NO_WINDOW)
+        except Exception as e:
+            log.error("Reboot schedule error: %s", e)
+
+    def start(self):
+        log.info("ServerServiceLoop starting (token=%s...)", self.token[:8])
+
+        # WebSocket
+        self._ws = WS(self.token, self._on_ws)
+        threading.Thread(target=self._ws.run, daemon=True).start()
+
+        # Backup scheduler
+        self._backup = None
+        try:
+            self._backup = BackupScheduler(self.token)
+        except Exception as e:
+            log.warning("Backup scheduler init failed: %s", e)
+
+        # Auto diagnostics
+        diag = None
+        try:
+            diag = AutoDiagnostics(self.token, self.cfg)
+            threading.Thread(target=diag.run, daemon=True).start()
+        except Exception as e:
+            log.warning("AutoDiagnostics init failed: %s", e)
+
+        # Metrics loop
+        cycle = 0
+        while self._running:
+            try:
+                data = metrics()
+                # Add server metrics every 5th cycle (every 5 min)
+                if cycle % 5 == 0:
+                    srv = server_metrics()
+                    if srv:
+                        data["serverMetrics"] = srv
+                do_metrics(self.token, data)
+            except Exception as e:
+                log.warning("Metrics error: %s", e)
+
+            # Backup check
+            if self._backup:
+                try: self._backup.check_and_run()
+                except Exception: pass
+                if cycle % 5 == 0:
+                    try: self._backup.sync_configs()
+                    except Exception: pass
+
+            time.sleep(60)
+            cycle += 1
+
+    def stop(self):
+        self._running = False
+
+
+# ── Windows Service wrapper ──────────────────────────────────────────────────
+_SERVICE_NAME = "InfraDeskServerAgent"
+_SERVICE_DISPLAY = "InfraDesk Server Agent"
+_SERVICE_DESC = "InfraDesk monitoring agent for Windows servers"
+
+try:
+    import win32serviceutil
+    import win32service
+    import win32event
+    import servicemanager
+
+    class InfraDeskService(win32serviceutil.ServiceFramework):
+        _svc_name_ = _SERVICE_NAME
+        _svc_display_name_ = _SERVICE_DISPLAY
+        _svc_description_ = _SERVICE_DESC
+
+        def __init__(self, args):
+            win32serviceutil.ServiceFramework.__init__(self, args)
+            self.hWaitStop = win32event.CreateEvent(None, 0, 0, None)
+            self._loop = None
+
+        def SvcStop(self):
+            self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING)
+            win32event.SetEvent(self.hWaitStop)
+            if self._loop:
+                self._loop.stop()
+            log.info("Service stop requested")
+
+        def SvcDoRun(self):
+            servicemanager.LogMsg(servicemanager.EVENTLOG_INFORMATION_TYPE,
+                                  servicemanager.PYS_SERVICE_STARTED,
+                                  (self._svc_name_, ''))
+            log.info("InfraDesk Server Agent service starting")
+            cfg = load_config()
+            if not cfg.get("token") or cfg.get("status") != "ACTIVE":
+                log.error("Service cannot start — agent not registered or not active. Run agent.exe first to register.")
+                servicemanager.LogMsg(servicemanager.EVENTLOG_ERROR_TYPE, 0xF000,
+                                      ("Agent not registered. Run InfraDesk Agent.exe first.", '', ''))
+                return
+
+            self._loop = ServerServiceLoop(cfg["token"], cfg)
+            threading.Thread(target=self._loop.start, daemon=True).start()
+            win32event.WaitForSingleObject(self.hWaitStop, win32event.INFINITE)
+            log.info("Service stopped")
+
+    _HAS_WIN32SVC = True
+except ImportError:
+    _HAS_WIN32SVC = False
+    log.debug("win32serviceutil not available — service mode disabled")
+
+
+def _install_service():
+    """Install InfraDesk as a Windows Service."""
+    if not _HAS_WIN32SVC:
+        print("ERROR: pywin32 nie jest zainstalowany. Uruchom: pip install pywin32")
+        return
+    try:
+        win32serviceutil.InstallService(
+            InfraDeskService._svc_reg_class_,
+            _SERVICE_NAME,
+            _SERVICE_DISPLAY,
+            startType=win32service.SERVICE_AUTO_START,
+            description=_SERVICE_DESC,
+        )
+        print(f"[OK] Usługa '{_SERVICE_DISPLAY}' zainstalowana.")
+        print(f"     Uruchom: net start {_SERVICE_NAME}")
+    except Exception as e:
+        # Fallback: use sc.exe
+        exe_path = sys.executable if not getattr(sys, 'frozen', False) else INSTALL_EXE
+        cmd = f'sc create {_SERVICE_NAME} binPath= "\"{exe_path}\" --service" start= auto DisplayName= "{_SERVICE_DISPLAY}"'
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        if result.returncode == 0:
+            subprocess.run(f'sc description {_SERVICE_NAME} "{_SERVICE_DESC}"', shell=True, capture_output=True)
+            print(f"[OK] Usługa '{_SERVICE_DISPLAY}' zainstalowana (sc.exe).")
+            print(f"     Uruchom: net start {_SERVICE_NAME}")
+        else:
+            print(f"[BŁĄD] Nie udało się zainstalować usługi: {e}\n{result.stderr}")
+
+
+def _remove_service():
+    """Remove InfraDesk Windows Service."""
+    try:
+        subprocess.run(f"net stop {_SERVICE_NAME}", shell=True, capture_output=True)
+        time.sleep(2)
+    except Exception:
+        pass
+    try:
+        if _HAS_WIN32SVC:
+            win32serviceutil.RemoveService(_SERVICE_NAME)
+        else:
+            subprocess.run(f"sc delete {_SERVICE_NAME}", shell=True, capture_output=True)
+        print(f"[OK] Usługa '{_SERVICE_DISPLAY}' usunięta.")
+    except Exception as e:
+        print(f"[BŁĄD] {e}")
+
+
 def main():
-    log.info("InfraDesk Agent %s starting — args: %s", APP_VERSION, sys.argv)
+    log.info("InfraDesk Agent %s starting — exe: %s args: %s", APP_VERSION, sys.executable, sys.argv)
+    log.info("INSTALL_EXE: %s  is_installed: %s  is_frozen: %s", INSTALL_EXE, is_installed(), is_frozen())
+
     if "--uninstall" in sys.argv:
         _do_uninstall()
         return
-    # Sprawdź instalację ZANIM powstanie jakiekolwiek okno
+
+    if "--install-service" in sys.argv:
+        _install_service()
+        return
+
+    if "--remove-service" in sys.argv:
+        _remove_service()
+        return
+
+    if "--service" in sys.argv:
+        # Run as headless server (called by Windows Service or manually)
+        log.info("Starting in SERVER mode (headless)")
+        cfg = load_config()
+        if cfg.get("status") == "ACTIVE" and cfg.get("token"):
+            loop = ServerServiceLoop(cfg["token"], cfg)
+            loop.start()
+        else:
+            log.error("Cannot start server mode — agent not registered. Run agent.exe first.")
+        return
+
     if is_frozen() and not is_installed():
+        log.info("Not installed — running install_and_restart()")
         install_and_restart()
         return
+
+    # Zabij inne instancje agenta
+    _kill_other_agents()
+
     open_ticket_on_start = "--ticket" in sys.argv
+
+    cfg = load_config()
+    log.info("Config file: %s exists=%s", CONFIG_FILE, os.path.exists(CONFIG_FILE))
+    log.info("Config: status=%s token=%s keys=%s", cfg.get("status"), "YES" if cfg.get("token") else "NO", list(cfg.keys()))
+
+    if cfg.get("status") == "ACTIVE" and cfg.get("token"):
+        log.info("Agent active — skipping login")
+
+        if open_ticket_on_start:
+            App(open_ticket_on_start=True)
+            return
+
+        # Auto-login URL
+        auto_url = f"{API_BASE}/auth/auto-login?token={cfg['token']}"
+
+        # Uruchom webview lub przeglądarkę
+        ok = _start_webview_app(auto_url, cfg["token"], cfg)
+        if ok:
+            return
+
+        # Fallback — przeglądarka + tray w tle
+        import webbrowser
+        webbrowser.open(auto_url)
+        bg = _BackgroundServices(cfg["token"], cfg)
+        bg.start()
+        log.info("Running in browser + tray mode")
+        while True:
+            time.sleep(60)
+
+    # Brak configu lub nie aktywny — logowanie
     App(open_ticket_on_start=open_ticket_on_start)
 
 

@@ -21,7 +21,7 @@ import { ClientForm } from '../../../components/forms/ClientForm';
 import { LocationForm } from '../../../components/forms/LocationForm';
 import { DeviceForm } from '../../../components/forms/DeviceForm';
 import { UserForm } from '../../../components/forms/UserForm';
-import { NewOrderWizard } from '../../../components/forms/NewOrderWizard';
+import { UnifiedTicketWizard } from '../../../components/wizard/UnifiedTicketWizard';
 import { CRM_TYPE_CONFIG, QUOTE_STATUS_CONFIG } from '../crm/CrmPage';
 import { getErrorMessage } from '../../../utils/helpers';
 import type { Location, Device, Ticket, Credential, User } from '../../../types';
@@ -32,12 +32,12 @@ type TabId = 'historia' | 'overview' | 'contract' | 'locations' | 'devices' | 't
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'historia',     label: 'Historia' },
-  { id: 'overview',     label: 'Przegląd' },
+  { id: 'overview',     label: 'Przegl\u0105d' },
   { id: 'contract',     label: 'Umowa' },
   { id: 'locations',    label: 'Lokalizacje' },
-  { id: 'devices',      label: 'Urządzenia' },
-  { id: 'tickets',      label: 'Zgłoszenia' },
-  { id: 'credentials',  label: 'Dostępy' },
+  { id: 'devices',      label: 'Urz\u0105dzenia' },
+  { id: 'tickets',      label: 'Zg\u0142oszenia' },
+  { id: 'credentials',  label: 'Dost\u0119py' },
   { id: 'users',        label: 'Pracownicy' },
 ];
 
@@ -108,7 +108,7 @@ export function ClientDetailPage() {
       toast.success('Opiekun zaktualizowany');
       qc.invalidateQueries({ queryKey: ['clients', id] });
     },
-    onError: () => toast.error('Błąd zapisu opiekuna'),
+    onError: () => toast.error('B\u0142\u0105d zapisu opiekuna'),
   });
 
   const deactivateMutation = useMutation({
@@ -125,7 +125,7 @@ export function ClientDetailPage() {
   const deleteMutation = useMutation({
     mutationFn: () => clientsApi.delete(id!),
     onSuccess: () => {
-      toast.success('Klient usunięty');
+      toast.success('Klient usuni\u0119ty');
       qc.invalidateQueries({ queryKey: ['clients'] });
       navigate('/clients');
     },
@@ -133,7 +133,7 @@ export function ClientDetailPage() {
   });
 
   if (isLoading) return <LoadingSpinner />;
-  if (!client) return <div className="text-sm text-gray-500">Nie znaleziono klienta</div>;
+  if (!client) return <div className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Nie znaleziono klienta</div>;
 
   const initials = client.name.slice(0, 2).toUpperCase();
 
@@ -142,37 +142,38 @@ export function ClientDetailPage() {
       <PageHeader title="" back="/clients" />
 
       {/* Header karty klienta */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 mb-5">
+      <div className="rounded-2xl p-5 mb-5" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
         <div className="flex items-start gap-4">
-          {/* Logo / inicjały */}
+          {/* Logo / inicja\u0142y */}
           {client.logoUrl ? (
             <img
               src={client.logoUrl}
               alt={client.name}
-              className="w-14 h-14 rounded-2xl object-contain bg-gray-50 border border-gray-100 flex-shrink-0"
+              className="w-14 h-14 rounded-2xl object-contain flex-shrink-0"
+              style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
             />
           ) : (
-            <div className="w-14 h-14 rounded-2xl bg-brand-100 text-brand-700 font-bold text-lg flex items-center justify-center flex-shrink-0">
+            <div className="w-14 h-14 rounded-2xl font-bold text-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139,92,246,0.12)', color: '#A78BFA' }}>
               {initials}
             </div>
           )}
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-xl font-bold text-gray-900">{client.name}</h1>
+              <h1 className="text-xl font-bold text-white/85">{client.name}</h1>
               <ClientStatusBadge status={client.status} />
             </div>
             {client.legalName && (
-              <div className="text-sm text-gray-500 mt-0.5">{client.legalName}</div>
+              <div className="text-sm mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>{client.legalName}</div>
             )}
             {client.taxId && (
-              <div className="text-xs text-gray-400 mt-0.5">NIP: {client.taxId}</div>
+              <div className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>NIP: {client.taxId}</div>
             )}
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
             <Button size="sm" icon={<Plus className="h-3.5 w-3.5" />} onClick={() => setShowNewOrder(true)}>
-              <span className="hidden sm:inline">Nowe zlecenie</span>
+              <span className="hidden sm:inline">Nowe zgłoszenie</span>
             </Button>
             <Button size="sm" variant="secondary" icon={<Pencil className="h-3.5 w-3.5" />} onClick={() => setShowEdit(true)}>
               <span className="hidden sm:inline">Edytuj</span>
@@ -183,44 +184,45 @@ export function ClientDetailPage() {
               </Button>
             )}
             <Button size="sm" variant="danger" icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setShowDelete(true)}>
-              <span className="hidden sm:inline">Usuń</span>
+              <span className="hidden sm:inline">Usu\u0144</span>
             </Button>
           </div>
         </div>
 
         {/* Szybkie kontakty */}
-        <div className="flex flex-wrap gap-x-5 gap-y-1.5 mt-4 text-sm text-gray-600">
+        <div className="flex flex-wrap gap-x-5 gap-y-1.5 mt-4 text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>
           {client.email && (
-            <a href={`mailto:${client.email}`} className="flex items-center gap-1.5 hover:text-brand-600">
-              <Mail className="h-3.5 w-3.5 text-gray-400" />{client.email}
+            <a href={`mailto:${client.email}`} className="flex items-center gap-1.5 hover:text-violet-400">
+              <Mail className="h-3.5 w-3.5" style={{ color: 'rgba(255,255,255,0.3)' }} />{client.email}
             </a>
           )}
           {client.phone && (
-            <a href={`tel:${client.phone}`} className="flex items-center gap-1.5 hover:text-brand-600">
-              <Phone className="h-3.5 w-3.5 text-gray-400" />{client.phone}
+            <a href={`tel:${client.phone}`} className="flex items-center gap-1.5 hover:text-violet-400">
+              <Phone className="h-3.5 w-3.5" style={{ color: 'rgba(255,255,255,0.3)' }} />{client.phone}
             </a>
           )}
           {client.website && (
-            <a href={client.website} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 hover:text-brand-600">
-              <Globe className="h-3.5 w-3.5 text-gray-400" />{client.website}
+            <a href={client.website} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 hover:text-violet-400">
+              <Globe className="h-3.5 w-3.5" style={{ color: 'rgba(255,255,255,0.3)' }} />{client.website}
             </a>
           )}
           {(client.city || client.addressLine1) && (
-            <span className="flex items-center gap-1.5 text-gray-500">
-              <MapPin className="h-3.5 w-3.5 text-gray-400" />
+            <span className="flex items-center gap-1.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              <MapPin className="h-3.5 w-3.5" style={{ color: 'rgba(255,255,255,0.3)' }} />
               {[client.addressLine1, client.postalCode, client.city].filter(Boolean).join(', ')}
             </span>
           )}
         </div>
 
         {/* Opiekun */}
-        <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100">
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider w-20 flex-shrink-0">Opiekun</span>
+        <div className="flex items-center gap-2 mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+          <span className="text-xs font-semibold uppercase tracking-wider w-20 flex-shrink-0" style={{ color: 'rgba(255,255,255,0.3)' }}>Opiekun</span>
           <select
             value={(client as any).managerId ?? ''}
             onChange={(e) => updateManagerMutation.mutate(e.target.value || null)}
             disabled={updateManagerMutation.isPending}
-            className="text-sm border border-gray-200 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
+            className="text-sm rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
           >
             <option value="">— brak opiekuna —</option>
             {staffUsers.map(u => (
@@ -233,38 +235,38 @@ export function ClientDetailPage() {
       {/* Statsy */}
       <div className="grid grid-cols-3 gap-3 mb-5">
         {[
-          { label: 'Lokalizacje', value: client._count?.locations ?? 0, tab: 'locations' as TabId, color: 'text-brand-600 bg-brand-50' },
-          { label: 'Urządzenia',  value: client._count?.devices ?? 0,   tab: 'devices' as TabId,   color: 'text-violet-600 bg-violet-50' },
-          { label: 'Zgłoszenia', value: client._count?.tickets ?? 0,    tab: 'tickets' as TabId,   color: 'text-orange-600 bg-orange-50' },
+          { label: 'Lokalizacje', value: client._count?.locations ?? 0, tab: 'locations' as TabId, activeBg: 'rgba(139,92,246,0.12)', activeColor: '#A78BFA' },
+          { label: 'Urz\u0105dzenia',  value: client._count?.devices ?? 0,   tab: 'devices' as TabId,   activeBg: 'rgba(139,92,246,0.12)', activeColor: '#A78BFA' },
+          { label: 'Zg\u0142oszenia', value: client._count?.tickets ?? 0,    tab: 'tickets' as TabId,   activeBg: 'rgba(251,146,60,0.12)', activeColor: '#FB923C' },
         ].map(s => (
           <button
             key={s.label}
             onClick={() => setTab(s.tab)}
-            className={clsx(
-              'rounded-2xl border p-4 text-center transition-colors',
-              tab === s.tab
-                ? 'border-transparent ' + s.color
-                : 'bg-white border-gray-200 hover:bg-gray-50'
-            )}
+            className="rounded-2xl p-4 text-center transition-colors hover:bg-white/[0.03]"
+            style={tab === s.tab
+              ? { background: s.activeBg, border: '1px solid transparent' }
+              : { background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }
+            }
           >
-            <div className={clsx('text-2xl font-bold', s.color.split(' ')[0])}>{s.value}</div>
-            <div className="text-xs text-gray-500 mt-0.5">{s.label}</div>
+            <div className="text-2xl font-bold" style={{ color: s.activeColor }}>{s.value}</div>
+            <div className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>{s.label}</div>
           </button>
         ))}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-0 mb-5 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-x-auto">
+      <div className="flex gap-0 mb-5 rounded-2xl overflow-x-auto" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
         {TABS.map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={clsx(
-              'flex-1 px-3 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2',
-              tab === t.id
-                ? 'border-brand-600 text-brand-600 bg-brand-50/30'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-            )}
+            className="flex-1 px-3 py-3 text-sm font-medium whitespace-nowrap transition-colors"
+            style={tab === t.id
+              ? { background: 'rgba(139,92,246,0.12)', color: '#A78BFA', borderBottom: '2px solid #A78BFA' }
+              : { color: 'rgba(255,255,255,0.4)', borderBottom: '2px solid transparent' }
+            }
+            onMouseEnter={(e) => { if (tab !== t.id) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
+            onMouseLeave={(e) => { if (tab !== t.id) e.currentTarget.style.color = 'rgba(255,255,255,0.4)'; }}
           >
             {t.label}
           </button>
@@ -276,11 +278,11 @@ export function ClientDetailPage() {
         <div>
           <div className="flex justify-end mb-3">
             <Button size="sm" icon={<Plus className="h-4 w-4" />} onClick={() => setShowNewOrder(true)}>
-              Nowe zlecenie
+              Nowe zgłoszenie
             </Button>
           </div>
           {timeline.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center text-sm text-gray-400">
+            <div className="rounded-2xl p-8 text-center text-sm" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.3)' }}>
               Brak historii — dodaj pierwsze zlecenie lub wpis CRM
             </div>
           ) : (
@@ -293,13 +295,13 @@ export function ClientDetailPage() {
         </div>
       )}
 
-      {/* Tab: Przegląd */}
+      {/* Tab: Przegl\u0105d */}
       {tab === 'overview' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {client.notes && (
-            <div className="md:col-span-2 bg-amber-50 border border-amber-100 rounded-2xl p-4">
-              <p className="text-xs font-semibold text-amber-700 uppercase mb-1">Notatki</p>
-              <p className="text-sm text-amber-900 whitespace-pre-wrap">{client.notes}</p>
+            <div className="md:col-span-2 rounded-2xl p-4" style={{ background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.15)' }}>
+              <p className="text-xs font-semibold uppercase mb-1" style={{ color: '#FBBF24' }}>Notatki</p>
+              <p className="text-sm whitespace-pre-wrap" style={{ color: 'rgba(255,255,255,0.7)' }}>{client.notes}</p>
             </div>
           )}
           <InfoCard title="Dane kontaktowe">
@@ -318,19 +320,22 @@ export function ClientDetailPage() {
       {tab === 'contract' && (
         <div className="space-y-4">
           {/* Status umowy */}
-          <div className={clsx(
-            'rounded-2xl border p-5 flex items-center gap-4',
-            client.hasContract ? 'bg-blue-50 border-blue-100' : 'bg-gray-50 border-gray-200'
-          )}>
+          <div
+            className="rounded-2xl p-5 flex items-center gap-4"
+            style={client.hasContract
+              ? { background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.15)' }
+              : { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }
+            }
+          >
             {client.hasContract
-              ? <CheckCircle2 className="h-8 w-8 text-blue-500 flex-shrink-0" />
-              : <XCircle className="h-8 w-8 text-gray-300 flex-shrink-0" />
+              ? <CheckCircle2 className="h-8 w-8 flex-shrink-0" style={{ color: '#60A5FA' }} />
+              : <XCircle className="h-8 w-8 flex-shrink-0" style={{ color: 'rgba(255,255,255,0.15)' }} />
             }
             <div>
-              <div className="font-semibold text-gray-900">
-                {client.hasContract ? 'Klient ma umowę SLA' : 'Brak umowy serwisowej'}
+              <div className="font-semibold text-white/85">
+                {client.hasContract ? 'Klient ma umow\u0119 SLA' : 'Brak umowy serwisowej'}
               </div>
-              <div className="text-sm text-gray-500 mt-0.5">
+              <div className="text-sm mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
                 {client.hasContract
                   ? 'Rozliczenie abonamentowe z limitem godzin'
                   : 'Rozliczenie godzinowe bez umowy'
@@ -346,73 +351,74 @@ export function ClientDetailPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Godziny */}
               {client.contractHours != null && (
-                <div className="bg-white rounded-2xl border border-gray-200 p-4 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center flex-shrink-0">
-                    <Clock className="h-5 w-5 text-brand-600" />
+                <div className="rounded-2xl p-4 flex items-center gap-3" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139,92,246,0.12)' }}>
+                    <Clock className="h-5 w-5" style={{ color: '#A78BFA' }} />
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-gray-900">{client.contractHours} h</div>
-                    <div className="text-xs text-gray-400">Godziny w umowie</div>
+                    <div className="text-2xl font-bold text-white/85">{client.contractHours} h</div>
+                    <div className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>Godziny w umowie</div>
                   </div>
                 </div>
               )}
-              {/* Wartość miesięczna */}
+              {/* Warto\u015b\u0107 miesi\u0119czna */}
               {client.contractMonthlyValue != null && (
-                <div className="bg-white rounded-2xl border border-gray-200 p-4 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center flex-shrink-0">
-                    <DollarSign className="h-5 w-5 text-green-600" />
+                <div className="rounded-2xl p-4 flex items-center gap-3" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(34,197,94,0.12)' }}>
+                    <DollarSign className="h-5 w-5" style={{ color: '#4ADE80' }} />
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-gray-900">{client.contractMonthlyValue.toLocaleString('pl-PL')} zł</div>
-                    <div className="text-xs text-gray-400">Wartość miesięczna</div>
+                    <div className="text-2xl font-bold text-white/85">{client.contractMonthlyValue.toLocaleString('pl-PL')} z\u0142</div>
+                    <div className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>Warto\u015b\u0107 miesi\u0119czna</div>
                   </div>
                 </div>
               )}
               {/* Stawka nadgodziny */}
               {client.contractHourlyRateOverLimit != null && (
-                <div className="bg-white rounded-2xl border border-gray-200 p-4 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
-                    <DollarSign className="h-5 w-5 text-orange-500" />
+                <div className="rounded-2xl p-4 flex items-center gap-3" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(251,146,60,0.12)' }}>
+                    <DollarSign className="h-5 w-5" style={{ color: '#FB923C' }} />
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-gray-900">{client.contractHourlyRateOverLimit} zł/h</div>
-                    <div className="text-xs text-gray-400">Stawka za nadgodziny</div>
+                    <div className="text-2xl font-bold text-white/85">{client.contractHourlyRateOverLimit} z\u0142/h</div>
+                    <div className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>Stawka za nadgodziny</div>
                   </div>
                 </div>
               )}
               {/* Zakres umowy */}
               {client.contractScope && (
-                <div className="sm:col-span-2 bg-white rounded-2xl border border-gray-200 p-4">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Zakres umowy</p>
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{client.contractScope}</p>
+                <div className="sm:col-span-2 rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'rgba(255,255,255,0.3)' }}>Zakres umowy</p>
+                  <p className="text-sm whitespace-pre-wrap" style={{ color: 'rgba(255,255,255,0.6)' }}>{client.contractScope}</p>
                 </div>
               )}
-              {/* PDF załącznik */}
+              {/* PDF za\u0142\u0105cznik */}
               {client.contractAttachmentUrl && (
-                <div className="sm:col-span-2 bg-white rounded-2xl border border-gray-200 p-4">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Załącznik umowy</p>
+                <div className="sm:col-span-2 rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'rgba(255,255,255,0.3)' }}>Za\u0142\u0105cznik umowy</p>
                   <a
                     href={client.contractAttachmentUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-2.5 px-4 py-2.5 bg-brand-50 border border-brand-100 rounded-xl text-sm text-brand-700 font-medium hover:bg-brand-100 transition-colors"
+                    className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
+                    style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.2)', color: '#A78BFA' }}
                   >
-                    <FileText className="h-4 w-4 text-brand-600" />
-                    Otwórz PDF umowy
-                    <ExternalLink className="h-3.5 w-3.5 text-brand-400" />
+                    <FileText className="h-4 w-4" style={{ color: '#A78BFA' }} />
+                    Otw\u00f3rz PDF umowy
+                    <ExternalLink className="h-3.5 w-3.5" style={{ color: 'rgba(167,139,250,0.6)' }} />
                   </a>
                 </div>
               )}
             </div>
           ) : (
             client.hourlyRate != null && (
-              <div className="bg-white rounded-2xl border border-gray-200 p-4 flex items-center gap-3 max-w-xs">
-                <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center flex-shrink-0">
-                  <DollarSign className="h-5 w-5 text-green-600" />
+              <div className="rounded-2xl p-4 flex items-center gap-3 max-w-xs" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(34,197,94,0.12)' }}>
+                  <DollarSign className="h-5 w-5" style={{ color: '#4ADE80' }} />
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-gray-900">{client.hourlyRate} zł/h</div>
-                  <div className="text-xs text-gray-400">Stawka godzinowa</div>
+                  <div className="text-2xl font-bold text-white/85">{client.hourlyRate} z\u0142/h</div>
+                  <div className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>Stawka godzinowa</div>
                 </div>
               </div>
             )
@@ -425,85 +431,105 @@ export function ClientDetailPage() {
         <>
           <div className="flex justify-end mb-3">
             <Button size="sm" icon={<Plus className="h-4 w-4" />} onClick={() => setShowAddLocation(true)}>
-              Dodaj lokalizację
+              Dodaj lokalizacj\u0119
             </Button>
           </div>
           <TabList
             items={locations}
             empty="Brak lokalizacji"
             render={(loc: Location) => (
-              <Link to={`/locations/${loc.id}`} key={loc.id} className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0">
-                <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center flex-shrink-0">
-                  <MapPin className="h-4 w-4 text-brand-600" />
+              <Link
+                to={`/locations/${loc.id}`}
+                key={loc.id}
+                className="flex items-center gap-4 p-4 hover:bg-white/[0.03] transition-colors"
+                style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}
+              >
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139,92,246,0.12)' }}>
+                  <MapPin className="h-4 w-4" style={{ color: '#A78BFA' }} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-gray-900">{loc.name}</div>
-                  <div className="text-xs text-gray-500">{loc.type} · {loc.city}</div>
+                  <div className="font-medium text-white/85">{loc.name}</div>
+                  <div className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>{loc.type} · {loc.city}</div>
                 </div>
-                <div className="text-xs text-gray-400">{loc._count?.devices ?? 0} urz.</div>
-                <ChevronRight className="h-4 w-4 text-gray-300" />
+                <div className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{loc._count?.devices ?? 0} urz.</div>
+                <ChevronRight className="h-4 w-4" style={{ color: 'rgba(255,255,255,0.15)' }} />
               </Link>
             )}
           />
         </>
       )}
 
-      {/* Tab: Urządzenia */}
+      {/* Tab: Urz\u0105dzenia */}
       {tab === 'devices' && (
         <>
           <div className="flex justify-end mb-3">
             <Button size="sm" icon={<Plus className="h-4 w-4" />} onClick={() => setShowAddDevice(true)}>
-              Dodaj urządzenie
+              Dodaj urz\u0105dzenie
             </Button>
           </div>
           <TabList
             items={devices}
-            empty="Brak urządzeń"
+            empty="Brak urz\u0105dze\u0144"
             render={(dev: Device) => (
-              <Link to={`/devices/${dev.id}`} key={dev.id} className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0">
+              <Link
+                to={`/devices/${dev.id}`}
+                key={dev.id}
+                className="flex items-center gap-4 p-4 hover:bg-white/[0.03] transition-colors"
+                style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}
+              >
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-gray-900">{dev.name}</div>
-                  <div className="text-xs text-gray-500">{dev.deviceType?.name ?? '—'} · <span className="font-mono">{dev.ipAddress ?? '—'}</span></div>
+                  <div className="font-medium text-white/85">{dev.name}</div>
+                  <div className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>{dev.deviceType?.name ?? '\u2014'} · <span className="font-mono">{dev.ipAddress ?? '\u2014'}</span></div>
                 </div>
                 <DeviceStatusBadge status={dev.status} />
-                <ChevronRight className="h-4 w-4 text-gray-300" />
+                <ChevronRight className="h-4 w-4" style={{ color: 'rgba(255,255,255,0.15)' }} />
               </Link>
             )}
           />
         </>
       )}
 
-      {/* Tab: Zgłoszenia */}
+      {/* Tab: Zg\u0142oszenia */}
       {tab === 'tickets' && (
         <TabList
           items={tickets}
-          empty="Brak zgłoszeń"
+          empty="Brak zg\u0142osze\u0144"
           render={(t: Ticket) => (
-            <Link to={`/tickets/${t.id}`} key={t.id} className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0">
+            <Link
+              to={`/tickets/${t.id}`}
+              key={t.id}
+              className="flex items-center gap-4 p-4 hover:bg-white/[0.03] transition-colors"
+              style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}
+            >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-mono text-xs text-brand-600">{t.ticketNumber}</span>
+                  <span className="font-mono text-xs" style={{ color: '#A78BFA' }}>{t.ticketNumber}</span>
                   <PriorityBadge priority={t.priority} />
                 </div>
-                <div className="font-medium text-gray-900 mt-0.5">{t.title}</div>
+                <div className="font-medium text-white/85 mt-0.5">{t.title}</div>
               </div>
               <TicketStatusBadge status={t.status} />
-              <ChevronRight className="h-4 w-4 text-gray-300" />
+              <ChevronRight className="h-4 w-4" style={{ color: 'rgba(255,255,255,0.15)' }} />
             </Link>
           )}
         />
       )}
 
-      {/* Tab: Dostępy */}
+      {/* Tab: Dost\u0119py */}
       {tab === 'credentials' && (
         <TabList
           items={credentials}
-          empty="Brak danych dostępowych"
+          empty="Brak danych dost\u0119powych"
           render={(c: Credential) => (
-            <Link to={`/credentials`} key={c.id} className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0">
+            <Link
+              to={`/credentials`}
+              key={c.id}
+              className="flex items-center gap-4 p-4 hover:bg-white/[0.03] transition-colors"
+              style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}
+            >
               <div className="flex-1 min-w-0">
-                <div className="font-medium text-gray-900">{c.name}</div>
-                <div className="text-xs text-gray-500 font-mono">{c.username ?? '—'} · {c.device?.name ?? '—'}</div>
+                <div className="font-medium text-white/85">{c.name}</div>
+                <div className="text-xs font-mono" style={{ color: 'rgba(255,255,255,0.4)' }}>{c.username ?? '\u2014'} · {c.device?.name ?? '\u2014'}</div>
               </div>
               <Badge color="gray">{c.category}</Badge>
             </Link>
@@ -511,25 +537,29 @@ export function ClientDetailPage() {
         />
       )}
 
-      {/* Tab: Użytkownicy */}
+      {/* Tab: U\u017cytkownicy */}
       {tab === 'users' && (
         <>
           <div className="flex justify-end mb-3">
             <Button size="sm" icon={<Plus className="h-4 w-4" />} onClick={() => setShowAddUser(true)}>
-              Dodaj użytkownika
+              Dodaj u\u017cytkownika
             </Button>
           </div>
           <TabList
             items={users}
-            empty="Brak użytkowników portalu"
+            empty="Brak u\u017cytkownik\u00f3w portalu"
             render={(u: User) => (
-              <div key={u.id} className="flex items-center gap-4 p-4 border-b border-gray-50 last:border-0">
-                <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
+              <div
+                key={u.id}
+                className="flex items-center gap-4 p-4"
+                style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}
+              >
+                <div className="w-9 h-9 rounded-full text-xs font-bold flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139,92,246,0.12)', color: '#A78BFA' }}>
                   {u.firstName[0]}{u.lastName[0]}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-gray-900">{u.firstName} {u.lastName}</div>
-                  <div className="text-xs text-gray-500">{u.email}</div>
+                  <div className="font-medium text-white/85">{u.firstName} {u.lastName}</div>
+                  <div className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>{u.email}</div>
                 </div>
                 <Badge color={u.isActive ? 'green' : 'gray'}>{u.isActive ? 'Aktywny' : 'Nieaktywny'}</Badge>
               </div>
@@ -555,7 +585,7 @@ export function ClientDetailPage() {
         onClose={() => setShowDeactivate(false)}
         onConfirm={() => deactivateMutation.mutate()}
         title="Dezaktywuj klienta"
-        message={`Czy dezaktywować klienta "${client.name}"? Wszystkie dane zostaną zachowane, klient będzie oznaczony jako nieaktywny.`}
+        message={`Czy dezaktywowa\u0107 klienta "${client.name}"? Wszystkie dane zostan\u0105 zachowane, klient b\u0119dzie oznaczony jako nieaktywny.`}
         loading={deactivateMutation.isPending}
       />
 
@@ -563,12 +593,12 @@ export function ClientDetailPage() {
         open={showDelete}
         onClose={() => setShowDelete(false)}
         onConfirm={() => deleteMutation.mutate()}
-        title="Usuń klienta"
-        message={`Czy na pewno chcesz trwale usunąć klienta "${client.name}" z bazy danych? Tej operacji nie można cofnąć.`}
+        title="Usu\u0144 klienta"
+        message={`Czy na pewno chcesz trwale usun\u0105\u0107 klienta "${client.name}" z bazy danych? Tej operacji nie mo\u017cna cofn\u0105\u0107.`}
         loading={deleteMutation.isPending}
       />
 
-      {/* Modal: dodaj lokalizację */}
+      {/* Modal: dodaj lokalizacj\u0119 */}
       <Modal open={showAddLocation} onClose={() => setShowAddLocation(false)} title="Nowa lokalizacja" size="lg">
         <LocationForm
           defaultClientId={id!}
@@ -581,7 +611,7 @@ export function ClientDetailPage() {
         />
       </Modal>
 
-      {/* Modal: dodaj urządzenie */}
+      {/* Modal: dodaj urz\u0105dzenie */}
       <Modal open={showAddDevice} onClose={() => setShowAddDevice(false)} size="xl" noPadding>
         <DeviceForm
           defaultClientId={id!}
@@ -594,7 +624,7 @@ export function ClientDetailPage() {
         />
       </Modal>
 
-      {/* Modal: dodaj użytkownika portalu */}
+      {/* Modal: dodaj u\u017cytkownika portalu */}
       <Modal open={showAddUser} onClose={() => setShowAddUser(false)} size="lg" noPadding>
         <UserForm
           defaultClientId={id}
@@ -607,17 +637,17 @@ export function ClientDetailPage() {
         />
       </Modal>
 
-      {/* Modal: nowe zlecenie (wizard) */}
-      <Modal open={showNewOrder} onClose={() => setShowNewOrder(false)} title="" size="lg" noPadding>
-        <NewOrderWizard
-          defaultClientId={id}
-          onClose={() => {
-            setShowNewOrder(false);
-            qc.invalidateQueries({ queryKey: ['crm', 'timeline', id] });
-            qc.invalidateQueries({ queryKey: ['tickets', { clientId: id }] });
-          }}
-        />
-      </Modal>
+      {/* Unified wizard */}
+      <UnifiedTicketWizard
+        open={showNewOrder}
+        onClose={() => setShowNewOrder(false)}
+        defaultClientId={id}
+        onSuccess={() => {
+          qc.invalidateQueries({ queryKey: ['crm', 'timeline', id] });
+          qc.invalidateQueries({ queryKey: ['tickets', { clientId: id }] });
+          qc.invalidateQueries({ queryKey: ['orders'] });
+        }}
+      />
     </div>
   );
 }
@@ -625,8 +655,8 @@ export function ClientDetailPage() {
 // Helpers
 function InfoCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-4">
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">{title}</p>
+    <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+      <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'rgba(255,255,255,0.3)' }}>{title}</p>
       <div className="space-y-2">{children}</div>
     </div>
   );
@@ -634,11 +664,11 @@ function InfoCard({ title, children }: { title: string; children: React.ReactNod
 
 function InfoRow({ icon, label, href, external }: { icon: React.ReactNode; label?: string; href?: string; external?: boolean }) {
   if (!label) return null;
-  const cls = 'flex items-center gap-2.5 text-sm text-gray-700 hover:text-brand-600';
+  const cls = 'flex items-center gap-2.5 text-sm hover:text-violet-400';
   const content = (
     <>
-      <span className="text-gray-400 w-4 h-4 flex-shrink-0">{icon}</span>
-      {label}
+      <span className="w-4 h-4 flex-shrink-0" style={{ color: 'rgba(255,255,255,0.3)' }}>{icon}</span>
+      <span style={{ color: 'rgba(255,255,255,0.6)' }}>{label}</span>
     </>
   );
   if (href) return <a href={href} target={external ? '_blank' : undefined} rel="noreferrer" className={cls}>{content}</a>;
@@ -660,29 +690,29 @@ function TimelineEntry({ entry }: { entry: Record<string, unknown> }) {
       : entry.quoteDescription;
 
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 p-4 flex items-start gap-3">
-        <div className={`w-9 h-9 rounded-xl border flex items-center justify-center flex-shrink-0 ${cfg?.bg ?? 'bg-gray-50 border-gray-100'}`}>
-          <span className={cfg?.color ?? 'text-gray-400'}>{cfg?.icon}</span>
+      <div className="rounded-2xl p-4 flex items-start gap-3" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.04)' }}>
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0`} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <span className={cfg?.color ?? ''} style={!cfg?.color ? { color: 'rgba(255,255,255,0.3)' } : undefined}>{cfg?.icon}</span>
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className={`text-xs font-semibold ${cfg?.color ?? ''}`}>{cfg?.label ?? String(type)}</span>
             {Boolean(entry.followUpRequired) && (
-              <span className="flex items-center gap-0.5 text-xs text-amber-600 font-medium">
-                <AlertCircle className="h-3 w-3" /> Do działania
+              <span className="flex items-center gap-0.5 text-xs font-medium" style={{ color: '#FBBF24' }}>
+                <AlertCircle className="h-3 w-3" /> Do dzia\u0142ania
               </span>
             )}
             {type === 'QUOTE' && entry.quoteStatus ? (
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${QUOTE_STATUS_CONFIG[entry.quoteStatus as keyof typeof QUOTE_STATUS_CONFIG]?.color ?? 'bg-gray-100 text-gray-600'}`}>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${QUOTE_STATUS_CONFIG[entry.quoteStatus as keyof typeof QUOTE_STATUS_CONFIG]?.color ?? ''}`} style={!QUOTE_STATUS_CONFIG[entry.quoteStatus as keyof typeof QUOTE_STATUS_CONFIG]?.color ? { background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)' } : undefined}>
                 {QUOTE_STATUS_CONFIG[entry.quoteStatus as keyof typeof QUOTE_STATUS_CONFIG]?.label}
               </span>
             ) : null}
           </div>
-          {summary ? <p className="text-sm text-gray-700 mt-0.5 line-clamp-2">{String(summary)}</p> : null}
+          {summary ? <p className="text-sm mt-0.5 line-clamp-2" style={{ color: 'rgba(255,255,255,0.6)' }}>{String(summary)}</p> : null}
           {type === 'QUOTE' && entry.quoteValue != null ? (
-            <p className="text-xs text-gray-500 mt-0.5">{Number(entry.quoteValue).toLocaleString('pl-PL')} zł</p>
+            <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>{Number(entry.quoteValue).toLocaleString('pl-PL')} z\u0142</p>
           ) : null}
-          <p className="text-xs text-gray-400 mt-1">{dateStr} {timeStr}</p>
+          <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>{dateStr} {timeStr}</p>
         </div>
       </div>
     );
@@ -691,19 +721,23 @@ function TimelineEntry({ entry }: { entry: Record<string, unknown> }) {
   // TICKET
   const t = entry as Record<string, unknown>;
   return (
-    <Link to={`/tickets/${t.id}`} className="bg-white rounded-2xl border border-gray-100 p-4 flex items-start gap-3 hover:bg-gray-50 transition-colors block">
-      <div className="w-9 h-9 rounded-xl bg-brand-50 border border-brand-100 flex items-center justify-center flex-shrink-0">
-        <Wrench className="h-4 w-4 text-brand-600" />
+    <Link
+      to={`/tickets/${t.id}`}
+      className="rounded-2xl p-4 flex items-start gap-3 hover:bg-white/[0.03] transition-colors block"
+      style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.04)' }}
+    >
+      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.2)' }}>
+        <Wrench className="h-4 w-4" style={{ color: '#A78BFA' }} />
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-mono text-xs text-brand-600">{String(t.ticketNumber ?? '')}</span>
-          {Boolean(t.billedInContract) && <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium">SLA</span>}
+          <span className="font-mono text-xs" style={{ color: '#A78BFA' }}>{String(t.ticketNumber ?? '')}</span>
+          {Boolean(t.billedInContract) && <span className="text-xs px-1.5 py-0.5 rounded-full font-medium" style={{ background: 'rgba(96,165,250,0.12)', color: '#60A5FA' }}>SLA</span>}
         </div>
-        <p className="text-sm font-medium text-gray-800 mt-0.5 line-clamp-2">{String(t.title ?? '')}</p>
-        <p className="text-xs text-gray-400 mt-1">{dateStr} {timeStr}</p>
+        <p className="text-sm font-medium text-white/80 mt-0.5 line-clamp-2">{String(t.title ?? '')}</p>
+        <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>{dateStr} {timeStr}</p>
       </div>
-      <ChevronRight className="h-4 w-4 text-gray-300 flex-shrink-0 mt-1" />
+      <ChevronRight className="h-4 w-4 flex-shrink-0 mt-1" style={{ color: 'rgba(255,255,255,0.15)' }} />
     </Link>
   );
 }
@@ -711,13 +745,13 @@ function TimelineEntry({ entry }: { entry: Record<string, unknown> }) {
 function TabList<T>({ items, empty, render }: { items: T[]; empty: string; render: (item: T) => React.ReactNode }) {
   if (items.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center text-sm text-gray-400">
+      <div className="rounded-2xl p-8 text-center text-sm" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.3)' }}>
         {empty}
       </div>
     );
   }
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+    <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
       {items.map(render)}
     </div>
   );

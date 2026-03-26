@@ -2,11 +2,11 @@
   "name": "InfraDesk",
   "short_name": "InfraDesk",
   "description": "Zarządzanie infrastrukturą IT",
-  "start_url": "/",
+  "start_url": "/m",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#4f46e5",
+  "background_color": "#080D19",
+  "theme_color": "#080D19",
   "orientation": "any",
   "lang": "pl",
   "categories": ["business", "productivity"],
@@ -22,19 +22,13 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
-    },
-    {
-      "src": "/logo.png",
-      "sizes": "any",
-      "type": "image/png"
     }
   ],
-  "screenshots": [],
   "shortcuts": [
     {
       "name": "Nowe zgłoszenie",
-      "url": "/tickets/new",
-      "description": "Utwórz nowe zgłoszenie"
+      "url": "/m/tickets",
+      "description": "Zgłoszenia serwisowe"
     },
     {
       "name": "Klienci",

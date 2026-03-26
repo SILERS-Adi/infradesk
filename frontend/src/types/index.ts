@@ -27,6 +27,8 @@ export interface User {
     emailOnTicketUpdate?: boolean;
     emailOnAssignment?: boolean;
   };
+  downloadPin?: string | null;
+  avatarUrl?: string | null;
   clientId?: string;
   client?: { id: string; name: string };
   lastLoginAt?: string;
@@ -89,6 +91,8 @@ export interface Location {
   contactPersonPhone?: string;
   contactPersonEmail?: string;
   notes?: string;
+  latitude?: number;
+  longitude?: number;
   createdAt: string;
   updatedAt: string;
   _count?: { devices: number };
@@ -117,7 +121,7 @@ export interface Device {
   clientId: string;
   client?: { id: string; name: string };
   locationId: string;
-  location?: { id: string; name: string; city?: string };
+  location?: { id: string; name: string; addressLine1?: string; postalCode?: string; city?: string; country?: string };
   deviceTypeId?: string;
   deviceType?: DeviceType;
   name: string;
@@ -152,6 +156,17 @@ export interface Device {
   gpsLon?: number;
   createdAt: string;
   updatedAt: string;
+  agents?: { lastSeen?: string; currentUser?: string }[];
+  agentInfo?: {
+    cpuModel?: string; cpuCores?: number; cpuThreads?: number;
+    ramTotalGb?: number; gpuModel?: string; motherboard?: string;
+    cpuUsage?: number; ramUsage?: number;
+    diskFree?: number; diskTotal?: number; cpuTempC?: number;
+    diskInfo?: { device: string; mountpoint: string; fstype: string; totalGb: number; freeGb: number; usedPct: number }[];
+    networkIfaces?: { name: string; ip: string; mac: string; isUp: boolean }[];
+    lastSeen?: string; appVersion?: string;
+    windowsVersion?: string; lastBootTime?: string;
+  } | null;
 }
 
 export interface Credential {
@@ -188,7 +203,7 @@ export interface Ticket {
   locationId: string;
   location?: { id: string; name: string };
   deviceId?: string;
-  device?: { id: string; name: string };
+  device?: { id: string; name: string; rustdeskId?: string };
   createdByUserId: string;
   createdBy?: { id: string; firstName: string; lastName: string };
   assignedToUserId?: string;
@@ -206,6 +221,7 @@ export interface Ticket {
   resolvedAt?: string;
   closedAt?: string;
   billedInContract?: boolean;
+  serviceMode?: 'REMOTE' | 'ONSITE' | null;
   createdAt: string;
   updatedAt: string;
   comments?: TicketComment[];
@@ -232,6 +248,7 @@ export interface Task {
   dueAt?: string;
   completedAt?: string;
   notes?: string;
+  travelKm?: number | null;
   createdAt: string;
   updatedAt: string;
   ticket?: {
@@ -239,7 +256,9 @@ export interface Task {
     ticketNumber: string;
     title: string;
     priority: TicketPriority;
+    serviceMode?: 'REMOTE' | 'ONSITE' | null;
     client?: { id: string; name: string };
+    device?: { id: string; name: string; rustdeskId?: string };
   };
   assignedTo?: { id: string; firstName: string; lastName: string; email: string };
   createdBy?: { id: string; firstName: string; lastName: string };
@@ -270,10 +289,18 @@ export interface DashboardStats {
 }
 
 export interface ClientDashboardStats {
-  myLocations: number;
-  myDevices: number;
-  openTickets: number;
+  client?: { id: string; name: string; status: string };
+  stats: {
+    totalDevices: number;
+    activeDevices: number;
+    brokenDevices: number;
+    totalTickets: number;
+    openTickets: number;
+    resolvedTickets: number;
+    totalLocations: number;
+  };
   recentTickets: Ticket[];
+  recentDevices: Device[];
 }
 
 export interface CrmActivity {

@@ -4,7 +4,6 @@ export default {
   theme: {
     extend: {
       colors: {
-        // InfraDesk brand blue (niebieski z logo)
         brand: {
           50:  '#e8f7fd',
           100: '#c4eaf8',
@@ -16,7 +15,6 @@ export default {
           700: '#0f6b8f',
           900: '#083d55',
         },
-        // InfraDesk accent orange (pomarańczowy z "Desk")
         accent: {
           50:  '#fff3e8',
           100: '#fddcb8',
@@ -25,14 +23,21 @@ export default {
           600: '#e06b08',
           700: '#b85500',
         },
-        // Sidebar (ciemny granat jak tło kolorystyki)
+        // Premium dark SaaS sidebar
         sidebar: {
-          bg:          '#0d1b2a',
-          hover:       '#162436',
-          active:      '#1a3a55',
-          border:      '#162436',
-          text:        '#7fa3be',
-          textActive:  '#e2f0f8',
+          bg:         '#080D19',
+          hover:      '#0F1629',
+          active:     '#151E35',
+          border:     '#151E35',
+          text:       '#64748B',
+          textActive: '#E2E8F0',
+        },
+        // Desktop dark surfaces
+        dsk: {
+          bg:      '#0A0F1E',
+          surface: '#0E1425',
+          card:    '#111827',
+          border:  '#1E293B',
         },
       },
       fontFamily: {

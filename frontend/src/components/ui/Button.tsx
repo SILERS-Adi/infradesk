@@ -19,25 +19,33 @@ export function Button({
   children,
   className,
   disabled,
+  style,
   ...props
 }: ButtonProps) {
   return (
     <button
       className={clsx(
-        'inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2',
+        'inline-flex items-center justify-center gap-2 font-semibold rounded-xl transition-all duration-200 focus:outline-none active:scale-[0.97]',
         {
-          'bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500': variant === 'primary',
-          'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 focus:ring-gray-300': variant === 'secondary',
-          'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500': variant === 'danger',
-          'text-gray-600 hover:bg-gray-100 hover:text-gray-900 focus:ring-gray-300': variant === 'ghost',
-          'border border-indigo-600 text-indigo-600 hover:bg-indigo-50 focus:ring-indigo-500': variant === 'outline',
-          'px-2.5 py-1.5 text-xs': size === 'sm',
-          'px-4 py-2 text-sm': size === 'md',
+          'text-white': variant === 'primary',
+          'text-white/60 hover:text-white/80 border border-white/8 hover:border-white/12 bg-white/[0.04] hover:bg-white/[0.06]': variant === 'secondary',
+          'text-red-400 bg-red-500/10 hover:bg-red-500/15 border border-red-500/20': variant === 'danger',
+          'text-white/50 hover:bg-white/[0.04] hover:text-white/70': variant === 'ghost',
+          'border border-violet-500/30 text-violet-400 hover:bg-violet-500/10': variant === 'outline',
+          'px-3 py-1.5 text-xs': size === 'sm',
+          'px-4 py-2.5 text-sm': size === 'md',
           'px-6 py-3 text-base': size === 'lg',
-          'opacity-50 cursor-not-allowed': disabled || loading,
+          'opacity-40 cursor-not-allowed': disabled || loading,
         },
         className
       )}
+      style={{
+        ...(variant === 'primary' ? {
+          background: 'linear-gradient(145deg, #6D28D9, #2563EB)',
+          boxShadow: '0 1px 8px rgba(109,40,217,0.15)',
+        } : {}),
+        ...style,
+      }}
       disabled={disabled || loading}
       {...props}
     >

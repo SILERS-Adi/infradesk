@@ -18,17 +18,20 @@ export function PageHeader({ title, subtitle, actions, back }: PageHeaderProps) 
         {back && (
           <button
             onClick={() => (typeof back === 'string' ? navigate(back) : navigate(-1))}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+            className="p-1.5 rounded-xl transition-colors"
+            style={{ color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.03)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.3)'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
         )}
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
-          {subtitle && <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>}
+          <h1 className="text-[18px] font-semibold text-white/90">{title}</h1>
+          {subtitle && <p className="text-[13px] mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{subtitle}</p>}
         </div>
       </div>
-      {actions && <div className="flex items-center gap-3">{actions}</div>}
+      {actions && <div className="flex items-center gap-2.5">{actions}</div>}
     </div>
   );
 }

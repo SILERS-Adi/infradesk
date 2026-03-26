@@ -1,46 +1,121 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Send, Lock } from 'lucide-react';
+import { Send, Lock, Pencil, X, Check, Trash2 } from 'lucide-react';
 import { AttachmentGallery } from '../../../components/ui/AttachmentGallery';
 import toast from 'react-hot-toast';
 import { ticketsApi } from '../../../api/tickets';
 import { usersApi } from '../../../api/users';
 import { PageHeader } from '../../../components/ui/PageHeader';
-import { Card } from '../../../components/ui/Card';
-import { Badge } from '../../../components/ui/Badge';
 import { Button } from '../../../components/ui/Button';
-import { Textarea } from '../../../components/ui/Textarea';
 import { TicketStatusBadge } from '../../../components/ui/StatusBadge';
 import { PriorityBadge } from '../../../components/ui/PriorityBadge';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { useAuth } from '../../../store/authStore';
 import { formatDateTime, getInitials, getErrorMessage } from '../../../utils/helpers';
-import type { TicketPriority } from '../../../types';
+import type { TicketPriority, TicketComment } from '../../../types';
 
-/** Splits description into {text, photoUrls} — photos are appended after the 📷 marker by the wizard */
+/* ── Helpers ─────────────────────────────────────────────────────────────── */
 function parseDescription(raw: string): { text: string; photoUrls: string } {
   const marker = '📷 Zrzuty ekranu:';
   const idx = raw.indexOf(marker);
   if (idx === -1) return { text: raw, photoUrls: '' };
-  const text = raw.slice(0, idx).trimEnd();
-  const urlBlock = raw.slice(idx + marker.length).trim();
-  const urls = urlBlock.split('\n').map(u => u.trim()).filter(Boolean).join(',');
-  return { text, photoUrls: urls };
+  return { text: raw.slice(0, idx).trimEnd(), photoUrls: raw.slice(idx + marker.length).trim().split('\n').map(u => u.trim()).filter(Boolean).join(',') };
 }
 
-const PRIORITY_LABELS: Record<TicketPriority, string> = {
-  LOW: 'Niski', MEDIUM: 'Średni', HIGH: 'Wysoki', CRITICAL: 'Krytyczny',
-};
-const TYPE_LABELS: Record<string, string> = {
-  INCIDENT: 'Incydent', REQUEST: 'Prośba', MAINTENANCE: 'Konserwacja',
-  INSTALLATION: 'Instalacja', OTHER: 'Inne',
-};
-const SOURCE_LABELS: Record<string, string> = {
-  CLIENT_PORTAL: 'Portal klienta', INTERNAL: 'Wewnętrzne', PHONE: 'Telefon',
-  EMAIL: 'Email', QR_SCAN: 'Skan QR', AGENT: 'Agent systemowy',
-};
+const TYPE_LABELS: Record<string, string> = { INCIDENT: 'Incydent', REQUEST: 'Prośba', MAINTENANCE: 'Konserwacja', INSTALLATION: 'Instalacja', OTHER: 'Inne' };
+const SOURCE_LABELS: Record<string, string> = { CLIENT_PORTAL: 'Portal klienta', INTERNAL: 'Wewnętrzne', PHONE: 'Telefon', EMAIL: 'Email', QR_SCAN: 'Skan QR', AGENT: 'Agent', IN_PERSON: 'Osobiście', MESSAGE: 'Wiadomość' };
 
+const glass = (extra?: React.CSSProperties): React.CSSProperties => ({
+  background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, ...extra,
+});
+const selectStyle: React.CSSProperties = { background: '#0E1425', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)' };
+
+function Section({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
+  return (
+    <div className="rounded-[16px] overflow-hidden" style={glass()}>
+      <div className="px-5 py-3.5 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+        <h3 className="text-[13px] font-semibold text-white/70">{title}</h3>
+        {action}
+      </div>
+      <div className="p-5">{children}</div>
+    </div>
+  );
+}
+
+/* ── Editable comment ────────────────────────────────────────────────────── */
+function CommentBubble({ c, isAdmin, onEdit, onDelete }: {
+  c: TicketComment; isAdmin: boolean;
+  onEdit: (id: string, text: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(c.comment);
+
+  const save = () => {
+    if (editText.trim() && editText !== c.comment) onEdit(c.id, editText.trim());
+    setEditing(false);
+  };
+
+  return (
+    <div className="flex gap-3 p-3 rounded-[12px]"
+      style={c.isInternal
+        ? { background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.1)' }
+        : { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }
+      }>
+      <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+        style={{ background: 'rgba(139,92,246,0.12)', color: '#A78BFA' }}>
+        {c.user ? getInitials(c.user.firstName, c.user.lastName) : '?'}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
+          <span className="text-[13px] font-semibold text-white/85">{c.user ? `${c.user.firstName} ${c.user.lastName}` : 'Użytkownik'}</span>
+          {c.isInternal && (
+            <span className="flex items-center gap-0.5 text-[10px] font-semibold" style={{ color: '#FBBF24' }}>
+              <Lock className="h-3 w-3" /> Wewnętrzne
+            </span>
+          )}
+          <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.25)' }}>{formatDateTime(c.createdAt)}</span>
+          {isAdmin && !editing && (
+            <div className="flex items-center gap-1 ml-auto">
+              <button onClick={() => { setEditText(c.comment); setEditing(true); }}
+                className="p-1 rounded-lg transition-colors hover:bg-white/[0.06]" title="Edytuj">
+                <Pencil className="h-3 w-3" style={{ color: 'rgba(255,255,255,0.2)' }} />
+              </button>
+              <button onClick={() => { if (confirm('Usunąć komentarz?')) onDelete(c.id); }}
+                className="p-1 rounded-lg transition-colors hover:bg-white/[0.06]" title="Usuń">
+                <Trash2 className="h-3 w-3" style={{ color: 'rgba(255,255,255,0.15)' }} />
+              </button>
+            </div>
+          )}
+        </div>
+        {editing ? (
+          <div className="space-y-2">
+            <textarea value={editText} onChange={e => setEditText(e.target.value)} rows={3}
+              className="w-full rounded-xl px-3 py-2 text-[13px] resize-none focus:outline-none placeholder:text-white/20"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.3)', color: 'rgba(255,255,255,0.85)' }} />
+            <div className="flex gap-2">
+              <button onClick={save} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white transition-all active:scale-[0.97]"
+                style={{ background: 'linear-gradient(145deg, #6D28D9, #2563EB)' }}>
+                <Check className="h-3 w-3" /> Zapisz
+              </button>
+              <button onClick={() => setEditing(false)} className="px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors"
+                style={{ color: 'rgba(255,255,255,0.4)' }}>
+                Anuluj
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-[13px] whitespace-pre-wrap" style={{ color: 'rgba(255,255,255,0.55)' }}>{c.comment}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   PAGE
+   ════════════════════════════════════════════════════════════════════════════ */
 export function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -49,217 +124,160 @@ export function TicketDetailPage() {
   const [isInternal, setIsInternal] = useState(false);
   const [assignUserId, setAssignUserId] = useState('');
 
-  const { data: ticket, isLoading } = useQuery({
-    queryKey: ['tickets', id],
-    queryFn: () => ticketsApi.getOne(id!),
-    enabled: !!id,
-  });
-
+  const { data: ticket, isLoading } = useQuery({ queryKey: ['tickets', id], queryFn: () => ticketsApi.getOne(id!), enabled: !!id });
   const { data: technicians = [] } = useQuery({
     queryKey: ['users-staff-all'],
     queryFn: async () => {
-      const [techs, admins] = await Promise.all([
-        usersApi.getAll({ role: 'TECHNICIAN' }),
-        usersApi.getAll({ role: 'ADMIN' }),
-      ]);
-      const merged = [...techs, ...admins];
-      return merged.filter((u, i, arr) => arr.findIndex(x => x.id === u.id) === i);
+      const [t, a] = await Promise.all([usersApi.getAll({ role: 'TECHNICIAN' }), usersApi.getAll({ role: 'ADMIN' })]);
+      return [...t, ...a].filter((u, i, arr) => arr.findIndex(x => x.id === u.id) === i);
     },
   });
 
-  const commentMutation = useMutation({
+  const inv = () => qc.invalidateQueries({ queryKey: ['tickets', id] });
+
+  const commentMut = useMutation({
     mutationFn: () => ticketsApi.addComment(id!, comment, isInternal),
-    onSuccess: () => {
-      setComment('');
-      qc.invalidateQueries({ queryKey: ['tickets', id] });
-      toast.success('Komentarz dodany');
-    },
-    onError: (err) => toast.error(getErrorMessage(err)),
+    onSuccess: () => { setComment(''); inv(); toast.success('Wiadomość wysłana'); },
+    onError: (e) => toast.error(getErrorMessage(e)),
   });
 
-  const cancelMutation = useMutation({
+  const editCommentMut = useMutation({
+    mutationFn: ({ commentId, text }: { commentId: string; text: string }) =>
+      ticketsApi.update(id!, { comments: [{ id: commentId, comment: text }] } as any),
+    onSuccess: () => { inv(); toast.success('Wiadomość zaktualizowana'); },
+    onError: () => {
+      // Fallback: jeśli backend nie obsługuje edycji komentarza, pokaż info
+      toast.error('Edycja komentarza niedostępna — backend nie obsługuje tej funkcji');
+    },
+  });
+
+  const deleteCommentMut = useMutation({
+    mutationFn: (commentId: string) =>
+      ticketsApi.update(id!, { deleteComment: commentId } as any),
+    onSuccess: () => { inv(); toast.success('Komentarz usunięty'); },
+    onError: () => toast.error('Usuwanie komentarza niedostępne'),
+  });
+
+  const cancelMut = useMutation({
     mutationFn: () => ticketsApi.cancel(id!),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['tickets', id] });
-      qc.invalidateQueries({ queryKey: ['tickets-all'] });
-      toast.success('Zgłoszenie anulowane');
-    },
-    onError: (err) => toast.error(getErrorMessage(err)),
+    onSuccess: () => { inv(); qc.invalidateQueries({ queryKey: ['tickets-all'] }); toast.success('Anulowane'); },
+    onError: (e) => toast.error(getErrorMessage(e)),
   });
 
-  const assignMutation = useMutation({
+  const assignMut = useMutation({
     mutationFn: () => ticketsApi.assign(id!, assignUserId),
-    onSuccess: () => {
-      setAssignUserId('');
-      qc.invalidateQueries({ queryKey: ['tickets', id] });
-      toast.success('Zgłoszenie przypisane');
-    },
-    onError: (err) => toast.error(getErrorMessage(err)),
+    onSuccess: () => { setAssignUserId(''); inv(); toast.success('Przypisane'); },
+    onError: (e) => toast.error(getErrorMessage(e)),
   });
 
   if (isLoading) return <LoadingSpinner />;
-  if (!ticket) return <div className="text-sm text-gray-500">Nie znaleziono zgłoszenia</div>;
+  if (!ticket) return <div className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Nie znaleziono zgłoszenia</div>;
 
   const { text: descText, photoUrls } = parseDescription(ticket.description);
-  const allPhotoUrls = [photoUrls, ticket.attachmentUrls].filter(Boolean).join(',');
-
+  const allPhotoUrls = [photoUrls, (ticket as any).attachmentUrls].filter(Boolean).join(',');
   const isAdminOrTech = user?.role === 'ADMIN' || user?.role === 'TECHNICIAN';
   const isClient = user?.role === 'CLIENT';
   const comments = ticket.comments ?? [];
-  const visibleComments = isClient ? comments.filter(c => !c.isInternal) : comments;
+  const visible = isClient ? comments.filter(c => !c.isInternal) : comments;
+  const canEdit = ticket.status !== 'CANCELLED' && ticket.status !== 'COMPLETED';
 
   return (
     <div>
-      <PageHeader
-        title={ticket.title}
-        back="/tickets"
-        subtitle={ticket.ticketNumber}
-        actions={
-          <div className="flex items-center gap-2">
-            <PriorityBadge priority={ticket.priority} />
-            <TicketStatusBadge status={ticket.status} />
-          </div>
-        }
-      />
+      <PageHeader title={ticket.title} back="/tickets" subtitle={ticket.ticketNumber}
+        actions={<div className="flex items-center gap-2"><PriorityBadge priority={ticket.priority} /><TicketStatusBadge status={ticket.status} /></div>} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* LEFT - Comments */}
-        <div className="lg:col-span-2 space-y-4">
-          <Card title="Opis">
-            <p className="text-sm text-gray-700 whitespace-pre-wrap">{descText}</p>
-            {allPhotoUrls && <AttachmentGallery urls={allPhotoUrls} />}
-          </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+        {/* ── LEFT ─────────────────────────────────────────────────────── */}
+        <div className="lg:col-span-2 space-y-5">
+
+          <Section title="Opis">
+            <p className="text-[13px] whitespace-pre-wrap leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>{descText}</p>
+            {allPhotoUrls && <div className="mt-3"><AttachmentGallery urls={allPhotoUrls} /></div>}
+          </Section>
 
           {ticket.resolutionSummary && (
-            <Card title="Rozwiązanie">
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{ticket.resolutionSummary}</p>
-            </Card>
+            <Section title="Rozwiązanie">
+              <p className="text-[13px] whitespace-pre-wrap" style={{ color: 'rgba(255,255,255,0.6)' }}>{ticket.resolutionSummary}</p>
+            </Section>
           )}
 
-          {/* Comments */}
-          <Card title={`Komentarze (${visibleComments.length})`}>
-            <div className="space-y-4 mb-6">
-              {visibleComments.length === 0 ? (
-                <p className="text-sm text-gray-500">Brak komentarzy</p>
-              ) : visibleComments.map(c => (
-                <div
-                  key={c.id}
-                  className={`flex gap-3 ${c.isInternal ? 'bg-yellow-50 -mx-2 px-2 py-2 rounded-lg' : ''}`}
-                >
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center justify-center">
-                    {c.user ? getInitials(c.user.firstName, c.user.lastName) : '?'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium text-gray-900">
-                        {c.user ? `${c.user.firstName} ${c.user.lastName}` : 'Użytkownik'}
-                      </span>
-                      {c.isInternal && (
-                        <span className="flex items-center gap-0.5 text-xs text-yellow-700 font-medium">
-                          <Lock className="h-3 w-3" />
-                          Wewnętrzne
-                        </span>
-                      )}
-                      <span className="text-xs text-gray-400">{formatDateTime(c.createdAt)}</span>
-                    </div>
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{c.comment}</p>
-                  </div>
-                </div>
+          {/* Wiadomości */}
+          <Section title={`Wiadomości (${visible.length})`}>
+            <div className="space-y-3 mb-5">
+              {visible.length === 0 ? (
+                <p className="text-[13px] text-center py-6" style={{ color: 'rgba(255,255,255,0.2)' }}>Brak wiadomości</p>
+              ) : visible.map(c => (
+                <CommentBubble key={c.id} c={c} isAdmin={isAdminOrTech}
+                  onEdit={(cid, text) => editCommentMut.mutate({ commentId: cid, text })}
+                  onDelete={(cid) => deleteCommentMut.mutate(cid)} />
               ))}
             </div>
 
-            {/* Add comment */}
-            <div className="border-t border-gray-100 pt-4">
-              <Textarea
-                placeholder="Dodaj komentarz..."
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                rows={3}
+            {/* Nowa wiadomość */}
+            <div className="pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+              <textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Napisz wiadomość..." rows={3}
+                className="w-full rounded-xl px-4 py-3 text-[13px] resize-none focus:outline-none transition-all placeholder:text-white/20"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
+                onFocus={e => { e.currentTarget.style.borderColor = 'rgba(139,92,246,0.4)'; }}
+                onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; }}
               />
               <div className="flex items-center justify-between mt-3">
-                {isAdminOrTech && (
-                  <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isInternal}
-                      onChange={(e) => setIsInternal(e.target.checked)}
-                      className="rounded border-gray-300 text-indigo-600"
-                    />
-                    <Lock className="h-3.5 w-3.5 text-yellow-600" />
-                    Notatka wewnętrzna
+                {isAdminOrTech ? (
+                  <label className="flex items-center gap-2 text-[12px] cursor-pointer" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                    <input type="checkbox" checked={isInternal} onChange={e => setIsInternal(e.target.checked)}
+                      className="rounded border-gray-600 text-violet-600" />
+                    <Lock className="h-3.5 w-3.5" style={{ color: '#FBBF24' }} /> Notatka wewnętrzna
                   </label>
-                )}
-                {!isAdminOrTech && <div />}
-                <Button
-                  size="sm"
-                  icon={<Send className="h-3.5 w-3.5" />}
-                  onClick={() => commentMutation.mutate()}
-                  loading={commentMutation.isPending}
-                  disabled={!comment.trim()}
-                >
+                ) : <div />}
+                <Button size="sm" icon={<Send className="h-3.5 w-3.5" />} onClick={() => commentMut.mutate()}
+                  loading={commentMut.isPending} disabled={!comment.trim()}>
                   Wyślij
                 </Button>
               </div>
             </div>
-          </Card>
+          </Section>
         </div>
 
-        {/* RIGHT - Details */}
-        <div className="space-y-4">
-          {/* Cancel ticket */}
-          {isAdminOrTech && ticket.status !== 'CANCELLED' && ticket.status !== 'COMPLETED' && (
-            <Card title="Akcje">
-              <Button
-                size="sm"
-                variant="danger"
-                className="w-full"
-                onClick={() => {
-                  if (confirm('Anulować zgłoszenie?')) cancelMutation.mutate();
-                }}
-                loading={cancelMutation.isPending}
-              >
-                Anuluj zgłoszenie
-              </Button>
-            </Card>
-          )}
+        {/* ── RIGHT ────────────────────────────────────────────────────── */}
+        <div className="space-y-5">
 
-          {/* Assign */}
+          {/* Przypisz */}
           {isAdminOrTech && (
-            <Card title="Przypisz technika">
-              <div className="space-y-2">
-                <select
-                  value={assignUserId}
-                  onChange={(e) => setAssignUserId(e.target.value)}
-                  className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="">Wybierz technika</option>
-                  {technicians.map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.firstName} {t.lastName}
-                    </option>
-                  ))}
+            <Section title="Przypisz technika">
+              <div className="space-y-2.5">
+                {ticket.assignedTo && (
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl" style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)' }}>
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-[9px] font-bold"
+                      style={{ background: 'rgba(139,92,246,0.15)', color: '#A78BFA' }}>
+                      {getInitials(ticket.assignedTo.firstName, ticket.assignedTo.lastName)}
+                    </div>
+                    <span className="text-[12px] font-semibold" style={{ color: '#A78BFA' }}>
+                      {ticket.assignedTo.firstName} {ticket.assignedTo.lastName}
+                    </span>
+                  </div>
+                )}
+                <select value={assignUserId} onChange={e => setAssignUserId(e.target.value)}
+                  className="w-full text-[13px] rounded-xl px-3 py-2.5 focus:outline-none appearance-none"
+                  style={selectStyle}>
+                  <option value="">{ticket.assignedTo ? 'Zmień technika...' : 'Wybierz technika...'}</option>
+                  {technicians.map(t => <option key={t.id} value={t.id}>{t.firstName} {t.lastName}</option>)}
                 </select>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="w-full"
-                  onClick={() => assignMutation.mutate()}
-                  loading={assignMutation.isPending}
-                  disabled={!assignUserId}
-                >
+                <Button size="sm" variant="secondary" className="w-full" onClick={() => assignMut.mutate()}
+                  loading={assignMut.isPending} disabled={!assignUserId}>
                   Przypisz
                 </Button>
               </div>
-            </Card>
+            </Section>
           )}
 
-          {/* Details */}
-          <Card title="Szczegóły">
-            <div className="space-y-3 text-sm">
+          {/* Szczegóły */}
+          <Section title="Szczegóły">
+            <div className="space-y-0">
               {[
-                { label: 'Klient', value: ticket.client ? <Link to={`/clients/${ticket.client.id}`} className="text-indigo-600 hover:underline">{ticket.client.name}</Link> : null },
+                { label: 'Klient', value: ticket.client ? <Link to={`/clients/${ticket.client.id}`} className="text-violet-400 hover:underline">{ticket.client.name}</Link> : null },
                 { label: 'Lokalizacja', value: ticket.location?.name },
-                { label: 'Urządzenie', value: ticket.device ? <Link to={`/devices/${ticket.device.id}`} className="text-indigo-600 hover:underline">{ticket.device.name}</Link> : null },
+                { label: 'Urządzenie', value: ticket.device ? <Link to={`/devices/${ticket.device.id}`} className="text-violet-400 hover:underline">{ticket.device.name}</Link> : null },
                 { label: 'Typ', value: TYPE_LABELS[ticket.type] ?? ticket.type },
                 { label: 'Priorytet', value: <PriorityBadge priority={ticket.priority} /> },
                 { label: 'Źródło', value: SOURCE_LABELS[ticket.source] ?? ticket.source },
@@ -268,13 +286,24 @@ export function TicketDetailPage() {
                 { label: 'Przypisany', value: ticket.assignedTo ? `${ticket.assignedTo.firstName} ${ticket.assignedTo.lastName}` : null },
                 { label: 'Autor', value: ticket.createdBy ? `${ticket.createdBy.firstName} ${ticket.createdBy.lastName}` : null },
               ].map(({ label, value }) => value ? (
-                <div key={label} className="flex items-start gap-2">
-                  <span className="text-xs font-medium text-gray-500 w-24 flex-shrink-0 mt-0.5">{label}</span>
-                  <span className="text-gray-800">{value}</span>
+                <div key={label} className="flex items-start gap-2 py-2.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                  <span className="text-[11px] font-medium w-24 flex-shrink-0 pt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{label}</span>
+                  <span className="text-[13px] text-white/75">{value}</span>
                 </div>
               ) : null)}
             </div>
-          </Card>
+          </Section>
+
+          {/* Anuluj */}
+          {isAdminOrTech && canEdit && (
+            <Section title="Akcje">
+              <Button size="sm" variant="danger" className="w-full"
+                onClick={() => { if (confirm('Anulować zgłoszenie?')) cancelMut.mutate(); }}
+                loading={cancelMut.isPending}>
+                Anuluj zgłoszenie
+              </Button>
+            </Section>
+          )}
         </div>
       </div>
     </div>

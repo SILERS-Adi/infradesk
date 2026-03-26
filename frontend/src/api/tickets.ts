@@ -35,8 +35,8 @@ export const ticketsApi = {
     return data;
   },
 
-  assign: async (id: string, userId: string): Promise<Ticket> => {
-    const { data } = await apiClient.post<Ticket>(`/tickets/${id}/assign`, { userId });
+  assign: async (id: string, userId: string, serviceMode?: string): Promise<Ticket> => {
+    const { data } = await apiClient.post<Ticket>(`/tickets/${id}/assign`, { assignedToUserId: userId, serviceMode });
     return data;
   },
 

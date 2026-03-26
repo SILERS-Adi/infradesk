@@ -31,8 +31,12 @@ export function getInitials(firstName: string, lastName: string): string {
 
 export function getErrorMessage(error: unknown): string {
   if (error && typeof error === 'object' && 'response' in error) {
-    const axiosError = error as { response?: { data?: { message?: string } } };
-    return axiosError.response?.data?.message ?? 'Wystąpił błąd';
+    const axiosError = error as { response?: { data?: { message?: string; error?: string; details?: { field: string; message: string }[] } } };
+    const data = axiosError.response?.data;
+    if (data?.details?.length) {
+      return data.details.map(d => `${d.field}: ${d.message}`).join(', ');
+    }
+    return data?.message ?? data?.error ?? 'Wystąpił błąd';
   }
   if (error instanceof Error) return error.message;
   return 'Wystąpił błąd';

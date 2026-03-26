@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { authenticate, authorize } from '../../middleware/auth';
-import { getSettingHandler, putSettingHandler, getContactHandler, getFaqHandler } from './settings.controller';
+import {
+  getSettingHandler, putSettingHandler, getContactHandler, getFaqHandler,
+  getSmtpHandler, putSmtpHandler, postSmtpTestHandler,
+} from './settings.controller';
 
 const router = Router();
 
@@ -8,7 +11,12 @@ const router = Router();
 router.get('/agent/contact', getContactHandler);
 router.get('/agent/faq',     getFaqHandler);
 
-// Protected settings endpoints
+// SMTP settings (admin only)
+router.get('/smtp',       authenticate, authorize('ADMIN'), getSmtpHandler);
+router.put('/smtp',       authenticate, authorize('ADMIN'), putSmtpHandler);
+router.post('/smtp/test', authenticate, authorize('ADMIN'), postSmtpTestHandler);
+
+// Generic settings endpoints (must come after specific routes)
 router.get('/:key', authenticate, getSettingHandler);
 router.put('/:key', authenticate, authorize('ADMIN'), putSettingHandler);
 

@@ -42,9 +42,10 @@ class MainActivity : Activity() {
 
     private val BASE_URL       = "https://infradesk.pl"
     private val VERSION_URL    = "https://infradesk.pl/downloads/version-tv.json"
-    private val CURRENT_VERSION = "1.1.0"
+    private val CURRENT_VERSION = "1.2.0"
 
     private val MENU_ITEMS = listOf(
+        MenuItem("Dashboard",  "📊", "/tv"),
         MenuItem("Zgłoszenia", "🎫", "/tickets"),
         MenuItem("Agenci",     "🤖", "/agents"),
         MenuItem("Zadania",    "✅", "/tasks"),
@@ -115,6 +116,26 @@ class MainActivity : Activity() {
         loadPage(MENU_ITEMS[index].path)
     }
 
+    /** Tylko podświetl pozycję menu — bez ładowania strony */
+    private fun focusMenuItem(index: Int) {
+        selectedIndex = index
+        highlightItem(index)
+    }
+
+    private fun isSidebarVisible(): Boolean =
+        findViewById<LinearLayout>(R.id.sidebar).visibility == View.VISIBLE
+
+    private fun showSidebar() {
+        findViewById<LinearLayout>(R.id.sidebar).visibility = View.VISIBLE
+        findViewById<View>(R.id.divider).visibility = View.VISIBLE
+        highlightItem(selectedIndex)
+    }
+
+    private fun hideSidebar() {
+        findViewById<LinearLayout>(R.id.sidebar).visibility = View.GONE
+        findViewById<View>(R.id.divider).visibility = View.GONE
+    }
+
     private fun highlightItem(index: Int) {
         menuViews.forEachIndexed { i, v ->
             val label = v.findViewById<TextView>(R.id.menuLabel)
@@ -169,6 +190,9 @@ class MainActivity : Activity() {
                         highlightItem(i)
                     }
                 }
+
+                // Zawsze ukryj sidebar po załadowaniu strony (fullscreen)
+                hideSidebar()
             }
         }
     }
@@ -252,22 +276,67 @@ class MainActivity : Activity() {
     // ── Input handling ────────────────────────────────────────────────────────
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        val sidebarOpen = isSidebarVisible()
+
         return when (keyCode) {
+
+            // ── BACK: ukryj sidebar → cofnij WebView → domyślne ──────
             KeyEvent.KEYCODE_BACK -> {
-                if (webView.canGoBack()) { webView.goBack(); true }
-                else false
+                if (sidebarOpen) {
+                    hideSidebar(); true
+                } else if (webView.canGoBack()) {
+                    webView.goBack(); true
+                } else false
             }
+
+            // ── LEFT: otwórz sidebar (menu) ──────────────────────────
+            KeyEvent.KEYCODE_DPAD_LEFT -> {
+                if (!sidebarOpen) { showSidebar(); true }
+                else true // już otwarty — nic nie rób
+            }
+
+            // ── RIGHT: zamknij sidebar, wróć do treści ───────────────
+            KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                if (sidebarOpen) { hideSidebar(); true }
+                else super.onKeyDown(keyCode, event)
+            }
+
+            // ── UP / DOWN: nawigacja po menu (tylko podświetlanie) ───
             KeyEvent.KEYCODE_DPAD_UP -> {
-                val next = (selectedIndex - 1 + MENU_ITEMS.size) % MENU_ITEMS.size
-                selectMenuItem(next); true
+                if (sidebarOpen) {
+                    val next = (selectedIndex - 1 + MENU_ITEMS.size) % MENU_ITEMS.size
+                    focusMenuItem(next); true
+                } else {
+                    // Sidebar ukryty — otwórz go
+                    showSidebar(); true
+                }
             }
             KeyEvent.KEYCODE_DPAD_DOWN -> {
-                val next = (selectedIndex + 1) % MENU_ITEMS.size
-                selectMenuItem(next); true
+                if (sidebarOpen) {
+                    val next = (selectedIndex + 1) % MENU_ITEMS.size
+                    focusMenuItem(next); true
+                } else {
+                    showSidebar(); true
+                }
             }
+
+            // ── ENTER / CENTER: zatwierdź wybór z menu ───────────────
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                if (sidebarOpen) {
+                    selectMenuItem(selectedIndex)
+                    // Po wyborze ukryj sidebar (wróć do fullscreen)
+                    handler.postDelayed({ hideSidebar() }, 300)
+                    true
+                } else {
+                    super.onKeyDown(keyCode, event)
+                }
+            }
+
+            // ── MENU: sprawdź aktualizację ───────────────────────────
             KeyEvent.KEYCODE_MENU -> {
                 checkForUpdate(silent = false); true
             }
+
             else -> super.onKeyDown(keyCode, event)
         }
     }

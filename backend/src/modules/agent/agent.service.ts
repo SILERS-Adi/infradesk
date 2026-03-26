@@ -4,6 +4,7 @@ import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { RegisterInput, MetricsInput, AgentTicketInput, ApproveInput } from './agent.validation';
 import { notifyAgent } from '../../utils/websocket';
+import { sendPushToRole } from '../../lib/webpush';
 
 /** Wyciąga główny MAC (pierwsza fizyczna karta z adresem MAC). */
 function primaryMac(networkIfaces: any[]): string | undefined {
@@ -42,7 +43,9 @@ async function resolveDevice(
     hostname,
     ipAddress:       (data as any).ipAddress,
     operatingSystem: osInfo,
-    rustdeskId:      (data as any).rustdeskId ?? undefined,
+    rustdeskId:      (data as any).rustdeskId  ?? undefined,
+    anydeskId:       (data as any).anydeskId   ?? undefined,
+    teamviewerId:    (data as any).teamviewerId ?? undefined,
     macAddress:      mac,
   };
 
@@ -78,7 +81,9 @@ async function resolveDevice(
       hostname,
       ipAddress:       (data as any).ipAddress,
       operatingSystem: osInfo,
-      rustdeskId:      (data as any).rustdeskId ?? undefined,
+      rustdeskId:      (data as any).rustdeskId  ?? undefined,
+      anydeskId:       (data as any).anydeskId   ?? undefined,
+      teamviewerId:    (data as any).teamviewerId ?? undefined,
       status:          'ACTIVE',
     },
   });
@@ -144,31 +149,98 @@ export async function registerAgent(data: RegisterInput) {
             hostname:        (data as any).hostname,
             ipAddress:       (data as any).ipAddress,
             operatingSystem: osLabel(data),
-            rustdeskId:      (data as any).rustdeskId ?? undefined,
+            rustdeskId:      (data as any).rustdeskId  ?? undefined,
+            anydeskId:       (data as any).anydeskId   ?? undefined,
+            teamviewerId:    (data as any).teamviewerId ?? undefined,
             macAddress:      primaryMac((data as any).networkIfaces ?? []),
           },
         });
       }
     }
     if (!deviceId) {
-      const location = await prisma.location.findFirst({
+      let location = await prisma.location.findFirst({
         where: { clientId: user.clientId! },
         select: { id: true },
       });
-      if (location) deviceId = await resolveDevice(user.clientId!, location.id, data);
+      if (!location) {
+        const created = await prisma.location.create({
+          data: {
+            clientId:     user.clientId!,
+            name:         'Główna siedziba',
+            type:         'OFFICE',
+            addressLine1: '-',
+            postalCode:   '00-000',
+            city:         user.client?.name ?? 'Nieznane',
+          },
+        });
+        location = { id: created.id };
+      }
+      deviceId = await resolveDevice(user.clientId!, location.id, data);
     }
 
-    await prisma.agentRegistration.create({
-      data: {
-        agentToken: token,
-        status:     'ACTIVE',
-        clientId:   user.clientId,
-        deviceId,
-        allowMonitoring: true,
-        allowRustdesk:   true,
-        ...hardwareFields(data),
-      },
-    });
+    // Szukaj istniejącej rejestracji — po hostname+clientId lub serial lub MAC
+    const hostname = (data as any).hostname as string | undefined;
+    const serial   = (data as any).serialNumber as string | undefined;
+    const mac      = primaryMac((data as any).networkIfaces ?? []);
+
+    let existingReg = null as any;
+
+    // 1) Po deviceId (ten sam komputer, reinstalacja)
+    if (deviceId) {
+      existingReg = await prisma.agentRegistration.findFirst({
+        where: { clientId: user.clientId!, deviceId },
+      });
+    }
+    // 2) Po hostname + clientId
+    if (!existingReg && hostname) {
+      existingReg = await prisma.agentRegistration.findFirst({
+        where: { clientId: user.clientId!, hostname },
+      });
+    }
+    // 3) Po serialNumber
+    if (!existingReg && serial) {
+      existingReg = await prisma.agentRegistration.findFirst({
+        where: { clientId: user.clientId!, serialNumber: serial },
+      });
+    }
+    // 4) Po MAC — szukaj przez powiązane urządzenie
+    if (!existingReg && mac) {
+      const devByMac = await prisma.device.findFirst({
+        where: { clientId: user.clientId!, macAddress: mac },
+        select: { id: true },
+      });
+      if (devByMac) {
+        existingReg = await prisma.agentRegistration.findFirst({
+          where: { clientId: user.clientId!, deviceId: devByMac.id },
+        });
+      }
+    }
+
+    if (existingReg) {
+      // Reuse existing registration — update token and data
+      await prisma.agentRegistration.update({
+        where: { id: existingReg.id },
+        data: {
+          agentToken: token,
+          status: 'ACTIVE',
+          deviceId: deviceId ?? existingReg.deviceId,
+          ...hardwareFields(data),
+        },
+      });
+    } else {
+      // Create new registration only if no match found
+      await prisma.agentRegistration.create({
+        data: {
+          agentToken: token,
+          status:     'ACTIVE',
+          clientId:   user.clientId,
+          deviceId,
+          allowMonitoring: true,
+          allowRustdesk:   true,
+          ...hardwareFields(data),
+        },
+      });
+    }
 
     return { token, status: 'ACTIVE', deviceId, clientName: user.client?.name ?? null, clientId: user.clientId };
   }
@@ -221,12 +293,48 @@ export async function registerAgent(data: RegisterInput) {
     ? await prisma.client.findUnique({ where: { id: matchedClientId }, select: { name: true } })
     : null;
 
+  // Push notification do adminów/techników o nowej rejestracji
+  sendPushToRole('ADMIN', {
+    title: 'Nowy agent do akceptacji',
+    body: `${data.hostname ?? 'Nowe urządzenie'}${matchedClient ? ` · ${matchedClient.name}` : ''}`,
+    url: '/agents',
+  }).catch(() => {});
+  sendPushToRole('TECHNICIAN', {
+    title: 'Nowy agent do akceptacji',
+    body: `${data.hostname ?? 'Nowe urządzenie'}${matchedClient ? ` · ${matchedClient.name}` : ''}`,
+    url: '/agents',
+  }).catch(() => {});
+
   return { token, status: 'PENDING', clientName: matchedClient?.name ?? null, registrationId: reg.id };
 }
 
 export async function updateMetrics(token: string, data: MetricsInput) {
   const reg = await prisma.agentRegistration.findUnique({ where: { agentToken: token } });
   if (!reg) throw new AppError('Agent not found', 404);
+
+  // Auto-create device if agent is ACTIVE with clientId but missing deviceId
+  if (!reg.deviceId && reg.clientId && reg.status === 'ACTIVE') {
+    const location = await prisma.location.findFirst({
+      where: { clientId: reg.clientId },
+      select: { id: true },
+    });
+    if (location) {
+      const deviceId = await resolveDevice(reg.clientId, location.id, { ...data, ...reg } as any);
+      await prisma.agentRegistration.update({ where: { id: reg.id }, data: { deviceId } });
+      reg.deviceId = deviceId;
+    }
+  }
+
+  // Aktualizuj device jeśli znane — zapisuj ID narzędzi zdalnych
+  if (reg.deviceId) {
+    const remoteUpdate: Record<string, unknown> = {};
+    if ((data as any).rustdeskId)   remoteUpdate.rustdeskId   = (data as any).rustdeskId;
+    if ((data as any).anydeskId)    remoteUpdate.anydeskId    = (data as any).anydeskId;
+    if ((data as any).teamviewerId) remoteUpdate.teamviewerId = (data as any).teamviewerId;
+    if (Object.keys(remoteUpdate).length > 0) {
+      await prisma.device.update({ where: { id: reg.deviceId }, data: remoteUpdate });
+    }
+  }
 
   return prisma.agentRegistration.update({
     where: { agentToken: token },

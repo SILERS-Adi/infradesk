@@ -43,8 +43,8 @@ export function UsersPage() {
       header: 'Imię i nazwisko',
       render: (row) => (
         <div>
-          <div className="font-medium text-gray-900">{row.firstName} {row.lastName}</div>
-          <div className="text-xs text-gray-500">{row.email}</div>
+          <div className="font-medium text-white/85">{row.firstName} {row.lastName}</div>
+          <div className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>{row.email}</div>
         </div>
       ),
     },
@@ -62,7 +62,7 @@ export function UsersPage() {
     {
       key: 'client',
       header: 'Klient',
-      render: (row) => row.client?.name ?? <span className="text-gray-400 text-xs">—</span>,
+      render: (row) => row.client?.name ?? <span className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>—</span>,
     },
     {
       key: 'isActive',
@@ -72,7 +72,7 @@ export function UsersPage() {
     {
       key: 'lastLoginAt',
       header: 'Ostatnie logowanie',
-      render: (row) => <span className="text-xs text-gray-500">{row.lastLoginAt ? formatDate(row.lastLoginAt) : 'Nigdy'}</span>,
+      render: (row) => <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>{row.lastLoginAt ? formatDate(row.lastLoginAt) : 'Nigdy'}</span>,
     },
     {
       key: 'actions',
@@ -98,7 +98,13 @@ export function UsersPage() {
         }
       />
 
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+      <div
+        className="rounded-lg"
+        style={{
+          background: 'rgba(255,255,255,0.025)',
+          border: '1px solid rgba(255,255,255,0.06)',
+        }}
+      >
         <DataTable
           columns={columns}
           data={users}

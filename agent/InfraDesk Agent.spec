@@ -3,7 +3,7 @@ from PyInstaller.utils.hooks import collect_all
 
 datas = [('logo.png', '.'), ('ikona.png', '.'), ('ikona_nazwa.png', '.')]
 binaries = []
-hiddenimports = ['customtkinter', 'PIL', 'pystray', 'websocket', 'winreg']
+hiddenimports = ['customtkinter', 'PIL', 'pystray', 'websocket', 'winreg', 'win32serviceutil', 'win32service', 'win32event', 'servicemanager']
 tmp_ret = collect_all('customtkinter')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 

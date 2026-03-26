@@ -31,6 +31,12 @@ import ordersRouter from './modules/orders/orders.routes';
 import delegationsRouter from './modules/delegations/delegations.routes';
 import aiRouter from './modules/ai/ai.routes';
 import notificationsRouter from './modules/notifications/notifications.routes';
+import downloadsRouter from './modules/downloads/downloads.routes';
+import geolocationRouter from './modules/geolocation/geolocation.routes';
+import backupRouter from './modules/backup/backup.routes';
+import { cleanupOldBackups } from './modules/backup/backup.service';
+import pushRouter from './modules/push/push.routes';
+import { initWebPush } from './lib/webpush';
 
 // Middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -90,6 +96,10 @@ app.use('/api/orders', ordersRouter);
 app.use('/api/delegations', delegationsRouter);
 app.use('/api/ai', aiRouter);
 app.use('/api/notifications', notificationsRouter);
+app.use('/api/downloads', downloadsRouter);
+app.use('/api/geolocation', geolocationRouter);
+app.use('/api/backup', backupRouter);
+app.use('/api/push', pushRouter);
 // Public agent endpoints (no auth)
 app.get('/api/agent/contact', getContactHandler);
 app.get('/api/agent/faq',     getFaqHandler);
@@ -122,6 +132,9 @@ const PORT = Number(config.port);
 
 seedAccessTypes().catch(console.error);
 initDefaultSettings().catch(console.error);
+initWebPush().catch(console.error);
+// Backup retention cleanup every 6 hours
+setInterval(() => cleanupOldBackups().catch(e => console.error('Backup cleanup error:', e)), 6 * 60 * 60 * 1000);
 
 const server = http.createServer(app);
 initWebSocket(server);

@@ -53,38 +53,38 @@ export function EmployeesPage() {
         }
       />
 
-      {isLoading && <p className="text-sm text-gray-500">Ładowanie...</p>}
+      {isLoading && <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Ładowanie...</p>}
 
       {!isLoading && employees.length === 0 && (
-        <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
-          <Users className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 font-medium">Brak pracowników</p>
-          <p className="text-gray-400 text-sm mt-1">Dodaj pierwszego pracownika klikając przycisk powyżej.</p>
+        <div className="rounded-2xl p-12 text-center" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <Users className="h-10 w-10 mx-auto mb-3" style={{ color: 'rgba(255,255,255,0.15)' }} />
+          <p className="font-medium" style={{ color: 'rgba(255,255,255,0.4)' }}>Brak pracowników</p>
+          <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>Dodaj pierwszego pracownika klikając przycisk powyżej.</p>
         </div>
       )}
 
       {!isLoading && employees.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50/50">
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Pracownik</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Rola</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(255,255,255,0.02)' }}>
+                <th className="text-left px-5 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Pracownik</th>
+                <th className="text-left px-5 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Rola</th>
+                <th className="text-left px-5 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Status</th>
                 <th className="px-5 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody>
               {employees.map(user => (
-                <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={user.id} className="hover:bg-white/[0.03] transition-colors" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 font-bold text-sm flex items-center justify-center flex-shrink-0">
+                      <div className="w-9 h-9 rounded-xl font-bold text-sm flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139,92,246,0.12)', color: '#A78BFA' }}>
                         {user.firstName[0]}{user.lastName[0]}
                       </div>
                       <div>
-                        <div className="font-medium text-gray-900">{user.firstName} {user.lastName}</div>
-                        <div className="text-xs text-gray-500">{user.email}</div>
+                        <div className="font-medium text-white/85">{user.firstName} {user.lastName}</div>
+                        <div className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>{user.email}</div>
                       </div>
                     </div>
                   </td>
@@ -108,7 +108,8 @@ export function EmployeesPage() {
                       <select
                         value={user.role}
                         onChange={(e) => changeRoleMutation.mutate({ id: user.id, role: e.target.value })}
-                        className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
+                        className="text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
                         disabled={changeRoleMutation.isPending}
                       >
                         <option value="ADMIN">Administrator</option>

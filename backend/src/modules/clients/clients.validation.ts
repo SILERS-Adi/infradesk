@@ -20,7 +20,7 @@ export const createClientSchema = z.object({
   status:       z.enum(['ACTIVE', 'INACTIVE']).default('ACTIVE'),
   // Rozliczenie
   billingIntervalMinutes:      z.number().int().positive().default(30),
-  contractStartDate:           z.string().datetime().optional().nullable(),
+  contractStartDate:           z.string().optional().nullable(),
   // Umowa serwisowa
   hasContract:                 z.boolean().optional(),
   contractHours:               z.number().int().positive().optional().nullable(),
