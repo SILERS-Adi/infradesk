@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
-import { Monitor, Check, Trash2, Wifi, WifiOff, Clock, ChevronDown, ChevronUp, Cpu, HardDrive, Network, Package, RefreshCw, Search } from 'lucide-react';
+import { Monitor, Check, Trash2, Wifi, WifiOff, Clock, ChevronDown, ChevronUp, Cpu, HardDrive, Network, Package, RefreshCw, Search, ExternalLink } from 'lucide-react';
 import { agentsApi, AgentRegistration, InstalledSoftware, DiskInfo, NetworkIface } from '../../../api/agents';
 import { clientsApi } from '../../../api/clients';
 import { devicesApi } from '../../../api/devices';
@@ -348,9 +348,103 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
             </div>
           )}
 
-          {/* Windows Update popup */}
+        </div>
+      )}
+
+      {/* ── Footer — always visible actions ─────────────────────── */}
+      {reg.status === 'ACTIVE' && (
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+          <div className="flex items-center gap-1 px-3 py-2">
+            {/* RustDesk */}
+            {reg.rustdeskId && (
+              <a
+                href={`rustdesk://id=${reg.rustdeskId}`}
+                className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all active:scale-[0.97]"
+                style={{ background: 'rgba(16,185,129,0.08)', borderColor: 'rgba(16,185,129,0.2)', color: '#10B981' }}
+                title={`Połącz RustDesk: ${reg.rustdeskId}`}
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                RustDesk
+              </a>
+            )}
+
+            {/* WoL — offline only */}
+            {!isOnline && (
+              <button
+                onClick={() => wakeMutation.mutate()}
+                disabled={wakeMutation.isPending}
+                className="flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                style={{ color: '#4ADE80' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(34,197,94,0.08)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                title="Wake-on-LAN"
+              >
+                <Wifi className="h-3.5 w-3.5" />{wakeMutation.isPending ? 'Budzę...' : 'WoL'}
+              </button>
+            )}
+
+            {/* Aktualizuj agenta */}
+            <button
+              onClick={() => pushUpdateMutation.mutate()}
+              disabled={pushUpdateMutation.isPending || updateSent}
+              className="flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+              style={{ color: updateSent ? '#4ADE80' : needsUpdate ? '#F87171' : '#A78BFA' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = needsUpdate ? 'rgba(239,68,68,0.08)' : 'rgba(139,92,246,0.08)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${pushUpdateMutation.isPending || updateSent ? 'animate-spin' : ''}`} />
+              {updateSent ? 'Aktualizacja...' : needsUpdate ? 'Aktualizuj!' : 'Aktualizuj'}
+            </button>
+
+            {/* Aktualizuj Windows */}
+            <button
+              onClick={() => setShowWinUpdate(!showWinUpdate)}
+              className="flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-colors"
+              style={{ color: '#60A5FA' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(96,165,250,0.08)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+            >
+              <Monitor className="h-3.5 w-3.5" />
+              Windows
+            </button>
+
+            <div className="flex-1" />
+
+            {/* Usuń */}
+            {confirmDelete ? (
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-medium" style={{ color: '#F87171' }}>Usunąć?</span>
+                <button
+                  onClick={() => { onDelete(reg.id); setConfirmDelete(false); }}
+                  className="text-[11px] font-semibold text-white bg-red-600 hover:bg-red-700 px-2.5 py-1 rounded-lg transition-colors"
+                >
+                  Tak
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="text-[11px] font-medium px-2.5 py-1 rounded-lg transition-colors"
+                  style={{ color: 'rgba(255,255,255,0.5)' }}
+                >
+                  Nie
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="p-1.5 rounded-lg transition-colors"
+                style={{ color: 'rgba(255,255,255,0.2)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)'; (e.currentTarget as HTMLElement).style.color = '#F87171'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.2)'; }}
+                title="Usuń agenta"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Windows Update popup — below footer bar */}
           {showWinUpdate && (
-            <div className="p-4 rounded-xl space-y-3" style={{ background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)' }}>
+            <div className="mx-3 mb-3 p-4 rounded-xl space-y-3" style={{ background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)' }}>
               <p className="text-[12px] font-semibold" style={{ color: '#60A5FA' }}>Aktualizacja Windows</p>
               <div className="flex gap-2">
                 <button onClick={() => setWinUpdateMode('reboot')}
@@ -391,101 +485,6 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
                 </button>
               </div>
             </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Footer — always visible actions ─────────────────────── */}
-      {reg.status === 'ACTIVE' && (
-        <div className="flex items-center gap-1 px-3 py-2" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-          {/* RustDesk */}
-          {reg.rustdeskId && (
-            <a
-              href={`rustdesk://id=${reg.rustdeskId}`}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-colors"
-              style={{ color: '#10B981' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.1)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-              title={`RustDesk: ${reg.rustdeskId}`}
-            >
-              <Monitor className="h-3.5 w-3.5" />
-              RD: {reg.rustdeskId}
-            </a>
-          )}
-
-          {/* WoL — offline only */}
-          {!isOnline && (
-            <button
-              onClick={() => wakeMutation.mutate()}
-              disabled={wakeMutation.isPending}
-              className="flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-              style={{ color: '#4ADE80' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(34,197,94,0.08)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-              title="Wake-on-LAN"
-            >
-              <Wifi className="h-3.5 w-3.5" />{wakeMutation.isPending ? 'Budzę...' : 'WoL'}
-            </button>
-          )}
-
-          {/* Aktualizuj agenta */}
-          <button
-            onClick={() => pushUpdateMutation.mutate()}
-            disabled={pushUpdateMutation.isPending || updateSent}
-            className="flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-            style={{ color: updateSent ? '#4ADE80' : needsUpdate ? '#F87171' : '#A78BFA' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = needsUpdate ? 'rgba(239,68,68,0.08)' : 'rgba(139,92,246,0.08)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${pushUpdateMutation.isPending || updateSent ? 'animate-spin' : ''}`} />
-            {updateSent ? 'Aktualizacja...' : needsUpdate ? 'Aktualizuj!' : 'Aktualizuj'}
-          </button>
-
-          {/* Aktualizuj Windows */}
-          <button
-            onClick={() => setShowWinUpdate(!showWinUpdate)}
-            className="flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-colors"
-            style={{ color: '#60A5FA' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(96,165,250,0.08)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-          >
-            <Monitor className="h-3.5 w-3.5" />
-            Windows
-          </button>
-
-          <div className="flex-1" />
-
-          {/* Usuń */}
-          {confirmDelete ? (
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-medium" style={{ color: '#F87171' }}>Usunąć?</span>
-              <button
-                onClick={() => { onDelete(reg.id); setConfirmDelete(false); }}
-                className="text-[11px] font-semibold text-white bg-red-600 hover:bg-red-700 px-2.5 py-1 rounded-lg transition-colors"
-              >
-                Tak
-              </button>
-              <button
-                onClick={() => setConfirmDelete(false)}
-                className="text-[11px] font-medium px-2.5 py-1 rounded-lg transition-colors"
-                style={{ color: 'rgba(255,255,255,0.5)' }}
-              >
-                Nie
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setConfirmDelete(true)}
-              className="p-1.5 rounded-lg transition-colors"
-              style={{ color: 'rgba(255,255,255,0.2)' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)'; (e.currentTarget as HTMLElement).style.color = '#F87171'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.2)'; }}
-              title="Usuń agenta"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
           )}
         </div>
       )}
