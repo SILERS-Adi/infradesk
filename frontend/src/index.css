@@ -88,10 +88,14 @@
     background: #F2F2F7 !important;
   }
 
+  /* Hide dark background layers in light mode */
+  html[data-theme="light"] .dark-bg-layers {
+    display: none !important;
+  }
+
   /* Invert ONLY the main content area, NOT the sidebar */
   html[data-theme="light"] main {
     filter: invert(1) hue-rotate(180deg);
-    background: #080D19;
   }
 
   /* Un-invert images, videos, emojis, avatars, logos, badges with colors */

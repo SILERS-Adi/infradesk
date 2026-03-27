@@ -40,30 +40,28 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <TopBar onMenuClick={() => setMobileOpen(true)} />
 
         <main className="flex-1 overflow-y-auto relative">
-          {/* Layer 1: Background image */}
-          <div className="fixed inset-0 pointer-events-none z-0">
-            <div className="absolute inset-0" style={{
-              backgroundImage: 'url(/tlo.png)',
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              opacity: 0.18,
-              filter: 'blur(1px)',
+          {/* Layer 1-3: Dark mode background layers (hidden in light mode) */}
+          <div className="dark-bg-layers">
+            <div className="fixed inset-0 pointer-events-none z-0">
+              <div className="absolute inset-0" style={{
+                backgroundImage: 'url(/tlo.png)',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                opacity: 0.18,
+                filter: 'blur(1px)',
+              }} />
+            </div>
+            <div className="fixed inset-0 pointer-events-none z-0" style={{
+              background: 'linear-gradient(180deg, rgba(8,13,25,0.78) 0%, rgba(8,13,25,0.88) 50%, rgba(8,13,25,0.94) 100%)',
             }} />
-          </div>
-
-          {/* Layer 2: Dark overlay for readability */}
-          <div className="fixed inset-0 pointer-events-none z-0" style={{
-            background: 'linear-gradient(180deg, rgba(8,13,25,0.78) 0%, rgba(8,13,25,0.88) 50%, rgba(8,13,25,0.94) 100%)',
-          }} />
-
-          {/* Layer 3: Subtle radial glow behind content center */}
-          <div className="fixed inset-0 pointer-events-none z-0">
-            <div className="absolute top-[10%] left-[30%] w-[50%] h-[40%] rounded-full" style={{
-              background: 'radial-gradient(ellipse, rgba(139,92,246,0.04), transparent 70%)',
-            }} />
-            <div className="absolute bottom-[10%] right-[20%] w-[40%] h-[30%] rounded-full" style={{
-              background: 'radial-gradient(ellipse, rgba(37,99,235,0.03), transparent 70%)',
-            }} />
+            <div className="fixed inset-0 pointer-events-none z-0">
+              <div className="absolute top-[10%] left-[30%] w-[50%] h-[40%] rounded-full" style={{
+                background: 'radial-gradient(ellipse, rgba(139,92,246,0.04), transparent 70%)',
+              }} />
+              <div className="absolute bottom-[10%] right-[20%] w-[40%] h-[30%] rounded-full" style={{
+                background: 'radial-gradient(ellipse, rgba(37,99,235,0.03), transparent 70%)',
+              }} />
+            </div>
           </div>
 
           {/* Content */}
