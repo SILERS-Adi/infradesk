@@ -98,6 +98,16 @@
     filter: invert(1) hue-rotate(180deg);
   }
 
+  /* Boost card visibility — after invert, rgba(255,255,255,0.025) becomes invisible */
+  /* Give all glass-like containers a solid inverted background */
+  html[data-theme="light"] main [style*="background: rgba(255,255,255,0.0"] {
+    background: rgba(255,255,255,0.12) !important;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.06) !important;
+  }
+  html[data-theme="light"] main [style*="background: rgba(255,255,255,0.1)"] {
+    background: rgba(255,255,255,0.15) !important;
+  }
+
   /* Un-invert images, videos, emojis, avatars, logos, badges with colors */
   html[data-theme="light"] main img,
   html[data-theme="light"] main video,
