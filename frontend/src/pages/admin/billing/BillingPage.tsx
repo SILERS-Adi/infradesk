@@ -196,7 +196,12 @@ export function BillingPage() {
 
   const { data: sessions = [], isLoading } = useQuery({
     queryKey: ['sessions-billing', from, to],
-    queryFn: () => sessionsApi.getAll({ from, to }),
+    queryFn: async () => {
+
+      const result = await sessionsApi.getAll({ from, to });
+
+      return result;
+    },
   });
 
   const { data: clients = [] } = useQuery({
@@ -210,8 +215,23 @@ export function BillingPage() {
   });
 
   const billingData = useMemo((): ClientBilling[] => {
+
+    // Build client map from BOTH sources: dedicated client list + session.client data
     const clientMap = new Map<string, Client>();
     for (const c of clients) clientMap.set(c.id, c);
+    // Also grab client billing data from sessions (has hourlyRate etc)
+    for (const s of sessions) {
+      if (s.clientId && s.client && !clientMap.has(s.clientId)) {
+        clientMap.set(s.clientId, s.client as any);
+      }
+      // Merge billing fields from session.client into clientMap entry
+      if (s.clientId && s.client && clientMap.has(s.clientId)) {
+        const existing = clientMap.get(s.clientId)!;
+        if (!existing.hourlyRate && (s.client as any).hourlyRate) {
+          clientMap.set(s.clientId, { ...existing, ...(s.client as any) });
+        }
+      }
+    }
 
     const sessionsByClient = new Map<string, WorkSession[]>();
     for (const s of sessions) {
@@ -221,7 +241,6 @@ export function BillingPage() {
       sessionsByClient.set(s.clientId, arr);
     }
 
-    // Tasks by client (via ticket)
     const tasksByClient = new Map<string, Task[]>();
     for (const t of tasks) {
       const cid = t.ticket?.client?.id;
@@ -234,23 +253,27 @@ export function BillingPage() {
     const result: ClientBilling[] = [];
     const processedClients = new Set<string>();
 
-    // 1. Klienci z sesjami w tym miesiącu
+    // 1. Klienci z sesjami
     for (const [clientId, clientSessions] of sessionsByClient) {
       const client = clientMap.get(clientId);
-      if (!client) continue;
+      if (!client) {
+
+        continue;
+      }
       processedClients.add(clientId);
       result.push(buildBilling(client, clientSessions, tasksByClient.get(clientId) ?? []));
     }
 
-    // 2. Klienci z abonamentem BEZ sesji (też muszą być widoczni)
+    // 2. Klienci z abonamentem BEZ sesji
     for (const client of clients) {
       if (processedClients.has(client.id)) continue;
       if (!client.hasContract) continue;
       result.push(buildBilling(client, [], tasksByClient.get(client.id) ?? []));
     }
 
+
     return result.sort((a, b) => b.totalValue - a.totalValue);
-  }, [sessions, clients, tasks, from, to]);
+  }, [sessions, clients, tasks]);
 
   const totalRevenue = billingData.reduce((s, b) => s + b.totalValue, 0);
   const totalHours = billingData.reduce((s, b) => s + b.billableHours, 0);
