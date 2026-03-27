@@ -14,6 +14,9 @@ export const changeTaskStatusSchema = z.object({
 });
 
 export const updateTaskSchema = z.object({
+  title: z.string().optional(),
+  description: z.string().optional(),
+  assignedToUserId: z.string().optional(),
   notes: z.string().optional(),
   dueAt: z.string().optional(),
   travelKm: z.number().optional().nullable(),

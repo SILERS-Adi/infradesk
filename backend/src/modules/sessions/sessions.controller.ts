@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { startSession, endSession, getSessionsByClient, startMobileSession, pauseSession, resumeSession, getActiveTechSession, listAllSessions } from './sessions.service';
+import { startSession, endSession, getSessionsByClient, startMobileSession, pauseSession, resumeSession, getActiveTechSession, listAllSessions, updateSession, deleteSession } from './sessions.service';
 
 export async function postStart(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -57,6 +57,20 @@ export async function getAll(req: Request, res: Response, next: NextFunction): P
       limit: limit ? parseInt(limit) : 50,
     });
     res.json(result);
+  } catch (err) { next(err); }
+}
+
+export async function patchSession(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const session = await updateSession(req.params.id, req.body);
+    res.json(session);
+  } catch (err) { next(err); }
+}
+
+export async function removeSession(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    await deleteSession(req.params.id);
+    res.status(204).send();
   } catch (err) { next(err); }
 }
 

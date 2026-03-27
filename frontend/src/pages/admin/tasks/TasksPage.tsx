@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   CheckCircle2, Clock, Loader2, Plus, X, ExternalLink, MapPin,
-  Monitor, Save, Play, Pause, Square, Timer, ChevronDown, ChevronUp,
+  Monitor, Save, Play, Pause, Square, Timer, ChevronDown, ChevronUp, Edit2, Trash2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { tasksApi } from '../../../api/tasks';
@@ -74,7 +74,7 @@ const newTaskSchema = z.object({
 type NewTaskForm = z.infer<typeof newTaskSchema>;
 
 // ── Task card ───────────────────────────────────────────────────────────────
-function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPauseSession, onResumeSession, onEndSession }: {
+function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPauseSession, onResumeSession, onEndSession, onEdit }: {
   task: Task;
   activeSession: WorkSession | null;
   onChangeStatus: (id: string, status: TaskStatus) => void;
@@ -82,9 +82,13 @@ function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPause
   onPauseSession: (sessionId: string) => void;
   onResumeSession: (sessionId: string) => void;
   onEndSession: (sessionId: string) => void;
+  onEdit: (task: Task) => void;
 }) {
   const qc = useQueryClient();
   const [expanded, setExpanded] = useState(false);
+  const [editingSession, setEditingSession] = useState<string | null>(null);
+  const [editStart, setEditStart] = useState('');
+  const [editEnd, setEditEnd] = useState('');
   const serviceMode = task.ticket?.serviceMode;
   const rustdeskId = task.ticket?.device?.rustdeskId;
   const [km, setKm] = useState(task.travelKm?.toString() ?? '');
@@ -106,6 +110,18 @@ function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPause
   });
   const taskSessions = clientSessions.filter(s => s.ticketId === task.ticketId);
   const completedMin = taskSessions.filter(s => s.status === 'COMPLETED').reduce((sum, s) => sum + (s.durationMin ?? 0), 0);
+
+  const editSessionMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { startedAt?: string; endedAt?: string } }) => sessionsApi.updateSession(id, data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sessions-task'] }); toast.success('Czas sesji zaktualizowany'); setEditingSession(null); },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+
+  const deleteSessionMutation = useMutation({
+    mutationFn: (id: string) => sessionsApi.deleteSession(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sessions-task'] }); toast.success('Sesja usunięta'); },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
 
   const saveKm = async () => {
     setSavingKm(true);
@@ -279,6 +295,12 @@ function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPause
 
         <div className="flex-1" />
 
+        {/* Edit task */}
+        <button onClick={() => onEdit(task)}
+          className="p-1.5 rounded-lg transition-colors hover:bg-white/[0.06]" title="Edytuj zadanie">
+          <Edit2 className="h-3.5 w-3.5" style={{ color: 'rgba(255,255,255,0.3)' }} />
+        </button>
+
         {/* History toggle */}
         {taskSessions.length > 0 && (
           <button onClick={() => setExpanded(e => !e)}
@@ -315,25 +337,56 @@ function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPause
                 const sMin = s.durationMin ?? 0;
                 const sBillable = Math.ceil(sMin / billingInterval) * (billingInterval / 60);
                 const sEarnings = isContract ? 0 : sBillable * hourlyRate;
+                const isEditing = editingSession === s.id;
                 return (
-                  <div key={s.id} className="flex items-center gap-3 text-[11px] py-1.5 px-2 rounded-lg"
-                    style={{ background: 'rgba(255,255,255,0.02)' }}>
-                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${s.status === 'ACTIVE' ? 'bg-emerald-500 animate-pulse' : s.status === 'PAUSED' ? 'bg-amber-400' : ''}`}
-                      style={s.status === 'COMPLETED' ? { background: 'rgba(255,255,255,0.15)' } : {}} />
-                    <span style={{ color: 'rgba(255,255,255,0.5)' }}>
-                      {formatDateTime(s.startedAt)}
-                    </span>
-                    {s.endedAt && (
-                      <span style={{ color: 'rgba(255,255,255,0.3)' }}>
-                        → {formatDateTime(s.endedAt)}
+                  <div key={s.id} className="rounded-lg" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                    <div className="flex items-center gap-2 text-[11px] py-1.5 px-2">
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${s.status === 'ACTIVE' ? 'bg-emerald-500 animate-pulse' : s.status === 'PAUSED' ? 'bg-amber-400' : ''}`}
+                        style={s.status === 'COMPLETED' ? { background: 'rgba(255,255,255,0.15)' } : {}} />
+                      <span style={{ color: 'rgba(255,255,255,0.5)' }}>{formatDateTime(s.startedAt)}</span>
+                      {s.endedAt && <span style={{ color: 'rgba(255,255,255,0.3)' }}>→ {formatDateTime(s.endedAt)}</span>}
+                      <span className="font-semibold" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                        {sMin ? formatDurationShort(sMin) : s.status === 'ACTIVE' ? 'w toku...' : '—'}
                       </span>
+                      <span className="font-semibold" style={{ color: isContract ? '#60A5FA' : '#4ADE80' }}>
+                        {s.status === 'COMPLETED' ? (isContract ? 'abonament' : `${sEarnings.toFixed(2)} zł`) : ''}
+                      </span>
+                      <div className="ml-auto flex items-center gap-1">
+                        {s.status === 'COMPLETED' && (
+                          <>
+                            <button onClick={() => {
+                              setEditingSession(isEditing ? null : s.id);
+                              setEditStart(s.startedAt.slice(0, 16));
+                              setEditEnd(s.endedAt?.slice(0, 16) ?? '');
+                            }} className="p-0.5 rounded transition-colors hover:bg-white/[0.06]" title="Edytuj czas">
+                              <Edit2 className="h-3 w-3" style={{ color: 'rgba(255,255,255,0.25)' }} />
+                            </button>
+                            <button onClick={() => { if (confirm('Usunąć tę sesję?')) deleteSessionMutation.mutate(s.id); }}
+                              className="p-0.5 rounded transition-colors hover:bg-red-500/10" title="Usuń sesję">
+                              <Trash2 className="h-3 w-3" style={{ color: 'rgba(255,255,255,0.15)' }} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    {isEditing && (
+                      <div className="flex items-center gap-2 px-2 pb-2">
+                        <input type="datetime-local" value={editStart} onChange={e => setEditStart(e.target.value)}
+                          className="text-[11px] px-2 py-1 rounded-lg focus:outline-none"
+                          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)' }} />
+                        <span style={{ color: 'rgba(255,255,255,0.3)' }}>→</span>
+                        <input type="datetime-local" value={editEnd} onChange={e => setEditEnd(e.target.value)}
+                          className="text-[11px] px-2 py-1 rounded-lg focus:outline-none"
+                          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)' }} />
+                        <button onClick={() => editSessionMutation.mutate({ id: s.id, data: { startedAt: new Date(editStart).toISOString(), endedAt: new Date(editEnd).toISOString() } })}
+                          disabled={editSessionMutation.isPending}
+                          className="text-[10px] font-semibold px-2 py-1 rounded-lg transition-colors"
+                          style={{ background: 'rgba(139,92,246,0.12)', color: '#A78BFA' }}>
+                          {editSessionMutation.isPending ? '...' : 'Zapisz'}
+                        </button>
+                        <button onClick={() => setEditingSession(null)} className="text-[10px] px-2 py-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Anuluj</button>
+                      </div>
                     )}
-                    <span className="font-semibold" style={{ color: 'rgba(255,255,255,0.7)' }}>
-                      {sMin ? formatDurationShort(sMin) : s.status === 'ACTIVE' ? 'w toku...' : '—'}
-                    </span>
-                    <span className="ml-auto font-semibold" style={{ color: isContract ? '#60A5FA' : '#4ADE80' }}>
-                      {s.status === 'COMPLETED' ? (isContract ? 'abonament' : `${sEarnings.toFixed(2)} zł`) : ''}
-                    </span>
                   </div>
                 );
               })}
@@ -368,6 +421,7 @@ export function TasksPage() {
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabKey>('IN_PROGRESS');
   const [showCreate, setShowCreate] = useState(false);
+  const [editTask, setEditTask] = useState<Task | null>(null);
   const isAdmin = user?.role === 'ADMIN';
 
   const { data: tasks = [], isLoading } = useQuery({
@@ -522,6 +576,7 @@ export function TasksPage() {
               onPauseSession={(id) => pauseSessionMutation.mutate(id)}
               onResumeSession={(id) => resumeSessionMutation.mutate(id)}
               onEndSession={(id) => endSessionMutation.mutate(id)}
+              onEdit={(t) => setEditTask(t)}
             />
           ))}
         </div>
@@ -551,6 +606,63 @@ export function TasksPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Modal: edycja zadania */}
+      {editTask && (
+        <EditTaskModal
+          task={editTask}
+          onClose={() => setEditTask(null)}
+          onSaved={() => { setEditTask(null); qc.invalidateQueries({ queryKey: ['tasks'] }); }}
+        />
+      )}
     </div>
+  );
+}
+
+// ── Edit Task Modal ─────────────────────────────────────────────────────────
+function EditTaskModal({ task, onClose, onSaved }: { task: Task; onClose: () => void; onSaved: () => void }) {
+  const [title, setTitle] = useState(task.title);
+  const [description, setDescription] = useState(task.description ?? '');
+  const [notes, setNotes] = useState(task.notes ?? '');
+  const [dueAt, setDueAt] = useState(task.dueAt?.slice(0, 10) ?? '');
+  const [status, setStatus] = useState(task.status);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await tasksApi.update(task.id, { title, description: description || undefined, notes: notes || undefined, dueAt: dueAt ? new Date(dueAt).toISOString() : undefined });
+      if (status !== task.status) {
+        await tasksApi.changeStatus(task.id, status);
+      }
+      toast.success('Zadanie zaktualizowane');
+      onSaved();
+    } catch (err) { toast.error(getErrorMessage(err)); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <Modal open onClose={onClose} title={`Edycja: ${task.taskNumber}`} size="md">
+      <div className="space-y-4">
+        <Input label="Tytuł" value={title} onChange={e => setTitle(e.target.value)} />
+        <Textarea label="Opis" rows={2} value={description} onChange={e => setDescription(e.target.value)} />
+        <Textarea label="Notatki" rows={2} value={notes} onChange={e => setNotes(e.target.value)} />
+        <Input label="Termin" type="date" value={dueAt} onChange={e => setDueAt(e.target.value)} />
+        <div>
+          <label className="block text-xs font-medium mb-1" style={{ color: 'rgba(255,255,255,0.6)' }}>Status</label>
+          <select value={status} onChange={e => setStatus(e.target.value as TaskStatus)}
+            className="block w-full rounded-xl px-3 py-2 text-sm focus:outline-none"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}>
+            <option value="NEW">Nowe</option>
+            <option value="IN_PROGRESS">W trakcie</option>
+            <option value="DONE">Zrealizowane</option>
+          </select>
+        </div>
+        <div className="flex justify-end gap-3 pt-1">
+          <Button variant="secondary" onClick={onClose}>Anuluj</Button>
+          <Button onClick={handleSave} loading={saving}>Zapisz</Button>
+        </div>
+      </div>
+    </Modal>
   );
 }

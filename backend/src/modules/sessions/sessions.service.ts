@@ -56,6 +56,41 @@ export async function listAllSessions(params: {
   return { data, pagination: { total, page, limit, totalPages: Math.ceil(total / limit) } };
 }
 
+// ── Edit session (admin manual time correction) ─────────────────────────────
+
+export async function updateSession(id: string, data: { startedAt?: string; endedAt?: string; durationMin?: number; notes?: string }) {
+  const session = await prisma.workSession.findUnique({ where: { id } });
+  if (!session) throw new AppError('Session not found', 404);
+
+  const updateData: Record<string, unknown> = {};
+  if (data.startedAt) updateData.startedAt = new Date(data.startedAt);
+  if (data.endedAt) updateData.endedAt = new Date(data.endedAt);
+  if (data.durationMin !== undefined) updateData.durationMin = data.durationMin;
+  if (data.notes !== undefined) updateData.notes = data.notes;
+
+  // Recalculate duration if start/end changed
+  if (data.startedAt || data.endedAt) {
+    const start = data.startedAt ? new Date(data.startedAt) : session.startedAt;
+    const end = data.endedAt ? new Date(data.endedAt) : session.endedAt;
+    if (start && end) {
+      updateData.durationMin = Math.round((end.getTime() - start.getTime()) / 60000);
+    }
+  }
+
+  return prisma.workSession.update({
+    where: { id },
+    data: updateData,
+    include: sessionInclude,
+  });
+}
+
+export async function deleteSession(id: string) {
+  const session = await prisma.workSession.findUnique({ where: { id } });
+  if (!session) throw new AppError('Session not found', 404);
+  await prisma.sessionTimeEntry.deleteMany({ where: { workSessionId: id } });
+  await prisma.workSession.delete({ where: { id } });
+}
+
 // ── Agent session (legacy) ───────────────────────────────────────────────────
 
 export async function startSession(techId: string, agentRegId: string) {

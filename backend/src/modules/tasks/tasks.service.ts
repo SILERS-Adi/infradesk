@@ -162,12 +162,17 @@ export async function updateTask(
   const task = await prisma.task.findUnique({ where: { id } });
   if (!task) throw new AppError('Task not found', 404);
 
+  const updateData: Record<string, unknown> = {};
+  if (data.title !== undefined) updateData.title = data.title;
+  if (data.description !== undefined) updateData.description = data.description;
+  if (data.assignedToUserId !== undefined) updateData.assignedToUserId = data.assignedToUserId;
+  if (data.notes !== undefined) updateData.notes = data.notes;
+  if (data.dueAt !== undefined) updateData.dueAt = data.dueAt ? new Date(data.dueAt) : null;
+  if (data.travelKm !== undefined) updateData.travelKm = data.travelKm;
+
   const updated = await prisma.task.update({
     where: { id },
-    data: {
-      notes: data.notes,
-      dueAt: data.dueAt ? new Date(data.dueAt) : undefined,
-    },
+    data: updateData,
     select: taskSelect,
   });
 

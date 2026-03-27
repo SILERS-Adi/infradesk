@@ -72,4 +72,10 @@ export const sessionsApi = {
 
   getActive: (): Promise<WorkSession | null> =>
     api.get('/sessions/active').then(r => r.data),
+
+  updateSession: (id: string, data: { startedAt?: string; endedAt?: string; durationMin?: number; notes?: string }): Promise<WorkSession> =>
+    api.patch(`/sessions/${id}`, data).then(r => r.data),
+
+  deleteSession: (id: string): Promise<void> =>
+    api.delete(`/sessions/${id}`).then(() => undefined),
 };
