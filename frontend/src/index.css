@@ -98,14 +98,25 @@
     filter: invert(1) hue-rotate(180deg);
   }
 
-  /* Boost card visibility — after invert, rgba(255,255,255,0.025) becomes invisible */
-  /* Give all glass-like containers a solid inverted background */
-  html[data-theme="light"] main [style*="background: rgba(255,255,255,0.0"] {
-    background: rgba(255,255,255,0.12) !important;
-    box-shadow: 0 1px 6px rgba(0,0,0,0.06) !important;
+  /* Light mode: boost ALL backgrounds in content area */
+  /* After invert, near-transparent whites become invisible on light bg */
+  /* Solution: make the inverted base darker so cards stand out */
+  html[data-theme="light"] main > div:last-child {
+    /* Content wrapper — give it a slightly darker base so cards pop */
+    background: rgba(0,0,0,0.03);
+    border-radius: 0;
   }
-  html[data-theme="light"] main [style*="background: rgba(255,255,255,0.1)"] {
-    background: rgba(255,255,255,0.15) !important;
+
+  /* Target rounded containers (cards, tables, panels) */
+  html[data-theme="light"] main [class*="rounded-"] {
+    --tw-shadow: 0 1px 8px rgba(0,0,0,0.05);
+    box-shadow: var(--tw-shadow) !important;
+  }
+  html[data-theme="light"] main [class*="rounded-xl"],
+  html[data-theme="light"] main [class*="rounded-2xl"],
+  html[data-theme="light"] main [class*="rounded-[16px]"],
+  html[data-theme="light"] main [class*="rounded-[18px]"] {
+    background-color: rgba(255,255,255,0.15) !important;
   }
 
   /* Un-invert images, videos, emojis, avatars, logos, badges with colors */
