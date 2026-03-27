@@ -39,8 +39,9 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
       { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-[18px] w-[18px]" /> },
     ]},
     { label: 'KLIENCI', items: [
-      { to: '/clients',     label: 'Klienci',    icon: <Building2 className="h-[18px] w-[18px]" /> },
-      { to: '/credentials', label: 'Dostępy',    icon: <KeyRound className="h-[18px] w-[18px]" /> },
+      { to: '/clients',     label: 'Klienci',      icon: <Building2 className="h-[18px] w-[18px]" /> },
+      { to: '/users',       label: 'Użytkownicy',  icon: <Users className="h-[18px] w-[18px]" /> },
+      { to: '/credentials', label: 'Dostępy',      icon: <KeyRound className="h-[18px] w-[18px]" /> },
     ]},
     { label: 'URZĄDZENIA', items: [
       { to: '/devices', label: 'Urządzenia', icon: <Monitor className="h-[18px] w-[18px]" /> },
