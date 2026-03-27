@@ -260,6 +260,7 @@ export interface Task {
     ticketNumber: string;
     title: string;
     priority: TicketPriority;
+    source?: TicketSource;
     serviceMode?: 'REMOTE' | 'ONSITE' | null;
     client?: {
       id: string; name: string;

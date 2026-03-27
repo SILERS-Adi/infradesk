@@ -7,10 +7,13 @@ import { z } from 'zod';
 import {
   CheckCircle2, Clock, Loader2, Plus, X, ExternalLink, MapPin,
   Monitor, Save, Play, Pause, Square, Timer, ChevronDown, ChevronUp, Edit2, Trash2,
+  Wifi, WifiOff, Sparkles, Zap, RotateCw,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { tasksApi } from '../../../api/tasks';
 import { sessionsApi, WorkSession, calcWorkSeconds } from '../../../api/sessions';
+import { agentsApi, AgentRegistration } from '../../../api/agents';
+import { aiApi, AiSuggestion } from '../../../api/ai';
 import { usersApi } from '../../../api/users';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { PriorityBadge } from '../../../components/ui/PriorityBadge';
@@ -72,6 +75,146 @@ const newTaskSchema = z.object({
   notes:            z.string().optional(),
 });
 type NewTaskForm = z.infer<typeof newTaskSchema>;
+
+// ── Remote panel (RustDesk + online status + WoL) ───────────────────────────
+function RemotePanel({ rustdeskId, deviceName }: { rustdeskId: string; deviceName?: string }) {
+  const { data: agents = [] } = useQuery({
+    queryKey: ['agents'],
+    queryFn: () => agentsApi.getAll(),
+    staleTime: 15_000,
+    refetchInterval: 15_000,
+  });
+
+  const agent = agents.find(a => a.rustdeskId === rustdeskId);
+  const isOnline = agent?.lastSeen
+    ? Date.now() - new Date(agent.lastSeen).getTime() < 2 * 60 * 1000
+    : false;
+
+  const wakeMutation = useMutation({
+    mutationFn: () => agentsApi.wake(agent!.id),
+    onSuccess: () => toast.success('WoL wysłany — komputer powinien się obudzić'),
+    onError: () => toast.error('Nie udało się obudzić komputera'),
+  });
+
+  const winUpdateMutation = useMutation({
+    mutationFn: () => agentsApi.windowsUpdate(agent!.id),
+    onSuccess: () => toast.success('Aktualizacja Windows wysłana'),
+    onError: () => toast.error('Błąd wysyłania aktualizacji'),
+  });
+
+  return (
+    <div className="mt-2 flex items-center gap-2 flex-wrap">
+      {/* Online status */}
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 border"
+        style={isOnline
+          ? { background: 'rgba(34,197,94,0.12)', borderColor: 'rgba(34,197,94,0.25)', color: '#4ADE80' }
+          : { background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)' }}>
+        {isOnline ? <><Wifi className="h-3 w-3" /> Online</> : <><WifiOff className="h-3 w-3" /> Offline</>}
+      </span>
+
+      {/* RustDesk connect */}
+      <a href={`rustdesk://id=${rustdeskId}`}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] border"
+        style={{ background: 'rgba(16,185,129,0.08)', borderColor: 'rgba(16,185,129,0.2)', color: '#10B981' }}
+        onClick={e => e.stopPropagation()}>
+        <ExternalLink className="h-3.5 w-3.5" /> RustDesk
+      </a>
+
+      {/* WoL if offline */}
+      {!isOnline && agent && (
+        <button onClick={() => wakeMutation.mutate()} disabled={wakeMutation.isPending}
+          className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg border transition-all active:scale-[0.95] disabled:opacity-50"
+          style={{ background: 'rgba(34,197,94,0.06)', borderColor: 'rgba(34,197,94,0.15)', color: '#4ADE80' }}>
+          <Wifi className="h-3 w-3" /> {wakeMutation.isPending ? '...' : 'Obudź'}
+        </button>
+      )}
+
+      {/* Windows Update if agent available */}
+      {agent && isOnline && (
+        <button onClick={() => winUpdateMutation.mutate()} disabled={winUpdateMutation.isPending}
+          className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-lg transition-colors disabled:opacity-50"
+          style={{ color: '#60A5FA' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(96,165,250,0.08)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+          <RotateCw className="h-3 w-3" /> Windows Update
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── AI Suggestion panel ─────────────────────────────────────────────────────
+function AiSuggestionPanel({ title, description, source }: { title: string; description?: string; source?: string }) {
+  const [suggestion, setSuggestion] = useState<AiSuggestion | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [visible, setVisible] = useState(false);
+
+  const fetchSuggestion = async () => {
+    if (suggestion) { setVisible(v => !v); return; }
+    setLoading(true);
+    setVisible(true);
+    try {
+      const result = await aiApi.suggest({ title, description, source });
+      setSuggestion(result);
+    } catch { toast.error('Nie udało się pobrać sugestii AI'); }
+    finally { setLoading(false); }
+  };
+
+  const DIFF_COLORS: Record<string, { bg: string; color: string; label: string }> = {
+    EASY:   { bg: 'rgba(34,197,94,0.12)', color: '#4ADE80', label: 'Łatwe' },
+    MEDIUM: { bg: 'rgba(234,179,8,0.12)', color: '#FBBF24', label: 'Średnie' },
+    HARD:   { bg: 'rgba(239,68,68,0.12)', color: '#F87171', label: 'Trudne' },
+  };
+
+  return (
+    <div className="mt-2">
+      <button onClick={fetchSuggestion} disabled={loading}
+        className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-lg border transition-all active:scale-[0.97] disabled:opacity-50"
+        style={{ background: 'rgba(168,85,247,0.06)', borderColor: 'rgba(168,85,247,0.15)', color: '#C084FC' }}>
+        {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+        {suggestion ? (visible ? 'Ukryj sugestię' : 'Pokaż sugestię') : 'AI: Sugeruj rozwiązanie'}
+      </button>
+
+      {visible && suggestion && (
+        <div className="mt-2 p-3 rounded-xl space-y-2" style={{ background: 'rgba(168,85,247,0.04)', border: '1px solid rgba(168,85,247,0.1)' }}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Sparkles className="h-4 w-4" style={{ color: '#C084FC' }} />
+            <span className="text-[12px] font-semibold" style={{ color: '#C084FC' }}>Sugestia AI</span>
+            {suggestion.difficulty && (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                style={{ background: DIFF_COLORS[suggestion.difficulty]?.bg, color: DIFF_COLORS[suggestion.difficulty]?.color }}>
+                {DIFF_COLORS[suggestion.difficulty]?.label}
+              </span>
+            )}
+            {suggestion.estimatedTime && (
+              <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.4)' }}>~{suggestion.estimatedTime}</span>
+            )}
+          </div>
+          <p className="text-[12px]" style={{ color: 'rgba(255,255,255,0.7)' }}>{suggestion.summary}</p>
+          {suggestion.steps.length > 0 && (
+            <ol className="space-y-1 pl-4">
+              {suggestion.steps.map((step, i) => (
+                <li key={i} className="text-[11px] list-decimal" style={{ color: 'rgba(255,255,255,0.6)' }}>{step}</li>
+              ))}
+            </ol>
+          )}
+          {suggestion.canAutoFix && suggestion.autoFixType && (
+            <div className="pt-1">
+              <button className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all active:scale-[0.97]"
+                style={{ background: 'rgba(34,197,94,0.08)', borderColor: 'rgba(34,197,94,0.2)', color: '#4ADE80' }}>
+                <Zap className="h-3.5 w-3.5" />
+                {suggestion.autoFixType === 'WINDOWS_UPDATE' ? 'Aktualizuj Windows' :
+                 suggestion.autoFixType === 'RESTART' ? 'Restartuj komputer' :
+                 suggestion.autoFixType === 'DISK_CLEANUP' ? 'Wyczyść dysk' :
+                 suggestion.autoFixType === 'ANTIVIRUS_SCAN' ? 'Skanuj antywirusem' : 'Napraw automatycznie'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Task card ───────────────────────────────────────────────────────────────
 function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPauseSession, onResumeSession, onEndSession, onEdit }: {
@@ -208,18 +351,11 @@ function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPause
           )}
         </div>
 
-        {/* RustDesk + Km */}
+        {/* Remote panel: RustDesk + Online status + WoL */}
         {serviceMode === 'REMOTE' && rustdeskId && (
-          <div className="mt-2">
-            <a href={`rustdesk://${rustdeskId}`} target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"
-              style={{ background: 'rgba(34,197,94,0.1)', color: '#4ADE80', border: '1px solid rgba(34,197,94,0.15)' }}
-              onClick={e => e.stopPropagation()}>
-              <ExternalLink className="h-3.5 w-3.5" />
-              RustDesk: {rustdeskId}
-            </a>
-          </div>
+          <RemotePanel rustdeskId={rustdeskId} deviceName={task.ticket?.device?.name} />
         )}
+        {/* Onsite: Km */}
         {serviceMode === 'ONSITE' && (
           <div className="mt-2 flex items-center gap-2">
             <MapPin className="h-3.5 w-3.5 flex-shrink-0" style={{ color: '#FB923C' }} />
@@ -233,6 +369,8 @@ function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPause
             </button>
           </div>
         )}
+        {/* AI Suggestion */}
+        <AiSuggestionPanel title={task.title} description={task.description} source={task.ticket?.source} />
 
         {task.notes && (
           <p className="text-xs mt-2 rounded p-2 whitespace-pre-wrap" style={{ color: 'rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.02)' }}>{task.notes}</p>
