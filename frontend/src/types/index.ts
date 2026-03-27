@@ -226,6 +226,8 @@ export interface Ticket {
   closedAt?: string;
   billedInContract?: boolean;
   serviceMode?: 'REMOTE' | 'ONSITE' | null;
+  reporterName?: string;
+  reporterPhone?: string;
   createdAt: string;
   updatedAt: string;
   comments?: TicketComment[];

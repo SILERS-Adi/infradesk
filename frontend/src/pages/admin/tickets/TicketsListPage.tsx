@@ -404,6 +404,7 @@ export function TicketsListPage() {
                   <SortTh label="Nr" sortKey="number" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                   <PlainTh label="Tytuł" />
                   <SortTh label="Klient" sortKey="client" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+                  <PlainTh label="Użytkownik" />
                   <SortTh label="Priorytet" sortKey="priority" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} align="center" />
                   <SortTh label="Przypisany" sortKey="assigned" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                   <PlainTh label="Źródło" align="center" />
@@ -455,6 +456,21 @@ export function TicketsListPage() {
                       <span className="text-[13px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
                         {ticket.client?.name ?? <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.2)' }}>--</span>}
                       </span>
+                    </td>
+
+                    {/* Użytkownik */}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {ticket.device?.assignedUser ? (
+                        <span className="text-[13px]" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                          {(ticket.device.assignedUser as any).firstName} {(ticket.device.assignedUser as any).lastName}
+                        </span>
+                      ) : ticket.reporterName ? (
+                        <span className="text-[12px]" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                          {ticket.reporterName}
+                        </span>
+                      ) : (
+                        <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.15)' }}>—</span>
+                      )}
                     </td>
 
                     {/* Priorytet */}
