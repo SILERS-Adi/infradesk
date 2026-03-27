@@ -243,6 +243,14 @@ export async function registerAgent(data: RegisterInput) {
       });
     }
 
+    // Auto-assign user to device
+    if (deviceId && user.id) {
+      await prisma.device.update({
+        where: { id: deviceId },
+        data: { assignedUserId: user.id },
+      }).catch(() => {});
+    }
+
     return { token, status: 'ACTIVE', deviceId, clientName: user.client?.name ?? null, clientId: user.clientId };
   }
 
