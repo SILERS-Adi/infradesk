@@ -255,6 +255,7 @@ export interface Task {
   completedAt?: string;
   notes?: string;
   travelKm?: number | null;
+  estimatedMinutes?: number | null;
   createdAt: string;
   updatedAt: string;
   ticket?: {

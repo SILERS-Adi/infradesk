@@ -73,6 +73,7 @@ const newTaskSchema = z.object({
   assignedToUserId: z.string().min(1, 'Wybierz osobę'),
   dueAt:            z.string().optional(),
   notes:            z.string().optional(),
+  estimatedMinutes: z.number().optional().nullable(),
 });
 type NewTaskForm = z.infer<typeof newTaskSchema>;
 
@@ -796,7 +797,8 @@ export function TasksPage() {
       assignedToUserId: d.assignedToUserId,
       dueAt: d.dueAt ? new Date(d.dueAt).toISOString() : undefined,
       notes: d.notes || undefined,
-    }),
+      estimatedMinutes: d.estimatedMinutes || undefined,
+    } as any),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks'] });
       toast.success('Zadanie dodane');
@@ -886,7 +888,10 @@ export function TasksPage() {
               <p className="text-xs text-red-500 mt-1">{form.formState.errors.assignedToUserId.message}</p>
             )}
           </div>
-          <Input label="Termin" type="date" {...form.register('dueAt')} />
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Termin" type="date" {...form.register('dueAt')} />
+            <Input label="Szacowany czas (min)" type="number" placeholder="np. 60" {...form.register('estimatedMinutes', { valueAsNumber: true })} />
+          </div>
           <Textarea label="Notatki" rows={2} {...form.register('notes')} />
           <div className="flex justify-end gap-3 pt-1">
             <Button variant="secondary" type="button" onClick={() => { setShowCreate(false); form.reset(); }}>Anuluj</Button>
@@ -913,13 +918,14 @@ function EditTaskModal({ task, onClose, onSaved }: { task: Task; onClose: () => 
   const [description, setDescription] = useState(task.description ?? '');
   const [notes, setNotes] = useState(task.notes ?? '');
   const [dueAt, setDueAt] = useState(task.dueAt?.slice(0, 10) ?? '');
+  const [estimatedMinutes, setEstimatedMinutes] = useState(task.estimatedMinutes?.toString() ?? '');
   const [status, setStatus] = useState(task.status);
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await tasksApi.update(task.id, { title, description: description || undefined, notes: notes || undefined, dueAt: dueAt ? new Date(dueAt).toISOString() : undefined });
+      await tasksApi.update(task.id, { title, description: description || undefined, notes: notes || undefined, dueAt: dueAt ? new Date(dueAt).toISOString() : undefined, estimatedMinutes: estimatedMinutes ? parseInt(estimatedMinutes) : null });
       if (status !== task.status) {
         await tasksApi.changeStatus(task.id, status);
       }
@@ -935,7 +941,10 @@ function EditTaskModal({ task, onClose, onSaved }: { task: Task; onClose: () => 
         <Input label="Tytuł" value={title} onChange={e => setTitle(e.target.value)} />
         <Textarea label="Opis" rows={2} value={description} onChange={e => setDescription(e.target.value)} />
         <Textarea label="Notatki" rows={2} value={notes} onChange={e => setNotes(e.target.value)} />
-        <Input label="Termin" type="date" value={dueAt} onChange={e => setDueAt(e.target.value)} />
+        <div className="grid grid-cols-2 gap-3">
+          <Input label="Termin" type="date" value={dueAt} onChange={e => setDueAt(e.target.value)} />
+          <Input label="Szacowany czas (min)" type="number" placeholder="np. 60" value={estimatedMinutes} onChange={e => setEstimatedMinutes(e.target.value)} />
+        </div>
         <div>
           <label className="block text-xs font-medium mb-1" style={{ color: 'rgba(255,255,255,0.6)' }}>Status</label>
           <select value={status} onChange={e => setStatus(e.target.value as TaskStatus)}

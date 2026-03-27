@@ -6,6 +6,7 @@ export const createTaskSchema = z.object({
   assignedToUserId: z.string().min(1, 'Przypisanie jest wymagane'),
   dueAt:            z.string().optional(),
   notes:            z.string().optional(),
+  estimatedMinutes: z.number().optional().nullable(),
 });
 
 export const changeTaskStatusSchema = z.object({
@@ -20,6 +21,7 @@ export const updateTaskSchema = z.object({
   notes: z.string().optional(),
   dueAt: z.string().optional(),
   travelKm: z.number().optional().nullable(),
+  estimatedMinutes: z.number().optional().nullable(),
 });
 
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;

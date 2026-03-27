@@ -662,6 +662,7 @@ model Task {
   completedAt      DateTime?
   notes            String?
   travelKm         Float?
+  estimatedMinutes Int?
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 

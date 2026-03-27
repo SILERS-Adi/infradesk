@@ -16,6 +16,7 @@ const taskSelect = {
   completedAt: true,
   notes: true,
   travelKm: true,
+  estimatedMinutes: true,
   createdAt: true,
   updatedAt: true,
   ticket: {
@@ -60,6 +61,7 @@ export async function createTask(
       createdByUserId:  requestingUser.id,
       dueAt:            data.dueAt ? new Date(data.dueAt) : undefined,
       notes:            data.notes,
+      estimatedMinutes: (data as any).estimatedMinutes ?? null,
       status:           TaskStatus.NEW,
     } as any,
     select: taskSelect,
@@ -173,6 +175,7 @@ export async function updateTask(
   if (data.notes !== undefined) updateData.notes = data.notes;
   if (data.dueAt !== undefined) updateData.dueAt = data.dueAt ? new Date(data.dueAt) : null;
   if (data.travelKm !== undefined) updateData.travelKm = data.travelKm;
+  if ((data as any).estimatedMinutes !== undefined) updateData.estimatedMinutes = (data as any).estimatedMinutes;
 
   const updated = await prisma.task.update({
     where: { id },

@@ -32,7 +32,7 @@ export const tasksApi = {
     return data;
   },
 
-  update: async (id: string, payload: { title?: string; description?: string; assignedToUserId?: string; notes?: string; dueAt?: string; travelKm?: number | null }): Promise<Task> => {
+  update: async (id: string, payload: { title?: string; description?: string; assignedToUserId?: string; notes?: string; dueAt?: string; travelKm?: number | null; estimatedMinutes?: number | null }): Promise<Task> => {
     const { data } = await apiClient.patch<Task>(`/tasks/${id}`, payload);
     return data;
   },
