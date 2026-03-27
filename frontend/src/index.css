@@ -83,6 +83,11 @@
     background: #F2F2F7;
   }
 
+  /* Light bg on app shell (but NOT sidebar inside it) */
+  html[data-theme="light"] .app-shell {
+    background: #F2F2F7 !important;
+  }
+
   /* Invert ONLY the main content area, NOT the sidebar */
   html[data-theme="light"] main {
     filter: invert(1) hue-rotate(180deg);

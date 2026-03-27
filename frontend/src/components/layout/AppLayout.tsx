@@ -19,7 +19,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   if (user?.role === 'CLIENT') return <Navigate to="/portal" replace />;
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#080D19' }}>
+    <div className="flex h-screen overflow-hidden app-shell" style={{ background: '#080D19' }}>
       {/* Sidebar – desktop — z-index above bg layers */}
       <div className="hidden md:flex flex-shrink-0 relative z-[2]">
         <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
