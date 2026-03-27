@@ -7,7 +7,7 @@ import { z } from 'zod';
 import {
   CheckCircle2, Clock, Loader2, Plus, X, ExternalLink, MapPin,
   Monitor, Save, Play, Pause, Square, Timer, ChevronDown, ChevronUp, Edit2, Trash2,
-  Wifi, WifiOff, Sparkles, Zap, RotateCw,
+  Wifi, WifiOff, Sparkles, Zap, RotateCw, Phone, User,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { tasksApi } from '../../../api/tasks';
@@ -192,11 +192,14 @@ function AiSuggestionPanel({ title, description, source }: { title: string; desc
           </div>
           <p className="text-[12px]" style={{ color: 'rgba(255,255,255,0.7)' }}>{suggestion.summary}</p>
           {suggestion.steps.length > 0 && (
-            <ol className="space-y-1 pl-4">
+            <div className="space-y-1.5">
               {suggestion.steps.map((step, i) => (
-                <li key={i} className="text-[11px] list-decimal" style={{ color: 'rgba(255,255,255,0.6)' }}>{step}</li>
+                <div key={i} className="flex gap-2 text-[11px]">
+                  <span className="flex-shrink-0 font-bold" style={{ color: '#C084FC' }}>Krok {i + 1}:</span>
+                  <span style={{ color: 'rgba(255,255,255,0.6)' }}>{step}</span>
+                </div>
               ))}
-            </ol>
+            </div>
           )}
           {suggestion.canAutoFix && suggestion.autoFixType && (
             <div className="pt-1">
@@ -276,9 +279,26 @@ function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPause
     finally { setSavingKm(false); }
   };
 
+  // Contact info
+  const reporter = task.ticket?.createdBy;
+  const reporterName = task.ticket?.reporterName || (reporter ? `${reporter.firstName} ${reporter.lastName}` : null);
+  const reporterPhone = task.ticket?.reporterPhone || reporter?.phone;
+  const reporterAvatar = reporter?.avatarUrl;
+  const deviceUser = task.ticket?.device?.assignedUser;
+  const locationContact = task.ticket?.location;
+
+  // Billing badge
+  const cl = task.ticket?.client;
+  const isCon = cl?.hasContract ?? false;
+  const rate = cl?.hourlyRate ?? 0;
+  const interval = cl?.billingIntervalMinutes ?? 30;
+  const bh = completedMin > 0 ? Math.ceil(completedMin / interval) * (interval / 60) : 0;
+  const earn = isCon ? 0 : bh * rate;
+
   return (
     <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.025)', border: `1px solid ${isThisTaskSession ? 'rgba(34,197,94,0.25)' : isThisTaskPaused ? 'rgba(234,179,8,0.25)' : 'rgba(255,255,255,0.06)'}` }}>
-      <div className="p-4">
+      {/* ── Header row ── */}
+      <div className="p-4 pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -296,46 +316,33 @@ function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPause
                   <MapPin className="h-3 w-3" /> Na miejscu
                 </span>
               )}
-              {completedMin > 0 && (() => {
-                const cl = task.ticket?.client;
-                const isCon = cl?.hasContract ?? false;
-                const rate = cl?.hourlyRate ?? 0;
-                const interval = cl?.billingIntervalMinutes ?? 30;
-                const bh = Math.ceil(completedMin / interval) * (interval / 60);
-                const earn = isCon ? 0 : bh * rate;
-                return (
-                  <>
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5"
-                      style={{ background: 'rgba(139,92,246,0.12)', color: '#A78BFA' }}>
-                      <Timer className="h-3 w-3" /> {formatDurationShort(completedMin)}
-                    </span>
-                    <span className="inline-flex items-center text-[10px] font-semibold rounded-full px-2 py-0.5"
-                      style={{ background: isCon ? 'rgba(96,165,250,0.12)' : 'rgba(34,197,94,0.12)', color: isCon ? '#60A5FA' : '#4ADE80' }}>
-                      {isCon ? 'abonament' : rate > 0 ? `${earn.toFixed(0)} zł` : '—'}
-                    </span>
-                  </>
-                );
-              })()}
+              {completedMin > 0 && (
+                <>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5"
+                    style={{ background: 'rgba(139,92,246,0.12)', color: '#A78BFA' }}>
+                    <Timer className="h-3 w-3" /> {formatDurationShort(completedMin)}
+                  </span>
+                  <span className="inline-flex items-center text-[10px] font-semibold rounded-full px-2 py-0.5"
+                    style={{ background: isCon ? 'rgba(96,165,250,0.12)' : 'rgba(34,197,94,0.12)', color: isCon ? '#60A5FA' : '#4ADE80' }}>
+                    {isCon ? 'abonament' : rate > 0 ? `${earn.toFixed(0)} zł` : '—'}
+                  </span>
+                </>
+              )}
             </div>
-            <p className="font-medium text-white/85 truncate">{task.title}</p>
+            <p className="font-medium text-white/85">{task.title}</p>
             {task.ticket?.client && (
               <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                <Link to={`/tickets/${task.ticketId}`} className="text-violet-400 hover:underline">
-                  {task.ticket.ticketNumber}
-                </Link>
+                <Link to={`/tickets/${task.ticketId}`} className="text-violet-400 hover:underline">{task.ticket.ticketNumber}</Link>
                 {' · '}{task.ticket.client.name}
                 {task.ticket.device && <span> · {task.ticket.device.name}</span>}
               </p>
             )}
           </div>
-
-          {/* Timer display when active */}
+          {/* Timer */}
           {isThisTaskSession && (
             <div className="flex-shrink-0 text-right">
-              <div className="text-lg font-mono font-bold" style={{ color: '#4ADE80' }}>
-                {formatTimer(liveSeconds)}
-              </div>
-              <div className="flex items-center gap-1 mt-0.5">
+              <div className="text-lg font-mono font-bold" style={{ color: '#4ADE80' }}>{formatTimer(liveSeconds)}</div>
+              <div className="flex items-center gap-1 mt-0.5 justify-end">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span className="text-[10px] font-medium" style={{ color: '#4ADE80' }}>Aktywne</span>
               </div>
@@ -343,38 +350,111 @@ function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPause
           )}
           {isThisTaskPaused && (
             <div className="flex-shrink-0 text-right">
-              <div className="text-lg font-mono font-bold" style={{ color: '#FBBF24' }}>
-                PAUZA
-              </div>
+              <div className="text-lg font-mono font-bold" style={{ color: '#FBBF24' }}>PAUZA</div>
               <span className="text-[10px] font-medium" style={{ color: '#FBBF24' }}>Wstrzymane</span>
             </div>
           )}
         </div>
+      </div>
 
-        {/* Remote panel: RustDesk + Online status + WoL */}
-        {serviceMode === 'REMOTE' && rustdeskId && (
-          <RemotePanel rustdeskId={rustdeskId} deviceName={task.ticket?.device?.name} />
-        )}
-        {/* Onsite: Km */}
-        {serviceMode === 'ONSITE' && (
-          <div className="mt-2 flex items-center gap-2">
-            <MapPin className="h-3.5 w-3.5 flex-shrink-0" style={{ color: '#FB923C' }} />
-            <input type="number" value={km} onChange={e => setKm(e.target.value)} placeholder="Km"
-              className="w-20 px-2 py-1 text-[12px] rounded-lg focus:outline-none"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }} />
-            <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>km</span>
-            <button onClick={saveKm} disabled={savingKm} className="p-1 rounded-lg transition-colors hover:bg-white/[0.06]" title="Zapisz km">
-              {savingKm ? <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: 'rgba(255,255,255,0.3)' }} />
-                : <Save className="h-3.5 w-3.5" style={{ color: km !== (task.travelKm?.toString() ?? '') ? '#FB923C' : 'rgba(255,255,255,0.2)' }} />}
-            </button>
-          </div>
-        )}
-        {/* AI Suggestion */}
-        <AiSuggestionPanel title={task.title} description={task.description} source={task.ticket?.source} />
+      {/* ── 2-column body ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr,200px] gap-0" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+        {/* Left: tools + AI */}
+        <div className="p-4 pt-3 space-y-2">
+          {/* Remote panel */}
+          {serviceMode === 'REMOTE' && rustdeskId && (
+            <RemotePanel rustdeskId={rustdeskId} deviceName={task.ticket?.device?.name} />
+          )}
+          {/* Onsite: Km */}
+          {serviceMode === 'ONSITE' && (
+            <div className="flex items-center gap-2">
+              <MapPin className="h-3.5 w-3.5 flex-shrink-0" style={{ color: '#FB923C' }} />
+              <input type="number" value={km} onChange={e => setKm(e.target.value)} placeholder="Km"
+                className="w-20 px-2 py-1 text-[12px] rounded-lg focus:outline-none"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }} />
+              <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>km</span>
+              <button onClick={saveKm} disabled={savingKm} className="p-1 rounded-lg transition-colors hover:bg-white/[0.06]">
+                {savingKm ? <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: 'rgba(255,255,255,0.3)' }} />
+                  : <Save className="h-3.5 w-3.5" style={{ color: km !== (task.travelKm?.toString() ?? '') ? '#FB923C' : 'rgba(255,255,255,0.2)' }} />}
+              </button>
+            </div>
+          )}
+          {/* AI */}
+          <AiSuggestionPanel title={task.title} description={task.description} source={task.ticket?.source} />
+          {/* Notes */}
+          {task.notes && (
+            <p className="text-xs rounded p-2 whitespace-pre-wrap" style={{ color: 'rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.02)' }}>{task.notes}</p>
+          )}
+        </div>
 
-        {task.notes && (
-          <p className="text-xs mt-2 rounded p-2 whitespace-pre-wrap" style={{ color: 'rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.02)' }}>{task.notes}</p>
-        )}
+        {/* Right: contact cards */}
+        <div className="p-3 space-y-2 lg:border-l" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+          {/* Zgłaszający */}
+          {reporterName && (
+            <div className="rounded-lg p-2.5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+              <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(255,255,255,0.25)' }}>Zgłaszający</div>
+              <div className="flex items-center gap-2">
+                {reporterAvatar
+                  ? <img src={reporterAvatar} alt="" className="w-7 h-7 rounded-lg object-cover flex-shrink-0" />
+                  : <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139,92,246,0.12)' }}>
+                      <User className="h-3.5 w-3.5" style={{ color: '#A78BFA' }} />
+                    </div>}
+                <div className="min-w-0">
+                  <p className="text-[12px] font-medium text-white/80 truncate">{reporterName}</p>
+                  {reporterPhone && (
+                    <a href={`tel:${reporterPhone}`} className="flex items-center gap-1 text-[10px] text-emerald-400 hover:underline">
+                      <Phone className="h-2.5 w-2.5" /> {reporterPhone}
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          {/* Użytkownik urządzenia */}
+          {deviceUser && deviceUser.id !== reporter?.id && (
+            <div className="rounded-lg p-2.5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+              <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(255,255,255,0.25)' }}>Użytkownik</div>
+              <div className="flex items-center gap-2">
+                {deviceUser.avatarUrl
+                  ? <img src={deviceUser.avatarUrl} alt="" className="w-7 h-7 rounded-lg object-cover flex-shrink-0" />
+                  : <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(59,130,246,0.12)' }}>
+                      <User className="h-3.5 w-3.5" style={{ color: '#60A5FA' }} />
+                    </div>}
+                <div className="min-w-0">
+                  <p className="text-[12px] font-medium text-white/80 truncate">{deviceUser.firstName} {deviceUser.lastName}</p>
+                  {deviceUser.phone && (
+                    <a href={`tel:${deviceUser.phone}`} className="flex items-center gap-1 text-[10px] text-emerald-400 hover:underline">
+                      <Phone className="h-2.5 w-2.5" /> {deviceUser.phone}
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          {/* Kontakt lokalizacji */}
+          {locationContact?.contactPersonName && (
+            <div className="rounded-lg p-2.5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+              <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(255,255,255,0.25)' }}>Kontakt lokalizacji</div>
+              <p className="text-[12px] font-medium text-white/80 truncate">{locationContact.contactPersonName}</p>
+              {locationContact.contactPersonPhone && (
+                <a href={`tel:${locationContact.contactPersonPhone}`} className="flex items-center gap-1 text-[10px] text-emerald-400 hover:underline mt-0.5">
+                  <Phone className="h-2.5 w-2.5" /> {locationContact.contactPersonPhone}
+                </a>
+              )}
+            </div>
+          )}
+          {/* Przypisany technik */}
+          {task.assignedTo && (
+            <div className="text-[10px] pt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>
+              Realizuje: {task.assignedTo.firstName} {task.assignedTo.lastName}
+            </div>
+          )}
+          {task.dueAt && (
+            <div className="text-[10px] text-amber-400">
+              Termin: {formatDate(task.dueAt)}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Action footer ── */}
@@ -451,11 +531,7 @@ function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPause
           </button>
         )}
 
-        {/* Meta info */}
-        <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.25)' }}>
-          {task.assignedTo && `${task.assignedTo.firstName} ${task.assignedTo.lastName}`}
-          {task.dueAt && <span className="text-amber-400 ml-2">Termin: {formatDate(task.dueAt)}</span>}
-        </span>
+        {/* spacer */}
       </div>
 
       {/* ── Session history + billing ── */}
@@ -703,7 +779,7 @@ export function TasksPage() {
           <p className="text-sm">Brak zadań w tej kategorii</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           {tabTasks.map(task => (
             <TaskCard
               key={task.id}

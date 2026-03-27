@@ -262,13 +262,19 @@ export interface Task {
     priority: TicketPriority;
     source?: TicketSource;
     serviceMode?: 'REMOTE' | 'ONSITE' | null;
+    reporterName?: string;
+    reporterPhone?: string;
     client?: {
       id: string; name: string;
       hasContract?: boolean; contractHours?: number; contractMonthlyValue?: number;
       hourlyRate?: number; contractHourlyRateOverLimit?: number; billingIntervalMinutes?: number;
     };
-    location?: { id: string; name: string };
-    device?: { id: string; name: string; rustdeskId?: string };
+    location?: { id: string; name: string; contactPersonName?: string; contactPersonPhone?: string };
+    device?: {
+      id: string; name: string; rustdeskId?: string;
+      assignedUser?: { id: string; firstName: string; lastName: string; email: string; phone?: string; avatarUrl?: string };
+    };
+    createdBy?: { id: string; firstName: string; lastName: string; email?: string; phone?: string; avatarUrl?: string };
   };
   assignedTo?: { id: string; firstName: string; lastName: string; email: string };
   createdBy?: { id: string; firstName: string; lastName: string };
