@@ -454,6 +454,33 @@ function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPause
         {/* Right: contact cards */}
         <div className="p-3 space-y-2 lg:border-l" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
           {/* Zgłaszający — Agent ticket: urządzenie + użytkownik */}
+          {/* Użytkownik urządzenia (assignedUser = zalogowany przez agenta) */}
+          {task.ticket?.device?.assignedUser && (
+            <div className="rounded-lg p-2.5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+              <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(255,255,255,0.25)' }}>Użytkownik urządzenia</div>
+              <div className="flex items-center gap-2">
+                {task.ticket.device.assignedUser.avatarUrl
+                  ? <img src={task.ticket.device.assignedUser.avatarUrl} alt="" className="w-7 h-7 rounded-lg object-cover flex-shrink-0" />
+                  : <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(34,197,94,0.12)' }}>
+                      <User className="h-3.5 w-3.5" style={{ color: '#4ADE80' }} />
+                    </div>}
+                <div className="min-w-0">
+                  <p className="text-[12px] font-medium text-white/80 truncate">{task.ticket.device.assignedUser.firstName} {task.ticket.device.assignedUser.lastName}</p>
+                  {task.ticket.device.assignedUser.phone && (
+                    <a href={`tel:${task.ticket.device.assignedUser.phone}`} className="flex items-center gap-1 text-[10px] text-emerald-400 hover:underline">
+                      <Phone className="h-2.5 w-2.5" /> {task.ticket.device.assignedUser.phone}
+                    </a>
+                  )}
+                  {task.ticket.device.assignedUser.email && (
+                    <a href={`mailto:${task.ticket.device.assignedUser.email}`} className="text-[10px] text-violet-400 hover:underline truncate block">
+                      {task.ticket.device.assignedUser.email}
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          {/* Zgłaszający */}
           {isAgentTicket ? (
             <AgentContactCard task={task} />
           ) : reporterName ? (
@@ -476,27 +503,7 @@ function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPause
               </div>
             </div>
           ) : null}
-          {/* Użytkownik urządzenia */}
-          {deviceUser && deviceUser.id !== reporter?.id && (
-            <div className="rounded-lg p-2.5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-              <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(255,255,255,0.25)' }}>Użytkownik</div>
-              <div className="flex items-center gap-2">
-                {deviceUser.avatarUrl
-                  ? <img src={deviceUser.avatarUrl} alt="" className="w-7 h-7 rounded-lg object-cover flex-shrink-0" />
-                  : <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(59,130,246,0.12)' }}>
-                      <User className="h-3.5 w-3.5" style={{ color: '#60A5FA' }} />
-                    </div>}
-                <div className="min-w-0">
-                  <p className="text-[12px] font-medium text-white/80 truncate">{deviceUser.firstName} {deviceUser.lastName}</p>
-                  {deviceUser.phone && (
-                    <a href={`tel:${deviceUser.phone}`} className="flex items-center gap-1 text-[10px] text-emerald-400 hover:underline">
-                      <Phone className="h-2.5 w-2.5" /> {deviceUser.phone}
-                    </a>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
+          {/* (użytkownik urządzenia przeniesiony na górę) */}
           {/* Kontakt lokalizacji */}
           {locationContact?.contactPersonName && (
             <div className="rounded-lg p-2.5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
