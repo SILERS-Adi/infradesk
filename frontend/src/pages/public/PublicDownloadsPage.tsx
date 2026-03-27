@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   Download, Monitor, Server, Smartphone, ScreenShare, CheckCircle,
-  ExternalLink, ArrowLeft, KeyRound, Mail, Loader2,
+  ExternalLink, ArrowLeft, KeyRound, Mail, Loader2, GitCompareArrows, X,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { downloadsApi } from '../../api/downloads';
@@ -83,6 +83,87 @@ function AppCardView({ app }: { app: AppCard }) {
   );
 }
 
+/* ── Agent Comparison Modal ──────────────────────────────────────────────── */
+interface CompareRow { feature: string; client: string | boolean; server: string | boolean }
+
+const COMPARE_DATA: CompareRow[] = [
+  { feature: 'Tryb pracy',              client: 'Aplikacja w zasobniku (tray)', server: 'Usługa Windows (background)' },
+  { feature: 'Wymaga logowania',         client: true,                          server: false },
+  { feature: 'Auto-start z Windows',     client: true,                          server: true },
+  { feature: 'Zgłoszenia serwisowe',     client: true,                          server: false },
+  { feature: 'Okno klienta (kontakt)',   client: true,                          server: false },
+  { feature: 'Wake-on-LAN',             client: true,                          server: true },
+  { feature: 'RustDesk (zdalny pulpit)', client: true,                          server: false },
+  { feature: 'Security Audit (0-100)',   client: true,                          server: true },
+  { feature: 'Skanowanie sieci',         client: true,                          server: true },
+  { feature: 'Monitoring S.M.A.R.T.',    client: false,                         server: true },
+  { feature: 'Monitoring RAID',          client: false,                         server: true },
+  { feature: 'Event Log Windows',        client: false,                         server: true },
+  { feature: 'Certyfikaty SSL',          client: false,                         server: true },
+  { feature: 'Hyper-V monitoring',       client: false,                         server: true },
+  { feature: 'Backup (konfigurowalny)',  client: true,                          server: true },
+  { feature: 'Auto-diagnostyka',         client: true,                          server: true },
+  { feature: 'Przeznaczenie',           client: 'Komputery pracowników',       server: 'Serwery Windows' },
+];
+
+function CompareModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }} />
+      <div className="relative w-full max-w-2xl max-h-[85vh] overflow-auto rounded-2xl"
+        style={{ background: '#0E1527', border: '1px solid rgba(255,255,255,0.08)' }}
+        onClick={e => e.stopPropagation()}>
+        <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4" style={{ background: '#0E1527', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="flex items-center gap-3">
+            <GitCompareArrows className="h-5 w-5" style={{ color: '#8B5CF6' }} />
+            <h3 className="text-[16px] font-semibold text-white/90">Agent Client vs Agent Server</h3>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg transition-colors hover:bg-white/10">
+            <X className="h-5 w-5 text-white/40" />
+          </button>
+        </div>
+        <div className="p-6">
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                <th className="text-left py-3 pr-4 font-medium" style={{ color: 'rgba(255,255,255,0.4)' }}>Funkcja</th>
+                <th className="text-center py-3 px-3 font-semibold" style={{ color: '#8B5CF6' }}>
+                  <div className="flex items-center justify-center gap-1.5"><Monitor className="h-3.5 w-3.5" /> Client</div>
+                </th>
+                <th className="text-center py-3 pl-3 font-semibold" style={{ color: '#22D3EE' }}>
+                  <div className="flex items-center justify-center gap-1.5"><Server className="h-3.5 w-3.5" /> Server</div>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {COMPARE_DATA.map((row, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                  <td className="py-2.5 pr-4" style={{ color: 'rgba(255,255,255,0.55)' }}>{row.feature}</td>
+                  <td className="py-2.5 px-3 text-center">
+                    {typeof row.client === 'boolean'
+                      ? row.client
+                        ? <CheckCircle className="h-4 w-4 mx-auto" style={{ color: '#22C55E' }} />
+                        : <span className="text-[12px]" style={{ color: 'rgba(255,255,255,0.15)' }}>—</span>
+                      : <span style={{ color: 'rgba(255,255,255,0.5)' }}>{row.client}</span>}
+                  </td>
+                  <td className="py-2.5 pl-3 text-center">
+                    {typeof row.server === 'boolean'
+                      ? row.server
+                        ? <CheckCircle className="h-4 w-4 mx-auto" style={{ color: '#22C55E' }} />
+                        : <span className="text-[12px]" style={{ color: 'rgba(255,255,255,0.15)' }}>—</span>
+                      : <span style={{ color: 'rgba(255,255,255,0.5)' }}>{row.server}</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function PublicDownloadsPage() {
   const SESSION_KEY = 'downloadPinVerified';
   const [verified, setVerified] = useState(() => sessionStorage.getItem(SESSION_KEY) === 'true');
@@ -91,6 +172,7 @@ export function PublicDownloadsPage() {
   const [verifying, setVerifying] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
 
   const { data: agentVersion } = useAgentVersion();
   const versionBadge = agentVersion ? `v${agentVersion}` : 'Najnowszy';
@@ -112,25 +194,25 @@ export function PublicDownloadsPage() {
   };
 
   const APPS: AppCard[] = [
-    { icon: <Monitor className="h-6 w-6" />, name: 'InfraDesk Agent', description: 'Agent monitorujący dla komputerów. Zgłoszenia, RustDesk, backup, Security Audit.', color: 'violet',
+    { icon: <Monitor className="h-6 w-6" />, name: 'InfraDesk Agent Client', description: 'Agent dla komputerów pracowników. Zgłoszenia, RustDesk, Wake-on-LAN, backup, Security Audit.', color: 'violet',
       files: [
-        { label: 'InfraDesk Agent — Windows', url: '/downloads/InfraDesk%20Agent.exe', badge: versionBadge, primary: true, size: '~40 MB' },
+        { label: 'InfraDesk Agent Client — Windows', url: '/downloads/InfraDesk%20Agent.exe', badge: versionBadge, primary: true, size: '~40 MB' },
       ],
-      notes: ['Wymaga Windows 10 lub nowszego', 'Przy pierwszym uruchomieniu wpisz kod rejestracji', 'Uruchamia się automatycznie z Windows', 'Security Audit, skanowanie sieci, monitoring'],
+      notes: ['Wymaga Windows 10 lub nowszego', 'Aplikacja w zasobniku systemowym (tray)', 'Przy pierwszym uruchomieniu wpisz kod rejestracji', 'Zgłoszenia, RustDesk, WoL, Security Audit'],
     },
-    { icon: <Server className="h-6 w-6" />, name: 'InfraDesk Server Agent', description: 'Agent dla serwerów Windows. Usługa Windows, monitoring S.M.A.R.T., RAID, Event Log, Hyper-V.', color: 'violet',
+    { icon: <Server className="h-6 w-6" />, name: 'InfraDesk Agent Server', description: 'Agent dla serwerów Windows. Usługa Windows, S.M.A.R.T., RAID, Event Log, Hyper-V, SSL.', color: 'violet',
       files: [
-        { label: 'InfraDesk Server Agent — Windows', url: '/downloads/InfraDesk%20Server%20Agent.exe', badge: 'v1.0.0', primary: true, size: '~40 MB' },
+        { label: 'InfraDesk Agent Server — Windows', url: '/downloads/InfraDesk%20Server%20Agent.exe', badge: versionBadge, primary: true, size: '~40 MB' },
       ],
-      notes: ['Działa jako usługa Windows (bez logowania)', 'S.M.A.R.T., RAID, Event Log, certyfikaty SSL', 'Security Audit 0-100, skanowanie sieci', 'Instalacja: agent.exe --install-service'],
+      notes: ['Działa jako usługa Windows (bez logowania)', 'S.M.A.R.T., RAID, Event Log, certyfikaty SSL', 'Security Audit 0-100, Hyper-V monitoring', 'Instalacja: agent.exe --install-service'],
     },
     { icon: <Smartphone className="h-6 w-6" />, name: 'InfraDesk TV — Android', description: 'Dashboard dla Android TV. Statystyki i zgłoszenia na dużym ekranie.', color: 'cyan',
-      files: [{ label: 'APK — Android TV', url: '/downloads/InfraDesk-TV.apk', primary: true, size: '~5 MB' }],
+      files: [{ label: 'APK — Android TV', url: '/downloads/InfraDesk-TV.apk', badge: 'v1.0.0', primary: true, size: '~5 MB' }],
       notes: ['Wymaga Android TV 5.0+', 'Instalacja: adb install InfraDesk-TV.apk', 'Auto-odświeżanie co 30 sekund'],
     },
     { icon: <ScreenShare className="h-6 w-6" />, name: 'RustDesk', description: 'Zdalny pulpit. Szyfrowane połączenie end-to-end.', color: 'orange',
       files: [
-        { label: 'RustDesk InfraDesk — Windows (64-bit)', url: '/downloads/silers.msi', primary: true, size: '~29 MB' },
+        { label: 'RustDesk InfraDesk — Windows (64-bit)', url: '/downloads/silers.msi', badge: 'v1.3.7', primary: true, size: '~29 MB' },
         { label: 'RustDesk — Android (Universal)', url: '/downloads/rustdesk.apk', size: '~68 MB' },
       ],
       notes: ['Podaj ID i hasło technikowi', 'Szyfrowanie end-to-end', 'Wersja Windows — konfiguracja InfraDesk'],
@@ -251,8 +333,24 @@ export function PublicDownloadsPage() {
           <p className="text-[13px] mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>Pobierz oprogramowanie InfraDesk</p>
         </div>
         <div className="space-y-5">
-          {APPS.map(app => <AppCardView key={app.name} app={app} />)}
+          {APPS.map((app, i) => (
+            <div key={app.name}>
+              <AppCardView app={app} />
+              {/* Compare button after first agent (between the two agent cards) */}
+              {i === 0 && (
+                <div className="flex justify-center -mb-2 mt-3">
+                  <button onClick={() => setCompareOpen(true)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-full text-[12px] font-medium transition-all hover:scale-105 active:scale-95"
+                    style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', color: 'rgba(139,92,246,0.8)' }}>
+                    <GitCompareArrows className="h-4 w-4" />
+                    Porównaj Agent Client vs Server
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
+        <CompareModal open={compareOpen} onClose={() => setCompareOpen(false)} />
       </main>
       <footer style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <div className="max-w-5xl mx-auto px-6 py-6 text-center text-[11px]" style={{ color: 'rgba(255,255,255,0.15)' }}>
