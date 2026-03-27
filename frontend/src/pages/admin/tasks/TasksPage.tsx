@@ -279,11 +279,14 @@ function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPause
     finally { setSavingKm(false); }
   };
 
-  // Contact info
+  // Contact info — if source is AGENT, reporter is the device, not the user
+  const isAgentTicket = task.ticket?.source === 'AGENT';
   const reporter = task.ticket?.createdBy;
-  const reporterName = task.ticket?.reporterName || (reporter ? `${reporter.firstName} ${reporter.lastName}` : null);
-  const reporterPhone = task.ticket?.reporterPhone || reporter?.phone;
-  const reporterAvatar = reporter?.avatarUrl;
+  const reporterName = isAgentTicket
+    ? null // Agent tickets don't have a human reporter
+    : (task.ticket?.reporterName || (reporter ? `${reporter.firstName} ${reporter.lastName}` : null));
+  const reporterPhone = isAgentTicket ? null : (task.ticket?.reporterPhone || reporter?.phone);
+  const reporterAvatar = isAgentTicket ? null : reporter?.avatarUrl;
   const deviceUser = task.ticket?.device?.assignedUser;
   const locationContact = task.ticket?.location;
 
@@ -389,8 +392,21 @@ function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPause
 
         {/* Right: contact cards */}
         <div className="p-3 space-y-2 lg:border-l" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
-          {/* Zgłaszający */}
-          {reporterName && (
+          {/* Zgłaszający — lub Agent */}
+          {isAgentTicket ? (
+            <div className="rounded-lg p-2.5" style={{ background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.1)' }}>
+              <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(96,165,250,0.5)' }}>Zgłoszenie automatyczne</div>
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(96,165,250,0.12)' }}>
+                  <Monitor className="h-3.5 w-3.5" style={{ color: '#60A5FA' }} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[12px] font-medium text-white/80 truncate">{task.ticket?.device?.name ?? 'Agent'}</p>
+                  <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.35)' }}>Źródło: Agent systemowy</p>
+                </div>
+              </div>
+            </div>
+          ) : reporterName ? (
             <div className="rounded-lg p-2.5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
               <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(255,255,255,0.25)' }}>Zgłaszający</div>
               <div className="flex items-center gap-2">
@@ -409,7 +425,7 @@ function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPause
                 </div>
               </div>
             </div>
-          )}
+          ) : null}
           {/* Użytkownik urządzenia */}
           {deviceUser && deviceUser.id !== reporter?.id && (
             <div className="rounded-lg p-2.5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
