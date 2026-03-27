@@ -98,25 +98,33 @@
     filter: invert(1) hue-rotate(180deg);
   }
 
-  /* Light mode: boost ALL backgrounds in content area */
-  /* After invert, near-transparent whites become invisible on light bg */
-  /* Solution: make the inverted base darker so cards stand out */
-  html[data-theme="light"] main > div:last-child {
-    /* Content wrapper — give it a slightly darker base so cards pop */
-    background: rgba(0,0,0,0.03);
-    border-radius: 0;
-  }
-
-  /* Target rounded containers (cards, tables, panels) */
-  html[data-theme="light"] main [class*="rounded-"] {
-    --tw-shadow: 0 1px 8px rgba(0,0,0,0.05);
-    box-shadow: var(--tw-shadow) !important;
-  }
+  /* Light: boost contrast — invert makes subtle whites invisible */
+  /* Override the inverted near-transparent backgrounds with solid ones */
   html[data-theme="light"] main [class*="rounded-xl"],
   html[data-theme="light"] main [class*="rounded-2xl"],
+  html[data-theme="light"] main [class*="rounded-[14px]"],
   html[data-theme="light"] main [class*="rounded-[16px]"],
   html[data-theme="light"] main [class*="rounded-[18px]"] {
+    background-color: rgba(255,255,255,0.35) !important;
+    box-shadow: 0 1px 8px rgba(0,0,0,0.06), 0 0 0 0.5px rgba(255,255,255,0.5) inset !important;
+    border-color: rgba(255,255,255,0.3) !important;
+  }
+
+  /* Stat cards — gradient backgrounds need extra boost */
+  html[data-theme="light"] main [class*="rounded-[16px]"][class*="overflow-hidden"] {
+    background-color: rgba(255,255,255,0.5) !important;
+  }
+
+  /* Table header rows */
+  html[data-theme="light"] main thead tr {
     background-color: rgba(255,255,255,0.15) !important;
+  }
+
+  /* Table wrapper */
+  html[data-theme="light"] main [class*="rounded-b-"],
+  html[data-theme="light"] main [class*="rounded-t-"] {
+    background-color: rgba(255,255,255,0.3) !important;
+    border-color: rgba(255,255,255,0.25) !important;
   }
 
   /* Un-invert images, videos, emojis, avatars, logos, badges with colors */
