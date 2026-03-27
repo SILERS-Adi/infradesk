@@ -63,7 +63,9 @@ Zwróć JSON (bez markdown) z polami:
       messages: [{ role: 'user', content: context }],
     });
 
-    const text = message.content[0].type === 'text' ? message.content[0].text : '{}';
+    let text = message.content[0].type === 'text' ? message.content[0].text : '{}';
+    // Strip markdown code blocks
+    text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
     try {
       res.json(JSON.parse(text));
     } catch {
