@@ -382,6 +382,8 @@ export async function createAgentTicket(token: string, data: AgentTicketInput) {
   const count  = await prisma.ticket.count();
   const ticketNumber = `T-${String(count + 1).padStart(4, '0')}`;
 
+  const reporterName = [reg.contactFirstName, reg.contactLastName].filter(Boolean).join(' ') || reg.hostname || 'Agent';
+
   const ticket = await prisma.ticket.create({
     data: {
       ticketNumber,
@@ -397,6 +399,8 @@ export async function createAgentTicket(token: string, data: AgentTicketInput) {
       description:     data.description ?? '',
       dueAt:           data.dueAt ? new Date(data.dueAt) : undefined,
       reportedAt:      new Date(),
+      reporterName:    reporterName,
+      reporterPhone:   reg.contactPhone ?? undefined,
     },
   });
 

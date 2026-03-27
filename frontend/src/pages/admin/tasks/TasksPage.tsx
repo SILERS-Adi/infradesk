@@ -392,17 +392,26 @@ function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPause
 
         {/* Right: contact cards */}
         <div className="p-3 space-y-2 lg:border-l" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
-          {/* Zgłaszający — lub Agent */}
+          {/* Zgłaszający — Agent ticket: urządzenie + użytkownik */}
           {isAgentTicket ? (
             <div className="rounded-lg p-2.5" style={{ background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.1)' }}>
-              <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(96,165,250,0.5)' }}>Zgłoszenie automatyczne</div>
+              <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(96,165,250,0.5)' }}>Zgłoszenie z Agenta</div>
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(96,165,250,0.12)' }}>
                   <Monitor className="h-3.5 w-3.5" style={{ color: '#60A5FA' }} />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[12px] font-medium text-white/80 truncate">{task.ticket?.device?.name ?? 'Agent'}</p>
-                  <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.35)' }}>Źródło: Agent systemowy</p>
+                  <p className="text-[12px] font-medium text-white/80 truncate">{task.ticket?.device?.name ?? 'Urządzenie'}</p>
+                  {task.ticket?.reporterName && (
+                    <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                      Użytkownik: {task.ticket.reporterName}
+                    </p>
+                  )}
+                  {task.ticket?.reporterPhone && (
+                    <a href={`tel:${task.ticket.reporterPhone}`} className="flex items-center gap-1 text-[10px] text-emerald-400 hover:underline">
+                      <Phone className="h-2.5 w-2.5" /> {task.ticket.reporterPhone}
+                    </a>
+                  )}
                 </div>
               </div>
             </div>
