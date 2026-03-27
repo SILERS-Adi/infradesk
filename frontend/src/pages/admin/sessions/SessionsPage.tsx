@@ -7,7 +7,6 @@ import { usersApi } from '../../../api/users';
 import { clientsApi } from '../../../api/clients';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { formatDateTime, getErrorMessage } from '../../../utils/helpers';
-import type { Client } from '../../../types';
 
 function formatDuration(min?: number | null): string {
   if (!min) return '—';
@@ -20,8 +19,8 @@ function formatMoney(val: number): string {
   return val.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' zł';
 }
 
-function calcEarnings(s: WorkSession, clientMap: Map<string, Client>): { amount: number; isContract: boolean; label: string } {
-  const client = s.clientId ? clientMap.get(s.clientId) : null;
+function calcEarnings(s: WorkSession): { amount: number; isContract: boolean; label: string } {
+  const client = s.client;
   if (!client) return { amount: 0, isContract: false, label: '—' };
   const isContract = client.hasContract ?? false;
   const rate = client.hourlyRate ?? 0;
@@ -40,7 +39,7 @@ const STATUS_STYLE: Record<string, { label: string; bg: string; color: string }>
   COMPLETED: { label: 'Zakończona', bg: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)' },
 };
 
-function SessionRow({ s, clientMap }: { s: WorkSession; clientMap: Map<string, Client> }) {
+function SessionRow({ s }: { s: WorkSession }) {
   const qc = useQueryClient();
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -49,7 +48,7 @@ function SessionRow({ s, clientMap }: { s: WorkSession; clientMap: Map<string, C
 
   const tech = (s as any).tech;
   const st = STATUS_STYLE[s.status ?? 'COMPLETED'];
-  const earn = calcEarnings(s, clientMap);
+  const earn = calcEarnings(s);
 
   const editMutation = useMutation({
     mutationFn: (data: { startedAt?: string; endedAt?: string }) => sessionsApi.updateSession(s.id, data),
@@ -192,22 +191,13 @@ export function SessionsPage() {
 
   const techs = users.filter(u => u.role === 'ADMIN' || u.role === 'TECHNICIAN');
 
-  const clientMap = useMemo(() => {
-    const m = new Map<string, Client>();
-    for (const c of clients) m.set(c.id, c);
-    return m;
-  }, [clients]);
-
   const stats = useMemo(() => {
     const total = sessions.length;
     const totalMin = sessions.reduce((s, x) => s + (x.durationMin ?? 0), 0);
     const active = sessions.filter(s => s.status === 'ACTIVE').length;
-    const totalEarnings = sessions.reduce((sum, s) => {
-      const e = calcEarnings(s, clientMap);
-      return sum + e.amount;
-    }, 0);
+    const totalEarnings = sessions.reduce((sum, s) => sum + calcEarnings(s).amount, 0);
     return { total, totalMin, active, totalEarnings };
-  }, [sessions, clientMap]);
+  }, [sessions]);
 
   const techSummary = useMemo(() => {
     const map = new Map<string, { name: string; sessions: number; minutes: number; earnings: number }>();
@@ -218,11 +208,11 @@ export function SessionsPage() {
       const existing = map.get(key) ?? { name, sessions: 0, minutes: 0, earnings: 0 };
       existing.sessions++;
       existing.minutes += s.durationMin ?? 0;
-      existing.earnings += calcEarnings(s, clientMap).amount;
+      existing.earnings += calcEarnings(s).amount;
       map.set(key, existing);
     }
     return [...map.values()].sort((a, b) => b.minutes - a.minutes);
-  }, [sessions, clientMap]);
+  }, [sessions]);
 
   return (
     <div>
@@ -317,7 +307,7 @@ export function SessionsPage() {
                 </tr>
               </thead>
               <tbody>
-                {sessions.map(s => <SessionRow key={s.id} s={s} clientMap={clientMap} />)}
+                {sessions.map(s => <SessionRow key={s.id} s={s} />)}
               </tbody>
               <tfoot>
                 <tr style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>

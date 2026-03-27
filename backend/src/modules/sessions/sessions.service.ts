@@ -3,7 +3,7 @@ import { AppError } from '../../middleware/errorHandler';
 import { notifyTicketWorkStarted, notifyTicketWorkCompleted } from '../../utils/ticketNotifications';
 
 const sessionInclude = {
-  client: { select: { id: true, name: true } },
+  client: { select: { id: true, name: true, hasContract: true, contractHours: true, contractMonthlyValue: true, hourlyRate: true, contractHourlyRateOverLimit: true, billingIntervalMinutes: true } },
   ticket: { select: { id: true, ticketNumber: true, title: true } },
   location: { select: { id: true, name: true } },
   device: { select: { id: true, name: true } },

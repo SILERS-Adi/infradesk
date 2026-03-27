@@ -24,7 +24,7 @@ export interface WorkSession {
   durationMin?: number;
   totalPausedMin?: number;
   notes?: string;
-  client?: { id: string; name: string } | null;
+  client?: { id: string; name: string; hasContract?: boolean; contractHours?: number; contractMonthlyValue?: number; hourlyRate?: number; contractHourlyRateOverLimit?: number; billingIntervalMinutes?: number } | null;
   device?: { id: string; name: string } | null;
   ticket?: { id: string; ticketNumber: string; title: string } | null;
   location?: { id: string; name: string } | null;
