@@ -190,8 +190,9 @@ export function BillingPage() {
   const [month, setMonth] = useState(now.getMonth());
   const [year, setYear] = useState(now.getFullYear());
 
-  const from = new Date(year, month, 1).toISOString();
-  const to = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
+  const from = `${year}-${String(month + 1).padStart(2, '0')}-01T00:00:00.000Z`;
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const to = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}T23:59:59.000Z`;
 
   const { data: sessions = [], isLoading } = useQuery({
     queryKey: ['sessions-billing', from, to],
