@@ -36,6 +36,7 @@ import { OrdersPage } from './pages/admin/orders/OrdersPage';
 import { DelegationsPage } from './pages/admin/delegations/DelegationsPage';
 import { SessionsPage } from './pages/admin/sessions/SessionsPage';
 import { BillingPage } from './pages/admin/billing/BillingPage';
+import { CalendarPage } from './pages/admin/tasks/CalendarPage';
 
 // Portal pages
 import { PortalDashboardPage } from './pages/portal/PortalDashboardPage';
@@ -102,6 +103,7 @@ function AdminRoutes() {
         <Route path="delegations" element={<DelegationsPage />} />
         <Route path="crm" element={<CrmPage />} />
         <Route path="sessions" element={<SessionsPage />} />
+        <Route path="calendar" element={<CalendarPage />} />
         <Route path="billing" element={<BillingPage />} />
         <Route path="agents" element={<WaitingRoomPage />} />
         <Route path="faq" element={<FaqPage />} />

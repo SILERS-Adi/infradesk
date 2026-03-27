@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Building2, Monitor,
   Ticket, ChevronLeft, ChevronRight, X, MessageSquare, Bot, Briefcase, ClipboardList,
   ShoppingCart, HelpCircle, Download, Settings, HardDrive, KeyRound, Timer,
-  Receipt, Plane, Users,
+  Receipt, Plane, Users, CalendarDays,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useQuery } from '@tanstack/react-query';
@@ -49,7 +49,8 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
     ]},
     { label: 'SERWIS', items: [
       { to: '/tickets', label: 'Zgłoszenia',  icon: <Ticket className="h-[18px] w-[18px]" />, badge: queueCount > 0 ? queueCount : undefined },
-      { to: '/tasks',   label: 'Zadania',     icon: <ClipboardList className="h-[18px] w-[18px]" />, badge: myActiveTasksCount > 0 ? myActiveTasksCount : undefined },
+      { to: '/tasks',     label: 'Zadania',     icon: <ClipboardList className="h-[18px] w-[18px]" />, badge: myActiveTasksCount > 0 ? myActiveTasksCount : undefined },
+      { to: '/calendar',  label: 'Kalendarz',   icon: <CalendarDays className="h-[18px] w-[18px]" /> },
       { to: '/orders',  label: 'Zamówienia',  icon: <ShoppingCart className="h-[18px] w-[18px]" /> },
       { to: '/delegations', label: 'Delegacje', icon: <Plane className="h-[18px] w-[18px]" /> },
     ]},
