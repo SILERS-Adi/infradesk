@@ -219,6 +219,67 @@ function AiSuggestionPanel({ title, description, source }: { title: string; desc
   );
 }
 
+// ── Agent contact card — pulls data from agent registration ─────────────────
+function AgentContactCard({ task }: { task: Task }) {
+  const { data: agents = [] } = useQuery({
+    queryKey: ['agents'],
+    queryFn: () => agentsApi.getAll(),
+    staleTime: 30_000,
+  });
+
+  const deviceName = task.ticket?.device?.name;
+  const agent = agents.find(a => a.deviceId === task.ticket?.device?.id || a.hostname === deviceName);
+
+  const userName = task.ticket?.reporterName
+    || (agent ? [agent.contactFirstName, agent.contactLastName].filter(Boolean).join(' ') : null)
+    || agent?.currentUser
+    || null;
+  const userPhone = task.ticket?.reporterPhone || agent?.contactPhone || null;
+  const userEmail = agent?.contactEmail || null;
+
+  return (
+    <div className="rounded-lg p-2.5" style={{ background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.1)' }}>
+      <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(96,165,250,0.5)' }}>Zgłoszenie z Agenta</div>
+      <div className="flex items-center gap-2">
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(96,165,250,0.12)' }}>
+          <Monitor className="h-3.5 w-3.5" style={{ color: '#60A5FA' }} />
+        </div>
+        <div className="min-w-0">
+          <p className="text-[12px] font-medium text-white/80 truncate">{deviceName ?? 'Urządzenie'}</p>
+          {agent?.currentUser && (
+            <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              Win: {agent.currentUser}
+            </p>
+          )}
+        </div>
+      </div>
+      {/* User contact */}
+      {userName && (
+        <div className="mt-2 pt-2 flex items-center gap-2" style={{ borderTop: '1px solid rgba(96,165,250,0.08)' }}>
+          <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139,92,246,0.12)' }}>
+            <User className="h-3 w-3" style={{ color: '#A78BFA' }} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-medium text-white/80 truncate">{userName}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              {userPhone && (
+                <a href={`tel:${userPhone}`} className="flex items-center gap-1 text-[10px] text-emerald-400 hover:underline">
+                  <Phone className="h-2.5 w-2.5" /> {userPhone}
+                </a>
+              )}
+              {userEmail && (
+                <a href={`mailto:${userEmail}`} className="text-[10px] text-violet-400 hover:underline truncate">
+                  {userEmail}
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Task card ───────────────────────────────────────────────────────────────
 function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPauseSession, onResumeSession, onEndSession, onEdit }: {
   task: Task;
@@ -394,27 +455,7 @@ function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPause
         <div className="p-3 space-y-2 lg:border-l" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
           {/* Zgłaszający — Agent ticket: urządzenie + użytkownik */}
           {isAgentTicket ? (
-            <div className="rounded-lg p-2.5" style={{ background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.1)' }}>
-              <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(96,165,250,0.5)' }}>Zgłoszenie z Agenta</div>
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(96,165,250,0.12)' }}>
-                  <Monitor className="h-3.5 w-3.5" style={{ color: '#60A5FA' }} />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[12px] font-medium text-white/80 truncate">{task.ticket?.device?.name ?? 'Urządzenie'}</p>
-                  {task.ticket?.reporterName && (
-                    <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                      Użytkownik: {task.ticket.reporterName}
-                    </p>
-                  )}
-                  {task.ticket?.reporterPhone && (
-                    <a href={`tel:${task.ticket.reporterPhone}`} className="flex items-center gap-1 text-[10px] text-emerald-400 hover:underline">
-                      <Phone className="h-2.5 w-2.5" /> {task.ticket.reporterPhone}
-                    </a>
-                  )}
-                </div>
-              </div>
-            </div>
+            <AgentContactCard task={task} />
           ) : reporterName ? (
             <div className="rounded-lg p-2.5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
               <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(255,255,255,0.25)' }}>Zgłaszający</div>

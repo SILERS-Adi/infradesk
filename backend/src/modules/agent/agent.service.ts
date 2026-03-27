@@ -382,7 +382,9 @@ export async function createAgentTicket(token: string, data: AgentTicketInput) {
   const count  = await prisma.ticket.count();
   const ticketNumber = `T-${String(count + 1).padStart(4, '0')}`;
 
-  const reporterName = [reg.contactFirstName, reg.contactLastName].filter(Boolean).join(' ') || reg.hostname || 'Agent';
+  // Best available name: contact name > Windows user > hostname
+  const contactName = [reg.contactFirstName, reg.contactLastName].filter(Boolean).join(' ');
+  const reporterName = contactName || reg.currentUser || reg.hostname || 'Agent';
 
   const ticket = await prisma.ticket.create({
     data: {
