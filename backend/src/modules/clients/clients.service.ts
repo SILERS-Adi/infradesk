@@ -173,12 +173,20 @@ export async function updateClient(id: string, data: UpdateClientInput, performe
     throw new AppError('Client not found', 404);
   }
 
+  const updateData: Record<string, unknown> = { ...data };
+  if (data.status) updateData.status = data.status as ClientStatus;
+  // Convert date strings to Date objects or null
+  if ('contractStartDate' in data) {
+    updateData.contractStartDate = data.contractStartDate ? new Date(data.contractStartDate) : null;
+  }
+  // Clean empty strings to null for optional fields
+  for (const key of ['contractScope', 'contractAttachmentUrl', 'logoUrl', 'notes'] as const) {
+    if (key in data && (data as any)[key] === '') updateData[key] = null;
+  }
+
   const client = await prisma.client.update({
     where: { id },
-    data: {
-      ...data,
-      status: data.status as ClientStatus | undefined,
-    },
+    data: updateData,
   });
 
   await logActivity(prisma, {
