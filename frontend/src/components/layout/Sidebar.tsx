@@ -3,8 +3,9 @@ import {
   LayoutDashboard, Building2, Monitor,
   Ticket, ChevronLeft, ChevronRight, X, MessageSquare, Bot, Briefcase, ClipboardList,
   ShoppingCart, HelpCircle, Download, Settings, HardDrive, KeyRound, Timer,
-  Receipt, Plane, Users, CalendarDays,
+  Receipt, Plane, Users, CalendarDays, Sun, Moon, SunMoon,
 } from 'lucide-react';
+import { useTheme } from '../../store/themeStore';
 import { clsx } from 'clsx';
 import { useQuery } from '@tanstack/react-query';
 import { ticketsApi } from '../../api/tickets';
@@ -155,6 +156,9 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
         ))}
       </nav>
 
+      {/* Theme switcher */}
+      <ThemeSwitcher collapsed={collapsed} />
+
       {/* FAQ */}
       <div className="px-2.5 pb-1 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         <NavLink to="/faq" onClick={mobile ? onClose : undefined} title={collapsed ? 'FAQ' : undefined}
@@ -181,5 +185,49 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
         </div>
       )}
     </aside>
+  );
+}
+
+function ThemeSwitcher({ collapsed }: { collapsed: boolean }) {
+  const { mode, setMode } = useTheme();
+  const modes: { value: 'light' | 'dark' | 'auto'; icon: React.ReactNode; label: string }[] = [
+    { value: 'light', icon: <Sun className="h-3.5 w-3.5" />, label: 'Jasny' },
+    { value: 'auto',  icon: <SunMoon className="h-3.5 w-3.5" />, label: 'Auto' },
+    { value: 'dark',  icon: <Moon className="h-3.5 w-3.5" />, label: 'Ciemny' },
+  ];
+
+  if (collapsed) {
+    return (
+      <div className="px-2.5 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <button
+          onClick={() => setMode(mode === 'dark' ? 'light' : mode === 'light' ? 'auto' : 'dark')}
+          className="flex items-center justify-center w-10 h-10 mx-auto rounded-xl text-white/40 hover:text-white/65 hover:bg-white/[0.05] transition-colors"
+          title={mode === 'auto' ? 'Auto' : mode === 'light' ? 'Jasny' : 'Ciemny'}
+        >
+          {mode === 'light' ? <Sun className="h-[18px] w-[18px]" /> : mode === 'auto' ? <SunMoon className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-3 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="flex rounded-xl p-0.5" style={{ background: 'rgba(255,255,255,0.04)' }}>
+        {modes.map(m => (
+          <button
+            key={m.value}
+            onClick={() => setMode(m.value)}
+            className={clsx(
+              'flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[11px] font-medium transition-all',
+              mode === m.value ? 'text-white' : 'text-white/35 hover:text-white/55'
+            )}
+            style={mode === m.value ? { background: 'rgba(139,92,246,0.2)', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' } : {}}
+          >
+            {m.icon}
+            {m.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
