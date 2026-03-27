@@ -68,8 +68,8 @@ function sortDevices(devices: Device[], key: SortKey, dir: SortDir): Device[] {
     switch (key) {
       case 'name': cmp = a.name.localeCompare(b.name); break;
       case 'user': {
-        const uA = a.agents?.[0]?.currentUser || (a.assignedUser ? `${a.assignedUser.firstName} ${a.assignedUser.lastName}` : '');
-        const uB = b.agents?.[0]?.currentUser || (b.assignedUser ? `${b.assignedUser.firstName} ${b.assignedUser.lastName}` : '');
+        const uA = a.assignedUser ? `${a.assignedUser.firstName} ${a.assignedUser.lastName}` : '';
+        const uB = b.assignedUser ? `${b.assignedUser.firstName} ${b.assignedUser.lastName}` : '';
         cmp = uA.localeCompare(uB); break;
       }
       case 'client': cmp = (a.client?.name ?? '').localeCompare(b.client?.name ?? ''); break;
@@ -263,6 +263,7 @@ export function DevicesListPage() {
                   <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <SortTh label="Urządzenie" sortKey="name" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <SortTh label="Użytkownik" sortKey="user" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+                    <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Login</th>
                     <SortTh label="Firma" sortKey="client" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <SortTh label="Lokalizacja" sortKey="location" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <th className="text-center px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>RustDesk</th>
@@ -298,18 +299,25 @@ export function DevicesListPage() {
                         </div>
                       </td>
 
-                      {/* Użytkownik */}
+                      {/* Użytkownik (assignedUser = kto zalogowany przez agenta) */}
                       <td className="px-4 py-3">
-                        {device.agents?.[0]?.currentUser ? (
-                          <span className="text-[13px]" style={{ color: 'rgba(255,255,255,0.6)' }}>
-                            {device.agents[0].currentUser}
-                          </span>
-                        ) : device.assignedUser ? (
-                          <span className="text-[13px]" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                        {device.assignedUser ? (
+                          <span className="text-[13px]" style={{ color: 'rgba(255,255,255,0.7)' }}>
                             {device.assignedUser.firstName} {device.assignedUser.lastName}
                           </span>
                         ) : (
                           <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.2)' }}>—</span>
+                        )}
+                      </td>
+
+                      {/* Login (Windows username z agenta) */}
+                      <td className="px-4 py-3">
+                        {device.agents?.[0]?.currentUser ? (
+                          <span className="text-[12px] font-mono" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                            {device.agents[0].currentUser}
+                          </span>
+                        ) : (
+                          <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.15)' }}>—</span>
                         )}
                       </td>
 
