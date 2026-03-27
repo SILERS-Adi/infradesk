@@ -460,9 +460,9 @@ export function TicketsListPage() {
 
                     {/* Użytkownik */}
                     <td className="px-4 py-3 whitespace-nowrap">
-                      {ticket.device?.assignedUser ? (
+                      {(ticket.device as any)?.assignedUser ? (
                         <span className="text-[13px]" style={{ color: 'rgba(255,255,255,0.6)' }}>
-                          {(ticket.device.assignedUser as any).firstName} {(ticket.device.assignedUser as any).lastName}
+                          {(ticket.device as any).assignedUser.firstName} {(ticket.device as any).assignedUser.lastName}
                         </span>
                       ) : ticket.reporterName ? (
                         <span className="text-[12px]" style={{ color: 'rgba(255,255,255,0.45)' }}>

@@ -70,8 +70,8 @@ export const sessionsApi = {
   resume: (id: string) =>
     api.patch(`/sessions/${id}/resume`).then(r => r.data),
 
-  getActive: (): Promise<WorkSession[]> =>
-    api.get('/sessions/active').then(r => Array.isArray(r.data) ? r.data : r.data ? [r.data] : []),
+  getActive: (): Promise<WorkSession | null> =>
+    api.get('/sessions/active').then(r => Array.isArray(r.data) ? r.data[0] ?? null : r.data ?? null),
 
   updateSession: (id: string, data: { startedAt?: string; endedAt?: string; durationMin?: number; notes?: string }): Promise<WorkSession> =>
     api.patch(`/sessions/${id}`, data).then(r => r.data),

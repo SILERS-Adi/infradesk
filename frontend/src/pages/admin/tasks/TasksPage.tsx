@@ -721,7 +721,7 @@ export function TasksPage() {
 
   const { data: activeSessions = [] } = useQuery({
     queryKey: ['session-active'],
-    queryFn: () => sessionsApi.getActive(),
+    queryFn: async () => { const s = await sessionsApi.getActive(); return s ? [s] : []; },
     refetchInterval: 5_000,
   });
 

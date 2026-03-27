@@ -10,6 +10,8 @@ import { PortalLayout } from './components/layout/PortalLayout';
 
 // Auth
 import { LoginPage } from './pages/auth/LoginPage';
+import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 
 // Admin pages
 import { DashboardPage } from './pages/admin/DashboardPage';
@@ -193,7 +195,10 @@ export default function App() {
           <AutoLoginHandler />
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/pobieranie" element={<PublicDownloadsPage />} />
+            <Route path="/downloads" element={<PublicDownloadsPage />} />
             <Route path="/tv" element={<TvDashboardPage />} />
             <Route path="/qr/:qrCodeValue" element={<QrPage />} />
             <Route path="/portal/*" element={<PortalRoutes />} />

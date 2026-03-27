@@ -1,17 +1,18 @@
 import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
 import {
   Download, Smartphone, Monitor, Server, ArrowRight, Mail, Lock,
-  ScreenShare, FileText,
+  ScreenShare, KeyRound, CheckCircle, Loader2,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { authApi } from '../../api/auth';
 import { useAuth } from '../../store/authStore';
 import { subscribeToPush } from '../../utils/pushNotifications';
+import { downloadsApi } from '../../api/downloads';
 
 function useIsMobile() {
   return useMemo(() => {
@@ -41,7 +42,7 @@ type FormData = z.infer<typeof schema>;
 const DOWNLOADS = [
   {
     icon: <Monitor className="h-5 w-5" />,
-    name: 'InfraDesk Agent',
+    name: 'InfraDesk Agent Client',
     desc: 'Windows',
     url: '/downloads/InfraDesk%20Agent.exe',
     color: '#8B5CF6',
@@ -51,12 +52,13 @@ const DOWNLOADS = [
   },
   {
     icon: <Server className="h-5 w-5" />,
-    name: 'Server Agent',
+    name: 'InfraDesk Agent Server',
     desc: 'Windows Server',
     url: '/downloads/InfraDesk%20Server%20Agent.exe',
     color: '#A78BFA',
     bg: 'rgba(167,139,250,0.08)',
     border: 'rgba(167,139,250,0.12)',
+    showVersion: true,
   },
   {
     icon: <ScreenShare className="h-5 w-5" />,
@@ -68,6 +70,147 @@ const DOWNLOADS = [
     border: 'rgba(251,146,60,0.12)',
   },
 ];
+
+/* ── PIN-gated Downloads Section ─────────────────────────────────────────── */
+function DownloadsWithPin({ agentVersion, compact }: { agentVersion?: string | null; compact?: boolean }) {
+  const PIN_KEY = 'downloadPinVerified';
+  const [verified, setVerified] = useState(() => sessionStorage.getItem(PIN_KEY) === 'true');
+  const [pinInput, setPinInput] = useState('');
+  const [emailInput, setEmailInput] = useState('');
+  const [verifying, setVerifying] = useState(false);
+  const [requesting, setRequesting] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+
+  const handleVerify = async () => {
+    if (!pinInput.trim()) return;
+    setVerifying(true);
+    try {
+      const { data } = await downloadsApi.verifyPin(pinInput.trim());
+      if (data.valid) { sessionStorage.setItem(PIN_KEY, 'true'); setVerified(true); }
+      else toast.error('Nieprawidłowy lub wygasły PIN');
+    } catch { toast.error('Błąd weryfikacji PIN'); }
+    finally { setVerifying(false); }
+  };
+
+  const handleRequestPin = async () => {
+    if (!emailInput.trim() || !emailInput.includes('@')) { toast.error('Podaj poprawny adres e-mail'); return; }
+    setRequesting(true);
+    try { await downloadsApi.requestPin(emailInput.trim()); setEmailSent(true); }
+    catch (err: unknown) {
+      const msg = err && typeof err === 'object' && 'response' in err ? (err as any).response?.data?.error : null;
+      toast.error(msg ?? 'Nie udało się wysłać PIN.');
+    } finally { setRequesting(false); }
+  };
+
+  /* Verified — show download links */
+  if (verified) {
+    return (
+      <div className={compact ? '' : 'mt-6'}>
+        <div className="flex items-center gap-2 mb-3">
+          <Download className="h-4 w-4" style={{ color: 'rgba(139,92,246,0.5)' }} />
+          <h3 className="text-[12px] font-semibold uppercase tracking-[0.08em]" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            Pliki do pobrania
+          </h3>
+          <div className="flex items-center gap-1 ml-auto px-2 py-0.5 rounded-full" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.15)' }}>
+            <CheckCircle className="h-3 w-3" style={{ color: '#22C55E' }} />
+            <span className="text-[9px] font-medium" style={{ color: '#22C55E' }}>PIN OK</span>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-2">
+          {DOWNLOADS.map(dl => (
+            <a key={dl.name} href={dl.url} download
+              className="group flex items-center gap-3 px-3.5 py-3 rounded-[12px] transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
+              style={{ background: dl.bg, border: `1px solid ${dl.border}` }}>
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ background: `${dl.color}15`, color: dl.color }}>
+                {dl.icon}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-[13px] font-semibold text-white/80">{dl.name}</span>
+                  {dl.showVersion && agentVersion && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: `${dl.color}20`, color: dl.color }}>
+                      v{agentVersion}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{dl.desc}</span>
+              </div>
+              <Download className="h-4 w-4 flex-shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" style={{ color: dl.color }} />
+            </a>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  /* Not verified — show PIN form */
+  return (
+    <div className={compact ? '' : 'mt-6'}>
+      <div className="flex items-center gap-2 mb-3">
+        <Download className="h-4 w-4" style={{ color: 'rgba(139,92,246,0.5)' }} />
+        <h3 className="text-[12px] font-semibold uppercase tracking-[0.08em]" style={{ color: 'rgba(255,255,255,0.4)' }}>
+          Pliki do pobrania
+        </h3>
+      </div>
+      <p className="text-[12px] mb-3" style={{ color: 'rgba(255,255,255,0.3)' }}>
+        Wpisz PIN od administratora lub wyślij na e-mail
+      </p>
+      <div className="space-y-2.5">
+        {/* PIN input */}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'rgba(255,255,255,0.2)' }} />
+            <input type="text" placeholder="Wpisz PIN" value={pinInput}
+              onChange={e => setPinInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleVerify()}
+              className="w-full pl-9 pr-3 py-2.5 rounded-xl text-[13px] text-center font-bold tracking-widest outline-none"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.9)' }}
+              maxLength={50} />
+          </div>
+          <button onClick={handleVerify} disabled={verifying || !pinInput.trim()}
+            className="px-4 py-2.5 rounded-xl text-[12px] font-semibold text-white flex items-center gap-1.5 active:scale-[0.98] transition-all disabled:opacity-50"
+            style={{ background: 'linear-gradient(145deg, #6D28D9, #2563EB)' }}>
+            {verifying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
+            OK
+          </button>
+        </div>
+
+        {/* Separator */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
+          <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.2)' }}>lub</span>
+          <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
+        </div>
+
+        {/* Email request */}
+        {emailSent ? (
+          <div className="flex items-center gap-2 p-2.5 rounded-xl" style={{ background: 'rgba(34,211,238,0.06)', border: '1px solid rgba(34,211,238,0.15)' }}>
+            <CheckCircle className="h-3.5 w-3.5" style={{ color: '#22D3EE' }} />
+            <span className="text-[12px]" style={{ color: '#22D3EE' }}>Sprawdź e-mail — PIN wysłany (ważny 24h)</span>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'rgba(255,255,255,0.2)' }} />
+              <input type="email" placeholder="jan@firma.pl" value={emailInput}
+                onChange={e => setEmailInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleRequestPin()}
+                className="w-full pl-9 pr-3 py-2.5 rounded-xl text-[13px] outline-none"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }} />
+            </div>
+            <button onClick={handleRequestPin} disabled={requesting}
+              className="px-4 py-2.5 rounded-xl text-[12px] font-medium flex items-center gap-1.5 active:scale-[0.98] transition-all disabled:opacity-50"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)' }}>
+              {requesting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
+              Wyślij
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 /* ══════════════════════════════════════════════════════════════════════════ */
 
@@ -147,42 +290,6 @@ export function LoginPage() {
     };
   };
 
-  /* ── Downloads section (reusable for mobile + desktop) ─────────────────── */
-  const DownloadsSection = ({ compact }: { compact?: boolean }) => (
-    <div className={compact ? '' : 'mt-6'}>
-      <div className="flex items-center gap-2 mb-3">
-        <Download className="h-4 w-4" style={{ color: 'rgba(139,92,246,0.5)' }} />
-        <h3 className="text-[12px] font-semibold uppercase tracking-[0.08em]" style={{ color: 'rgba(255,255,255,0.4)' }}>
-          Pliki do pobrania
-        </h3>
-      </div>
-      <div className="grid grid-cols-1 gap-2">
-        {DOWNLOADS.map(dl => (
-          <a key={dl.name} href={dl.url} download
-            className="group flex items-center gap-3 px-3.5 py-3 rounded-[12px] transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
-            style={{ background: dl.bg, border: `1px solid ${dl.border}` }}>
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ background: `${dl.color}15`, color: dl.color }}>
-              {dl.icon}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-[13px] font-semibold text-white/80">{dl.name}</span>
-                {dl.showVersion && agentVersion && (
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: `${dl.color}20`, color: dl.color }}>
-                    v{agentVersion}
-                  </span>
-                )}
-              </div>
-              <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{dl.desc}</span>
-            </div>
-            <Download className="h-4 w-4 flex-shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" style={{ color: dl.color }} />
-          </a>
-        ))}
-      </div>
-    </div>
-  );
-
   /* ── Main login ────────────────────────────────────────────────────────── */
   return (
     <div className="min-h-screen flex" style={{ background: '#080D19' }}>
@@ -241,7 +348,7 @@ export function LoginPage() {
             border: '1px solid rgba(255,255,255,0.06)',
             backdropFilter: 'blur(12px)',
           }}>
-            <DownloadsSection compact />
+            <DownloadsWithPin agentVersion={agentVersion} compact />
           </div>
 
           {/* ── Login + Downloads card ──────────────────────────────── */}
@@ -294,6 +401,14 @@ export function LoginPage() {
                   {errors.password && <p className="text-[11px] text-red-400/70 mt-1.5">{errors.password.message}</p>}
                 </div>
 
+                {/* Forgot password */}
+                <div className="text-right -mt-1">
+                  <Link to="/forgot-password" className="text-[12px] font-medium transition-colors hover:text-violet-400"
+                    style={{ color: 'rgba(255,255,255,0.35)' }}>
+                    Nie pamiętam hasła
+                  </Link>
+                </div>
+
                 {/* Submit */}
                 <button type="submit" disabled={loading}
                   className="w-full flex items-center justify-center gap-2 py-[14px] rounded-[14px] text-[14px] font-semibold text-white transition-all duration-200 active:scale-[0.98] disabled:opacity-60"
@@ -316,28 +431,9 @@ export function LoginPage() {
                 <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
               </div>
 
-              {/* ── Desktop: Downloads inside card ─────────────────── */}
+              {/* ── Desktop: Downloads with PIN ─────────────────────── */}
               <div className="hidden lg:block">
-                <div className="grid grid-cols-3 gap-2">
-                  {DOWNLOADS.map(dl => (
-                    <a key={dl.name} href={dl.url} download
-                      className="group flex flex-col items-center gap-2 p-3.5 rounded-[14px] text-center transition-all duration-200 hover:scale-[1.03] hover:-translate-y-0.5 active:scale-[0.98]"
-                      style={{ background: dl.bg, border: `1px solid ${dl.border}` }}>
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                        style={{ background: `${dl.color}18`, color: dl.color }}>
-                        {dl.icon}
-                      </div>
-                      <div>
-                        <p className="text-[12px] font-semibold text-white/80 leading-tight">{dl.name}</p>
-                        <p className="text-[10px] mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                          {dl.desc}
-                          {dl.showVersion && agentVersion ? ` · v${agentVersion}` : ''}
-                        </p>
-                      </div>
-                      <Download className="h-3.5 w-3.5 opacity-30 group-hover:opacity-70 transition-opacity" style={{ color: dl.color }} />
-                    </a>
-                  ))}
-                </div>
+                <DownloadsWithPin agentVersion={agentVersion} />
               </div>
 
               {/* Footer */}

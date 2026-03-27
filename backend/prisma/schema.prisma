@@ -624,6 +624,15 @@ model DownloadPinRequest {
   createdAt DateTime  @default(now())
 }
 
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  email     String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
 model AppSetting {
   key       String   @id
   value     String

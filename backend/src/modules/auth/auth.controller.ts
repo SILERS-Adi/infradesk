@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { loginService, refreshTokenService, getMeService } from './auth.service';
+import { loginService, refreshTokenService, getMeService, forgotPasswordService, resetPasswordService } from './auth.service';
 import prisma from '../../lib/prisma';
 import { signAccessToken, signRefreshToken, JwtPayload } from '../../utils/jwt';
 
@@ -74,4 +74,23 @@ export async function me(req: Request, res: Response, next: NextFunction): Promi
   } catch (err) {
     next(err);
   }
+}
+
+export async function forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { email } = req.body;
+    if (!email) { res.status(400).json({ error: 'Email jest wymagany' }); return; }
+    const result = await forgotPasswordService(email);
+    res.json(result);
+  } catch (err) { next(err); }
+}
+
+export async function resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) { res.status(400).json({ error: 'Token i hasło są wymagane' }); return; }
+    if (password.length < 6) { res.status(400).json({ error: 'Hasło musi mieć min. 6 znaków' }); return; }
+    const result = await resetPasswordService(token, password);
+    res.json(result);
+  } catch (err) { next(err); }
 }

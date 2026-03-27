@@ -4,7 +4,7 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin, { Draggable } from '@fullcalendar/interaction';
-import type { EventInput, EventDropArg, EventClickArg, EventReceiveArg } from '@fullcalendar/core';
+import type { EventInput, EventDropArg, EventClickArg } from '@fullcalendar/core';
 import { ClipboardList, Clock, GripVertical } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { tasksApi } from '../../../api/tasks';
@@ -112,7 +112,7 @@ export function CalendarPage() {
     if (newDate) updateDueMutation.mutate({ id: info.event.id, dueAt: newDate });
   };
 
-  const handleEventReceive = (info: EventReceiveArg) => {
+  const handleEventReceive = (info: any) => {
     // External drop from unscheduled panel
     const newDate = info.event.start?.toISOString();
     if (newDate && info.event.id) {
