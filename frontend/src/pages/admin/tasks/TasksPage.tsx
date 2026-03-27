@@ -281,9 +281,9 @@ function AgentContactCard({ task }: { task: Task }) {
 }
 
 // ── Task card ───────────────────────────────────────────────────────────────
-function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPauseSession, onResumeSession, onEndSession, onEdit }: {
+function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPauseSession, onResumeSession, onEndSession, onEdit }: {
   task: Task;
-  activeSession: WorkSession | null;
+  activeSessions: WorkSession[];
   onChangeStatus: (id: string, status: TaskStatus) => void;
   onStartSession: (task: Task) => void;
   onPauseSession: (sessionId: string) => void;
@@ -301,9 +301,10 @@ function TaskCard({ task, activeSession, onChangeStatus, onStartSession, onPause
   const [km, setKm] = useState(task.travelKm?.toString() ?? '');
   const [savingKm, setSavingKm] = useState(false);
 
-  // Is THIS task's session active?
-  const isThisTaskSession = activeSession?.ticketId === task.ticketId && activeSession?.status === 'ACTIVE';
-  const isThisTaskPaused = activeSession?.ticketId === task.ticketId && activeSession?.status === 'PAUSED';
+  // Find THIS task's active/paused session (supports multiple concurrent sessions)
+  const activeSession = activeSessions.find(s => s.ticketId === task.ticketId) ?? null;
+  const isThisTaskSession = activeSession?.status === 'ACTIVE';
+  const isThisTaskPaused = activeSession?.status === 'PAUSED';
   const hasActiveSession = isThisTaskSession || isThisTaskPaused;
 
   const liveSeconds = useLiveTimer(isThisTaskSession ? activeSession : null);
@@ -717,7 +718,7 @@ export function TasksPage() {
     refetchInterval: 15_000,
   });
 
-  const { data: activeSession } = useQuery({
+  const { data: activeSessions = [] } = useQuery({
     queryKey: ['session-active'],
     queryFn: () => sessionsApi.getActive(),
     refetchInterval: 5_000,
@@ -857,7 +858,7 @@ export function TasksPage() {
             <TaskCard
               key={task.id}
               task={task}
-              activeSession={activeSession ?? null}
+              activeSessions={activeSessions}
               onChangeStatus={(id, status) => statusMutation.mutate({ id, status })}
               onStartSession={(t) => startSessionMutation.mutate(t)}
               onPauseSession={(id) => pauseSessionMutation.mutate(id)}

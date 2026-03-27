@@ -170,11 +170,7 @@ export async function startMobileSession(techId: string, data: {
   deviceId?: string;
   notes?: string;
 }) {
-  const existing = await prisma.workSession.findFirst({
-    where: { techId, status: { in: ['ACTIVE', 'PAUSED'] } },
-  });
-  if (existing) throw new AppError('Already have an active session', 409);
-
+  // Allow multiple concurrent sessions (multitasking)
   const session = await prisma.workSession.create({
     data: {
       clientId: data.clientId,
@@ -264,7 +260,8 @@ export async function resumeSession(id: string, techId: string) {
 // ── Get active session ───────────────────────────────────────────────────────
 
 export async function getActiveTechSession(techId: string) {
-  return prisma.workSession.findFirst({
+  // Return ALL active/paused sessions (multitasking support)
+  return prisma.workSession.findMany({
     where: { techId, status: { in: ['ACTIVE', 'PAUSED'] } },
     include: sessionInclude,
     orderBy: { startedAt: 'desc' },
