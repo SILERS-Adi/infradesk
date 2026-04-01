@@ -5,9 +5,8 @@ import { CreateOrderInput, ChangeOrderStatusInput } from './orders.validation';
 import { OrderStatus } from '@prisma/client';
 
 const orderSelect = {
-  id: true, orderNumber: true, clientId: true, ticketId: true,
+  id: true, orderNumber: true, workspaceId: true, ticketId: true,
   assignedToUserId: true, status: true, notes: true, createdAt: true, updatedAt: true,
-  client: { select: { id: true, name: true } },
   ticket: { select: { id: true, ticketNumber: true, title: true } },
   createdBy: { select: { id: true, firstName: true, lastName: true } },
   assignedTo: { select: { id: true, firstName: true, lastName: true } },
@@ -21,24 +20,18 @@ async function generateOrderNumber(): Promise<string> {
 }
 
 export async function listOrders(params: {
-  clientId?: string; status?: OrderStatus; requestingUser: { id: string; role: string; clientId?: string | null };
+  status?: OrderStatus; workspaceId?: string | null;
 }) {
-  const { clientId, status, requestingUser } = params;
+  const { status, workspaceId } = params;
   const where: Record<string, unknown> = {};
-  if (clientId) where.clientId = clientId;
+  if (workspaceId) where.workspaceId = workspaceId;
   if (status) where.status = status;
-  if (requestingUser.role === 'CLIENT') {
-    where.clientId = requestingUser.clientId;
-  }
   return prisma.order.findMany({ where, orderBy: { createdAt: 'desc' }, select: orderSelect });
 }
 
-export async function getOrderById(id: string, requestingUser?: { id: string; role: string; clientId?: string | null }) {
+export async function getOrderById(id: string) {
   const order = await prisma.order.findUnique({ where: { id }, select: orderSelect });
   if (!order) throw new AppError('Order not found', 404);
-  if (requestingUser?.role === 'CLIENT' && order.clientId !== requestingUser.clientId) {
-    throw new AppError('Access denied', 403);
-  }
   return order;
 }
 
@@ -47,7 +40,7 @@ export async function createOrder(data: CreateOrderInput, createdByUserId: strin
   const order = await prisma.order.create({
     data: {
       orderNumber,
-      clientId: data.clientId,
+      workspaceId: data.workspaceId,
       ticketId: data.ticketId,
       createdByUserId,
       assignedToUserId: data.assignedToUserId,

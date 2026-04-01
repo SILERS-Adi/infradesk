@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const createTicketSchema = z.object({
-  clientId: z.string().uuid().optional(),
+  workspaceId: z.string().uuid().optional(),
   locationId: z.string().uuid().optional(),
   deviceId: z.string().uuid().optional().nullable(),
   type: z.enum(['INCIDENT', 'REQUEST', 'MAINTENANCE', 'INSTALLATION', 'REKLAMACJA', 'OTHER']).default('INCIDENT'),

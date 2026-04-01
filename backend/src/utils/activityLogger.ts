@@ -6,6 +6,7 @@ interface LogActivityParams {
   actionType: string;
   description: string;
   performedByUserId?: string | null;
+  workspaceId?: string | null;
   metadata?: Record<string, unknown>;
 }
 
@@ -21,7 +22,7 @@ export async function logActivity(
         actionType: params.actionType,
         description: params.description,
         performedByUserId: params.performedByUserId || null,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        workspaceId: params.workspaceId || undefined,
         metadata: params.metadata ? (params.metadata as any) : undefined,
       },
     });

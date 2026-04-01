@@ -42,9 +42,9 @@ type FormData = z.infer<typeof schema>;
 const DOWNLOADS = [
   {
     icon: <Monitor className="h-5 w-5" />,
-    name: 'InfraDesk Agent Client',
+    name: 'InfraDesk',
     desc: 'Windows',
-    url: '/downloads/InfraDesk%20Agent.exe',
+    url: '/downloads/InfraDesk.exe',
     color: '#8B5CF6',
     bg: 'rgba(139,92,246,0.1)',
     border: 'rgba(139,92,246,0.15)',
@@ -52,7 +52,7 @@ const DOWNLOADS = [
   },
   {
     icon: <Server className="h-5 w-5" />,
-    name: 'InfraDesk Agent Server',
+    name: 'InfraDesk Server',
     desc: 'Windows Server',
     url: '/downloads/InfraDesk%20Server%20Agent.exe',
     color: '#A78BFA',
@@ -170,7 +170,7 @@ function DownloadsWithPin({ agentVersion, compact }: { agentVersion?: string | n
           </div>
           <button onClick={handleVerify} disabled={verifying || !pinInput.trim()}
             className="px-4 py-2.5 rounded-xl text-[12px] font-semibold text-white flex items-center gap-1.5 active:scale-[0.98] transition-all disabled:opacity-50"
-            style={{ background: 'linear-gradient(145deg, #6D28D9, #2563EB)' }}>
+            style={{ background: 'linear-gradient(135deg, #4f8cff 0%, #6366F1 40%, #8B5CF6 100%)' }}>
             {verifying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
             OK
           </button>
@@ -232,8 +232,8 @@ export function LoginPage() {
       setTokens(response.accessToken, response.refreshToken);
       setUser(response.user);
       subscribeToPush().catch(() => {});
-      if (response.user.role === 'CLIENT') navigate('/portal');
-      else if (isMobile) setShowVersionPicker(true);
+      // After login, workspace context will determine portal vs admin
+      if (isMobile) setShowVersionPicker(true);
       else navigate('/dashboard');
     } catch (err: unknown) {
       const msg = err && typeof err === 'object' && 'response' in err
@@ -245,18 +245,17 @@ export function LoginPage() {
   /* ── Version picker (mobile) ───────────────────────────────────────────── */
   if (showVersionPicker) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden" style={{ background: '#080D19' }}>
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden" style={{ background: '#040a16' }}>
         <div className="absolute inset-0" style={{ backgroundImage: 'url(/tlo.png)', backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.15 }} />
         <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(8,13,25,0.3), rgba(8,13,25,0.9))' }} />
         <div className="relative z-10 flex flex-col items-center w-full max-w-sm">
-          <img src="/logo.png" alt="" className="h-16 mb-4" />
-          <h1 className="text-xl font-semibold text-white/90 mb-1">Witaj w InfraDesk</h1>
+          <img src="/logo.png" alt="InfraDesk" className="w-40 max-w-[60%] mb-6 drop-shadow-xl" />
           <p className="text-[13px] text-white/40 mb-10">Wybierz wersję interfejsu</p>
           <div className="w-full space-y-3">
             <button onClick={() => navigate('/m')}
               className="w-full flex items-center gap-4 p-5 rounded-[18px] active:scale-[0.98] transition-all duration-200"
               style={{ background: 'rgba(255,255,255,0.95)', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(145deg, #6D28D9, #2563EB)' }}>
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, #4f8cff 0%, #6366F1 40%, #8B5CF6 100%)' }}>
                 <Smartphone className="h-6 w-6 text-white" />
               </div>
               <div className="text-left"><p className="text-[15px] font-semibold text-gray-900">Wersja mobilna</p><p className="text-[12px] text-gray-500">Dotykowy interfejs</p></div>
@@ -292,11 +291,11 @@ export function LoginPage() {
 
   /* ── Main login ────────────────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen flex" style={{ background: '#080D19' }}>
+    <div className="min-h-screen flex" style={{ background: '#040a16' }}>
 
       {/* ── LEFT — branding ─────────────────────────────────────────── */}
       <div className="hidden lg:flex lg:w-[46%] flex-col items-center justify-center p-12 relative overflow-hidden"
-        style={{ background: 'linear-gradient(160deg, #0A0F1E 0%, #0F1B34 40%, #131E3A 70%, #0E1628 100%)' }}>
+        style={{ background: 'linear-gradient(160deg, #040a16 0%, #0F1B34 40%, #131E3A 70%, #0E1628 100%)' }}>
 
         {/* Ambient lights */}
         <div className="absolute inset-0 pointer-events-none">
@@ -305,15 +304,14 @@ export function LoginPage() {
           <div className="absolute bottom-[15%] left-[20%] w-[30%] h-[25%] rounded-full" style={{ background: 'radial-gradient(ellipse, rgba(37,99,235,0.04), transparent 70%)' }} />
         </div>
 
-        <div className="relative z-10 text-center max-w-md">
-          <img src="/logo.png" alt="" className="h-20 mx-auto mb-6 opacity-90" />
-          <h1 className="text-[32px] font-semibold text-white/90 tracking-[-0.02em] mb-3">InfraDesk</h1>
-          <p className="text-[13px] font-medium uppercase tracking-[0.15em] mb-10"
-            style={{ color: 'rgba(139,92,246,0.6)' }}>
+        <div className="relative z-10 text-center max-w-md flex flex-col items-center justify-center">
+          <img src="/logo.png" alt="InfraDesk" className="w-72 max-w-[80%] mx-auto mb-10" style={{ filter: 'drop-shadow(0 0 50px rgba(139,92,246,0.2))' }} />
+          <p className="text-[13px] font-medium uppercase tracking-[0.2em] mb-10"
+            style={{ color: 'rgba(139,92,246,0.5)' }}>
             Zarządzanie infrastrukturą IT
           </p>
           <p className="text-[14px] leading-relaxed max-w-[340px] mx-auto" style={{ color: 'rgba(255,255,255,0.3)' }}>
-            Zarządzanie infrastrukturą IT, zgłoszeniami i urządzeniami w jednym miejscu.
+            Zgłoszenia, inwentaryzacja, monitoring i helpdesk w jednym miejscu.
           </p>
         </div>
 
@@ -326,14 +324,13 @@ export function LoginPage() {
       <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden">
 
         {/* BG */}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(160deg, #0C1220 0%, #0A0F1E 50%, #0D1525 100%)' }} />
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(160deg, #060B1A 0%, #040a16 50%, #0D1525 100%)' }} />
         <div className="absolute top-[15%] right-[10%] w-[45%] h-[35%] rounded-full pointer-events-none"
           style={{ background: 'radial-gradient(ellipse, rgba(139,92,246,0.03), transparent 70%)' }} />
 
         {/* Mobile logo */}
         <div className="lg:hidden text-center mb-8 relative z-10">
-          <img src="/logo.png" alt="" className="h-14 mx-auto mb-3" />
-          <h1 className="text-[20px] font-semibold text-white/85">InfraDesk</h1>
+          <img src="/logo.png" alt="InfraDesk" className="w-44 max-w-[70%] mx-auto mb-3 drop-shadow-xl" />
           <p className="text-[10px] font-medium uppercase tracking-[0.15em] mt-1" style={{ color: 'rgba(139,92,246,0.5)' }}>
             Zarządzanie infrastrukturą IT
           </p>
@@ -413,8 +410,8 @@ export function LoginPage() {
                 <button type="submit" disabled={loading}
                   className="w-full flex items-center justify-center gap-2 py-[14px] rounded-[14px] text-[14px] font-semibold text-white transition-all duration-200 active:scale-[0.98] disabled:opacity-60"
                   style={{
-                    background: 'linear-gradient(145deg, #6D28D9, #2563EB)',
-                    boxShadow: '0 2px 12px rgba(109,40,217,0.2), inset 0 1px 0 rgba(255,255,255,0.08)',
+                    background: 'linear-gradient(135deg, #4f8cff 0%, #6366F1 40%, #8B5CF6 100%)',
+                    boxShadow: '0 2px 12px rgba(79,140,255,0.2), inset 0 1px 0 rgba(255,255,255,0.08)',
                   }}>
                   {loading ? (
                     <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -434,6 +431,13 @@ export function LoginPage() {
               {/* ── Desktop: Downloads with PIN ─────────────────────── */}
               <div className="hidden lg:block">
                 <DownloadsWithPin agentVersion={agentVersion} />
+              </div>
+
+              {/* Register tenant link */}
+              <div className="text-center mt-4">
+                <Link to="/register" className="text-[12px] font-medium text-violet-400/60 hover:text-violet-400 transition-colors">
+                  Masz firmę IT? Utwórz własny panel →
+                </Link>
               </div>
 
               {/* Footer */}

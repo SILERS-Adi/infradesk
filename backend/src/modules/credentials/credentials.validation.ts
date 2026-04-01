@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const createCredentialSchema = z.object({
-  clientId:     z.string().uuid(),
+  workspaceId:     z.string().uuid(),
   locationId:   z.string().uuid().optional().nullable(),
   deviceId:     z.string().uuid().optional().nullable(),
   accessTypeId: z.string().uuid().optional().nullable(),
@@ -17,7 +17,7 @@ export const createCredentialSchema = z.object({
   isSharedWithClient: z.boolean().default(false),
 });
 
-export const updateCredentialSchema = createCredentialSchema.omit({ clientId: true }).partial();
+export const updateCredentialSchema = createCredentialSchema.omit({ workspaceId: true }).partial();
 
 export type CreateCredentialInput = z.infer<typeof createCredentialSchema>;
 export type UpdateCredentialInput = z.infer<typeof updateCredentialSchema>;

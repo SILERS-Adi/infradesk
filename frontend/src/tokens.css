@@ -1,0 +1,82 @@
+/* ══════════════════════════════════════════════
+   INFRADESK — DESIGN TOKENS
+   Premium SaaS aesthetic. Dark default, light auto.
+   ══════════════════════════════════════════════ */
+
+/* ── DARK MODE (default) — deep navy, electric accents ── */
+:root {
+  /* Backgrounds — layered depth */
+  --bg: #060b18;
+  --bg2: #0c1324;
+  --sidebar-bg: linear-gradient(180deg, rgba(8,14,32,0.97), rgba(5,9,22,0.95));
+  --bg-card: rgba(12,20,42,0.55);
+
+  /* Text — 4 tiers of hierarchy */
+  --t: #f0f4ff;
+  --ts: #94a3c4;
+  --tm: #5b6a8a;
+  --td: #3b4766;
+
+  /* Borders */
+  --border: rgba(148,180,255,0.06);
+  --border-l: rgba(148,180,255,0.10);
+
+  /* Accent — electric indigo-blue */
+  --accent: #6366F1;
+  --accent-g: rgba(99,102,241,0.15);
+  --accent-s: #818CF8;
+  --cta: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+
+  /* Radii */
+  --r: 16px;
+  --rs: 10px;
+
+  /* Transitions */
+  --tr: all .2s cubic-bezier(.4,0,.2,1);
+  --trf: all .15s cubic-bezier(.4,0,.2,1);
+
+  /* Glass */
+  --glass-bg: rgba(255,255,255,0.025);
+  --glass-border: rgba(255,255,255,0.06);
+  --shadow-soft: 0 1px 3px rgba(0,0,0,0.2);
+  --shadow-card: 0 1px 2px rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.12);
+  --shadow-glow: 0 0 20px rgba(99,102,241,0.06);
+
+  /* Hover */
+  --hover-bg: rgba(255,255,255,0.03);
+}
+
+/* ── LIGHT MODE — warm white, crisp indigo accents ── */
+[data-theme="light"] {
+  /* Backgrounds — subtle warmth */
+  --bg: #f6f8fc;
+  --bg2: #ffffff;
+  --sidebar-bg: rgba(255,255,255,0.75);
+  --bg-card: rgba(255,255,255,0.80);
+
+  /* Text — 4 tiers */
+  --t: #111827;
+  --ts: #374151;
+  --tm: #6b7280;
+  --td: #9ca3af;
+
+  /* Borders */
+  --border: rgba(0,0,0,0.06);
+  --border-l: rgba(0,0,0,0.10);
+
+  /* Accent — deeper indigo for contrast */
+  --accent: #4F46E5;
+  --accent-g: rgba(79,70,229,0.10);
+  --accent-s: #6366F1;
+  --cta: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+
+  /* Glass */
+  --glass-bg: rgba(255,255,255,0.6);
+  --glass-border: rgba(0,0,0,0.04);
+  --shadow-soft: 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-card: 0 1px 2px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.06);
+  --shadow-glow: 0 0 20px rgba(79,70,229,0.04);
+
+  /* Hover */
+  --hover-bg: rgba(79,70,229,0.04);
+}

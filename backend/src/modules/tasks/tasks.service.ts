@@ -41,10 +41,14 @@ const taskSelect = {
 
 export async function generateTaskNumber(): Promise<string> {
   const year = new Date().getFullYear();
-  const count = await prisma.task.count({
-    where: { taskNumber: { startsWith: `TSK-${year}-` } },
+  const prefix = `TSK-${year}-`;
+  const last = await prisma.task.findFirst({
+    where: { taskNumber: { startsWith: prefix } },
+    orderBy: { taskNumber: 'desc' },
+    select: { taskNumber: true },
   });
-  return `TSK-${year}-${String(count + 1).padStart(4, '0')}`;
+  const lastNum = last ? parseInt(last.taskNumber.replace(prefix, ''), 10) || 0 : 0;
+  return `${prefix}${String(lastNum + 1).padStart(4, '0')}`;
 }
 
 export async function createTask(
@@ -84,10 +88,13 @@ export async function listTasks(params: {
   status?: TaskStatus;
   assignedToUserId?: string;
   all?: boolean;
+  workspaceId?: string | null;
 }) {
-  const { requestingUser, status, assignedToUserId, all } = params;
+  const { requestingUser, status, assignedToUserId, all, workspaceId } = params;
 
   const where: Record<string, unknown> = {};
+
+  if (workspaceId) where.workspaceId = workspaceId;
 
   // Technician sees only their tasks unless admin
   if (requestingUser.role !== 'ADMIN' && !all) {
@@ -144,7 +151,7 @@ export async function changeTaskStatus(
   });
 
   // Gdy zadanie zrealizowane → zamknij zgłoszenie
-  if (newStatus === TaskStatus.DONE) {
+  if (newStatus === TaskStatus.DONE && updated.ticketId) {
     await completeTicket(updated.ticketId);
   }
 

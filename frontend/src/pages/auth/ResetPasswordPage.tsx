@@ -29,7 +29,7 @@ export function ResetPasswordPage() {
 
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#080D19' }}>
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#040a16' }}>
         <div className="text-center">
           <p className="text-white/60 mb-4">Brak tokenu resetowania w linku.</p>
           <Link to="/login" className="text-violet-400 text-sm hover:underline">Powrót do logowania</Link>
@@ -39,8 +39,8 @@ export function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#080D19' }}>
-      <div className="absolute inset-0" style={{ background: 'linear-gradient(160deg, #0C1220 0%, #0A0F1E 50%, #0D1525 100%)' }} />
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#040a16' }}>
+      <div className="absolute inset-0" style={{ background: 'linear-gradient(160deg, #060B1A 0%, #040a16 50%, #0D1525 100%)' }} />
 
       <div className="w-full max-w-[420px] relative z-10">
         <div className="text-center mb-8">
@@ -67,7 +67,7 @@ export function ResetPasswordPage() {
                 </p>
                 <Link to="/login"
                   className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-[14px] font-semibold text-white transition-all active:scale-[0.98]"
-                  style={{ background: 'linear-gradient(145deg, #6D28D9, #2563EB)' }}>
+                  style={{ background: 'linear-gradient(135deg, #4f8cff 0%, #6366F1 40%, #8B5CF6 100%)' }}>
                   Zaloguj się
                 </Link>
               </div>
@@ -104,7 +104,7 @@ export function ResetPasswordPage() {
                   </div>
                   <button type="submit" disabled={loading}
                     className="w-full flex items-center justify-center gap-2 py-[14px] rounded-[14px] text-[14px] font-semibold text-white transition-all active:scale-[0.98] disabled:opacity-60"
-                    style={{ background: 'linear-gradient(145deg, #6D28D9, #2563EB)' }}>
+                    style={{ background: 'linear-gradient(135deg, #4f8cff 0%, #6366F1 40%, #8B5CF6 100%)' }}>
                     {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Lock className="h-5 w-5 opacity-60" />}
                     {loading ? 'Zapisuję...' : 'Ustaw nowe hasło'}
                   </button>

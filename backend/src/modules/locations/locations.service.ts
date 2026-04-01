@@ -4,20 +4,22 @@ import { logActivity } from '../../utils/activityLogger';
 import { CreateLocationInput, UpdateLocationInput } from './locations.validation';
 
 export async function listLocations(params: {
-  clientId?: string;
+  workspaceId?: string | null;
   page?: number;
   limit?: number;
-  requestingUser: { role: string; clientId?: string | null };
+  scopeFilter?: Record<string, unknown>;
+  requestingUser?: any;
 }) {
-  const { clientId, page = 1, limit = 50, requestingUser } = params;
+  const { workspaceId, page = 1, limit = 50, scopeFilter } = params;
   const skip = (page - 1) * limit;
 
   const where: Record<string, unknown> = {};
 
-  if (requestingUser.role === 'CLIENT') {
-    where.clientId = requestingUser.clientId;
-  } else if (clientId) {
-    where.clientId = clientId;
+  if (workspaceId) {
+    where.workspaceId = workspaceId;
+  }
+  if (scopeFilter && Object.keys(scopeFilter).length > 0) {
+    where.AND = [...((where.AND as any[]) || []), scopeFilter];
   }
 
   const [locations, total] = await Promise.all([
@@ -27,7 +29,6 @@ export async function listLocations(params: {
       take: limit,
       orderBy: { name: 'asc' },
       include: {
-        client: { select: { id: true, name: true } },
         _count: { select: { devices: true } },
       },
     }),
@@ -49,11 +50,10 @@ export async function listLocations(params: {
   };
 }
 
-export async function getLocationById(id: string, requestingUser: { role: string; clientId?: string | null }) {
+export async function getLocationById(id: string, _requestingUser?: any) {
   const location = await prisma.location.findUnique({
     where: { id },
     include: {
-      client: { select: { id: true, name: true } },
       devices: {
         select: {
           id: true,
@@ -74,10 +74,6 @@ export async function getLocationById(id: string, requestingUser: { role: string
     throw new AppError('Location not found', 404);
   }
 
-  if (requestingUser.role === 'CLIENT' && location.clientId !== requestingUser.clientId) {
-    throw new AppError('Access denied', 403);
-  }
-
   return {
     ...location,
     deviceCount: location._count.devices,
@@ -87,18 +83,13 @@ export async function getLocationById(id: string, requestingUser: { role: string
 }
 
 export async function createLocation(data: CreateLocationInput, performedByUserId: string) {
-  const client = await prisma.client.findUnique({ where: { id: data.clientId } });
-  if (!client) {
-    throw new AppError('Client not found', 404);
-  }
-
   const location = await prisma.location.create({ data });
 
   await logActivity(prisma, {
     entityType: 'Location',
     entityId: location.id,
     actionType: 'CREATE',
-    description: `Location "${location.name}" created for client "${client.name}"`,
+    description: `Location "${location.name}" created`,
     performedByUserId,
   });
 

@@ -5,7 +5,7 @@ import { CrmActivityType, QuoteStatus } from '@prisma/client';
 
 const activitySelect = {
   id: true,
-  clientId: true,
+  workspaceId: true,
   locationId: true,
   deviceId: true,
   createdByUserId: true,
@@ -28,7 +28,6 @@ const activitySelect = {
   linkedTicketId: true,
   createdAt: true,
   updatedAt: true,
-  client:     { select: { id: true, name: true, logoUrl: true } },
   location:   { select: { id: true, name: true, city: true } },
   device:     { select: { id: true, name: true } },
   createdBy:  { select: { id: true, firstName: true, lastName: true } },
@@ -36,18 +35,18 @@ const activitySelect = {
 };
 
 export async function listCrmActivities(params: {
-  clientId?: string;
   type?: CrmActivityType;
   quoteStatus?: QuoteStatus;
   followUp?: boolean;
   page?: number;
   limit?: number;
+  workspaceId?: string | null;
 }) {
-  const { clientId, type, quoteStatus, followUp, page = 1, limit = 50 } = params;
+  const { type, quoteStatus, followUp, page = 1, limit = 50, workspaceId } = params;
   const skip = (page - 1) * limit;
 
   const where: Record<string, unknown> = {};
-  if (clientId) where.clientId = clientId;
+  if (workspaceId) where.workspaceId = workspaceId;
   if (type) where.type = type;
   if (quoteStatus) where.quoteStatus = quoteStatus;
   if (followUp) where.followUpRequired = true;
@@ -74,12 +73,9 @@ export async function createCrmActivity(
   data: CreateCrmActivityInput,
   createdByUserId: string
 ) {
-  const client = await prisma.client.findUnique({ where: { id: data.clientId } });
-  if (!client) throw new AppError('Client not found', 404);
-
   return prisma.crmActivity.create({
     data: {
-      clientId: data.clientId,
+      workspaceId: data.workspaceId,
       locationId: data.locationId ?? null,
       deviceId: data.deviceId ?? null,
       createdByUserId,
@@ -127,17 +123,17 @@ export async function deleteCrmActivity(id: string) {
   await prisma.crmActivity.delete({ where: { id } });
 }
 
-// Timeline: mix of CRM activities + Tickets for a client, sorted by date
-export async function getClientTimeline(clientId: string) {
+// Timeline: mix of CRM activities + Tickets for a workspace, sorted by date
+export async function getClientTimeline(workspaceId: string) {
   const [activities, tickets] = await Promise.all([
     prisma.crmActivity.findMany({
-      where: { clientId },
+      where: { workspaceId },
       orderBy: { occurredAt: 'desc' },
       take: 100,
       select: activitySelect,
     }),
     prisma.ticket.findMany({
-      where: { clientId },
+      where: { workspaceId },
       orderBy: { createdAt: 'desc' },
       take: 100,
       select: {

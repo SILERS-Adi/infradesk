@@ -5,7 +5,7 @@ import { listCrmQuerySchema } from './crm.validation';
 export async function getActivities(req: Request, res: Response, next: NextFunction) {
   try {
     const query = listCrmQuerySchema.parse(req.query);
-    const result = await service.listCrmActivities(query);
+    const result = await service.listCrmActivities({ ...query, workspaceId: req.workspaceId });
     res.json(result);
   } catch (err) { next(err); }
 }
@@ -38,6 +38,6 @@ export async function removeActivity(req: Request, res: Response, next: NextFunc
 
 export async function getTimeline(req: Request, res: Response, next: NextFunction) {
   try {
-    res.json(await service.getClientTimeline(req.params.clientId));
+    res.json(await service.getClientTimeline(req.params.workspaceId));
   } catch (err) { next(err); }
 }

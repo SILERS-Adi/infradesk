@@ -13,6 +13,7 @@ export async function getActivityLogs(req: Request, res: Response, next: NextFun
       actionType,
       page: page ? parseInt(page, 10) : 1,
       limit: limit ? parseInt(limit, 10) : 50,
+      workspaceId: req.workspaceId,
     });
 
     res.status(200).json(result);

@@ -11,39 +11,36 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, hint, className, id, ...props }, ref) => {
     const inputId = id ?? label?.toLowerCase().replace(/\s/g, '-');
     return (
-      <div className="flex flex-col gap-1.5">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {label && (
-          <label htmlFor={inputId} className="text-[11px] font-semibold uppercase tracking-[0.06em]" style={{ color: 'rgba(255,255,255,0.4)' }}>
+          <label htmlFor={inputId} style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--td)' }}>
             {label}
           </label>
         )}
         <input
           id={inputId}
           ref={ref}
-          className={clsx(
-            'block w-full rounded-xl px-3.5 py-2.5 text-sm transition-all duration-200 placeholder:text-white/20 focus:outline-none',
-            className
-          )}
+          className={clsx(className)}
           style={{
-            background: 'rgba(255,255,255,0.04)',
-            border: `1px solid ${error ? 'rgba(248,113,113,0.4)' : 'rgba(255,255,255,0.07)'}`,
-            color: 'rgba(255,255,255,0.85)',
-            boxShadow: 'none',
+            width: '100%', borderRadius: 'var(--rs)', padding: '10px 14px', fontSize: 13,
+            background: 'var(--hover-bg)',
+            border: `1px solid ${error ? 'rgba(248,113,113,0.4)' : 'var(--border)'}`,
+            color: 'var(--t)', outline: 'none', transition: 'var(--trf)',
           }}
           onFocus={(e) => {
-            e.target.style.borderColor = error ? 'rgba(248,113,113,0.5)' : 'rgba(139,92,246,0.4)';
-            e.target.style.boxShadow = `0 0 0 3px ${error ? 'rgba(248,113,113,0.08)' : 'rgba(139,92,246,0.08)'}`;
+            e.target.style.borderColor = error ? 'rgba(248,113,113,0.5)' : 'var(--accent)';
+            e.target.style.boxShadow = `0 0 0 3px ${error ? 'rgba(248,113,113,0.08)' : 'var(--accent-g)'}`;
             props.onFocus?.(e);
           }}
           onBlur={(e) => {
-            e.target.style.borderColor = error ? 'rgba(248,113,113,0.4)' : 'rgba(255,255,255,0.07)';
+            e.target.style.borderColor = error ? 'rgba(248,113,113,0.4)' : 'var(--border)';
             e.target.style.boxShadow = 'none';
             props.onBlur?.(e);
           }}
           {...props}
         />
-        {error && <p className="text-[11px]" style={{ color: '#F87171' }}>{error}</p>}
-        {hint && !error && <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{hint}</p>}
+        {error && <p style={{ fontSize: 11, color: '#F87171' }}>{error}</p>}
+        {hint && !error && <p style={{ fontSize: 11, color: 'var(--td)' }}>{hint}</p>}
       </div>
     );
   }

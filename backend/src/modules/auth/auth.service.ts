@@ -4,13 +4,13 @@ import prisma from '../../lib/prisma';
 import { signAccessToken, signRefreshToken, verifyRefreshToken, JwtPayload } from '../../utils/jwt';
 import { AppError } from '../../middleware/errorHandler';
 import { logActivity } from '../../utils/activityLogger';
+import { validatePassword } from '../../utils/passwordPolicy';
 import { LoginInput } from './auth.validation';
 import { sendMail } from '../../lib/mailer';
 
 export async function loginService(data: LoginInput) {
   const user = await prisma.user.findUnique({
     where: { email: data.email },
-    include: { client: { select: { id: true, name: true } } },
   });
 
   if (!user || !user.isActive) {
@@ -30,8 +30,7 @@ export async function loginService(data: LoginInput) {
   const payload: JwtPayload = {
     userId: user.id,
     email: user.email,
-    role: user.role,
-    clientId: user.clientId,
+    isSuperAdmin: user.isSuperAdmin,
   };
 
   const accessToken = signAccessToken(payload);
@@ -53,9 +52,7 @@ export async function loginService(data: LoginInput) {
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
-      role: user.role,
-      clientId: user.clientId,
-      client: user.client,
+      isSuperAdmin: user.isSuperAdmin,
     },
   };
 }
@@ -79,8 +76,7 @@ export async function refreshTokenService(refreshToken: string) {
   const newPayload: JwtPayload = {
     userId: user.id,
     email: user.email,
-    role: user.role,
-    clientId: user.clientId,
+    isSuperAdmin: user.isSuperAdmin,
   };
 
   const newAccessToken = signAccessToken(newPayload);
@@ -101,18 +97,10 @@ export async function getMeService(userId: string) {
       lastName: true,
       email: true,
       phone: true,
-      role: true,
-      clientId: true,
+      isSuperAdmin: true,
       isActive: true,
       lastLoginAt: true,
       createdAt: true,
-      client: {
-        select: {
-          id: true,
-          name: true,
-          status: true,
-        },
-      },
     },
   });
 
@@ -172,6 +160,7 @@ export async function resetPasswordService(token: string, newPassword: string) {
   const user = await prisma.user.findUnique({ where: { email: resetToken.email } });
   if (!user || !user.isActive) throw new AppError('Konto nie istnieje lub jest nieaktywne', 400);
 
+  validatePassword(newPassword);
   const passwordHash = await bcrypt.hash(newPassword, 12);
 
   await prisma.$transaction([

@@ -2,7 +2,7 @@ import { type ReactNode, useState } from 'react';
 import { Navigate, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../store/authStore';
 import {
-  LayoutDashboard, MapPin, Monitor, Ticket, Plus, LogOut, ShoppingCart, Menu, X, Receipt,
+  LayoutDashboard, MapPin, Monitor, Ticket, Plus, LogOut, ShoppingCart, Menu, X, Receipt, KeyRound,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { getInitials } from '../../utils/helpers';
@@ -12,6 +12,7 @@ const navItems = [
   { to: '/portal/tickets', label: 'Zgłoszenia', icon: Ticket },
   { to: '/portal/devices', label: 'Urządzenia', icon: Monitor },
   { to: '/portal/locations', label: 'Lokalizacje', icon: MapPin },
+  { to: '/portal/vault', label: 'Sejf haseł', icon: KeyRound },
   { to: '/portal/orders', label: 'Zamówienia', icon: ShoppingCart },
   { to: '/portal/billing', label: 'Rozliczenia', icon: Receipt },
 ];
@@ -22,17 +23,17 @@ export function PortalLayout({ children }: { children: ReactNode }) {
   const [mobileNav, setMobileNav] = useState(false);
 
   if (isLoading) return (
-    <div className="h-screen flex items-center justify-center" style={{ background: '#080D19' }}>
+    <div className="h-screen flex items-center justify-center" style={{ background: '#040a16' }}>
       <div className="animate-spin h-7 w-7 border-2 border-orange-500 border-t-transparent rounded-full" />
     </div>
   );
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (user?.role !== 'CLIENT') return <Navigate to="/dashboard" replace />;
+  if ((user as any)?.role !== 'CLIENT') return <Navigate to="/dashboard" replace />;
 
   const initials = user ? getInitials(user.firstName, user.lastName) : '?';
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden" style={{ background: '#080D19' }}>
+    <div className="flex flex-col h-screen overflow-hidden" style={{ background: '#040a16' }}>
 
       {/* Background — tlo.png */}
       <div className="fixed inset-0 pointer-events-none z-0">
@@ -94,7 +95,7 @@ export function PortalLayout({ children }: { children: ReactNode }) {
             <div className="hidden md:flex items-center gap-2.5 ml-2">
               <div className="text-right">
                 <div className="text-[12px] font-medium text-white/70 leading-tight">{user?.firstName} {user?.lastName}</div>
-                <div className="text-[10px] leading-tight" style={{ color: 'rgba(255,255,255,0.3)' }}>{user?.client?.name}</div>
+                <div className="text-[10px] leading-tight" style={{ color: 'rgba(255,255,255,0.3)' }}>{(user as any)?.client?.name}</div>
               </div>
               <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
                 style={{ background: 'linear-gradient(145deg, #EA580C, #F97316)' }}>
@@ -142,7 +143,7 @@ export function PortalLayout({ children }: { children: ReactNode }) {
                 </div>
                 <div>
                   <div className="text-[13px] font-medium text-white/80">{user?.firstName} {user?.lastName}</div>
-                  <div className="text-[11px] text-white/30">{user?.client?.name}</div>
+                  <div className="text-[11px] text-white/30">{(user as any)?.client?.name}</div>
                 </div>
               </div>
               <button onClick={logout} className="p-2 rounded-lg text-white/30 hover:text-red-400/70 transition-colors">

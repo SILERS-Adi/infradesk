@@ -1,0 +1,171 @@
+/* ══════════════════════════════════════════════
+   INFRADESK — LIGHT MODE OVERRIDES
+   Tokens handle colors. This file handles
+   component-specific visual adjustments.
+   ══════════════════════════════════════════════ */
+
+/* ── Background — clean gradient ── */
+[data-theme="light"] body,
+[data-theme="light"] .app,
+[data-theme="light"] .main {
+  background: linear-gradient(180deg, #f6f8fc 0%, #eef1f8 100%) !important;
+}
+[data-theme="light"] .app::before {
+  background:
+    radial-gradient(ellipse 60% 40% at 20% 10%, rgba(99,102,241,0.04), transparent),
+    radial-gradient(ellipse 50% 35% at 80% 15%, rgba(139,92,246,0.03), transparent) !important;
+}
+[data-theme="light"] .app::after { display: none !important; }
+
+/* ── Sidebar — glass panel ── */
+[data-theme="light"] .sidebar {
+  background: rgba(255,255,255,0.75) !important;
+  backdrop-filter: blur(20px) saturate(1.4) !important;
+  border-right: 1px solid rgba(0,0,0,0.06) !important;
+  box-shadow: 1px 0 16px rgba(0,0,0,0.03) !important;
+}
+[data-theme="light"] .sidebar-header { border-bottom-color: rgba(0,0,0,0.05) !important; }
+[data-theme="light"] .sidebar-footer { border-top-color: rgba(0,0,0,0.05) !important; }
+[data-theme="light"] .nav-item.active {
+  background: var(--accent-g) !important;
+  border-color: rgba(79,70,229,0.12) !important;
+}
+[data-theme="light"] .nav-item.active::before {
+  background: var(--accent) !important;
+}
+
+/* ── Topbar ── */
+[data-theme="light"] .topbar {
+  background: rgba(255,255,255,0.7) !important;
+  backdrop-filter: blur(16px) !important;
+  border-bottom: 1px solid rgba(0,0,0,0.05) !important;
+}
+
+/* ── Cards — glass ── */
+[data-theme="light"] .card,
+[data-theme="light"] .ids-v3-kpi-card,
+[data-theme="light"] .ids-v3-card,
+[data-theme="light"] .ids-v3-session {
+  background: rgba(255,255,255,0.8) !important;
+  backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(0,0,0,0.05) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.04) !important;
+}
+[data-theme="light"] .card:hover,
+[data-theme="light"] .ids-v3-kpi-card:hover {
+  background: rgba(255,255,255,0.95) !important;
+  border-color: rgba(79,70,229,0.12) !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.06) !important;
+}
+[data-theme="light"] .card::before,
+[data-theme="light"] .card::after,
+[data-theme="light"] .ids-v3-kpi-card::before { display: none !important; }
+
+/* ── Hero — warm glass ── */
+[data-theme="light"] .hero,
+[data-theme="light"] .ids-v3-hero {
+  background: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.05)), rgba(255,255,255,0.85) !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(0,0,0,0.05) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04), 0 8px 32px rgba(0,0,0,0.06) !important;
+}
+[data-theme="light"] .hero::before,
+[data-theme="light"] .hero-canvas { opacity: 0.15 !important; }
+[data-theme="light"] .hero-overlay { background: linear-gradient(135deg, rgba(255,255,255,0.3), rgba(255,255,255,0.1)) !important; }
+[data-theme="light"] .ids-v3-hero-hl { background: linear-gradient(90deg, transparent, rgba(99,102,241,0.1), transparent) !important; }
+
+/* ── Ring — light glow ── */
+[data-theme="light"] .ids-v3-ring-glow {
+  background: radial-gradient(circle, rgba(99,102,241,0.12), transparent 55%) !important;
+}
+[data-theme="light"] .ids-v3-ring-val {
+  background: linear-gradient(180deg, #111827, #374151) !important;
+  -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important;
+}
+[data-theme="light"] .ring-value {
+  background: linear-gradient(180deg, #111827, #374151) !important;
+  -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important;
+}
+
+/* ── KPI icons & badges — saturated ── */
+[data-theme="light"] .ids-v3-kpi-icon.blue { background: rgba(37,99,235,0.1) !important; color: #2563EB !important; }
+[data-theme="light"] .ids-v3-kpi-icon.teal { background: rgba(5,150,105,0.1) !important; color: #059669 !important; }
+[data-theme="light"] .ids-v3-kpi-icon.indigo { background: rgba(79,70,229,0.1) !important; color: #4F46E5 !important; }
+[data-theme="light"] .ids-v3-kpi-badge.blue { background: rgba(37,99,235,0.08) !important; color: #2563EB !important; }
+[data-theme="light"] .ids-v3-kpi-badge.teal { background: rgba(5,150,105,0.08) !important; color: #059669 !important; }
+[data-theme="light"] .ids-v3-kpi-badge.indigo { background: rgba(79,70,229,0.08) !important; color: #4F46E5 !important; }
+[data-theme="light"] .card-value.blue { color: #2563EB !important; }
+[data-theme="light"] .card-value.purple { color: #7C3AED !important; }
+[data-theme="light"] .card-value.green { color: #059669 !important; }
+[data-theme="light"] .card-icon.memory { background: rgba(37,99,235,0.08) !important; color: #2563EB !important; }
+[data-theme="light"] .card-icon.browser { background: rgba(124,58,237,0.08) !important; color: #7C3AED !important; }
+[data-theme="light"] .card-icon.perf { background: rgba(5,150,105,0.08) !important; color: #059669 !important; }
+
+/* ── Health, actions, tasks ── */
+[data-theme="light"] .ids-v3-health-item,
+[data-theme="light"] .health-item {
+  background: rgba(255,255,255,0.6) !important;
+  border-color: rgba(0,0,0,0.04) !important;
+}
+[data-theme="light"] .ids-v3-action,
+[data-theme="light"] .action-card {
+  background: rgba(255,255,255,0.6) !important;
+  border-color: rgba(0,0,0,0.04) !important;
+}
+[data-theme="light"] .ids-v3-action:hover,
+[data-theme="light"] .action-card:hover {
+  background: rgba(255,255,255,0.9) !important;
+  border-color: rgba(79,70,229,0.12) !important;
+}
+
+/* ── Page cards ── */
+[data-theme="light"] .page-card {
+  background: rgba(255,255,255,0.8) !important;
+  border-color: rgba(0,0,0,0.05) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.04) !important;
+}
+
+/* ── Buttons ── */
+[data-theme="light"] .ids-v3-btn.primary,
+[data-theme="light"] .btn-primary {
+  box-shadow: 0 2px 8px rgba(79,70,229,0.2), 0 0 0 1px rgba(79,70,229,0.1) !important;
+}
+[data-theme="light"] .ids-v3-btn.ghost,
+[data-theme="light"] .btn-secondary {
+  background: rgba(255,255,255,0.5) !important;
+  border-color: rgba(0,0,0,0.08) !important;
+  color: var(--ts) !important;
+}
+
+/* ── Theme toggle ── */
+[data-theme="light"] .theme-toggle {
+  background: rgba(0,0,0,0.03) !important;
+  border-color: rgba(0,0,0,0.06) !important;
+  color: var(--tm) !important;
+}
+[data-theme="light"] .theme-toggle:hover {
+  background: rgba(0,0,0,0.06) !important;
+}
+
+/* ── Scrollbar ── */
+[data-theme="light"] ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.06) !important; }
+
+/* ── Misc component overrides ── */
+[data-theme="light"] .info-row { border-bottom-color: rgba(0,0,0,0.04) !important; }
+[data-theme="light"] .metric-card { background: rgba(255,255,255,0.6) !important; border-color: rgba(0,0,0,0.04) !important; }
+[data-theme="light"] .speed-card { background: rgba(255,255,255,0.5) !important; border-color: rgba(0,0,0,0.04) !important; }
+[data-theme="light"] .audit-check { background: rgba(0,0,0,0.01) !important; border-color: rgba(0,0,0,0.04) !important; }
+[data-theme="light"] .cleanup-row { background: rgba(0,0,0,0.01) !important; }
+[data-theme="light"] .speed-hero { background: rgba(255,255,255,0.6) !important; border-color: rgba(0,0,0,0.04) !important; }
+[data-theme="light"] .autostart-row { background: rgba(0,0,0,0.01) !important; border-color: rgba(0,0,0,0.04) !important; }
+[data-theme="light"] .dark-bg-layers { display: none !important; }
+
+/* ── FullCalendar ── */
+[data-theme="light"] .fc { --fc-border-color: rgba(0,0,0,0.06); --fc-page-bg-color: transparent; --fc-neutral-bg-color: rgba(0,0,0,0.01); --fc-today-bg-color: rgba(79,70,229,0.04); }
+[data-theme="light"] .fc .fc-col-header-cell { background: rgba(0,0,0,0.01); }
+[data-theme="light"] .fc .fc-toolbar-title { color: var(--t); }
+[data-theme="light"] .fc .fc-button { background: rgba(255,255,255,0.5); border-color: rgba(0,0,0,0.08); color: var(--ts); }
+
+/* ── No icon jank ── */
+[data-theme="light"] .card:hover .card-icon svg,
+[data-theme="light"] .nav-item:hover .nav-icon { filter: none !important; transform: none !important; }

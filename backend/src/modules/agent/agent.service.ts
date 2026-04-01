@@ -1,5 +1,6 @@
 import prisma from '../../lib/prisma';
 import { AppError } from '../../middleware/errorHandler';
+import { logActivity } from '../../utils/activityLogger';
 import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { RegisterInput, MetricsInput, AgentTicketInput, ApproveInput } from './agent.validation';
@@ -31,7 +32,7 @@ function osLabel(data: Partial<RegisterInput & MetricsInput>): string | undefine
  * Jeśli nie znajdzie — tworzy nowe i zwraca jego id.
  */
 async function resolveDevice(
-  clientId: string,
+  workspaceId: string,
   locationId: string,
   data: Partial<RegisterInput & MetricsInput>
 ): Promise<string> {
@@ -54,7 +55,7 @@ async function resolveDevice(
   const validSerial = serial && !BOGUS_SERIALS.includes(serial.toLowerCase()) ? serial : undefined;
 
   if (validSerial) {
-    const bySerial = await prisma.device.findFirst({ where: { clientId, serialNumber: validSerial } });
+    const bySerial = await prisma.device.findFirst({ where: { workspaceId, serialNumber: validSerial } });
     if (bySerial) {
       await prisma.device.update({ where: { id: bySerial.id }, data: commonUpdate });
       return bySerial.id;
@@ -63,7 +64,7 @@ async function resolveDevice(
 
   // 2) Szukaj po MAC adresie
   if (mac) {
-    const byMac = await prisma.device.findFirst({ where: { clientId, macAddress: mac } });
+    const byMac = await prisma.device.findFirst({ where: { workspaceId, macAddress: mac } });
     if (byMac) {
       await prisma.device.update({ where: { id: byMac.id }, data: { ...commonUpdate, serialNumber: validSerial } });
       return byMac.id;
@@ -73,7 +74,7 @@ async function resolveDevice(
   // 3) Utwórz nowe urządzenie
   const device = await prisma.device.create({
     data: {
-      clientId,
+      workspaceId,
       locationId,
       name:            hostname ?? `Komputer ${new Date().toLocaleDateString('pl-PL')}`,
       serialNumber:    validSerial,
@@ -123,24 +124,44 @@ function hardwareFields(data: Partial<RegisterInput & MetricsInput>) {
 export async function registerAgent(data: RegisterInput) {
   const token = uuidv4();
 
-  // ── Logowanie istniejącego klienta (email + hasło) ──────────────────────
+  // ── Resolve workspace from workspaceKey ──────────────────────────────────────
+  let workspaceId: string | undefined;
+  if (data.tenantKey) {
+    const workspace = await prisma.workspace.findUnique({
+      where: { workspaceKey: data.tenantKey },
+      select: { id: true, isActive: true },
+    });
+    if (!workspace) throw new AppError('Invalid workspace key', 400);
+    if (!workspace.isActive) throw new AppError('Workspace is inactive', 403);
+    workspaceId = workspace.id;
+  }
+
+  // ── Logowanie istniejącego użytkownika (email + hasło) ──────────────────────
   if (data.email && data.password && !data.companyName && !data.nip) {
     const user = await prisma.user.findUnique({
       where: { email: data.email },
-      include: { client: { select: { id: true, name: true } } },
     });
 
     if (!user || !user.isActive) throw new AppError('Invalid credentials', 401);
     const valid = await bcrypt.compare(data.password, user.passwordHash);
     if (!valid) throw new AppError('Invalid credentials', 401);
-    if (!user.clientId) throw new AppError('User not linked to a client', 400);
+
+    // Find workspace for user if not provided
+    if (!workspaceId) {
+      const membership = await prisma.workspaceMembership.findFirst({
+        where: { userId: user.id },
+        select: { workspaceId: true },
+      });
+      if (membership) workspaceId = membership.workspaceId;
+    }
+    if (!workspaceId) throw new AppError('User not linked to a workspace', 400);
 
     // Identyfikuj urządzenie: najpierw po deviceId z config.json, potem serial/MAC
     let deviceId: string | undefined;
     const knownDeviceId = (data as any).deviceId as string | undefined;
     if (knownDeviceId) {
       const known = await prisma.device.findFirst({
-        where: { id: knownDeviceId, clientId: user.clientId! },
+        where: { id: knownDeviceId, workspaceId },
       });
       if (known) {
         deviceId = known.id;
@@ -160,26 +181,26 @@ export async function registerAgent(data: RegisterInput) {
     }
     if (!deviceId) {
       let location = await prisma.location.findFirst({
-        where: { clientId: user.clientId! },
+        where: { workspaceId },
         select: { id: true },
       });
       if (!location) {
         const created = await prisma.location.create({
           data: {
-            clientId:     user.clientId!,
+            workspaceId,
             name:         'Główna siedziba',
             type:         'OFFICE',
             addressLine1: '-',
             postalCode:   '00-000',
-            city:         user.client?.name ?? 'Nieznane',
+            city:         'Nieznane',
           },
         });
         location = { id: created.id };
       }
-      deviceId = await resolveDevice(user.clientId!, location.id, data);
+      deviceId = await resolveDevice(workspaceId, location.id, data);
     }
 
-    // Szukaj istniejącej rejestracji — po hostname+clientId lub serial lub MAC
+    // Szukaj istniejącej rejestracji — po hostname+workspace lub serial lub MAC
     const hostname = (data as any).hostname as string | undefined;
     const serial   = (data as any).serialNumber as string | undefined;
     const mac      = primaryMac((data as any).networkIfaces ?? []);
@@ -189,30 +210,30 @@ export async function registerAgent(data: RegisterInput) {
     // 1) Po deviceId (ten sam komputer, reinstalacja)
     if (deviceId) {
       existingReg = await prisma.agentRegistration.findFirst({
-        where: { clientId: user.clientId!, deviceId },
+        where: { workspaceId, deviceId },
       });
     }
-    // 2) Po hostname + clientId
+    // 2) Po hostname + workspace
     if (!existingReg && hostname) {
       existingReg = await prisma.agentRegistration.findFirst({
-        where: { clientId: user.clientId!, hostname },
+        where: { workspaceId, hostname },
       });
     }
     // 3) Po serialNumber
     if (!existingReg && serial) {
       existingReg = await prisma.agentRegistration.findFirst({
-        where: { clientId: user.clientId!, serialNumber: serial },
+        where: { workspaceId, serialNumber: serial },
       });
     }
     // 4) Po MAC — szukaj przez powiązane urządzenie
     if (!existingReg && mac) {
       const devByMac = await prisma.device.findFirst({
-        where: { clientId: user.clientId!, macAddress: mac },
+        where: { workspaceId, macAddress: mac },
         select: { id: true },
       });
       if (devByMac) {
         existingReg = await prisma.agentRegistration.findFirst({
-          where: { clientId: user.clientId!, deviceId: devByMac.id },
+          where: { workspaceId, deviceId: devByMac.id },
         });
       }
     }
@@ -224,6 +245,7 @@ export async function registerAgent(data: RegisterInput) {
         data: {
           agentToken: token,
           status: 'ACTIVE',
+          workspaceId,
           deviceId: deviceId ?? existingReg.deviceId,
           ...hardwareFields(data),
         },
@@ -233,8 +255,9 @@ export async function registerAgent(data: RegisterInput) {
       await prisma.agentRegistration.create({
         data: {
           agentToken: token,
+          agentType:  (data as any).agentType || 'CLIENT',
           status:     'ACTIVE',
-          clientId:   user.clientId,
+          workspaceId,
           deviceId,
           allowMonitoring: true,
           allowRustdesk:   true,
@@ -251,40 +274,27 @@ export async function registerAgent(data: RegisterInput) {
       }).catch(() => {});
     }
 
-    return { token, status: 'ACTIVE', deviceId, clientName: user.client?.name ?? null, clientId: user.clientId };
+    return { token, status: 'ACTIVE', deviceId };
   }
 
   // ── Rejestracja nowego urządzenia (formularz) ────────────────────────────
   const nip = data.nip?.replace(/[-\s]/g, '') ?? undefined;
 
-  // 1) Szukaj klienta po NIP
-  let matchedClientId: string | undefined;
-  if (nip) {
-    const clientByNip = await prisma.client.findFirst({
-      where: { taxId: nip },
-      select: { id: true },
-    });
-    if (clientByNip) matchedClientId = clientByNip.id;
-  }
-
-  // 2) Jeśli brak — szukaj po e-mailu kontaktowym
-  if (!matchedClientId && data.contactEmail) {
-    const userByEmail = await prisma.user.findUnique({
-      where: { email: data.contactEmail },
-      select: { clientId: true },
-    });
-    if (userByEmail?.clientId) matchedClientId = userByEmail.clientId;
-  }
-
   // Zahashuj hasło żeby można było stworzyć użytkownika przy approve
-  const contactPasswordHash = data.password ? await bcrypt.hash(data.password, 10) : undefined;
+  let contactPasswordHash: string | undefined;
+  if (data.password) {
+    const { validatePassword } = await import('../../utils/passwordPolicy');
+    validatePassword(data.password);
+    contactPasswordHash = await bcrypt.hash(data.password, 10);
+  }
 
   const reg = await prisma.agentRegistration.create({
     data: {
       agentToken:           token,
+      agentType:            (data as any).agentType || 'CLIENT',
       status:               'PENDING',
+      workspaceId,
       nip,
-      clientId:             matchedClientId,
       companyName:          data.companyName,
       contactFirstName:     data.contactFirstName,
       contactLastName:      data.contactLastName,
@@ -298,37 +308,33 @@ export async function registerAgent(data: RegisterInput) {
     },
   });
 
-  const matchedClient = matchedClientId
-    ? await prisma.client.findUnique({ where: { id: matchedClientId }, select: { name: true } })
-    : null;
-
   // Push notification do adminów/techników o nowej rejestracji
   sendPushToRole('ADMIN', {
     title: 'Nowy agent do akceptacji',
-    body: `${data.hostname ?? 'Nowe urządzenie'}${matchedClient ? ` · ${matchedClient.name}` : ''}`,
+    body: `${data.hostname ?? 'Nowe urządzenie'}`,
     url: '/agents',
   }).catch(() => {});
   sendPushToRole('TECHNICIAN', {
     title: 'Nowy agent do akceptacji',
-    body: `${data.hostname ?? 'Nowe urządzenie'}${matchedClient ? ` · ${matchedClient.name}` : ''}`,
+    body: `${data.hostname ?? 'Nowe urządzenie'}`,
     url: '/agents',
   }).catch(() => {});
 
-  return { token, status: 'PENDING', clientName: matchedClient?.name ?? null, registrationId: reg.id };
+  return { token, status: 'PENDING', registrationId: reg.id };
 }
 
 export async function updateMetrics(token: string, data: MetricsInput) {
   const reg = await prisma.agentRegistration.findUnique({ where: { agentToken: token } });
   if (!reg) throw new AppError('Agent not found', 404);
 
-  // Auto-create device if agent is ACTIVE with clientId but missing deviceId
-  if (!reg.deviceId && reg.clientId && reg.status === 'ACTIVE') {
+  // Auto-create device if agent is ACTIVE with workspaceId but missing deviceId
+  if (!reg.deviceId && reg.workspaceId && reg.status === 'ACTIVE') {
     const location = await prisma.location.findFirst({
-      where: { clientId: reg.clientId },
+      where: { workspaceId: reg.workspaceId },
       select: { id: true },
     });
     if (location) {
-      const deviceId = await resolveDevice(reg.clientId, location.id, { ...data, ...reg } as any);
+      const deviceId = await resolveDevice(reg.workspaceId, location.id, { ...data, ...reg } as any);
       await prisma.agentRegistration.update({ where: { id: reg.id }, data: { deviceId } });
       reg.deviceId = deviceId;
     }
@@ -360,31 +366,30 @@ export async function createAgentTicket(token: string, data: AgentTicketInput) {
     include: { device: { select: { locationId: true } } },
   });
 
-  if (!reg || reg.status !== 'ACTIVE' || !reg.clientId) {
-    throw new AppError('Agent not active or not linked to client', 403);
+  if (!reg || reg.status !== 'ACTIVE' || !reg.workspaceId) {
+    throw new AppError('Agent not active or not linked to workspace', 403);
   }
 
   let location: { id: string } | null = reg.device?.locationId
     ? { id: reg.device.locationId }
-    : await prisma.location.findFirst({ where: { clientId: reg.clientId! }, select: { id: true } });
+    : await prisma.location.findFirst({ where: { workspaceId: reg.workspaceId! }, select: { id: true } });
 
   if (!location) {
     // Brak lokalizacji — utwórz domyślną żeby zgłoszenie mogło powstać
-    const client = await prisma.client.findUnique({ where: { id: reg.clientId! }, select: { name: true } });
     const created = await prisma.location.create({
       data: {
-        clientId:     reg.clientId!,
+        workspaceId:  reg.workspaceId!,
         name:         'Główna siedziba',
         type:         'OFFICE',
         addressLine1: '-',
         postalCode:   '00-000',
-        city:         client?.name ?? 'Nieznane',
+        city:         'Nieznane',
       },
     });
     location = { id: created.id };
   }
 
-  const admin = await prisma.user.findFirst({ where: { role: 'ADMIN', isActive: true } });
+  const admin = await prisma.user.findFirst({ where: { isActive: true } });
   if (!admin) throw new AppError('No admin configured', 500);
 
   const count  = await prisma.ticket.count();
@@ -397,7 +402,7 @@ export async function createAgentTicket(token: string, data: AgentTicketInput) {
   const ticket = await prisma.ticket.create({
     data: {
       ticketNumber,
-      clientId:        reg.clientId,
+      workspaceId:     reg.workspaceId!,
       locationId:      location.id,
       deviceId:        reg.deviceId ?? undefined,
       createdByUserId: admin.id,
@@ -423,36 +428,74 @@ export async function createAgentTicket(token: string, data: AgentTicketInput) {
   return ticket;
 }
 
-export async function getAllRegistrations() {
+export async function getAllRegistrations(params: {
+  workspaceId?: string | null;
+  scopeFilter?: Record<string, unknown>;
+}) {
+  const { workspaceId, scopeFilter } = params;
+  const where: Record<string, unknown> = {};
+
+  if (workspaceId) {
+    where.workspaceId = workspaceId;
+  }
+
+  if (scopeFilter && Object.keys(scopeFilter).length > 0) {
+    where.AND = [...((where.AND as any[]) || []), scopeFilter];
+  }
+
   return prisma.agentRegistration.findMany({
+    where,
     include: {
-      client: { select: { id: true, name: true } },
-      device: { select: { id: true, name: true } },
+      device: { select: { id: true, name: true, locationId: true } },
     },
-    orderBy: [{ status: 'asc' }, { lastSeen: 'desc' }],
+    orderBy: [{ status: 'asc' }, { hostname: 'asc' }],
   });
 }
 
-export async function approveRegistration(id: string, data: ApproveInput) {
+export async function getAuditOverview(workspaceId?: string | null) {
+  const where: any = { status: 'ACTIVE' };
+  if (workspaceId) where.workspaceId = workspaceId;
+
+  const agents = await prisma.agentRegistration.findMany({
+    where,
+    select: {
+      id: true,
+      hostname: true,
+      ipAddress: true,
+      agentType: true,
+      cpuUsage: true,
+      ramUsage: true,
+      diskFree: true,
+      diskTotal: true,
+      serverMetrics: true,
+      lastSeen: true,
+      appVersion: true,
+    },
+    orderBy: { hostname: 'asc' },
+  });
+
+  return agents;
+}
+
+export async function approveRegistration(id: string, data: ApproveInput, performedByUserId?: string) {
   const reg = await prisma.agentRegistration.findUnique({ where: { id } });
   if (!reg) throw new AppError('Registration not found', 404);
 
-  // Use clientId from request or fall back to what was matched during registration
-  const clientId = data.clientId ?? reg.clientId;
-  if (!clientId) throw new AppError('Brak klienta — wybierz ręcznie lub uzupełnij NIP/e-mail klienta', 400);
+  // Use workspaceId from request data or fall back to registration's workspace
+  const effectiveWorkspaceId = data.workspaceId ?? reg.workspaceId;
+  if (!effectiveWorkspaceId) throw new AppError('Brak workspace — przypisz workspace', 400);
 
-  // Upewnij się że klient ma co najmniej jedną lokalizację (wymaganą przez Device)
-  let location = await prisma.location.findFirst({ where: { clientId }, select: { id: true } });
+  // Upewnij się że workspace ma co najmniej jedną lokalizację (wymaganą przez Device)
+  let location = await prisma.location.findFirst({ where: { workspaceId: effectiveWorkspaceId }, select: { id: true } });
   if (!location) {
-    const client = await prisma.client.findUnique({ where: { id: clientId }, select: { name: true } });
     const created = await prisma.location.create({
       data: {
-        clientId,
+        workspaceId: effectiveWorkspaceId,
         name:         'Główna siedziba',
         type:         'OFFICE',
         addressLine1: '-',
         postalCode:   '00-000',
-        city:         client?.name ?? 'Nieznane',
+        city:         'Nieznane',
       },
     });
     location = { id: created.id };
@@ -461,7 +504,7 @@ export async function approveRegistration(id: string, data: ApproveInput) {
   // Auto-create or find device using serial/MAC priority
   let deviceId = data.deviceId ?? reg.deviceId ?? undefined;
   if (!deviceId) {
-    deviceId = await resolveDevice(clientId, location.id, {
+    deviceId = await resolveDevice(effectiveWorkspaceId, location.id, {
       hostname:       reg.hostname       ?? undefined,
       ipAddress:      reg.ipAddress      ?? undefined,
       osInfo:         reg.osInfo         ?? undefined,
@@ -472,39 +515,45 @@ export async function approveRegistration(id: string, data: ApproveInput) {
     } as any);
   }
 
-  // Utwórz konto użytkownika CLIENT jeśli mamy e-mail + hasło i konto jeszcze nie istnieje
+  // Utwórz konto użytkownika jeśli mamy e-mail + hasło i konto jeszcze nie istnieje
   if (reg.contactEmail && reg.contactPasswordHash) {
     const existing = await prisma.user.findUnique({ where: { email: reg.contactEmail } });
     if (!existing) {
-      await prisma.user.create({
+      const newUser = await prisma.user.create({
         data: {
           firstName:    reg.contactFirstName ?? 'Użytkownik',
           lastName:     reg.contactLastName  ?? '',
           email:        reg.contactEmail,
           phone:        reg.contactPhone     ?? undefined,
           passwordHash: reg.contactPasswordHash,
-          role:         'CLIENT',
-          clientId,
           isActive:     true,
         },
       });
-    } else if (!existing.clientId) {
-      // Konto istnieje ale bez klienta — przypisz
-      await prisma.user.update({ where: { id: existing.id }, data: { clientId } });
+      // Add user to workspace
+      await prisma.workspaceMembership.create({
+        data: { workspaceId: effectiveWorkspaceId, userId: newUser.id, role: 'MEMBER' },
+      }).catch(() => {});
     }
   }
 
   const updated = await prisma.agentRegistration.update({
     where: { id },
-    data: { status: 'ACTIVE', clientId, deviceId },
+    data: { status: 'ACTIVE', workspaceId: effectiveWorkspaceId, deviceId },
   });
 
-  const client = await prisma.client.findUnique({ where: { id: clientId }, select: { name: true } });
   notifyAgent(reg.agentToken, {
     type:  'notification',
     title: 'Urządzenie zatwierdzone!',
-    body:  `Twoje urządzenie zostało aktywowane. Klient: ${client?.name}`,
+    body:  `Twoje urządzenie zostało aktywowane.`,
   });
+
+  if (performedByUserId) {
+    await logActivity(prisma, {
+      entityType: 'AgentRegistration', entityId: id, actionType: 'APPROVE',
+      description: `Agent "${reg.hostname ?? id}" approved (workspace=${effectiveWorkspaceId})`,
+      performedByUserId, workspaceId: effectiveWorkspaceId,
+    }).catch(() => {});
+  }
 
   return updated;
 }
@@ -512,30 +561,40 @@ export async function approveRegistration(id: string, data: ApproveInput) {
 export async function approveRegistrationWithNewClient(id: string, clientData: {
   name: string; taxId?: string; phone?: string; email?: string;
   addressLine1?: string; postalCode?: string; city?: string;
-}) {
+}, performedByUserId?: string) {
   const reg = await prisma.agentRegistration.findUnique({ where: { id } });
   if (!reg) throw new AppError('Registration not found', 404);
 
-  // Utwórz nowego klienta
-  const client = await prisma.client.create({
+  // Create a new workspace for the client
+  const workspace = await prisma.workspace.create({
     data: {
       name:         clientData.name,
+      slug:         clientData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+      type:         'COMPANY',
       taxId:        clientData.taxId    || undefined,
       phone:        clientData.phone    || undefined,
       email:        clientData.email    || undefined,
       addressLine1: clientData.addressLine1 || '-',
       postalCode:   clientData.postalCode   || '00-000',
       city:         clientData.city         || clientData.name,
-      status:       'ACTIVE',
     },
   });
 
   // Przekaż do standardowego approve (stworzy lokalizację + device)
-  return approveRegistration(id, { clientId: client.id });
+  return approveRegistration(id, { workspaceId: workspace.id }, performedByUserId);
 }
 
-export async function deleteRegistration(id: string) {
+export async function deleteRegistration(id: string, performedByUserId?: string) {
   const reg = await prisma.agentRegistration.findUnique({ where: { id } });
   if (!reg) throw new AppError('Registration not found', 404);
-  return prisma.agentRegistration.delete({ where: { id } });
+
+  await prisma.agentRegistration.delete({ where: { id } });
+
+  if (performedByUserId) {
+    await logActivity(prisma, {
+      entityType: 'AgentRegistration', entityId: id, actionType: 'DELETE',
+      description: `Agent "${reg.hostname ?? id}" deleted`,
+      performedByUserId, workspaceId: reg.workspaceId ?? undefined,
+    }).catch(() => {});
+  }
 }

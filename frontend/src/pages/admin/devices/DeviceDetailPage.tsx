@@ -28,6 +28,7 @@ import { Modal } from '../../../components/ui/Modal';
 import { DeviceForm } from '../../../components/forms/DeviceForm';
 import { formatDate, formatDateTime, copyToClipboard, isExpired } from '../../../utils/helpers';
 import { useAuth } from '../../../store/authStore';
+import { useWorkspaceContext } from '../../../hooks/useWorkspaceContext';
 import type { Ticket, Credential } from '../../../types';
 
 function CopyButton({ value, label }: { value: string; label?: string }) {
@@ -39,7 +40,7 @@ function CopyButton({ value, label }: { value: string; label?: string }) {
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <button onClick={handle} className="transition-colors p-0.5" style={{ color: 'rgba(255,255,255,0.3)' }} title="Kopiuj">
+    <button onClick={handle} className="transition-colors p-0.5" style={{ color: 'var(--tm)' }} title="Kopiuj">
       {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
     </button>
   );
@@ -49,7 +50,7 @@ function InfoRow({ label, value, mono, children }: { label: string; value?: stri
   if (!value && !children) return null;
   return (
     <div className="flex items-start gap-2">
-      <span className="text-xs font-medium w-32 flex-shrink-0 mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>{label}</span>
+      <span className="text-xs font-medium w-32 flex-shrink-0 mt-0.5" style={{ color: 'var(--tm)' }}>{label}</span>
       {children ?? (
         <span className={`text-sm text-white/80 flex items-center gap-1 ${mono ? 'font-mono' : ''}`}>
           {value}
@@ -106,7 +107,7 @@ const REMOTE_TOOLS = [
     key: 'sshAddress' as const,
     label: 'SSH',
     color: 'border rounded-xl',
-    colorStyle: { background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.08)' },
+    colorStyle: { background: 'var(--hover-bg)', borderColor: 'var(--border)' },
     labelColor: 'text-white/60',
     btnColor: 'bg-gray-600 hover:bg-gray-700',
     href: (id: string) => `ssh://${id}`,
@@ -127,7 +128,7 @@ const REMOTE_TOOLS = [
 // ── Pasek zasobu ─────────────────────────────────────────────────────────────
 function ResourceBar({ pct, color }: { pct: number; color: string }) {
   return (
-    <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+    <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
       <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${Math.min(pct, 100)}%` }} />
     </div>
   );
@@ -155,14 +156,14 @@ function AgentStatsBox({ agent }: { agent: NonNullable<import('../../../types').
       {/* Status agenta */}
       <div className="flex items-center justify-between text-xs">
         <div className="flex items-center gap-1.5">
-          <span className={`inline-block w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : ''}`} style={!isOnline ? { background: 'rgba(255,255,255,0.15)' } : {}} />
-          <span className={isOnline ? 'text-emerald-400 font-medium' : ''} style={!isOnline ? { color: 'rgba(255,255,255,0.3)' } : {}}>
+          <span className={`inline-block w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : ''}`} style={!isOnline ? { background: 'var(--td)' } : {}} />
+          <span className={isOnline ? 'text-emerald-400 font-medium' : ''} style={!isOnline ? { color: 'var(--tm)' } : {}}>
             {isOnline ? 'Online' : 'Offline'}
           </span>
-          {agent.appVersion && <span className="ml-1" style={{ color: 'rgba(255,255,255,0.3)' }}>v{agent.appVersion}</span>}
+          {agent.appVersion && <span className="ml-1" style={{ color: 'var(--tm)' }}>v{agent.appVersion}</span>}
         </div>
         {agent.lastSeen && (
-          <span className="flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.3)' }}>
+          <span className="flex items-center gap-1" style={{ color: 'var(--tm)' }}>
             <Clock className="h-3 w-3" />
             {new Date(agent.lastSeen).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' })}
           </span>
@@ -173,11 +174,11 @@ function AgentStatsBox({ agent }: { agent: NonNullable<import('../../../types').
       {agent.cpuUsage != null && (
         <div>
           <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'rgba(255,255,255,0.5)' }}>
+            <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'var(--ts)' }}>
               <Cpu className="h-3.5 w-3.5" />
               <span>CPU</span>
-              {agent.cpuModel && <span className="font-normal truncate max-w-[200px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{agent.cpuModel}</span>}
-              {agent.cpuCores && <span style={{ color: 'rgba(255,255,255,0.3)' }}>· {agent.cpuCores}C/{agent.cpuThreads}T</span>}
+              {agent.cpuModel && <span className="font-normal truncate max-w-[200px]" style={{ color: 'var(--tm)' }}>{agent.cpuModel}</span>}
+              {agent.cpuCores && <span style={{ color: 'var(--tm)' }}>· {agent.cpuCores}C/{agent.cpuThreads}T</span>}
             </div>
             <div className="flex items-center gap-2">
               {agent.cpuTempC != null && (
@@ -186,7 +187,7 @@ function AgentStatsBox({ agent }: { agent: NonNullable<import('../../../types').
                   {agent.cpuTempC}°C
                 </span>
               )}
-              <span className="text-xs font-bold" style={{ color: 'rgba(255,255,255,0.6)' }}>{agent.cpuUsage.toFixed(1)}%</span>
+              <span className="text-xs font-bold" style={{ color: 'var(--ts)' }}>{agent.cpuUsage.toFixed(1)}%</span>
             </div>
           </div>
           <ResourceBar pct={agent.cpuUsage} color={cpuColor} />
@@ -197,12 +198,12 @@ function AgentStatsBox({ agent }: { agent: NonNullable<import('../../../types').
       {agent.ramUsage != null && (
         <div>
           <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'rgba(255,255,255,0.5)' }}>
+            <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'var(--ts)' }}>
               <CircuitBoard className="h-3.5 w-3.5" />
               <span>RAM</span>
-              {agent.ramTotalGb && <span className="font-normal" style={{ color: 'rgba(255,255,255,0.3)' }}>· {agent.ramTotalGb} GB</span>}
+              {agent.ramTotalGb && <span className="font-normal" style={{ color: 'var(--tm)' }}>· {agent.ramTotalGb} GB</span>}
             </div>
-            <span className="text-xs font-bold" style={{ color: 'rgba(255,255,255,0.6)' }}>
+            <span className="text-xs font-bold" style={{ color: 'var(--ts)' }}>
               {ramUsedGb && `${ramUsedGb} / ${agent.ramTotalGb} GB`} ({agent.ramUsage.toFixed(1)}%)
             </span>
           </div>
@@ -214,11 +215,11 @@ function AgentStatsBox({ agent }: { agent: NonNullable<import('../../../types').
       {diskPct != null && (
         <div>
           <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'rgba(255,255,255,0.5)' }}>
+            <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'var(--ts)' }}>
               <HardDrive className="h-3.5 w-3.5" />
               <span>Dysk C:</span>
             </div>
-            <span className="text-xs font-bold" style={{ color: 'rgba(255,255,255,0.6)' }}>
+            <span className="text-xs font-bold" style={{ color: 'var(--ts)' }}>
               {diskUsed != null && agent.diskTotal
                 ? `${diskUsed.toFixed(1)} / ${agent.diskTotal.toFixed(1)} GB`
                 : ''} ({diskPct.toFixed(1)}%)
@@ -232,12 +233,12 @@ function AgentStatsBox({ agent }: { agent: NonNullable<import('../../../types').
       {Array.isArray(agent.diskInfo) && agent.diskInfo.filter(d => d.mountpoint !== 'C:\\').map(disk => (
         <div key={disk.mountpoint}>
           <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'var(--tm)' }}>
               <HardDrive className="h-3 w-3" />
               <span>{disk.mountpoint}</span>
-              <span className="font-normal" style={{ color: 'rgba(255,255,255,0.3)' }}>· {disk.totalGb} GB</span>
+              <span className="font-normal" style={{ color: 'var(--tm)' }}>· {disk.totalGb} GB</span>
             </div>
-            <span className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
+            <span className="text-xs" style={{ color: 'var(--ts)' }}>
               {(disk.totalGb - disk.freeGb).toFixed(1)} / {disk.totalGb} GB ({disk.usedPct}%)
             </span>
           </div>
@@ -251,17 +252,17 @@ function AgentStatsBox({ agent }: { agent: NonNullable<import('../../../types').
       {/* Sieć */}
       {Array.isArray(agent.networkIfaces) && agent.networkIfaces.filter(n => n.ip && n.isUp).length > 0 && (
         <div className="pt-1">
-          <div className="flex items-center gap-1.5 text-xs font-medium mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>
+          <div className="flex items-center gap-1.5 text-xs font-medium mb-2" style={{ color: 'var(--ts)' }}>
             <Radio className="h-3.5 w-3.5" />
             Sieć
           </div>
           <div className="grid grid-cols-1 gap-1">
             {agent.networkIfaces.filter(n => n.ip && n.isUp).map(iface => (
-              <div key={iface.name} className="flex items-center justify-between text-xs rounded-lg px-3 py-1.5" style={{ background: 'rgba(255,255,255,0.02)' }}>
-                <span className="font-medium truncate max-w-[160px]" style={{ color: 'rgba(255,255,255,0.6)' }}>{iface.name}</span>
-                <div className="flex items-center gap-2" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              <div key={iface.name} className="flex items-center justify-between text-xs rounded-lg px-3 py-1.5" style={{ background: 'var(--bg-card)' }}>
+                <span className="font-medium truncate max-w-[160px]" style={{ color: 'var(--ts)' }}>{iface.name}</span>
+                <div className="flex items-center gap-2" style={{ color: 'var(--tm)' }}>
                   <span className="font-mono">{iface.ip}</span>
-                  {iface.mac && <span className="font-mono" style={{ color: 'rgba(255,255,255,0.3)' }}>{iface.mac}</span>}
+                  {iface.mac && <span className="font-mono" style={{ color: 'var(--tm)' }}>{iface.mac}</span>}
                 </div>
               </div>
             ))}
@@ -271,10 +272,10 @@ function AgentStatsBox({ agent }: { agent: NonNullable<import('../../../types').
 
       {/* Ostatni rozruch */}
       {agent.lastBootTime && (
-        <div className="flex items-center gap-1.5 text-xs pt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
+        <div className="flex items-center gap-1.5 text-xs pt-1" style={{ color: 'var(--tm)' }}>
           <Activity className="h-3.5 w-3.5" />
           <span>Ostatni rozruch:</span>
-          <span className="font-medium" style={{ color: 'rgba(255,255,255,0.6)' }}>{new Date(agent.lastBootTime).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' })}</span>
+          <span className="font-medium" style={{ color: 'var(--ts)' }}>{new Date(agent.lastBootTime).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' })}</span>
         </div>
       )}
     </div>
@@ -287,7 +288,7 @@ function LocationMap({ lat, lon, label }: { lat: number; lon: number; label?: st
   const bbox = `${lon - delta},${lat - delta},${lon + delta},${lat + delta}`;
   const src = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lon}`;
   return (
-    <div className="mt-3 rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
+    <div className="mt-3 rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
       <iframe
         src={src}
         title={label ?? 'Lokalizacja'}
@@ -369,7 +370,7 @@ export function DeviceDetailPage() {
   const { data: staffUsers = [] } = useQuery({
     queryKey: ['users', { roles: 'ADMIN,TECHNICIAN' }],
     queryFn: () => usersApi.getAll(),
-    select: (data) => data.filter(u => u.role === 'ADMIN' || u.role === 'TECHNICIAN'),
+    select: (data) => data.filter(u => (u as any).role === 'ADMIN' || (u as any).role === 'TECHNICIAN'),
   });
 
   const { data: agentData } = useQuery({
@@ -394,10 +395,9 @@ export function DeviceDetailPage() {
   });
 
   if (isLoading) return <LoadingSpinner />;
-  if (!device) return <div className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Nie znaleziono urządzenia</div>;
+  if (!device) return <div className="text-sm" style={{ color: 'var(--tm)' }}>Nie znaleziono urządzenia</div>;
 
-  const isAdmin = user?.role === 'ADMIN';
-  const isTech = user?.role === 'TECHNICIAN';
+  const { isAdmin, isTechnician: isTech } = useWorkspaceContext();
   const canSeeInternal = isAdmin || isTech;
 
   // Aktywne narzędzia zdalne (tylko te z ID)
@@ -446,7 +446,7 @@ export function DeviceDetailPage() {
               <button
                 onClick={() => setShowEdit(true)}
                 className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors hover:text-violet-400"
-                style={{ color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.08)' }}
+                style={{ color: 'var(--ts)', border: '1px solid var(--border)' }}
               >
                 <Edit2 className="h-3.5 w-3.5" />
                 Edytuj
@@ -457,18 +457,18 @@ export function DeviceDetailPage() {
       />
 
       {/* Tabs */}
-      <div className="flex gap-0 mb-5 rounded-2xl overflow-x-auto" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="flex gap-0 mb-5 rounded-2xl overflow-x-auto" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
         {TABS.map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
             className="flex-1 px-3 py-3 text-sm font-medium whitespace-nowrap transition-colors"
             style={tab === t.id
-              ? { background: 'rgba(139,92,246,0.12)', color: '#A78BFA', borderBottom: '2px solid #A78BFA' }
-              : { color: 'rgba(255,255,255,0.4)', borderBottom: '2px solid transparent' }
+              ? { background: 'rgba(139,92,246,0.12)', color: 'var(--accent-s)', borderBottom: '2px solid var(--accent)' }
+              : { color: 'var(--tm)', borderBottom: '2px solid transparent' }
             }
-            onMouseEnter={(e) => { if (tab !== t.id) e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
-            onMouseLeave={(e) => { if (tab !== t.id) e.currentTarget.style.color = 'rgba(255,255,255,0.4)'; }}
+            onMouseEnter={(e) => { if (tab !== t.id) e.currentTarget.style.color = 'var(--ts)'; }}
+            onMouseLeave={(e) => { if (tab !== t.id) e.currentTarget.style.color = 'var(--tm)'; }}
           >
             {t.label}
           </button>
@@ -497,11 +497,11 @@ export function DeviceDetailPage() {
               <InfoRow label="Użytkownik">
                 {device.assignedUser ? (
                   <span className="text-sm text-white/80 flex items-center gap-1">
-                    <User className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'rgba(255,255,255,0.3)' }} />
+                    <User className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'var(--tm)' }} />
                     {device.assignedUser.firstName} {device.assignedUser.lastName}
                   </span>
                 ) : (
-                  <span className="text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>— nie przypisano —</span>
+                  <span className="text-sm" style={{ color: 'var(--tm)' }}>— nie przypisano —</span>
                 )}
               </InfoRow>
 
@@ -512,13 +512,13 @@ export function DeviceDetailPage() {
 
             {/* Lokalizacja + mapka */}
             {loc && (
-              <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+              <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
                 <div className="flex items-start gap-1.5">
-                  <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: 'rgba(255,255,255,0.3)' }} />
+                  <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--tm)' }} />
                   <div>
                     <p className="text-sm font-medium text-white/80">{loc.name}</p>
                     {locationAddress && (
-                      <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>{locationAddress}</p>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--tm)' }}>{locationAddress}</p>
                     )}
                   </div>
                 </div>
@@ -545,13 +545,13 @@ export function DeviceDetailPage() {
               <InfoRow label="Numer seryjny" value={device.serialNumber} mono />
               <InfoRow label="Data zakupu" value={device.purchaseDate ? formatDate(device.purchaseDate) : null} />
               <div className="flex items-start gap-2">
-                <span className="text-xs font-medium w-32 flex-shrink-0 mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Gwarancja do</span>
+                <span className="text-xs font-medium w-32 flex-shrink-0 mt-0.5" style={{ color: 'var(--tm)' }}>Gwarancja do</span>
                 {device.warrantyUntil ? (
                   <span className={`text-sm font-medium ${isExpired(device.warrantyUntil) ? 'text-red-400' : 'text-green-400'}`}>
                     {formatDate(device.warrantyUntil)}
                     {isExpired(device.warrantyUntil) && ' (wygasła)'}
                   </span>
-                ) : <span className="text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>—</span>}
+                ) : <span className="text-sm" style={{ color: 'var(--tm)' }}>—</span>}
               </div>
             </div>
           </Card>
@@ -593,7 +593,7 @@ export function DeviceDetailPage() {
                         <div className="min-w-0">
                           <p className={`text-sm font-semibold ${tool.labelColor}`}>{tool.label}</p>
                           <div className="flex items-center gap-1 mt-0.5">
-                            <span className="text-xs font-mono truncate" style={{ color: 'rgba(255,255,255,0.5)' }}>{toolId}</span>
+                            <span className="text-xs font-mono truncate" style={{ color: 'var(--ts)' }}>{toolId}</span>
                             <CopyButton value={toolId} label={`${tool.label} ID skopiowane`} />
                           </div>
                         </div>
@@ -618,8 +618,8 @@ export function DeviceDetailPage() {
           {activeRemoteTools.length === 0 && canSeeInternal && (
             <Card title="Połączenia zdalne">
               <div className="flex flex-col items-center py-6 gap-3">
-                <Laptop className="h-8 w-8" style={{ color: 'rgba(255,255,255,0.15)' }} />
-                <p className="text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>Brak skonfigurowanych połączeń</p>
+                <Laptop className="h-8 w-8" style={{ color: 'var(--td)' }} />
+                <p className="text-sm" style={{ color: 'var(--tm)' }}>Brak skonfigurowanych połączeń</p>
                 <button
                   onClick={() => setShowEdit(true)}
                   className="flex items-center gap-1.5 text-xs text-violet-400 hover:underline"
@@ -637,16 +637,16 @@ export function DeviceDetailPage() {
               <div className="space-y-4">
                 {canSeeInternal && device.internalNotes && (
                   <div>
-                    <div className="text-xs font-semibold uppercase mb-1.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Notatki wewnętrzne</div>
-                    <div className="rounded-lg p-3 text-sm whitespace-pre-wrap" style={{ background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.2)', color: 'rgba(255,255,255,0.6)' }}>
+                    <div className="text-xs font-semibold uppercase mb-1.5" style={{ color: 'var(--tm)' }}>Notatki wewnętrzne</div>
+                    <div className="rounded-lg p-3 text-sm whitespace-pre-wrap" style={{ background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.2)', color: 'var(--ts)' }}>
                       {device.internalNotes}
                     </div>
                   </div>
                 )}
                 {device.clientVisibleNotes && (
                   <div>
-                    <div className="text-xs font-semibold uppercase mb-1.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Notatki publiczne</div>
-                    <div className="rounded-lg p-3 text-sm whitespace-pre-wrap" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)' }}>
+                    <div className="text-xs font-semibold uppercase mb-1.5" style={{ color: 'var(--tm)' }}>Notatki publiczne</div>
+                    <div className="rounded-lg p-3 text-sm whitespace-pre-wrap" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--ts)' }}>
                       {device.clientVisibleNotes}
                     </div>
                   </div>
@@ -666,22 +666,22 @@ export function DeviceDetailPage() {
               }
             >
               {credentials.length === 0 ? (
-                <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Brak zapisanych danych dostępowych</p>
+                <p className="text-sm" style={{ color: 'var(--tm)' }}>Brak zapisanych danych dostępowych</p>
               ) : (
                 <div>
                   {credentials.map((cred: Credential, idx: number) => (
-                    <div key={cred.id} className="py-3 flex items-center justify-between gap-4" style={idx < credentials.length - 1 ? { borderBottom: '1px solid rgba(255,255,255,0.04)' } : {}}>
+                    <div key={cred.id} className="py-3 flex items-center justify-between gap-4" style={idx < credentials.length - 1 ? { borderBottom: '1px solid var(--border)' } : {}}>
                       <div>
                         <div className="text-sm font-medium text-white/80">{cred.name}</div>
                         <div className="flex items-center gap-2 mt-0.5">
                           <Badge color="gray">{cred.category}</Badge>
                           {cred.username && (
-                            <span className="text-xs font-mono flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                            <span className="text-xs font-mono flex items-center gap-1" style={{ color: 'var(--tm)' }}>
                               {cred.username}
                               <CopyButton value={cred.username} label="Login skopiowany" />
                             </span>
                           )}
-                          {cred.urlOrHost && <span className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{cred.urlOrHost}</span>}
+                          {cred.urlOrHost && <span className="text-xs" style={{ color: 'var(--tm)' }}>{cred.urlOrHost}</span>}
                         </div>
                       </div>
                       <PasswordRevealField
@@ -705,7 +705,7 @@ export function DeviceDetailPage() {
             }
           >
             {openTickets.length === 0 ? (
-              <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Brak otwartych zgłoszeń</p>
+              <p className="text-sm" style={{ color: 'var(--tm)' }}>Brak otwartych zgłoszeń</p>
             ) : (
               <div className="space-y-2">
                 {openTickets.map((t: Ticket) => (
@@ -713,7 +713,7 @@ export function DeviceDetailPage() {
                     key={t.id}
                     to={`/tickets/${t.id}`}
                     className="flex items-center justify-between p-2.5 rounded-lg hover:bg-white/[0.03] transition-colors"
-                    style={{ border: '1px solid rgba(255,255,255,0.04)' }}
+                    style={{ border: '1px solid var(--border)' }}
                   >
                     <div>
                       <span className="text-xs font-mono text-violet-400">{t.ticketNumber}</span>
@@ -740,11 +740,11 @@ export function DeviceDetailPage() {
                     className="flex items-center justify-between p-2.5 rounded-lg hover:bg-white/[0.03] transition-colors"
                   >
                     <div>
-                      <span className="text-xs font-mono" style={{ color: 'rgba(255,255,255,0.3)' }}>{t.ticketNumber}</span>
-                      <span className="text-sm ml-2" style={{ color: 'rgba(255,255,255,0.5)' }}>{t.title}</span>
+                      <span className="text-xs font-mono" style={{ color: 'var(--tm)' }}>{t.ticketNumber}</span>
+                      <span className="text-sm ml-2" style={{ color: 'var(--ts)' }}>{t.title}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{formatDate(t.reportedAt)}</span>
+                      <span className="text-xs" style={{ color: 'var(--tm)' }}>{formatDate(t.reportedAt)}</span>
                       <TicketStatusBadge status={t.status} />
                     </div>
                   </Link>
@@ -772,14 +772,14 @@ export function DeviceDetailPage() {
             {qrBase64 ? (
               <div className="flex flex-col items-center gap-3">
                 <img src={`data:image/png;base64,${qrBase64}`} alt="QR Code" className="w-40 h-40" />
-                <div className="text-xs font-mono text-center break-all" style={{ color: 'rgba(255,255,255,0.4)' }}>{device.qrCodeValue}</div>
+                <div className="text-xs font-mono text-center break-all" style={{ color: 'var(--tm)' }}>{device.qrCodeValue}</div>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-3 py-4">
-                <div className="w-20 h-20 border-2 border-dashed rounded-lg flex items-center justify-center" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
-                  <QrCode className="h-8 w-8" style={{ color: 'rgba(255,255,255,0.15)' }} />
+                <div className="w-20 h-20 border-2 border-dashed rounded-lg flex items-center justify-center" style={{ borderColor: 'var(--border)' }}>
+                  <QrCode className="h-8 w-8" style={{ color: 'var(--td)' }} />
                 </div>
-                <p className="text-xs text-center" style={{ color: 'rgba(255,255,255,0.4)' }}>Kliknij "Wygeneruj" aby zobaczyć kod QR</p>
+                <p className="text-xs text-center" style={{ color: 'var(--tm)' }}>Kliknij "Wygeneruj" aby zobaczyć kod QR</p>
               </div>
             )}
           </Card>
@@ -787,7 +787,7 @@ export function DeviceDetailPage() {
           {/* ── Opiekun ── */}
           <Card title="Opiekun urządzenia">
             <div className="space-y-2">
-              <label className="text-xs flex items-center gap-1.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              <label className="text-xs flex items-center gap-1.5" style={{ color: 'var(--tm)' }}>
                 <User className="h-3.5 w-3.5" />
                 Przypisany opiekun
               </label>
@@ -796,7 +796,7 @@ export function DeviceDetailPage() {
                 onChange={(e) => updateManagerMutation.mutate(e.target.value || null)}
                 disabled={updateManagerMutation.isPending}
                 className="w-full text-sm rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
+                style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}
               >
                 <option value="">— brak opiekuna —</option>
                 {staffUsers.map(u => (
@@ -809,15 +809,15 @@ export function DeviceDetailPage() {
           {/* ── Historia aktywności ── */}
           <Card title="Historia aktywności">
             {logs.length === 0 ? (
-              <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Brak wpisów</p>
+              <p className="text-sm" style={{ color: 'var(--tm)' }}>Brak wpisów</p>
             ) : (
               <div className="space-y-3">
                 {logs.slice(0, 10).map(log => (
                   <div key={log.id} className="flex gap-2.5">
                     <div className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-violet-400 mt-1.5" />
                     <div className="min-w-0">
-                      <p className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>{log.description}</p>
-                      <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                      <p className="text-xs" style={{ color: 'var(--ts)' }}>{log.description}</p>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--tm)' }}>
                         {log.performedBy ? `${log.performedBy.firstName} ${log.performedBy.lastName} · ` : ''}
                         {formatDateTime(log.createdAt)}
                       </p>
@@ -835,11 +835,11 @@ export function DeviceDetailPage() {
         <div className="space-y-5">
           {securityAudit ? (
             <>
-              <div className="flex items-center gap-6 p-6 rounded-[18px]" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="flex items-center gap-6 p-6 rounded-[18px]" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                 {/* Big circular score */}
                 <div className="relative w-[120px] h-[120px] flex-shrink-0">
                   <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-                    <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
+                    <circle cx="60" cy="60" r="52" fill="none" stroke="var(--border)" strokeWidth="8" />
                     <circle cx="60" cy="60" r="52" fill="none"
                       stroke={securityAudit.score >= 80 ? '#4ADE80' : securityAudit.score >= 50 ? '#FBBF24' : '#F87171'}
                       strokeWidth="8" strokeLinecap="round"
@@ -849,32 +849,32 @@ export function DeviceDetailPage() {
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <span className="text-[32px] font-bold text-white">{securityAudit.score}</span>
-                    <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.35)' }}>/ 100</span>
+                    <span className="text-[10px]" style={{ color: 'var(--tm)' }}>/ 100</span>
                   </div>
                 </div>
                 <div>
                   <h3 className="text-[18px] font-bold" style={{ color: securityAudit.score >= 80 ? '#4ADE80' : securityAudit.score >= 50 ? '#FBBF24' : '#F87171' }}>
                     {securityAudit.score >= 80 ? 'Bezpieczny' : securityAudit.score >= 50 ? 'Wymaga uwagi' : 'Zagrożony'}
                   </h3>
-                  <p className="text-[12px] mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                  <p className="text-[12px] mt-1" style={{ color: 'var(--tm)' }}>
                     {securityAudit.checks.filter((c: any) => c.status === 'pass').length} / {securityAudit.checks.length} testów zaliczonych
                   </p>
-                  <p className="text-[11px] mt-0.5" style={{ color: 'rgba(255,255,255,0.25)' }}>
+                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--td)' }}>
                     Ostatni audyt: {securityAudit.timestamp}
                   </p>
                 </div>
               </div>
 
               {/* Checks list */}
-              <div className="rounded-[18px] overflow-hidden" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div className="px-5 py-3.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+              <div className="rounded-[18px] overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                <div className="px-5 py-3.5" style={{ borderBottom: '1px solid var(--border)' }}>
                   <h3 className="text-[13px] font-semibold text-white/70">Wyniki audytu</h3>
                 </div>
-                <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.03)' }}>
+                <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
                   {securityAudit.checks.map((check: any) => (
                     <div key={check.id} className="flex items-center gap-3 px-5 py-3">
                       <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
-                        style={{ background: check.status === 'pass' ? 'rgba(34,197,94,0.12)' : check.status === 'fail' ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)' }}>
+                        style={{ background: check.status === 'pass' ? 'rgba(34,197,94,0.12)' : check.status === 'fail' ? 'rgba(239,68,68,0.12)' : 'var(--hover-bg)' }}>
                         {check.status === 'pass' ? <CheckCircle2 className="h-3.5 w-3.5" style={{ color: '#4ADE80' }} />
                          : check.status === 'fail' ? <XCircle className="h-3.5 w-3.5" style={{ color: '#F87171' }} />
                          : <AlertTriangle className="h-3.5 w-3.5" style={{ color: '#FBBF24' }} />}
@@ -883,12 +883,12 @@ export function DeviceDetailPage() {
                         <div className="flex items-center gap-2">
                           <span className="text-[13px] font-medium text-white/80">{check.name}</span>
                           <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded"
-                            style={{ background: check.severity === 'critical' ? 'rgba(239,68,68,0.12)' : check.severity === 'high' ? 'rgba(251,146,60,0.1)' : 'rgba(255,255,255,0.04)',
-                                     color: check.severity === 'critical' ? '#F87171' : check.severity === 'high' ? '#FB923C' : 'rgba(255,255,255,0.35)' }}>
+                            style={{ background: check.severity === 'critical' ? 'rgba(239,68,68,0.12)' : check.severity === 'high' ? 'rgba(251,146,60,0.1)' : 'var(--hover-bg)',
+                                     color: check.severity === 'critical' ? '#F87171' : check.severity === 'high' ? '#FB923C' : 'var(--tm)' }}>
                             {check.severity}
                           </span>
                         </div>
-                        <p className="text-[11px] mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{check.detail}</p>
+                        <p className="text-[11px] mt-0.5" style={{ color: 'var(--tm)' }}>{check.detail}</p>
                       </div>
                     </div>
                   ))}
@@ -896,10 +896,10 @@ export function DeviceDetailPage() {
               </div>
             </>
           ) : (
-            <div className="text-center py-16 rounded-[18px]" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <Shield className="h-10 w-10 mx-auto mb-3" style={{ color: 'rgba(255,255,255,0.1)' }} />
-              <p className="text-[13px]" style={{ color: 'rgba(255,255,255,0.4)' }}>Brak danych audytu bezpieczeństwa</p>
-              <p className="text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.2)' }}>Agent zbiera dane — pojawią się w ciągu godziny</p>
+            <div className="text-center py-16 rounded-[18px]" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+              <Shield className="h-10 w-10 mx-auto mb-3" style={{ color: 'var(--td)' }} />
+              <p className="text-[13px]" style={{ color: 'var(--tm)' }}>Brak danych audytu bezpieczeństwa</p>
+              <p className="text-[11px] mt-1" style={{ color: 'var(--td)' }}>Agent zbiera dane — pojawią się w ciągu godziny</p>
             </div>
           )}
         </div>
@@ -909,40 +909,40 @@ export function DeviceDetailPage() {
         <div className="space-y-5">
           {networkScan && networkScan.devices?.length > 0 ? (
             <>
-              <div className="flex items-center gap-4 p-4 rounded-[18px]" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="flex items-center gap-4 p-4 rounded-[18px]" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                 <Wifi className="h-5 w-5" style={{ color: '#A78BFA' }} />
                 <div>
                   <p className="text-[14px] font-semibold text-white/80">Sieć: {networkScan.subnet}</p>
-                  <p className="text-[12px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                  <p className="text-[12px]" style={{ color: 'var(--tm)' }}>
                     {networkScan.devices.length} urządzeń · Brama: {networkScan.gateway} · Skan: {networkScan.scannedAt}
                   </p>
                 </div>
               </div>
 
-              <div className="rounded-[18px] overflow-hidden" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="rounded-[18px] overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                 <table className="w-full text-sm">
                   <thead>
-                    <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>IP</th>
-                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Hostname</th>
-                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>MAC</th>
-                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Typ</th>
-                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Porty</th>
+                    <tr style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }}>
+                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>IP</th>
+                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Hostname</th>
+                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>MAC</th>
+                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Typ</th>
+                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Porty</th>
                     </tr>
                   </thead>
                   <tbody>
                     {networkScan.devices.map((d: any, i: number) => (
-                      <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                      <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
                         <td className="px-4 py-2.5 text-[13px] font-mono text-white/70">{d.ip}</td>
                         <td className="px-4 py-2.5 text-[13px] text-white/60">{d.hostname || '—'}</td>
-                        <td className="px-4 py-2.5 text-[11px] font-mono" style={{ color: 'rgba(255,255,255,0.35)' }}>{d.mac}</td>
+                        <td className="px-4 py-2.5 text-[11px] font-mono" style={{ color: 'var(--tm)' }}>{d.mac}</td>
                         <td className="px-4 py-2.5">
                           <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{
-                            background: d.type === 'server' ? 'rgba(139,92,246,0.12)' : d.type === 'router' ? 'rgba(96,165,250,0.12)' : d.type === 'printer' ? 'rgba(251,146,60,0.12)' : 'rgba(255,255,255,0.04)',
-                            color: d.type === 'server' ? '#A78BFA' : d.type === 'router' ? '#60A5FA' : d.type === 'printer' ? '#FB923C' : 'rgba(255,255,255,0.4)',
+                            background: d.type === 'server' ? 'rgba(139,92,246,0.12)' : d.type === 'router' ? 'rgba(96,165,250,0.12)' : d.type === 'printer' ? 'rgba(251,146,60,0.12)' : 'var(--hover-bg)',
+                            color: d.type === 'server' ? '#A78BFA' : d.type === 'router' ? '#60A5FA' : d.type === 'printer' ? '#FB923C' : 'var(--tm)',
                           }}>{d.type}</span>
                         </td>
-                        <td className="px-4 py-2.5 text-[11px] font-mono" style={{ color: 'rgba(255,255,255,0.3)' }}>{d.ports?.join(', ') || '—'}</td>
+                        <td className="px-4 py-2.5 text-[11px] font-mono" style={{ color: 'var(--tm)' }}>{d.ports?.join(', ') || '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -950,10 +950,10 @@ export function DeviceDetailPage() {
               </div>
             </>
           ) : (
-            <div className="text-center py-16 rounded-[18px]" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <Wifi className="h-10 w-10 mx-auto mb-3" style={{ color: 'rgba(255,255,255,0.1)' }} />
-              <p className="text-[13px]" style={{ color: 'rgba(255,255,255,0.4)' }}>Brak danych skanowania sieci</p>
-              <p className="text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.2)' }}>Agent skanuje sieć co 30 minut</p>
+            <div className="text-center py-16 rounded-[18px]" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+              <Wifi className="h-10 w-10 mx-auto mb-3" style={{ color: 'var(--td)' }} />
+              <p className="text-[13px]" style={{ color: 'var(--tm)' }}>Brak danych skanowania sieci</p>
+              <p className="text-[11px] mt-1" style={{ color: 'var(--td)' }}>Agent skanuje sieć co 30 minut</p>
             </div>
           )}
         </div>

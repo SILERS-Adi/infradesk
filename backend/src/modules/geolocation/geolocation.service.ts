@@ -20,8 +20,7 @@ export async function updateTechPosition(userId: string, lat: number, lng: numbe
   // Find all locations with coordinates
   const locations = await prisma.location.findMany({
     where: { latitude: { not: null }, longitude: { not: null } },
-    select: { id: true, name: true, latitude: true, longitude: true, clientId: true,
-      client: { select: { id: true, name: true } } },
+    select: { id: true, name: true, latitude: true, longitude: true, workspaceId: true },
   });
 
   // Calculate which locations are within geofence
@@ -40,7 +39,7 @@ export async function updateTechPosition(userId: string, lat: number, lng: numbe
   const exitedLocations = exited.length > 0
     ? await prisma.location.findMany({
         where: { id: { in: exited } },
-        select: { id: true, name: true, clientId: true, client: { select: { id: true, name: true } } },
+        select: { id: true, name: true, workspaceId: true },
       })
     : [];
 
@@ -79,13 +78,13 @@ export async function updateTechPosition(userId: string, lat: number, lng: numbe
   }
 
   return {
-    nearLocations: nearNow.map(l => ({ id: l.id, name: l.name, clientId: l.clientId, clientName: l.client?.name })),
+    nearLocations: nearNow.map(l => ({ id: l.id, name: l.name, workspaceId: l.workspaceId })),
     entered: enteredWithTickets.map(e => ({
-      location: { id: e.location.id, name: e.location.name, clientId: e.location.clientId, clientName: e.location.client?.name },
+      location: { id: e.location.id, name: e.location.name, workspaceId: e.location.workspaceId },
       tickets: e.tickets,
     })),
     exited: exitedWithTickets.map(e => ({
-      location: { id: e.location.id, name: e.location.name, clientId: e.location.clientId, clientName: e.location.client?.name },
+      location: { id: e.location.id, name: e.location.name, workspaceId: e.location.workspaceId },
       tickets: e.tickets,
     })),
   };
@@ -94,18 +93,17 @@ export async function updateTechPosition(userId: string, lat: number, lng: numbe
 export async function getNearbyTickets(lat: number, lng: number, radiusMeters = 500) {
   const locations = await prisma.location.findMany({
     where: { latitude: { not: null }, longitude: { not: null } },
-    select: { id: true, name: true, latitude: true, longitude: true, clientId: true,
-      client: { select: { id: true, name: true } } },
+    select: { id: true, name: true, latitude: true, longitude: true, workspaceId: true },
   });
 
   const nearbyLocIds: string[] = [];
-  const locMap = new Map<string, { name: string; clientName?: string; distance: number }>();
+  const locMap = new Map<string, { name: string; distance: number }>();
 
   for (const loc of locations) {
     const dist = haversineMeters(lat, lng, loc.latitude!, loc.longitude!);
     if (dist <= radiusMeters) {
       nearbyLocIds.push(loc.id);
-      locMap.set(loc.id, { name: loc.name, clientName: loc.client?.name, distance: Math.round(dist) });
+      locMap.set(loc.id, { name: loc.name, distance: Math.round(dist) });
     }
   }
 
@@ -118,8 +116,7 @@ export async function getNearbyTickets(lat: number, lng: number, radiusMeters = 
     },
     select: {
       id: true, ticketNumber: true, title: true, status: true, priority: true,
-      locationId: true, clientId: true,
-      client: { select: { id: true, name: true } },
+      locationId: true,
       location: { select: { id: true, name: true } },
       assignedTo: { select: { id: true, firstName: true, lastName: true } },
     },

@@ -1,11 +1,12 @@
 import { Router } from 'express';
-import { authenticate, authorize } from '../../middleware/auth';
+import { authenticate } from '../../middleware/auth';
+import { withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
 import * as ctrl from './notifications.controller';
 
 const router = Router();
 router.use(authenticate);
 
-router.post('/send',   authorize('ADMIN', 'TECHNICIAN'), ctrl.send);
+router.post('/send',   withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), ctrl.send);
 router.get('/mine',    ctrl.getMine);
 router.get('/unread',  ctrl.unreadCount);
 router.post('/read',   ctrl.read);

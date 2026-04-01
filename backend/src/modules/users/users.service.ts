@@ -2,8 +2,8 @@ import bcrypt from 'bcrypt';
 import prisma from '../../lib/prisma';
 import { AppError } from '../../middleware/errorHandler';
 import { logActivity } from '../../utils/activityLogger';
+import { validatePassword } from '../../utils/passwordPolicy';
 import { CreateUserInput, UpdateUserInput } from './users.validation';
-import { Role } from '@prisma/client';
 
 const userSelect = {
   id: true,
@@ -11,32 +11,50 @@ const userSelect = {
   lastName: true,
   email: true,
   phone: true,
-  role: true,
-  clientId: true,
   isActive: true,
   downloadPin: true,
   avatarUrl: true,
   lastLoginAt: true,
   createdAt: true,
   updatedAt: true,
-  client: {
-    select: { id: true, name: true },
-  },
 };
 
 export async function listUsers(params: {
-  role?: Role;
-  clientId?: string;
   isActive?: boolean;
   page?: number;
   limit?: number;
+  workspaceId?: string | null;
 }) {
-  const { role, clientId, isActive, page = 1, limit = 20 } = params;
+  const { isActive, page = 1, limit = 20, workspaceId } = params;
   const skip = (page - 1) * limit;
 
+  // If workspaceId is provided, list users who are members of that workspace
+  if (workspaceId) {
+    const memberships = await prisma.workspaceMembership.findMany({
+      where: {
+        workspaceId,
+        ...(isActive !== undefined ? { user: { isActive } } : {}),
+      },
+      include: {
+        user: { select: userSelect },
+      },
+      skip,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+    });
+    const total = await prisma.workspaceMembership.count({
+      where: {
+        workspaceId,
+        ...(isActive !== undefined ? { user: { isActive } } : {}),
+      },
+    });
+    return {
+      data: memberships.map(m => ({ ...m.user, membershipRole: m.role })),
+      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
   const where: Record<string, unknown> = {};
-  if (role) where.role = role;
-  if (clientId) where.clientId = clientId;
   if (isActive !== undefined) where.isActive = isActive;
 
   const [users, total] = await Promise.all([
@@ -74,16 +92,13 @@ export async function getUserById(id: string) {
   return user;
 }
 
-export async function createUser(data: CreateUserInput, performedByUserId: string) {
+export async function createUser(data: CreateUserInput, performedByUserId: string, workspaceId?: string | null) {
   const existing = await prisma.user.findUnique({ where: { email: data.email } });
   if (existing) {
     throw new AppError('Email already in use', 409);
   }
 
-  if (data.role === 'CLIENT' && !data.clientId) {
-    throw new AppError('clientId is required for CLIENT role', 400);
-  }
-
+  validatePassword(data.password);
   const passwordHash = await bcrypt.hash(data.password, 12);
 
   const user = await prisma.user.create({
@@ -93,12 +108,17 @@ export async function createUser(data: CreateUserInput, performedByUserId: strin
       email: data.email,
       phone: data.phone,
       passwordHash,
-      role: data.role as Role,
-      clientId: data.clientId,
       isActive: data.isActive,
     },
     select: userSelect,
   });
+
+  // Add to workspace if provided
+  if (workspaceId) {
+    await prisma.workspaceMembership.create({
+      data: { workspaceId, userId: user.id, role: 'MEMBER' },
+    }).catch(() => {});
+  }
 
   await logActivity(prisma, {
     entityType: 'User',
@@ -124,18 +144,15 @@ export async function updateUser(id: string, data: UpdateUserInput, performedByU
     }
   }
 
-  // Build update payload explicitly to avoid passing unknown fields to Prisma
   const updateData: Record<string, unknown> = {};
   if (data.firstName !== undefined) updateData.firstName = data.firstName;
   if (data.lastName  !== undefined) updateData.lastName  = data.lastName;
   if (data.email     !== undefined) updateData.email     = data.email;
   if (data.phone     !== undefined) updateData.phone     = data.phone;
-  if (data.clientId  !== undefined) updateData.clientId  = data.clientId;
   if (data.isActive  !== undefined) updateData.isActive  = data.isActive;
   if (data.notificationSettings !== undefined) updateData.notificationSettings = data.notificationSettings;
   if (data.downloadPin !== undefined) updateData.downloadPin = data.downloadPin;
   if (data.avatarUrl !== undefined) updateData.avatarUrl = data.avatarUrl;
-  if (data.role !== undefined) updateData.role = data.role as Role;
 
   if (data.password) {
     updateData.passwordHash = await bcrypt.hash(data.password, 12);

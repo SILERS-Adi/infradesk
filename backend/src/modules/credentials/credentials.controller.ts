@@ -8,17 +8,19 @@ import {
   deleteCredential,
 } from './credentials.service';
 import { CredentialCategory } from '@prisma/client';
+import { credentialScopeFilter, isCredentialAccessible } from '../../middleware/workspace';
 
 export async function getCredentials(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { clientId, locationId, deviceId, category, page, limit } = req.query as Record<string, string>;
+    const { locationId, deviceId, category, page, limit } = req.query as Record<string, string>;
     const result = await listCredentials({
-      clientId,
+      workspaceId: req.workspaceId,
       locationId,
       deviceId,
       category: category as CredentialCategory | undefined,
       page: page ? parseInt(page, 10) : 1,
       limit: limit ? parseInt(limit, 10) : 20,
+      scopeFilter: credentialScopeFilter(req.membership),
       requestingUser: req.user!,
     });
     res.status(200).json(result);
@@ -30,6 +32,16 @@ export async function getCredentials(req: Request, res: Response, next: NextFunc
 export async function getCredential(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const credential = await getCredentialById(req.params.id, req.user!);
+
+    if (req.membership && !isCredentialAccessible(req.membership, {
+      deviceId: credential.deviceId,
+      locationId: credential.locationId,
+      deviceLocationId: (credential.device as any)?.locationId ?? null,
+    })) {
+      res.status(403).json({ error: 'Credential not in your access scope' });
+      return;
+    }
+
     res.status(200).json(credential);
   } catch (err) {
     next(err);
@@ -39,8 +51,6 @@ export async function getCredential(req: Request, res: Response, next: NextFunct
 export async function revealCredentialPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const result = await revealCredential(req.params.id, {
-      role: req.user!.role,
-      clientId: req.user!.clientId,
       userId: req.user!.userId,
     });
     res.status(200).json(result);

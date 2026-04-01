@@ -43,7 +43,7 @@ const SCHEDULE_LABELS: Record<string, string> = {
 };
 
 function StatusBadge({ status }: { status?: string }) {
-  if (!status) return <span className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>--</span>;
+  if (!status) return <span className="text-xs" style={{ color: 'var(--tm)' }}>--</span>;
 
   const map: Record<string, { bg: string; color: string; icon: React.ReactNode }> = {
     SUCCESS: {
@@ -63,7 +63,7 @@ function StatusBadge({ status }: { status?: string }) {
     },
   };
 
-  const s = map[status] ?? { bg: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', icon: null };
+  const s = map[status] ?? { bg: 'var(--border)', color: 'var(--ts)', icon: null };
 
   return (
     <span
@@ -225,9 +225,9 @@ function BackupFormModal({
 
         <div
           className="rounded-xl p-4 space-y-4"
-          style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
         >
-          <p className="text-[11px] font-semibold uppercase tracking-[0.06em]" style={{ color: 'rgba(255,255,255,0.4)' }}>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.06em]" style={{ color: 'var(--tm)' }}>
             Ustawienia ogólne
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -252,14 +252,14 @@ function BackupFormModal({
               onChange={e => set('retentionDays', Number(e.target.value))}
             />
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-[0.06em]" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              <label className="text-[11px] font-semibold uppercase tracking-[0.06em]" style={{ color: 'var(--tm)' }}>
                 Szyfrowanie
               </label>
               <label className="flex items-center gap-3 cursor-pointer py-2.5">
                 <div
                   className="relative w-10 h-[22px] rounded-full transition-colors cursor-pointer"
                   style={{
-                    background: form.encryptBackups ? 'linear-gradient(145deg, #6D28D9, #2563EB)' : 'rgba(255,255,255,0.08)',
+                    background: form.encryptBackups ? 'linear-gradient(135deg, #4f8cff 0%, #6366F1 40%, #8B5CF6 100%)' : 'var(--border)',
                   }}
                   onClick={() => set('encryptBackups', !form.encryptBackups)}
                 >
@@ -268,7 +268,7 @@ function BackupFormModal({
                     style={{ left: form.encryptBackups ? '22px' : '3px' }}
                   />
                 </div>
-                <span className="text-sm" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                <span className="text-sm" style={{ color: 'var(--ts)' }}>
                   {form.encryptBackups ? 'Włączone' : 'Wyłączone'}
                 </span>
               </label>
@@ -329,32 +329,32 @@ function HistoryModal({ open, onClose, configId, configName }: {
       <div className="overflow-y-auto max-h-[60vh]">
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin" style={{ color: 'rgba(255,255,255,0.3)' }} />
+            <Loader2 className="h-6 w-6 animate-spin" style={{ color: 'var(--tm)' }} />
           </div>
         ) : history.length === 0 ? (
-          <div className="text-center py-12" style={{ color: 'rgba(255,255,255,0.3)' }}>
+          <div className="text-center py-12" style={{ color: 'var(--tm)' }}>
             <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm">Brak historii</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'rgba(255,255,255,0.35)' }}>Status</th>
-                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'rgba(255,255,255,0.35)' }}>Start</th>
-                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'rgba(255,255,255,0.35)' }}>Koniec</th>
-                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'rgba(255,255,255,0.35)' }}>Rozmiar</th>
-                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'rgba(255,255,255,0.35)' }}>Plik</th>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--tm)' }}>Status</th>
+                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--tm)' }}>Start</th>
+                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--tm)' }}>Koniec</th>
+                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--tm)' }}>Rozmiar</th>
+                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--tm)' }}>Plik</th>
               </tr>
             </thead>
             <tbody>
               {history.map(h => (
-                <tr key={h.id} className="hover:bg-white/[0.02] transition-colors" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                <tr key={h.id} className="hover:bg-white/[0.02] transition-colors" style={{ borderBottom: '1px solid var(--border)' }}>
                   <td className="px-5 py-3"><StatusBadge status={h.status} /></td>
-                  <td className="px-5 py-3" style={{ color: 'rgba(255,255,255,0.7)' }}>{formatDateTime(h.startedAt)}</td>
-                  <td className="px-5 py-3" style={{ color: 'rgba(255,255,255,0.7)' }}>{h.completedAt ? formatDateTime(h.completedAt) : '--'}</td>
-                  <td className="px-5 py-3" style={{ color: 'rgba(255,255,255,0.7)' }}>{formatSize(h.sizeBytes)}</td>
-                  <td className="px-5 py-3 max-w-[200px] truncate" style={{ color: 'rgba(255,255,255,0.5)' }}>{h.fileName ?? '--'}</td>
+                  <td className="px-5 py-3" style={{ color: 'var(--ts)' }}>{formatDateTime(h.startedAt)}</td>
+                  <td className="px-5 py-3" style={{ color: 'var(--ts)' }}>{h.completedAt ? formatDateTime(h.completedAt) : '--'}</td>
+                  <td className="px-5 py-3" style={{ color: 'var(--ts)' }}>{formatSize(h.sizeBytes)}</td>
+                  <td className="px-5 py-3 max-w-[200px] truncate" style={{ color: 'var(--ts)' }}>{h.fileName ?? '--'}</td>
                 </tr>
               ))}
             </tbody>
@@ -425,16 +425,16 @@ export function BackupPage() {
 
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-6 w-6 animate-spin" style={{ color: 'rgba(255,255,255,0.3)' }} />
+          <Loader2 className="h-6 w-6 animate-spin" style={{ color: 'var(--tm)' }} />
         </div>
       ) : configs.length === 0 ? (
         <div
           className="rounded-2xl flex flex-col items-center justify-center py-20"
-          style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
         >
-          <Database className="h-10 w-10 mb-3" style={{ color: 'rgba(255,255,255,0.15)' }} />
-          <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Brak konfiguracji backupów</p>
-          <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.25)' }}>Kliknij "Dodaj konfigurację" aby rozpocząć</p>
+          <Database className="h-10 w-10 mb-3" style={{ color: 'var(--td)' }} />
+          <p className="text-sm" style={{ color: 'var(--tm)' }}>Brak konfiguracji backupów</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--td)' }}>Kliknij "Dodaj konfigurację" aby rozpocząć</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -443,8 +443,8 @@ export function BackupPage() {
               key={cfg.id}
               className="rounded-2xl p-5 transition-colors hover:bg-white/[0.01]"
               style={{
-                background: 'rgba(255,255,255,0.025)',
-                border: '1px solid rgba(255,255,255,0.06)',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border)',
               }}
             >
               <div className="flex items-start gap-4">
@@ -455,7 +455,7 @@ export function BackupPage() {
                     <h3 className="text-[14px] font-semibold text-white/90 truncate">{cfg.name}</h3>
                     <span
                       className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md flex-shrink-0"
-                      style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.45)' }}
+                      style={{ background: 'var(--hover-bg)', color: 'var(--ts)' }}
                     >
                       {TYPE_LABELS[cfg.type] ?? cfg.type}
                     </span>
@@ -469,7 +469,7 @@ export function BackupPage() {
                     )}
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[12px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[12px]" style={{ color: 'var(--tm)' }}>
                     {cfg.agent?.hostname && (
                       <span className="flex items-center gap-1.5">
                         <Power className="h-3 w-3" />
@@ -495,7 +495,7 @@ export function BackupPage() {
                   <button
                     onClick={() => setHistoryConfig({ id: cfg.id, name: cfg.name })}
                     className="p-2 rounded-lg transition-colors hover:bg-white/[0.05]"
-                    style={{ color: 'rgba(255,255,255,0.35)' }}
+                    style={{ color: 'var(--tm)' }}
                     title="Historia"
                   >
                     <History className="h-4 w-4" />
@@ -514,7 +514,7 @@ export function BackupPage() {
                   <button
                     onClick={() => openEdit(cfg)}
                     className="p-2 rounded-lg transition-colors hover:bg-white/[0.05]"
-                    style={{ color: 'rgba(255,255,255,0.35)' }}
+                    style={{ color: 'var(--tm)' }}
                     title="Edytuj"
                   >
                     <Pencil className="h-4 w-4" />
@@ -523,7 +523,7 @@ export function BackupPage() {
                   <button
                     onClick={() => setDeleteId(cfg.id)}
                     className="p-2 rounded-lg transition-colors hover:bg-red-500/10"
-                    style={{ color: 'rgba(255,255,255,0.25)' }}
+                    style={{ color: 'var(--td)' }}
                     title="Usuń"
                   >
                     <Trash2 className="h-4 w-4" />

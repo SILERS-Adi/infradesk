@@ -7,7 +7,8 @@ import {
   patchCredential,
   removeCredential,
 } from './credentials.controller';
-import { authenticate, authorize } from '../../middleware/auth';
+import { authenticate } from '../../middleware/auth';
+import { withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
 import { validate } from '../../middleware/validate';
 import { createCredentialSchema, updateCredentialSchema } from './credentials.validation';
 
@@ -15,11 +16,12 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get('/', authorize('ADMIN', 'TECHNICIAN', 'CLIENT'), getCredentials);
-router.get('/:id', authorize('ADMIN', 'TECHNICIAN', 'CLIENT'), getCredential);
-router.post('/:id/reveal', authorize('ADMIN', 'TECHNICIAN', 'CLIENT'), revealCredentialPassword);
-router.post('/', authorize('ADMIN', 'TECHNICIAN'), validate(createCredentialSchema), postCredential);
-router.patch('/:id', authorize('ADMIN', 'TECHNICIAN'), validate(updateCredentialSchema), patchCredential);
-router.delete('/:id', authorize('ADMIN'), removeCredential);
+router.get('/', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'), getCredentials);
+router.get('/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'), getCredential);
+import { credentialRevealLimiter } from '../../middleware/rateLimit';
+router.post('/:id/reveal', credentialRevealLimiter, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'), revealCredentialPassword);
+router.post('/', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), validate(createCredentialSchema), postCredential);
+router.patch('/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), validate(updateCredentialSchema), patchCredential);
+router.delete('/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), removeCredential);
 
 export default router;

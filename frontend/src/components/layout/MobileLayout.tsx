@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../store/authStore';
+import { useWorkspaceContext } from '../../hooks/useWorkspaceContext';
 import { useGeolocation } from '../../hooks/useGeolocation';
 import { sessionsApi } from '../../api/sessions';
 import { GeofencePrompt } from '../mobile/GeofencePrompt';
@@ -36,7 +37,8 @@ export function MobileLayout({ children }: Props) {
   const [showProfile, setShowProfile] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
 
-  const isAdminOrTech = user?.role === 'ADMIN' || user?.role === 'TECHNICIAN';
+  const { isAdmin: wsIsAdmin, isTechnician: wsIsTech, isMember, isViewer } = useWorkspaceContext();
+  const isAdminOrTech = wsIsAdmin || wsIsTech;
   const geo = useGeolocation(isAdminOrTech ?? false);
   const [showPrompt, setShowPrompt] = useState(true);
 
@@ -52,16 +54,16 @@ export function MobileLayout({ children }: Props) {
   const handleDismissPrompt = useCallback(() => { geo.clearEvents(); setShowPrompt(false); setTimeout(() => setShowPrompt(true), 120_000); }, [geo]);
   if (geo.lastEvents && !showPrompt && (geo.lastEvents.entered.length > 0 || geo.lastEvents.exited.length > 0)) setShowPrompt(true);
 
-  if (isLoading) return (<div className="min-h-screen flex items-center justify-center" style={{ background: '#080D19' }}><div className="animate-spin h-7 w-7 border-2 border-violet-500 border-t-transparent rounded-full" /></div>);
+  if (isLoading) return (<div className="min-h-screen flex items-center justify-center" style={{ background: '#040a16' }}><div className="animate-spin h-7 w-7 border-2 border-violet-500 border-t-transparent rounded-full" /></div>);
   if (!isAuthenticated || !user) return <Navigate to="/login" replace />;
-  if (user.role === 'CLIENT') return <Navigate to="/portal" replace />;
+  if (isMember || isViewer) return <Navigate to="/portal" replace />;
 
   const isActiveTab = (tab: any) => tab.path && (tab.exact ? location.pathname === tab.path : location.pathname.startsWith(tab.path));
   const initials = `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase();
   const handleLogout = () => { logout(); navigate('/login'); };
 
   return (
-    <div className="min-h-screen flex flex-col relative" style={{ background: '#080D19', overflowX: 'hidden', maxWidth: '100vw' }}>
+    <div className="min-h-screen flex flex-col relative" style={{ background: '#040a16', overflowX: 'hidden', maxWidth: '100vw' }}>
 
       {/* ── BG: CSS recreation of background.png ──────────────────────── */}
       <div className="fixed inset-0 z-0 pointer-events-none">
@@ -100,7 +102,7 @@ export function MobileLayout({ children }: Props) {
           )}
           <button onClick={() => setShowProfile(!showProfile)}
             className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold text-white active:scale-95 transition-transform"
-            style={{ background: 'linear-gradient(145deg, #6D28D9, #2563EB)', boxShadow: '0 0 0 1.5px rgba(255,255,255,0.06)' }}>
+            style={{ background: 'linear-gradient(135deg, #4f8cff 0%, #6366F1 40%, #8B5CF6 100%)', boxShadow: '0 0 0 1.5px rgba(255,255,255,0.06)' }}>
             {initials}
           </button>
         </div>
@@ -112,7 +114,7 @@ export function MobileLayout({ children }: Props) {
         <div className="absolute right-4 top-[58px] z-40 w-[250px] rounded-[18px] overflow-hidden safe-area-pt"
           style={{ background: 'rgba(12,17,30,0.97)', backdropFilter: 'blur(32px)', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 16px 48px rgba(0,0,0,0.5)' }}>
           <div className="p-3.5 flex items-center gap-2.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-            <div className="w-9 h-9 rounded-[10px] flex items-center justify-center text-[10px] font-bold text-white" style={{ background: 'linear-gradient(145deg, #6D28D9, #2563EB)' }}>{initials}</div>
+            <div className="w-9 h-9 rounded-[10px] flex items-center justify-center text-[10px] font-bold text-white" style={{ background: 'linear-gradient(135deg, #4f8cff 0%, #6366F1 40%, #8B5CF6 100%)' }}>{initials}</div>
             <div className="min-w-0"><p className="text-[12px] font-semibold text-white/80 truncate">{user.firstName} {user.lastName}</p><p className="text-[10px] text-white/30 truncate">{user.email}</p></div>
           </div>
           <div className="py-0.5">

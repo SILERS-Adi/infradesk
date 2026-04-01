@@ -29,11 +29,11 @@ export function EmployeesPage() {
   });
 
   // Only show ADMIN and TECHNICIAN — CLIENT users belong to clients
-  const employees = allUsers.filter(u => u.role === 'ADMIN' || u.role === 'TECHNICIAN');
+  const employees = allUsers.filter(u => (u as any).role === 'ADMIN' || (u as any).role === 'TECHNICIAN');
 
   const changeRoleMutation = useMutation({
     mutationFn: ({ id, role }: { id: string; role: string }) =>
-      usersApi.update(id, { role: role as User['role'] }),
+      usersApi.update(id, { role } as any),
     onSuccess: () => {
       toast.success('Rola zmieniona');
       qc.invalidateQueries({ queryKey: ['users'] });
@@ -53,30 +53,30 @@ export function EmployeesPage() {
         }
       />
 
-      {isLoading && <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Ładowanie...</p>}
+      {isLoading && <p className="text-sm" style={{ color: 'var(--tm)' }}>Ładowanie...</p>}
 
       {!isLoading && employees.length === 0 && (
-        <div className="rounded-2xl p-12 text-center" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <Users className="h-10 w-10 mx-auto mb-3" style={{ color: 'rgba(255,255,255,0.15)' }} />
-          <p className="font-medium" style={{ color: 'rgba(255,255,255,0.4)' }}>Brak pracowników</p>
-          <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>Dodaj pierwszego pracownika klikając przycisk powyżej.</p>
+        <div className="rounded-2xl p-12 text-center" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+          <Users className="h-10 w-10 mx-auto mb-3" style={{ color: 'var(--td)' }} />
+          <p className="font-medium" style={{ color: 'var(--tm)' }}>Brak pracowników</p>
+          <p className="text-sm mt-1" style={{ color: 'var(--tm)' }}>Dodaj pierwszego pracownika klikając przycisk powyżej.</p>
         </div>
       )}
 
       {!isLoading && employees.length > 0 && (
-        <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(255,255,255,0.02)' }}>
-                <th className="text-left px-5 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Pracownik</th>
-                <th className="text-left px-5 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Rola</th>
-                <th className="text-left px-5 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Status</th>
+              <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-card)' }}>
+                <th className="text-left px-5 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Pracownik</th>
+                <th className="text-left px-5 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Rola</th>
+                <th className="text-left px-5 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Status</th>
                 <th className="px-5 py-3" />
               </tr>
             </thead>
             <tbody>
               {employees.map(user => (
-                <tr key={user.id} className="hover:bg-white/[0.03] transition-colors" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                <tr key={user.id} className="hover:bg-white/[0.03] transition-colors" style={{ borderBottom: '1px solid var(--border)' }}>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-xl font-bold text-sm flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139,92,246,0.12)', color: '#A78BFA' }}>
@@ -84,16 +84,16 @@ export function EmployeesPage() {
                       </div>
                       <div>
                         <div className="font-medium text-white/85">{user.firstName} {user.lastName}</div>
-                        <div className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>{user.email}</div>
+                        <div className="text-xs" style={{ color: 'var(--tm)' }}>{user.email}</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2">
-                      <Badge color={ROLE_COLORS[user.role as keyof typeof ROLE_COLORS] ?? 'gray'}>
+                      <Badge color={ROLE_COLORS[((user as any).role ?? '') as keyof typeof ROLE_COLORS] ?? 'gray'}>
                         <span className="flex items-center gap-1">
-                          {ROLE_ICONS[user.role as keyof typeof ROLE_ICONS]}
-                          {ROLE_LABELS[user.role as keyof typeof ROLE_LABELS] ?? user.role}
+                          {ROLE_ICONS[((user as any).role ?? '') as keyof typeof ROLE_ICONS]}
+                          {ROLE_LABELS[((user as any).role ?? '') as keyof typeof ROLE_LABELS] ?? (user as any).role ?? ''}
                         </span>
                       </Badge>
                     </div>
@@ -106,10 +106,10 @@ export function EmployeesPage() {
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2 justify-end">
                       <select
-                        value={user.role}
+                        value={(user as any).role ?? ''}
                         onChange={(e) => changeRoleMutation.mutate({ id: user.id, role: e.target.value })}
                         className="text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500"
-                        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
+                        style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}
                         disabled={changeRoleMutation.isPending}
                       >
                         <option value="ADMIN">Administrator</option>

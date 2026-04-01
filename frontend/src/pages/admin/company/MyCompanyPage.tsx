@@ -65,103 +65,103 @@ export function MyCompanyPage() {
       />
 
       {/* Logo Section */}
-      <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="rounded-2xl p-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
         <h2 className="text-base font-semibold text-white/85 mb-4 flex items-center gap-2">
           <Building2 className="h-5 w-5 text-violet-400" />
           Logo firmy
         </h2>
         <div className="flex items-center gap-6">
-          <div className="w-20 h-20 rounded-2xl flex items-center justify-center overflow-hidden" style={{ border: '2px dashed rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)' }}>
+          <div className="w-20 h-20 rounded-2xl flex items-center justify-center overflow-hidden" style={{ border: '2px dashed var(--border)', background: 'var(--bg-card)' }}>
             {logoPreview ? (
               <img src={logoPreview} alt="Logo podgląd" className="w-full h-full object-contain" />
             ) : (
-              <Building2 className="h-8 w-8" style={{ color: 'rgba(255,255,255,0.15)' }} />
+              <Building2 className="h-8 w-8" style={{ color: 'var(--td)' }} />
             )}
           </div>
           <div>
-            <label className="inline-flex items-center gap-2 cursor-pointer text-sm font-medium px-4 py-2 rounded-xl transition-colors hover:bg-white/[0.03]" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)' }}>
+            <label className="inline-flex items-center gap-2 cursor-pointer text-sm font-medium px-4 py-2 rounded-xl transition-colors hover:bg-white/[0.03]" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--ts)' }}>
               <Upload className="h-4 w-4" />
               Wgraj logo
               <input type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
             </label>
-            <p className="text-xs mt-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>PNG, JPG, SVG · max 2MB</p>
+            <p className="text-xs mt-1.5" style={{ color: 'var(--tm)' }}>PNG, JPG, SVG · max 2MB</p>
           </div>
         </div>
       </div>
 
       {/* Contact Settings */}
-      <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="rounded-2xl p-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
         <h2 className="text-base font-semibold text-white/85 mb-5 flex items-center gap-2">
           <Phone className="h-5 w-5 text-violet-400" />
           Dane kontaktowe (widoczne dla klientów)
         </h2>
 
         {isLoading ? (
-          <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Ładowanie...</p>
+          <p className="text-sm" style={{ color: 'var(--tm)' }}>Ładowanie...</p>
         ) : (
           <form onSubmit={handleSubmit((v) => saveMutation.mutate(v))} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(255,255,255,0.6)' }}>
-                  <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" style={{ color: 'rgba(255,255,255,0.3)' }} />Infolinia</span>
+                <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--ts)' }}>
+                  <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" style={{ color: 'var(--tm)' }} />Infolinia</span>
                 </label>
                 <input
                   {...register('infolinia')}
                   type="tel"
                   placeholder="+48 000 000 000"
                   className="w-full px-3 py-2.5 text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
+                  style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(255,255,255,0.6)' }}>
-                  <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" style={{ color: 'rgba(255,255,255,0.3)' }} />E-mail zgłoszeń</span>
+                <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--ts)' }}>
+                  <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" style={{ color: 'var(--tm)' }} />E-mail zgłoszeń</span>
                 </label>
                 <input
                   {...register('email')}
                   type="email"
                   placeholder="zgloszenia@firma.pl"
                   className="w-full px-3 py-2.5 text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
+                  style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}
                 />
               </div>
             </div>
 
-            <div className="pt-4 mt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2" style={{ color: 'rgba(255,255,255,0.6)' }}>
-                <User className="h-4 w-4" style={{ color: 'rgba(255,255,255,0.3)' }} />
+            <div className="pt-4 mt-2" style={{ borderTop: '1px solid var(--border)' }}>
+              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2" style={{ color: 'var(--ts)' }}>
+                <User className="h-4 w-4" style={{ color: 'var(--tm)' }} />
                 Opiekun klienta
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(255,255,255,0.6)' }}>Imię i nazwisko opiekuna</label>
+                  <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--ts)' }}>Imię i nazwisko opiekuna</label>
                   <input
                     {...register('opiekun')}
                     type="text"
                     placeholder="Jan Kowalski"
                     className="w-full px-3 py-2.5 text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
+                    style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(255,255,255,0.6)' }}>Telefon opiekuna</label>
+                  <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--ts)' }}>Telefon opiekuna</label>
                   <input
                     {...register('opiekunTel')}
                     type="tel"
                     placeholder="+48 000 000 000"
                     className="w-full px-3 py-2.5 text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
+                    style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(255,255,255,0.6)' }}>E-mail opiekuna</label>
+                  <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--ts)' }}>E-mail opiekuna</label>
                   <input
                     {...register('opiekunEmail')}
                     type="email"
                     placeholder="opiekun@firma.pl"
                     className="w-full px-3 py-2.5 text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
+                    style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}
                   />
                 </div>
               </div>

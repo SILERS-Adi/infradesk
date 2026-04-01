@@ -31,6 +31,10 @@ const hardwareSchema = z.object({
 });
 
 export const registerSchema = hardwareSchema.extend({
+  // Agent type: CLIENT or SERVER
+  agentType: z.preprocess(v => v ?? undefined, z.enum(['CLIENT', 'SERVER']).optional()),
+  // Tenant binding (from agent download link)
+  tenantKey: ns,
   // Logowanie istniejącego klienta
   email:    ne,
   password: ns,
@@ -72,7 +76,8 @@ export const metricsSchema = z.object({
   networkIfaces:     na,
   installedSoftware: na,
   serverMetrics:     z.any().optional(),
-});
+  appVersion:        ns,
+}).passthrough();
 
 export const agentTicketSchema = z.object({
   title:       z.string().min(1).max(200),
@@ -82,7 +87,7 @@ export const agentTicketSchema = z.object({
 });
 
 export const approveSchema = z.object({
-  clientId: z.string().uuid().optional(), // optional: backend uses reg.clientId if omitted
+  workspaceId: z.string().uuid().optional(),
   deviceId: z.string().uuid().optional(),
 });
 

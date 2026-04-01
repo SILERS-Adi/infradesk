@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const createDeviceSchema = z.object({
-  clientId: z.string().uuid(),
+  workspaceId: z.string().uuid(),
   locationId: z.string().uuid(),
   deviceTypeId: z.string().uuid().optional().nullable(),
   name: z.string().min(1).max(200),
@@ -35,7 +35,7 @@ export const createDeviceSchema = z.object({
   managerId:        z.string().uuid().optional().nullable(),
 });
 
-export const updateDeviceSchema = createDeviceSchema.omit({ clientId: true }).partial();
+export const updateDeviceSchema = createDeviceSchema.omit({ workspaceId: true }).partial();
 
 export type CreateDeviceInput = z.infer<typeof createDeviceSchema>;
 export type UpdateDeviceInput = z.infer<typeof updateDeviceSchema>;

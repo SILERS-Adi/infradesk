@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { postVerifyPin, postRequestPin, getPinRequests } from './downloads.controller';
-import { authenticate, authorize } from '../../middleware/auth';
+import { authenticate } from '../../middleware/auth';
+import { withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
 
 const router = Router();
 
@@ -9,6 +10,6 @@ router.post('/verify-pin', postVerifyPin);
 router.post('/request-pin', postRequestPin);
 
 // Admin only
-router.get('/pin-requests', authenticate, authorize('ADMIN'), getPinRequests);
+router.get('/pin-requests', authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), getPinRequests);
 
 export default router;

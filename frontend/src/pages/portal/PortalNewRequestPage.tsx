@@ -8,6 +8,7 @@ import { ticketsApi } from '../../api/tickets';
 import { locationsApi } from '../../api/locations';
 import { devicesApi } from '../../api/devices';
 import { useAuth } from '../../store/authStore';
+import { useWorkspaceContext } from '../../hooks/useWorkspaceContext';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
@@ -57,7 +58,7 @@ export function PortalNewRequestPage() {
   const mutation = useMutation({
     mutationFn: (data: FormData) => ticketsApi.create({
       ...data,
-      clientId: user?.clientId,
+      // clientId is set by backend from workspace context
       type: data.type as any,
       priority: 'MEDIUM',
       source: 'CLIENT_PORTAL',

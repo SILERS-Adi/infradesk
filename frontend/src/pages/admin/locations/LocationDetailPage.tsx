@@ -40,7 +40,7 @@ export function LocationDetailPage() {
   });
 
   if (isLoading) return <LoadingSpinner />;
-  if (!location) return <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Nie znaleziono lokalizacji</p>;
+  if (!location) return <p className="text-sm" style={{ color: 'var(--tm)' }}>Nie znaleziono lokalizacji</p>;
 
   return (
     <div>
@@ -51,15 +51,16 @@ export function LocationDetailPage() {
         actions={<Badge color="indigo">{location.type}</Badge>}
       />
 
-      <div className="flex gap-1 mb-6" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="flex gap-1 mb-6" style={{ borderBottom: '1px solid var(--border)' }}>
         {(['overview', 'devices', 'tickets'] as TabId[]).map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors capitalize ${
-              tab === t ? 'border-violet-500 text-violet-400' : 'border-transparent hover:text-white/60'
-            }`}
-            style={tab !== t ? { color: 'rgba(255,255,255,0.4)' } : undefined}
+            className="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors"
+            style={tab === t
+              ? { borderColor: 'var(--accent)', color: 'var(--accent-s)' }
+              : { borderColor: 'transparent', color: 'var(--tm)' }
+            }
           >
             {{ overview: 'Przegląd', devices: 'Urządzenia', tickets: 'Zgłoszenia' }[t]}
           </button>
@@ -69,7 +70,7 @@ export function LocationDetailPage() {
       {tab === 'overview' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card title="Adres">
-            <div className="space-y-1 text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>
+            <div className="space-y-1 text-sm" style={{ color: 'var(--ts)' }}>
               {location.addressLine1 && <div>{location.addressLine1}</div>}
               {location.addressLine2 && <div>{location.addressLine2}</div>}
               <div>{[location.postalCode, location.city].filter(Boolean).join(' ')}</div>
@@ -80,20 +81,20 @@ export function LocationDetailPage() {
             <Card title="Osoba kontaktowa">
               <div className="space-y-2 text-sm">
                 {location.contactPersonName && (
-                  <div className="flex items-center gap-2" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                    <User className="h-4 w-4" style={{ color: 'rgba(255,255,255,0.3)' }} />
+                  <div className="flex items-center gap-2" style={{ color: 'var(--ts)' }}>
+                    <User className="h-4 w-4" style={{ color: 'var(--td)' }} />
                     {location.contactPersonName}
                   </div>
                 )}
                 {location.contactPersonPhone && (
-                  <div className="flex items-center gap-2" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                    <Phone className="h-4 w-4" style={{ color: 'rgba(255,255,255,0.3)' }} />
+                  <div className="flex items-center gap-2" style={{ color: 'var(--ts)' }}>
+                    <Phone className="h-4 w-4" style={{ color: 'var(--td)' }} />
                     {location.contactPersonPhone}
                   </div>
                 )}
                 {location.contactPersonEmail && (
-                  <div className="flex items-center gap-2" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                    <Mail className="h-4 w-4" style={{ color: 'rgba(255,255,255,0.3)' }} />
+                  <div className="flex items-center gap-2" style={{ color: 'var(--ts)' }}>
+                    <Mail className="h-4 w-4" style={{ color: 'var(--td)' }} />
                     {location.contactPersonEmail}
                   </div>
                 )}
@@ -102,7 +103,7 @@ export function LocationDetailPage() {
           )}
           {location.notes && (
             <Card title="Notatki" className="md:col-span-2">
-              <p className="text-sm whitespace-pre-wrap" style={{ color: 'rgba(255,255,255,0.5)' }}>{location.notes}</p>
+              <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--ts)' }}>{location.notes}</p>
             </Card>
           )}
         </div>
@@ -112,7 +113,7 @@ export function LocationDetailPage() {
         <Card noPadding>
           <DataTable
             columns={[
-              { key: 'name', header: 'Urządzenie', render: (r) => <Link to={`/devices/${(r as unknown as Device).id}`} className="font-medium text-violet-400 hover:underline">{(r as unknown as Device).name}</Link> },
+              { key: 'name', header: 'Urządzenie', render: (r) => <Link to={`/devices/${(r as unknown as Device).id}`} className="font-medium hover:underline" style={{ color: 'var(--accent-s)' }}>{(r as unknown as Device).name}</Link> },
               { key: 'type', header: 'Typ', render: (r) => (r as unknown as Device).deviceType?.name ?? '—' },
               { key: 'ip', header: 'IP', render: (r) => <span className="font-mono text-xs">{(r as unknown as Device).ipAddress ?? '—'}</span> },
               { key: 'status', header: 'Status', render: (r) => <DeviceStatusBadge status={(r as unknown as Device).status} /> },
@@ -128,7 +129,7 @@ export function LocationDetailPage() {
         <Card noPadding>
           <DataTable
             columns={[
-              { key: 'num', header: 'Nr', render: (r) => <Link to={`/tickets/${(r as unknown as Ticket).id}`} className="font-mono text-xs text-violet-400 hover:underline">{(r as unknown as Ticket).ticketNumber}</Link> },
+              { key: 'num', header: 'Nr', render: (r) => <Link to={`/tickets/${(r as unknown as Ticket).id}`} className="font-mono text-xs hover:underline" style={{ color: 'var(--accent-s)' }}>{(r as unknown as Ticket).ticketNumber}</Link> },
               { key: 'title', header: 'Tytuł', render: (r) => (r as unknown as Ticket).title },
               { key: 'priority', header: 'Priorytet', render: (r) => <PriorityBadge priority={(r as unknown as Ticket).priority} /> },
               { key: 'status', header: 'Status', render: (r) => <TicketStatusBadge status={(r as unknown as Ticket).status} /> },

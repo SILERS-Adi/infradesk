@@ -2,6 +2,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { devicesApi } from '../../api/devices';
 import { useAuth } from '../../store/authStore';
+import { useWorkspaceContext } from '../../hooks/useWorkspaceContext';
 import { DeviceStatusBadge } from '../../components/ui/StatusBadge';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Shield, Monitor, AlertTriangle, ExternalLink } from 'lucide-react';
@@ -9,6 +10,8 @@ import { Shield, Monitor, AlertTriangle, ExternalLink } from 'lucide-react';
 export function QrPage() {
   const { qrCodeValue } = useParams<{ qrCodeValue: string }>();
   const { isAuthenticated, user } = useAuth();
+  const { isMember, isViewer } = useWorkspaceContext();
+  const isPortalUser = isMember || isViewer;
 
   const { data: device, isLoading, isError } = useQuery({
     queryKey: ['qr', qrCodeValue],
@@ -69,13 +72,13 @@ export function QrPage() {
               {isAuthenticated ? (
                 <>
                   <Link
-                    to={user?.role === 'CLIENT' ? `/portal/new-request` : `/tickets?deviceId=${device.id}`}
+                    to={isPortalUser ? `/portal/new-request` : `/tickets?deviceId=${device.id}`}
                     className="flex items-center justify-center gap-2 w-full py-2.5 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors font-medium text-sm"
                   >
                     <AlertTriangle className="h-4 w-4" />
                     Zgłoś problem
                   </Link>
-                  {user?.role !== 'CLIENT' && (
+                  {!isPortalUser && (
                     <Link
                       to={`/devices/${device.id}`}
                       className="flex items-center justify-center gap-2 w-full py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors font-medium text-sm"

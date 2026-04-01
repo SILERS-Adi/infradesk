@@ -17,8 +17,8 @@ const SOURCE_LABELS: Record<string, { label: string; icon: React.ReactNode; bg: 
   CLIENT_PORTAL: { label: 'Portal',  icon: <Globe className="h-3 w-3" />,  bg: 'rgba(59,130,246,0.12)',  color: '#60A5FA' },
   PHONE:         { label: 'Telefon', icon: <Phone className="h-3 w-3" />,  bg: 'rgba(34,197,94,0.12)',   color: '#4ADE80' },
   EMAIL:         { label: 'E-mail',  icon: <Mail className="h-3 w-3" />,   bg: 'rgba(245,158,11,0.12)',  color: '#FBBF24' },
-  QR_SCAN:       { label: 'QR',      icon: <QrCode className="h-3 w-3" />, bg: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)' },
-  INTERNAL:      { label: 'Wewnątr.', icon: null,                           bg: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)' },
+  QR_SCAN:       { label: 'QR',      icon: <QrCode className="h-3 w-3" />, bg: 'var(--hover-bg)', color: 'var(--ts)' },
+  INTERNAL:      { label: 'Wewnątr.', icon: null,                           bg: 'var(--hover-bg)', color: 'var(--ts)' },
 };
 
 function timeAgo(date: string): string {
@@ -54,7 +54,7 @@ function TicketCard({ ticket, technicians }: { ticket: Ticket; technicians: User
   const border = PRIORITY_BORDER[ticket.priority] ?? 'border-l-gray-600';
 
   return (
-    <div className={`rounded-xl border-l-4 ${border} p-4 flex flex-col gap-3`} style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', borderLeftWidth: '4px' }}>
+    <div className={`rounded-xl border-l-4 ${border} p-4 flex flex-col gap-3`} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderLeftWidth: '4px' }}>
       {/* Top row */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
@@ -76,7 +76,7 @@ function TicketCard({ ticket, technicians }: { ticket: Ticket; technicians: User
           </button>
         </div>
         <div className="text-right flex-shrink-0">
-          <div className="text-xs flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
+          <div className="text-xs flex items-center gap-1" style={{ color: 'var(--tm)' }}>
             <Clock className="h-3 w-3" />
             {timeAgo(ticket.createdAt)}
           </div>
@@ -84,22 +84,22 @@ function TicketCard({ ticket, technicians }: { ticket: Ticket; technicians: User
       </div>
 
       {/* Meta */}
-      <div className="flex items-center gap-3 text-xs flex-wrap" style={{ color: 'rgba(255,255,255,0.4)' }}>
-        <span className="font-medium" style={{ color: 'rgba(255,255,255,0.6)' }}>{ticket.client?.name ?? '—'}</span>
+      <div className="flex items-center gap-3 text-xs flex-wrap" style={{ color: 'var(--tm)' }}>
+        <span className="font-medium" style={{ color: 'var(--ts)' }}>{ticket.client?.name ?? '—'}</span>
         {ticket.device && <span>🖥 {ticket.device.name}</span>}
         {ticket.description && (
-          <span className="truncate max-w-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{ticket.description.substring(0, 80)}…</span>
+          <span className="truncate max-w-xs" style={{ color: 'var(--tm)' }}>{ticket.description.substring(0, 80)}…</span>
         )}
       </div>
 
       {/* Assign */}
-      <div className="flex items-center gap-2 pt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-        <UserCheck className="h-4 w-4 flex-shrink-0" style={{ color: 'rgba(255,255,255,0.3)' }} />
+      <div className="flex items-center gap-2 pt-1" style={{ borderTop: '1px solid var(--border)' }}>
+        <UserCheck className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--tm)' }} />
         {assigning ? (
           <select
             autoFocus
             className="flex-1 text-sm rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-violet-500"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
+            style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}
             defaultValue=""
             onBlur={() => setAssigning(false)}
             onChange={e => {
@@ -140,7 +140,7 @@ export function TicketsQueuePage() {
     queryFn: () => usersApi.getAll(),
   });
 
-  const technicians = allUsers.filter(u => u.role !== 'CLIENT' && u.isActive);
+  const technicians = allUsers.filter(u => (u as any).role !== 'CLIENT' && u.isActive);
 
   const sorted = [...tickets].sort((a, b) => {
     const pd = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
@@ -157,7 +157,7 @@ export function TicketsQueuePage() {
             <Inbox className="h-6 w-6 text-violet-400" />
             Poczekalnia zgłoszeń
           </h1>
-          <p className="text-sm mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--tm)' }}>
             Nowe zgłoszenia bez przydzielonego pracownika
           </p>
         </div>
@@ -171,7 +171,7 @@ export function TicketsQueuePage() {
             onClick={() => refetch()}
             disabled={isFetching}
             className="p-2 rounded-lg transition-colors hover:text-violet-400 hover:bg-white/[0.03]"
-            style={{ color: 'rgba(255,255,255,0.4)' }}
+            style={{ color: 'var(--tm)' }}
             title="Odśwież"
           >
             <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
@@ -181,12 +181,12 @@ export function TicketsQueuePage() {
 
       {/* Content */}
       {isLoading ? (
-        <div className="flex items-center justify-center h-48" style={{ color: 'rgba(255,255,255,0.3)' }}>Ładowanie…</div>
+        <div className="flex items-center justify-center h-48" style={{ color: 'var(--tm)' }}>Ładowanie…</div>
       ) : sorted.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-64 rounded-xl" style={{ background: 'rgba(255,255,255,0.025)', border: '1px dashed rgba(255,255,255,0.08)' }}>
-          <Inbox className="h-12 w-12 mb-3" style={{ color: 'rgba(255,255,255,0.15)' }} />
-          <p className="font-medium" style={{ color: 'rgba(255,255,255,0.4)' }}>Brak oczekujących zgłoszeń</p>
-          <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>Wszystkie nowe zgłoszenia zostały przydzielone</p>
+        <div className="flex flex-col items-center justify-center h-64 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px dashed var(--border)' }}>
+          <Inbox className="h-12 w-12 mb-3" style={{ color: 'var(--td)' }} />
+          <p className="font-medium" style={{ color: 'var(--tm)' }}>Brak oczekujących zgłoszeń</p>
+          <p className="text-sm mt-1" style={{ color: 'var(--tm)' }}>Wszystkie nowe zgłoszenia zostały przydzielone</p>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">

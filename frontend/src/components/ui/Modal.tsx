@@ -12,7 +12,7 @@ interface ModalProps {
   noPadding?: boolean;
 }
 
-const sizeMap = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-xl', '2xl': 'max-w-2xl' };
+const sizeMap = { sm: 380, md: 440, lg: 520, xl: 600, '2xl': 680 };
 
 export function Modal({ open, onClose, title, children, size = 'md', footer, noPadding }: ModalProps) {
   useEffect(() => {
@@ -25,22 +25,33 @@ export function Modal({ open, onClose, title, children, size = 'md', footer, noP
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0" onClick={onClose}
-        style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} />
-      <div className={clsx('relative w-full flex flex-col max-h-[90vh] rounded-[18px] overflow-hidden', sizeMap[size])}
-        style={{ background: 'rgba(14,20,38,0.97)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.07)', boxShadow: '0 24px 80px rgba(0,0,0,0.5)' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }} onClick={onClose} />
+      <div style={{
+        position: 'relative', width: '100%', maxWidth: sizeMap[size], maxHeight: '90vh',
+        display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        background: 'var(--bg2)', border: '1px solid var(--border-l)', borderRadius: 'var(--r)',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+      }}>
         {title && (
-          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-            <h2 className="text-[15px] font-semibold text-white/85">{title}</h2>
-            <button onClick={onClose} className="text-white/25 hover:text-white/50 p-1 rounded-lg hover:bg-white/[0.04] transition-colors">
-              <X className="h-5 w-5" />
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '14px 18px', borderBottom: '1px solid var(--border)',
+            fontSize: 14, fontWeight: 600, color: 'var(--t)',
+          }}>
+            <span>{title}</span>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--tm)', padding: 4 }}>
+              <X style={{ width: 18, height: 18 }} />
             </button>
           </div>
         )}
-        <div className={clsx('flex-1 min-h-0', noPadding ? 'flex flex-col' : 'overflow-y-auto p-5')}>{children}</div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', ...(noPadding ? {} : { padding: '16px 18px' }) }}>
+          {children}
+        </div>
         {footer && (
-          <div className="px-5 py-4 flex justify-end gap-2.5" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>{footer}</div>
+          <div style={{ padding: '14px 18px', display: 'flex', justifyContent: 'flex-end', gap: 10, borderTop: '1px solid var(--border)' }}>
+            {footer}
+          </div>
         )}
       </div>
     </div>

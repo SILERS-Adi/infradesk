@@ -4,8 +4,7 @@ import { config } from '../config';
 export interface JwtPayload {
   userId: string;
   email: string;
-  role: string;
-  clientId?: string | null;
+  isSuperAdmin?: boolean;
 }
 
 export function signAccessToken(payload: JwtPayload): string {

@@ -1,9 +1,8 @@
 import prisma from '../../lib/prisma';
-import { AppError } from '../../middleware/errorHandler';
 
-export async function getAdminDashboard() {
+export async function getAdminDashboard(workspaceId?: string | null) {
+  const wf = workspaceId ? { workspaceId } : {};
   const [
-    totalClients,
     totalLocations,
     totalDevices,
     openTickets,
@@ -12,22 +11,24 @@ export async function getAdminDashboard() {
     recentTickets,
     recentDevices,
   ] = await Promise.all([
-    prisma.client.count(),
-    prisma.location.count(),
-    prisma.device.count(),
-    prisma.ticket.count({ where: { status: { in: ['PENDING', 'ASSIGNED'] } } }),
+    prisma.location.count({ where: wf }),
+    prisma.device.count({ where: wf }),
+    prisma.ticket.count({ where: { ...wf, status: { in: ['PENDING', 'ASSIGNED'] } } }),
     prisma.ticket.count({
       where: {
+        ...wf,
         status: { in: ['PENDING', 'ASSIGNED'] },
         dueAt: { lt: new Date() },
       },
     }),
     prisma.ticket.count({
       where: {
+        ...wf,
         status: 'PENDING',
       },
     }),
     prisma.ticket.findMany({
+      where: wf,
       take: 8,
       orderBy: { createdAt: 'desc' },
       select: {
@@ -40,22 +41,20 @@ export async function getAdminDashboard() {
         reportedAt: true,
         createdAt: true,
         assignedToUserId: true,
-        client: { select: { id: true, name: true } },
         assignedTo: { select: { id: true, firstName: true, lastName: true } },
       },
     }),
     prisma.device.findMany({
+      where: wf,
       take: 6,
       orderBy: { updatedAt: 'desc' },
       include: {
-        client: { select: { id: true, name: true } },
         location: { select: { id: true, name: true } },
       },
     }),
   ]);
 
   return {
-    totalClients,
     totalLocations,
     totalDevices,
     openTickets,
@@ -67,15 +66,8 @@ export async function getAdminDashboard() {
   };
 }
 
-export async function getClientDashboard(clientId: string) {
-  const client = await prisma.client.findUnique({
-    where: { id: clientId },
-    select: { id: true, name: true, status: true },
-  });
-
-  if (!client) {
-    throw new AppError('Client not found', 404);
-  }
+export async function getClientDashboard(workspaceId: string) {
+  const wf = { workspaceId };
 
   const [
     totalDevices,
@@ -88,15 +80,15 @@ export async function getClientDashboard(clientId: string) {
     recentTickets,
     recentDevices,
   ] = await Promise.all([
-    prisma.device.count({ where: { clientId } }),
-    prisma.device.count({ where: { clientId, status: 'ACTIVE' } }),
-    prisma.device.count({ where: { clientId, status: 'BROKEN' } }),
-    prisma.ticket.count({ where: { clientId } }),
-    prisma.ticket.count({ where: { clientId, status: { in: ['PENDING', 'ASSIGNED'] } } }),
-    prisma.ticket.count({ where: { clientId, status: { in: ['COMPLETED', 'CANCELLED'] } } }),
-    prisma.location.count({ where: { clientId } }),
+    prisma.device.count({ where: wf }),
+    prisma.device.count({ where: { ...wf, status: 'ACTIVE' } }),
+    prisma.device.count({ where: { ...wf, status: 'BROKEN' } }),
+    prisma.ticket.count({ where: wf }),
+    prisma.ticket.count({ where: { ...wf, status: { in: ['PENDING', 'ASSIGNED'] } } }),
+    prisma.ticket.count({ where: { ...wf, status: { in: ['COMPLETED', 'CANCELLED'] } } }),
+    prisma.location.count({ where: wf }),
     prisma.ticket.findMany({
-      where: { clientId },
+      where: wf,
       take: 5,
       orderBy: { createdAt: 'desc' },
       select: {
@@ -110,7 +102,7 @@ export async function getClientDashboard(clientId: string) {
       },
     }),
     prisma.device.findMany({
-      where: { clientId },
+      where: wf,
       take: 5,
       orderBy: { updatedAt: 'desc' },
       select: {
@@ -127,7 +119,6 @@ export async function getClientDashboard(clientId: string) {
   ]);
 
   return {
-    client,
     stats: {
       totalDevices,
       activeDevices,

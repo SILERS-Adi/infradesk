@@ -181,7 +181,7 @@ export function PortalDashboardPage() {
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="pd-fade-up pd-fade-up-2">
         <h1 className="text-[22px] md:text-[26px] font-bold text-white/90 tracking-tight">Witaj, {user?.firstName}!</h1>
-        <p className="text-[13px] mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>{user?.client?.name}</p>
+        <p className="text-[13px] mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>{(user as any)?.client?.name}</p>
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -289,7 +289,7 @@ export function PortalDashboardPage() {
               </div>
               {hasManager && (
                 <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
-                  style={{ background: '#080D19', border: '2.5px solid #080D19' }}>
+                  style={{ background: '#040a16', border: '2.5px solid #040a16' }}>
                   <div className="w-3.5 h-3.5 rounded-full bg-green-400 animate-pulse" />
                 </div>
               )}

@@ -30,38 +30,38 @@ export async function autoLogin(req: Request, res: Response, next: NextFunction)
     // Find agent registration by token
     const reg = await prisma.agentRegistration.findUnique({
       where: { agentToken },
-      select: { clientId: true, status: true, contactEmail: true },
+      select: { workspaceId: true, status: true, contactEmail: true },
     });
-    if (!reg || reg.status !== 'ACTIVE' || !reg.clientId) {
+    if (!reg || reg.status !== 'ACTIVE' || !reg.workspaceId) {
       res.status(401).json({ error: 'Invalid agent token' }); return;
     }
 
-    // Find a user linked to this client
+    // Find a user linked to this workspace
     let user = reg.contactEmail
       ? await prisma.user.findUnique({ where: { email: reg.contactEmail } })
       : null;
 
     if (!user) {
-      // Find any active user for this client
-      user = await prisma.user.findFirst({
-        where: { clientId: reg.clientId, isActive: true },
-        orderBy: { role: 'asc' }, // CLIENT first
+      // Find any active user for this workspace
+      const membership = await prisma.workspaceMembership.findFirst({
+        where: { workspaceId: reg.workspaceId },
+        include: { user: true },
       });
+      user = membership?.user ?? null;
     }
 
-    if (!user) { res.status(401).json({ error: 'No user found for this client' }); return; }
+    if (!user) { res.status(401).json({ error: 'No user found for this workspace' }); return; }
 
     const payload: JwtPayload = {
-      userId: user.id, email: user.email, role: user.role, clientId: user.clientId,
+      userId: user.id, email: user.email,
     };
     const accessToken = signAccessToken(payload);
     const refreshToken = signRefreshToken(payload);
 
     // Redirect to portal with tokens in URL hash (not query — safer)
-    const redirect = user.role === 'CLIENT' ? '/portal' : '/dashboard';
-    res.redirect(`${redirect}#autologin=${encodeURIComponent(JSON.stringify({
+    res.redirect(`/portal#autologin=${encodeURIComponent(JSON.stringify({
       accessToken, refreshToken,
-      user: { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role, clientId: user.clientId },
+      user: { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email },
     }))}`);
   } catch (err) { next(err); }
 }

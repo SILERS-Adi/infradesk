@@ -25,6 +25,7 @@ export interface NetworkIface {
 export interface AgentRegistration {
   id: string;
   agentToken: string;
+  agentType?: 'CLIENT' | 'SERVER';
   status: 'PENDING' | 'ACTIVE' | 'REJECTED';
   nip?: string;
   clientId?: string;
@@ -104,4 +105,14 @@ export const agentsApi = {
 
   delete: (id: string): Promise<void> =>
     api.delete(`/agent/${id}`).then(() => undefined),
+
+  getAudit: () => api.get('/agent/audit').then((r: any) => r.data),
+
+  // RustDesk integration
+  getRustdeskPeers: () => api.get('/agent/rustdesk/peers').then((r: any) => r.data),
+  getRustdeskSessions: (page = 1, limit = 50) =>
+    api.get('/agent/rustdesk/sessions', { params: { page, limit } }).then((r: any) => r.data),
+  getRustdeskActive: () => api.get('/agent/rustdesk/active').then((r: any) => r.data),
+  syncRustdesk: () => api.post('/agent/rustdesk/sync').then((r: any) => r.data),
+  syncRustdeskSessions: () => api.post('/agent/rustdesk/sync-sessions').then((r: any) => r.data),
 };

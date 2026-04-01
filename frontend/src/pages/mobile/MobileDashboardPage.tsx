@@ -77,7 +77,7 @@ export function MobileDashboardPage() {
           <div className="relative overflow-hidden" style={{
             borderRadius: 20, padding: '20px',
             background: on
-              ? 'linear-gradient(145deg, rgba(109,40,217,0.09), rgba(37,99,235,0.06))'
+              ? 'linear-gradient(145deg, rgba(79,140,255,0.09), rgba(37,99,235,0.06))'
               : 'linear-gradient(145deg, rgba(251,191,36,0.06), rgba(248,113,113,0.04))',
             border: `1px solid ${on ? 'rgba(139,92,246,0.12)' : 'rgba(251,191,36,0.1)'}`,
           }}>
@@ -115,7 +115,7 @@ export function MobileDashboardPage() {
               </>) : (<>
                 <button onClick={() => act('resume')} disabled={!!ld}
                   className="flex-1 flex items-center justify-center gap-[6px] py-[10px] rounded-[12px] text-[12px] font-semibold active:scale-[0.97] transition-all disabled:opacity-50"
-                  style={{ background: 'linear-gradient(145deg, #6D28D9, #2563EB)', color: '#fff', boxShadow: '0 1px 8px rgba(109,40,217,0.12)' }}>
+                  style={{ background: 'linear-gradient(135deg, #4f8cff 0%, #6366F1 40%, #8B5CF6 100%)', color: '#fff', boxShadow: '0 1px 8px rgba(79,140,255,0.12)' }}>
                   {ld === 'resume' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />} Wznów
                 </button>
                 <button onClick={() => act('end')} disabled={!!ld}
@@ -165,7 +165,7 @@ export function MobileDashboardPage() {
       <div className="grid grid-cols-2 gap-3 pt-1">
         <button onClick={() => navigate('/m/tickets')}
           className="flex items-center gap-2 px-4 py-[13px] rounded-[14px] text-[13px] font-semibold text-white active:scale-[0.97] transition-all duration-200"
-          style={{ background: 'linear-gradient(145deg, #6D28D9, #4C1D95)', boxShadow: '0 1px 12px rgba(109,40,217,0.15), inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+          style={{ background: 'linear-gradient(145deg, #6D28D9, #4C1D95)', boxShadow: '0 1px 12px rgba(79,140,255,0.15), inset 0 1px 0 rgba(255,255,255,0.06)' }}>
           <Ticket className="h-[16px] w-[16px]" /> Zgłoszenia
         </button>
         <button onClick={() => navigate('/m/agents')}

@@ -194,13 +194,13 @@ export function PublicDownloadsPage() {
   };
 
   const APPS: AppCard[] = [
-    { icon: <Monitor className="h-6 w-6" />, name: 'InfraDesk Agent Client', description: 'Agent dla komputerów pracowników. Zgłoszenia, RustDesk, Wake-on-LAN, backup, Security Audit.', color: 'violet',
+    { icon: <Monitor className="h-6 w-6" />, name: 'InfraDesk', description: 'Dla firm i użytkowników domowych. Monitoring, zgłoszenia, audyt bezpieczeństwa, pomoc zdalna.', color: 'violet',
       files: [
-        { label: 'InfraDesk Agent Client — Windows', url: '/downloads/InfraDesk%20Agent.exe', badge: versionBadge, primary: true, size: '~40 MB' },
+        { label: 'InfraDesk — Windows', url: '/downloads/InfraDesk.exe', badge: versionBadge, primary: true, size: '~40 MB' },
       ],
-      notes: ['Wymaga Windows 10 lub nowszego', 'Aplikacja w zasobniku systemowym (tray)', 'Przy pierwszym uruchomieniu wpisz kod rejestracji', 'Zgłoszenia, RustDesk, WoL, Security Audit'],
+      notes: ['Wymaga Windows 10 lub nowszego', 'Tryb firmowy lub Asystent InfraDesk (domowy)', 'Monitoring, audyt, czyszczenie, pomoc zdalna'],
     },
-    { icon: <Server className="h-6 w-6" />, name: 'InfraDesk Agent Server', description: 'Agent dla serwerów Windows. Usługa Windows, S.M.A.R.T., RAID, Event Log, Hyper-V, SSL.', color: 'violet',
+    { icon: <Server className="h-6 w-6" />, name: 'InfraDesk Server', description: 'Dla serwerów Windows. S.M.A.R.T., RAID, Event Log, Hyper-V, SSL.', color: 'violet',
       files: [
         { label: 'InfraDesk Agent Server — Windows', url: '/downloads/InfraDesk%20Server%20Agent.exe', badge: versionBadge, primary: true, size: '~40 MB' },
       ],
@@ -222,10 +222,10 @@ export function PublicDownloadsPage() {
   // ── PIN verification ─────────────────────────────────────────────────────
   if (!verified) {
     return (
-      <div className="min-h-screen flex" style={{ background: '#080D19' }}>
+      <div className="min-h-screen flex" style={{ background: '#040a16' }}>
         {/* Left */}
         <div className="hidden lg:flex lg:w-[48%] flex-col items-center justify-center p-12 relative overflow-hidden"
-          style={{ background: 'linear-gradient(160deg, #0A0F1E 0%, #0F1B34 40%, #131E3A 70%, #0E1628 100%)' }}>
+          style={{ background: 'linear-gradient(160deg, #040a16 0%, #0F1B34 40%, #131E3A 70%, #0E1628 100%)' }}>
           <div className="absolute inset-0 pointer-events-none">
             <div className="absolute top-[10%] left-[15%] w-[50%] h-[40%] rounded-full" style={{ background: 'radial-gradient(ellipse, rgba(99,102,241,0.07), transparent 70%)' }} />
           </div>
@@ -241,7 +241,7 @@ export function PublicDownloadsPage() {
         </div>
 
         {/* Right — PIN */}
-        <div className="flex-1 flex flex-col items-center justify-center p-6 relative" style={{ background: 'linear-gradient(160deg, #0C1220, #0A0F1E)' }}>
+        <div className="flex-1 flex flex-col items-center justify-center p-6 relative" style={{ background: 'linear-gradient(160deg, #060B1A, #040a16)' }}>
           <div className="lg:hidden text-center mb-10">
             <img src="/logo.png" alt="" className="h-14 mx-auto mb-3" />
             <h1 className="text-[20px] font-semibold text-white/85">InfraDesk</h1>
@@ -263,7 +263,7 @@ export function PublicDownloadsPage() {
                   </div>
                   <button onClick={handleVerify} disabled={verifying || !pinInput.trim()}
                     className="w-full py-3.5 rounded-xl text-[14px] font-semibold text-white flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-50"
-                    style={{ background: 'linear-gradient(145deg, #6D28D9, #2563EB)', boxShadow: '0 2px 10px rgba(109,40,217,0.15)' }}>
+                    style={{ background: 'linear-gradient(135deg, #4f8cff 0%, #6366F1 40%, #8B5CF6 100%)', boxShadow: '0 2px 10px rgba(79,140,255,0.15)' }}>
                     {verifying ? <Loader2 className="h-5 w-5 animate-spin" /> : <Download className="h-5 w-5" />}
                     {verifying ? 'Sprawdzam...' : 'Sprawdź PIN'}
                   </button>
@@ -306,7 +306,7 @@ export function PublicDownloadsPage() {
 
   // ── Downloads view ───────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen" style={{ background: '#0A0F1E' }}>
+    <div className="min-h-screen" style={{ background: '#040a16' }}>
       <header className="sticky top-0 z-30" style={{ background: 'rgba(10,15,30,0.9)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
         <div className="max-w-5xl mx-auto px-6 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-3">

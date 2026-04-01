@@ -109,7 +109,7 @@ export function CredentialForm({ credential, defaultClientId, defaultDeviceId, o
     queryFn: () => usersApi.getAll(),
     enabled: step === 'details',
   });
-  const availableUsers = allUsers.filter(u => u.role !== 'CLIENT' || u.clientId === activeClientId);
+  const availableUsers = allUsers;
 
   const filteredTypes = accessTypes.filter(
     t => !typeSearch || t.name.toLowerCase().includes(typeSearch.toLowerCase())

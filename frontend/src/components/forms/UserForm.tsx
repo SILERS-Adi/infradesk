@@ -58,7 +58,7 @@ export function UserForm({ user, defaultClientId, defaultRole, onSuccess, onCanc
   const qc = useQueryClient();
   const isEdit = !!user;
 
-  const isClientUser = user?.role === 'CLIENT' || defaultRole === 'CLIENT';
+  const isClientUser = defaultRole === 'CLIENT';
   const initialKind: UserKind = isClientUser ? 'client' : 'employee';
 
   // When adding from within a client page — show everything on one page, no wizard
@@ -72,7 +72,7 @@ export function UserForm({ user, defaultClientId, defaultRole, onSuccess, onCanc
   // Employee roles
   const initRoles = user
     ? ((user as any).roles?.filter((r: string) => r !== 'CLIENT') as ('ADMIN' | 'TECHNICIAN')[])
-      || (user.role !== 'CLIENT' ? [user.role as 'ADMIN' | 'TECHNICIAN'] : [])
+      || (defaultRole && defaultRole !== 'CLIENT' ? [defaultRole] : ['TECHNICIAN' as const])
     : (defaultRole && defaultRole !== 'CLIENT' ? [defaultRole] : ['TECHNICIAN' as const]);
   const [selectedRoles, setSelectedRoles] = useState<('ADMIN' | 'TECHNICIAN')[]>(initRoles);
 
@@ -86,7 +86,7 @@ export function UserForm({ user, defaultClientId, defaultRole, onSuccess, onCanc
 
   // Client firm selection (wizard)
   const [selectedClientId, setSelectedClientId] = useState<string>(
-    user?.clientId ?? defaultClientId ?? ''
+    defaultClientId ?? ''
   );
   const [clientSearch, setClientSearch] = useState('');
 
@@ -305,7 +305,7 @@ export function UserForm({ user, defaultClientId, defaultRole, onSuccess, onCanc
                   </div>
                 )}
                 <label className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center cursor-pointer"
-                  style={{ background: 'linear-gradient(145deg, #6D28D9, #2563EB)' }}>
+                  style={{ background: 'linear-gradient(135deg, #4f8cff 0%, #6366F1 40%, #8B5CF6 100%)' }}>
                   <Upload className="h-3.5 w-3.5 text-white" />
                   <input type="file" accept="image/*" className="sr-only" onChange={handleAvatarUpload} disabled={uploading} />
                 </label>

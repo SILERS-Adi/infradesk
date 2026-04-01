@@ -172,7 +172,7 @@ export function MobileScanPage() {
           />
           <button onClick={() => manualCode.trim() && handleQrResult(manualCode.trim())} disabled={!manualCode.trim()}
             className="px-5 py-3 rounded-[14px] active:scale-95 transition-all duration-200 disabled:opacity-40"
-            style={{ background: 'linear-gradient(145deg, #6D28D9, #2563EB)' }}>
+            style={{ background: 'linear-gradient(135deg, #4f8cff 0%, #6366F1 40%, #8B5CF6 100%)' }}>
             <QrCode className="h-5 w-5 text-white" />
           </button>
         </div>

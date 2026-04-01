@@ -8,7 +8,7 @@ export async function createTask(req: Request, res: Response, next: NextFunction
     const data = createTaskSchema.parse(req.body);
     const task = await tasksService.createTask(data, {
       id:   req.user!.userId,
-      role: req.user!.role,
+      role: 'ADMIN',
     });
     res.status(201).json(task);
   } catch (err) { next(err); }
@@ -18,10 +18,11 @@ export async function listTasks(req: Request, res: Response, next: NextFunction)
   try {
     const { status, assignedToUserId, all } = req.query as Record<string, string>;
     const tasks = await tasksService.listTasks({
-      requestingUser: { id: req.user!.userId, role: req.user!.role },
+      requestingUser: { id: req.user!.userId, role: 'ADMIN' },
       status: status as TaskStatus | undefined,
       assignedToUserId,
       all: all === 'true',
+      workspaceId: req.workspaceId,
     });
     res.json(tasks);
   } catch (err) { next(err); }
@@ -31,7 +32,7 @@ export async function getTask(req: Request, res: Response, next: NextFunction) {
   try {
     const task = await tasksService.getTaskById(req.params.id, {
       id: req.user!.userId,
-      role: req.user!.role,
+      role: 'ADMIN',
     });
     res.json(task);
   } catch (err) { next(err); }
@@ -42,7 +43,7 @@ export async function changeStatus(req: Request, res: Response, next: NextFuncti
     const data = changeTaskStatusSchema.parse(req.body);
     const task = await tasksService.changeTaskStatus(req.params.id, data, {
       id: req.user!.userId,
-      role: req.user!.role,
+      role: 'ADMIN',
     });
     res.json(task);
   } catch (err) { next(err); }
@@ -53,7 +54,7 @@ export async function updateTask(req: Request, res: Response, next: NextFunction
     const data = updateTaskSchema.parse(req.body);
     const task = await tasksService.updateTask(req.params.id, data, {
       id: req.user!.userId,
-      role: req.user!.role,
+      role: 'ADMIN',
     });
     res.json(task);
   } catch (err) { next(err); }

@@ -25,32 +25,39 @@ const DEFAULT_FAQ = JSON.stringify([
 ]);
 
 export async function initDefaultSettings(): Promise<void> {
-  await prisma.setting.upsert({
-    where: { key: 'contact' },
-    update: {},
-    create: { key: 'contact', value: DEFAULT_CONTACT },
-  });
-  await prisma.setting.upsert({
-    where: { key: 'faq' },
-    update: {},
-    create: { key: 'faq', value: DEFAULT_FAQ },
-  });
+  const existing = await prisma.setting.findFirst({ where: { key: 'contact' } });
+  if (!existing) {
+    await prisma.setting.create({ data: { key: 'contact', value: DEFAULT_CONTACT } });
+  }
+  const existingFaq = await prisma.setting.findFirst({ where: { key: 'faq' } });
+  if (!existingFaq) {
+    await prisma.setting.create({ data: { key: 'faq', value: DEFAULT_FAQ } });
+  }
 }
 
-export async function getSetting(key: string): Promise<{ key: string; value: string } | null> {
-  return prisma.setting.findUnique({ where: { key } });
+export async function getSetting(key: string, _workspaceId?: string | null): Promise<{ key: string; value: string } | null> {
+  // Setting.key is unique now — just look it up
+  const setting = await prisma.setting.findFirst({ where: { key } });
+  return setting ? { key: setting.key, value: setting.value } : null;
 }
 
-export async function setSetting(key: string, value: string): Promise<{ key: string; value: string }> {
-  return prisma.setting.upsert({
-    where: { key },
-    update: { value },
-    create: { key, value },
+export async function setSetting(key: string, value: string, _workspaceId?: string | null): Promise<{ key: string; value: string }> {
+  const existing = await prisma.setting.findFirst({ where: { key } });
+  if (existing) {
+    const updated = await prisma.setting.update({
+      where: { id: existing.id },
+      data: { value },
+    });
+    return { key: updated.key, value: updated.value };
+  }
+  const created = await prisma.setting.create({
+    data: { key, value },
   });
+  return { key: created.key, value: created.value };
 }
 
-export async function getContactInfo(): Promise<Record<string, string>> {
-  const setting = await prisma.setting.findUnique({ where: { key: 'contact' } });
+export async function getContactInfo(workspaceId?: string | null): Promise<Record<string, string>> {
+  const setting = await getSetting('contact', workspaceId);
   if (!setting) return JSON.parse(DEFAULT_CONTACT);
   try { return JSON.parse(setting.value); }
   catch { return JSON.parse(DEFAULT_CONTACT); }
@@ -60,10 +67,8 @@ export async function getContactInfo(): Promise<Record<string, string>> {
 
 const SMTP_KEYS = ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from'] as const;
 
-export async function getSmtpSettings(): Promise<Record<string, string>> {
-  const settings = await prisma.setting.findMany({
-    where: { key: { in: [...SMTP_KEYS] } },
-  });
+export async function getSmtpSettings(_workspaceId?: string | null): Promise<Record<string, string>> {
+  const settings = await prisma.setting.findMany({ where: { key: { in: [...SMTP_KEYS] } } });
   const result: Record<string, string> = {};
   for (const s of settings) {
     result[s.key] = s.value;
@@ -77,7 +82,7 @@ export async function saveSmtpSettings(data: {
   smtp_user?: string;
   smtp_pass?: string;
   smtp_from?: string;
-}): Promise<Record<string, string>> {
+}, workspaceId?: string | null): Promise<Record<string, string>> {
   const entries: [string, string][] = [];
   if (data.smtp_host !== undefined) entries.push(['smtp_host', String(data.smtp_host)]);
   if (data.smtp_port !== undefined) entries.push(['smtp_port', String(data.smtp_port)]);
@@ -86,14 +91,10 @@ export async function saveSmtpSettings(data: {
   if (data.smtp_from !== undefined) entries.push(['smtp_from', String(data.smtp_from)]);
 
   for (const [key, value] of entries) {
-    await prisma.setting.upsert({
-      where: { key },
-      update: { value },
-      create: { key, value },
-    });
+    await setSetting(key, value, workspaceId);
   }
 
-  return getSmtpSettings();
+  return getSmtpSettings(workspaceId);
 }
 
 export async function testSmtp(email: string): Promise<void> {
@@ -104,8 +105,8 @@ export async function testSmtp(email: string): Promise<void> {
   );
 }
 
-export async function getFaqItems(forAgent = false): Promise<Array<{ q: string; a: string; visibility?: string }>> {
-  const setting = await prisma.setting.findUnique({ where: { key: 'faq' } });
+export async function getFaqItems(forAgent = false, workspaceId?: string | null): Promise<Array<{ q: string; a: string; visibility?: string }>> {
+  const setting = await getSetting('faq', workspaceId);
   const all: Array<{ q: string; a: string; visibility?: string }> = (() => {
     try { return JSON.parse(setting?.value ?? ''); }
     catch { return JSON.parse(DEFAULT_FAQ); }

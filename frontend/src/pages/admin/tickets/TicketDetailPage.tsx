@@ -12,6 +12,7 @@ import { TicketStatusBadge } from '../../../components/ui/StatusBadge';
 import { PriorityBadge } from '../../../components/ui/PriorityBadge';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { useAuth } from '../../../store/authStore';
+import { useWorkspaceContext } from '../../../hooks/useWorkspaceContext';
 import { formatDateTime, getInitials, getErrorMessage } from '../../../utils/helpers';
 import type { TicketPriority, TicketComment } from '../../../types';
 
@@ -27,14 +28,14 @@ const TYPE_LABELS: Record<string, string> = { INCIDENT: 'Incydent', REQUEST: 'Pr
 const SOURCE_LABELS: Record<string, string> = { CLIENT_PORTAL: 'Portal klienta', INTERNAL: 'Wewnętrzne', PHONE: 'Telefon', EMAIL: 'Email', QR_SCAN: 'Skan QR', AGENT: 'Agent', IN_PERSON: 'Osobiście', MESSAGE: 'Wiadomość' };
 
 const glass = (extra?: React.CSSProperties): React.CSSProperties => ({
-  background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, ...extra,
+  background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, ...extra,
 });
-const selectStyle: React.CSSProperties = { background: '#0E1425', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)' };
+const selectStyle: React.CSSProperties = { background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' };
 
 function Section({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
     <div className="rounded-[16px] overflow-hidden" style={glass()}>
-      <div className="px-5 py-3.5 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+      <div className="px-5 py-3.5 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border)' }}>
         <h3 className="text-[13px] font-semibold text-white/70">{title}</h3>
         {action}
       </div>
@@ -61,7 +62,7 @@ function CommentBubble({ c, isAdmin, onEdit, onDelete }: {
     <div className="flex gap-3 p-3 rounded-[12px]"
       style={c.isInternal
         ? { background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.1)' }
-        : { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }
+        : { background: 'var(--bg-card)', border: '1px solid var(--border)' }
       }>
       <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
         style={{ background: 'rgba(139,92,246,0.12)', color: '#A78BFA' }}>
@@ -75,16 +76,16 @@ function CommentBubble({ c, isAdmin, onEdit, onDelete }: {
               <Lock className="h-3 w-3" /> Wewnętrzne
             </span>
           )}
-          <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.25)' }}>{formatDateTime(c.createdAt)}</span>
+          <span className="text-[11px]" style={{ color: 'var(--td)' }}>{formatDateTime(c.createdAt)}</span>
           {isAdmin && !editing && (
             <div className="flex items-center gap-1 ml-auto">
               <button onClick={() => { setEditText(c.comment); setEditing(true); }}
                 className="p-1 rounded-lg transition-colors hover:bg-white/[0.06]" title="Edytuj">
-                <Pencil className="h-3 w-3" style={{ color: 'rgba(255,255,255,0.2)' }} />
+                <Pencil className="h-3 w-3" style={{ color: 'var(--td)' }} />
               </button>
               <button onClick={() => { if (confirm('Usunąć komentarz?')) onDelete(c.id); }}
                 className="p-1 rounded-lg transition-colors hover:bg-white/[0.06]" title="Usuń">
-                <Trash2 className="h-3 w-3" style={{ color: 'rgba(255,255,255,0.15)' }} />
+                <Trash2 className="h-3 w-3" style={{ color: 'var(--td)' }} />
               </button>
             </div>
           )}
@@ -93,20 +94,20 @@ function CommentBubble({ c, isAdmin, onEdit, onDelete }: {
           <div className="space-y-2">
             <textarea value={editText} onChange={e => setEditText(e.target.value)} rows={3}
               className="w-full rounded-xl px-3 py-2 text-[13px] resize-none focus:outline-none placeholder:text-white/20"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.3)', color: 'rgba(255,255,255,0.85)' }} />
+              style={{ background: 'var(--hover-bg)', border: '1px solid rgba(139,92,246,0.3)', color: 'var(--t)' }} />
             <div className="flex gap-2">
               <button onClick={save} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white transition-all active:scale-[0.97]"
-                style={{ background: 'linear-gradient(145deg, #6D28D9, #2563EB)' }}>
+                style={{ background: 'linear-gradient(135deg, #4f8cff 0%, #6366F1 40%, #8B5CF6 100%)' }}>
                 <Check className="h-3 w-3" /> Zapisz
               </button>
               <button onClick={() => setEditing(false)} className="px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors"
-                style={{ color: 'rgba(255,255,255,0.4)' }}>
+                style={{ color: 'var(--tm)' }}>
                 Anuluj
               </button>
             </div>
           </div>
         ) : (
-          <p className="text-[13px] whitespace-pre-wrap" style={{ color: 'rgba(255,255,255,0.55)' }}>{c.comment}</p>
+          <p className="text-[13px] whitespace-pre-wrap" style={{ color: 'var(--ts)' }}>{c.comment}</p>
         )}
       </div>
     </div>
@@ -171,12 +172,13 @@ export function TicketDetailPage() {
   });
 
   if (isLoading) return <LoadingSpinner />;
-  if (!ticket) return <div className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Nie znaleziono zgłoszenia</div>;
+  if (!ticket) return <div className="text-sm" style={{ color: 'var(--tm)' }}>Nie znaleziono zgłoszenia</div>;
 
   const { text: descText, photoUrls } = parseDescription(ticket.description);
   const allPhotoUrls = [photoUrls, (ticket as any).attachmentUrls].filter(Boolean).join(',');
-  const isAdminOrTech = user?.role === 'ADMIN' || user?.role === 'TECHNICIAN';
-  const isClient = user?.role === 'CLIENT';
+  const { isAdmin: wsAdmin, isTechnician: wsTech, isMember, isViewer } = useWorkspaceContext();
+  const isAdminOrTech = wsAdmin || wsTech;
+  const isClient = isMember || isViewer;
   const comments = ticket.comments ?? [];
   const visible = isClient ? comments.filter(c => !c.isInternal) : comments;
   const canEdit = ticket.status !== 'CANCELLED' && ticket.status !== 'COMPLETED';
@@ -192,13 +194,13 @@ export function TicketDetailPage() {
         <div className="lg:col-span-2 space-y-5">
 
           <Section title="Opis">
-            <p className="text-[13px] whitespace-pre-wrap leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>{descText}</p>
+            <p className="text-[13px] whitespace-pre-wrap leading-relaxed" style={{ color: 'var(--ts)' }}>{descText}</p>
             {allPhotoUrls && <div className="mt-3"><AttachmentGallery urls={allPhotoUrls} /></div>}
           </Section>
 
           {ticket.resolutionSummary && (
             <Section title="Rozwiązanie">
-              <p className="text-[13px] whitespace-pre-wrap" style={{ color: 'rgba(255,255,255,0.6)' }}>{ticket.resolutionSummary}</p>
+              <p className="text-[13px] whitespace-pre-wrap" style={{ color: 'var(--ts)' }}>{ticket.resolutionSummary}</p>
             </Section>
           )}
 
@@ -206,7 +208,7 @@ export function TicketDetailPage() {
           <Section title={`Wiadomości (${visible.length})`}>
             <div className="space-y-3 mb-5">
               {visible.length === 0 ? (
-                <p className="text-[13px] text-center py-6" style={{ color: 'rgba(255,255,255,0.2)' }}>Brak wiadomości</p>
+                <p className="text-[13px] text-center py-6" style={{ color: 'var(--td)' }}>Brak wiadomości</p>
               ) : visible.map(c => (
                 <CommentBubble key={c.id} c={c} isAdmin={isAdminOrTech}
                   onEdit={(cid, text) => editCommentMut.mutate({ commentId: cid, text })}
@@ -215,16 +217,16 @@ export function TicketDetailPage() {
             </div>
 
             {/* Nowa wiadomość */}
-            <div className="pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+            <div className="pt-4" style={{ borderTop: '1px solid var(--border)' }}>
               <textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Napisz wiadomość..." rows={3}
                 className="w-full rounded-xl px-4 py-3 text-[13px] resize-none focus:outline-none transition-all placeholder:text-white/20"
-                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
-                onFocus={e => { e.currentTarget.style.borderColor = 'rgba(139,92,246,0.4)'; }}
-                onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; }}
+                style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}
+                onFocus={e => { e.currentTarget.style.borderColor = 'var(--accent)'; }}
+                onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
               />
               <div className="flex items-center justify-between mt-3">
                 {isAdminOrTech ? (
-                  <label className="flex items-center gap-2 text-[12px] cursor-pointer" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                  <label className="flex items-center gap-2 text-[12px] cursor-pointer" style={{ color: 'var(--tm)' }}>
                     <input type="checkbox" checked={isInternal} onChange={e => setIsInternal(e.target.checked)}
                       className="rounded border-gray-600 text-violet-600" />
                     <Lock className="h-3.5 w-3.5" style={{ color: '#FBBF24' }} /> Notatka wewnętrzna
@@ -286,8 +288,8 @@ export function TicketDetailPage() {
                 { label: 'Przypisany', value: ticket.assignedTo ? `${ticket.assignedTo.firstName} ${ticket.assignedTo.lastName}` : null },
                 { label: 'Autor', value: ticket.createdBy ? `${ticket.createdBy.firstName} ${ticket.createdBy.lastName}` : null },
               ].map(({ label, value }) => value ? (
-                <div key={label} className="flex items-start gap-2 py-2.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                  <span className="text-[11px] font-medium w-24 flex-shrink-0 pt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{label}</span>
+                <div key={label} className="flex items-start gap-2 py-2.5" style={{ borderBottom: '1px solid var(--border)' }}>
+                  <span className="text-[11px] font-medium w-24 flex-shrink-0 pt-0.5" style={{ color: 'var(--tm)' }}>{label}</span>
                   <span className="text-[13px] text-white/75">{value}</span>
                 </div>
               ) : null)}

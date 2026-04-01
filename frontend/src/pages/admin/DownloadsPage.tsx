@@ -64,7 +64,7 @@ function AppCardView({ app }: { app: AppCard }) {
   const c = COLOR_MAP[app.color];
   return (
     <div className="rounded-2xl overflow-hidden"
-      style={{ background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.07)', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
+      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
       <div className="flex items-center gap-4 px-6 py-5" style={{ background: c.bg, borderBottom: `1px solid ${c.border}` }}>
         <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
           style={{ background: c.iconBg, color: c.iconColor }}>
@@ -72,13 +72,13 @@ function AppCardView({ app }: { app: AppCard }) {
         </div>
         <div>
           <h2 className="text-lg font-bold text-white/90">{app.name}</h2>
-          <p className="text-sm mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>{app.description}</p>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--ts)' }}>{app.description}</p>
         </div>
       </div>
 
       <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-3">
-          <h3 className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Pobierz</h3>
+          <h3 className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Pobierz</h3>
           {app.files.map(f => {
             const isExternal = f.url.startsWith('http');
             const isComingSoon = f.badge === 'Wkrótce';
@@ -92,28 +92,28 @@ function AppCardView({ app }: { app: AppCard }) {
                 className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all"
                 style={
                   isComingSoon
-                    ? { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', opacity: 0.5, cursor: 'not-allowed' }
+                    ? { background: 'var(--bg-card)', border: '1px solid var(--border)', opacity: 0.5, cursor: 'not-allowed' }
                     : f.primary
                       ? { background: c.primaryBg, border: '1px solid transparent', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }
-                      : { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer' }
+                      : { background: 'var(--bg-card)', border: '1px solid var(--border)', cursor: 'pointer' }
                 }
               >
                 {isExternal
-                  ? <ExternalLink className="h-4 w-4 flex-shrink-0" style={{ color: f.primary ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.35)' }} />
-                  : <Download className="h-4 w-4 flex-shrink-0" style={{ color: f.primary ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.35)' }} />
+                  ? <ExternalLink className="h-4 w-4 flex-shrink-0" style={{ color: f.primary ? 'var(--t)' : 'var(--tm)' }} />
+                  : <Download className="h-4 w-4 flex-shrink-0" style={{ color: f.primary ? 'var(--t)' : 'var(--tm)' }} />
                 }
-                <span className="text-sm font-medium flex-1" style={{ color: f.primary ? '#fff' : 'rgba(255,255,255,0.7)' }}>
+                <span className="text-sm font-medium flex-1" style={{ color: f.primary ? '#fff' : 'var(--ts)' }}>
                   {f.label}
                 </span>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {f.size && (
-                    <span className="text-xs" style={{ color: f.primary ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.3)' }}>{f.size}</span>
+                    <span className="text-xs" style={{ color: f.primary ? 'var(--ts)' : 'var(--tm)' }}>{f.size}</span>
                   )}
                   {f.badge && (
                     <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
                       style={
                         f.primary && !isComingSoon
-                          ? { background: 'rgba(255,255,255,0.2)', color: '#fff' }
+                          ? { background: 'var(--td)', color: '#fff' }
                           : { background: c.badgeBg, color: c.badgeColor }
                       }>
                       {f.badge}
@@ -127,11 +127,11 @@ function AppCardView({ app }: { app: AppCard }) {
 
         {app.notes && (
           <div className="space-y-3">
-            <h3 className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Informacje</h3>
+            <h3 className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Informacje</h3>
             <ul className="space-y-2">
               {app.notes.map((note, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                  <CheckCircle className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: 'rgba(255,255,255,0.25)' }} />
+                <li key={i} className="flex items-start gap-2 text-sm" style={{ color: 'var(--ts)' }}>
+                  <CheckCircle className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: 'var(--td)' }} />
                   {note}
                 </li>
               ))}
@@ -172,9 +172,9 @@ function CompareModal({ open, onClose }: { open: boolean; onClose: () => void })
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }} />
       <div className="relative w-full max-w-2xl max-h-[85vh] overflow-auto rounded-2xl"
-        style={{ background: '#0E1527', border: '1px solid rgba(255,255,255,0.08)' }}
+        style={{ background: '#0E1527', border: '1px solid var(--border)' }}
         onClick={e => e.stopPropagation()}>
-        <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4" style={{ background: '#0E1527', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4" style={{ background: '#0E1527', borderBottom: '1px solid var(--border)' }}>
           <div className="flex items-center gap-3">
             <GitCompareArrows className="h-5 w-5" style={{ color: '#818CF8' }} />
             <h3 className="text-[16px] font-semibold text-white/90">Agent Client vs Agent Server</h3>
@@ -186,8 +186,8 @@ function CompareModal({ open, onClose }: { open: boolean; onClose: () => void })
         <div className="p-6">
           <table className="w-full text-[13px]">
             <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                <th className="text-left py-3 pr-4 font-medium" style={{ color: 'rgba(255,255,255,0.4)' }}>Funkcja</th>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                <th className="text-left py-3 pr-4 font-medium" style={{ color: 'var(--tm)' }}>Funkcja</th>
                 <th className="text-center py-3 px-3 font-semibold" style={{ color: '#818CF8' }}>
                   <div className="flex items-center justify-center gap-1.5"><Monitor className="h-3.5 w-3.5" /> Client</div>
                 </th>
@@ -198,21 +198,21 @@ function CompareModal({ open, onClose }: { open: boolean; onClose: () => void })
             </thead>
             <tbody>
               {COMPARE_DATA.map((row, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  <td className="py-2.5 pr-4" style={{ color: 'rgba(255,255,255,0.55)' }}>{row.feature}</td>
+                <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td className="py-2.5 pr-4" style={{ color: 'var(--ts)' }}>{row.feature}</td>
                   <td className="py-2.5 px-3 text-center">
                     {typeof row.client === 'boolean'
                       ? row.client
                         ? <CheckCircle className="h-4 w-4 mx-auto" style={{ color: '#22C55E' }} />
-                        : <span className="text-[12px]" style={{ color: 'rgba(255,255,255,0.15)' }}>—</span>
-                      : <span style={{ color: 'rgba(255,255,255,0.5)' }}>{row.client}</span>}
+                        : <span className="text-[12px]" style={{ color: 'var(--td)' }}>—</span>
+                      : <span style={{ color: 'var(--ts)' }}>{row.client}</span>}
                   </td>
                   <td className="py-2.5 pl-3 text-center">
                     {typeof row.server === 'boolean'
                       ? row.server
                         ? <CheckCircle className="h-4 w-4 mx-auto" style={{ color: '#22C55E' }} />
-                        : <span className="text-[12px]" style={{ color: 'rgba(255,255,255,0.15)' }}>—</span>
-                      : <span style={{ color: 'rgba(255,255,255,0.5)' }}>{row.server}</span>}
+                        : <span className="text-[12px]" style={{ color: 'var(--td)' }}>—</span>
+                      : <span style={{ color: 'var(--ts)' }}>{row.server}</span>}
                   </td>
                 </tr>
               ))}
@@ -232,11 +232,11 @@ export function DownloadsPage() {
   const APPS: AppCard[] = [
     {
       icon: <Monitor className="h-7 w-7" />,
-      name: 'InfraDesk Agent Client',
-      description: 'Agent dla komputerów pracowników. Zgłoszenia, RustDesk, Wake-on-LAN, backup, Security Audit.',
+      name: 'InfraDesk',
+      description: 'Monitoring, zgłoszenia, audyt bezpieczeństwa, pomoc zdalna. Tryb firmowy lub Asystent InfraDesk.',
       color: 'indigo',
       files: [
-        { label: 'Instalator (zalecany)', url: '/downloads/InfraDesk%20Agent.exe', badge: versionBadge, primary: true, size: '~39 MB' },
+        { label: 'InfraDesk (zalecany)', url: '/downloads/InfraDesk.exe', badge: versionBadge, primary: true, size: '~40 MB' },
         { label: 'Wersja Beta (v4.1.0 — auto-diagnostyka, backup)', url: '/downloads/InfraDesk-Agent-beta.exe', badge: 'Beta 4.1', size: '~39 MB' },
       ],
       notes: [

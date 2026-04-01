@@ -8,7 +8,7 @@ import { DeviceStatus, DeviceCriticality, AgentStatus } from '@prisma/client';
 
 const deviceSelect = {
   id: true,
-  clientId: true,
+  workspaceId: true,
   locationId: true,
   deviceTypeId: true,
   name: true,
@@ -41,7 +41,6 @@ const deviceSelect = {
   gpsLon:           true,
   createdAt: true,
   updatedAt: true,
-  client:       { select: { id: true, name: true } },
   location:     { select: { id: true, name: true, addressLine1: true, postalCode: true, city: true, country: true } },
   deviceType:   { select: { id: true, name: true, icon: true } },
   assignedUser: { select: { id: true, firstName: true, lastName: true, email: true } },
@@ -59,24 +58,23 @@ const deviceSelectWithInternalNotes = {
 };
 
 export async function listDevices(params: {
-  clientId?: string;
+  workspaceId?: string | null;
   locationId?: string;
   status?: DeviceStatus;
   criticality?: DeviceCriticality;
   search?: string;
   page?: number;
   limit?: number;
-  requestingUser: { role: string; clientId?: string | null };
+  scopeFilter?: Record<string, unknown>;
+  requestingUser?: any;
 }) {
-  const { clientId, locationId, status, criticality, search, page = 1, limit = 20, requestingUser } = params;
+  const { workspaceId, locationId, status, criticality, search, page = 1, limit = 20, scopeFilter } = params;
   const skip = (page - 1) * limit;
 
   const where: Record<string, unknown> = {};
 
-  if (requestingUser.role === 'CLIENT') {
-    where.clientId = requestingUser.clientId;
-  } else if (clientId) {
-    where.clientId = clientId;
+  if (workspaceId) {
+    where.workspaceId = workspaceId;
   }
 
   if (locationId) where.locationId = locationId;
@@ -93,13 +91,18 @@ export async function listDevices(params: {
     ];
   }
 
+  // Workspace scope filter (SCOPED memberships)
+  if (scopeFilter && Object.keys(scopeFilter).length > 0) {
+    where.AND = [...((where.AND as any[]) || []), scopeFilter];
+  }
+
   const [devices, total] = await Promise.all([
     prisma.device.findMany({
       where,
       skip,
       take: limit,
       orderBy: { name: 'asc' },
-      select: requestingUser.role === 'CLIENT' ? deviceSelect : deviceSelectWithInternalNotes,
+      select: deviceSelectWithInternalNotes,
     }),
     prisma.device.count({ where }),
   ]);
@@ -117,19 +120,15 @@ export async function listDevices(params: {
 
 export async function getDeviceById(
   id: string,
-  requestingUser: { role: string; clientId?: string | null }
+  _requestingUser?: any,
 ) {
   const device = await prisma.device.findUnique({
     where: { id },
-    select: requestingUser.role === 'CLIENT' ? deviceSelect : deviceSelectWithInternalNotes,
+    select: deviceSelectWithInternalNotes,
   });
 
   if (!device) {
     throw new AppError('Device not found', 404);
-  }
-
-  if (requestingUser.role === 'CLIENT' && device.clientId !== requestingUser.clientId) {
-    throw new AppError('Access denied', 403);
   }
 
   // Dołącz dane z najnowszej rejestracji agenta
@@ -163,7 +162,6 @@ export async function getDeviceByQrValue(qrCodeValue: string) {
       status: true,
       criticality: true,
       clientVisibleNotes: true,
-      client: { select: { id: true, name: true } },
       location: { select: { id: true, name: true, addressLine1: true, postalCode: true, city: true, country: true } },
       deviceType: { select: { id: true, name: true, icon: true } },
     },
@@ -177,18 +175,9 @@ export async function getDeviceByQrValue(qrCodeValue: string) {
 }
 
 export async function createDevice(data: CreateDeviceInput, performedByUserId: string) {
-  const client = await prisma.client.findUnique({ where: { id: data.clientId } });
-  if (!client) {
-    throw new AppError('Client not found', 404);
-  }
-
   const location = await prisma.location.findUnique({ where: { id: data.locationId } });
   if (!location) {
     throw new AppError('Location not found', 404);
-  }
-
-  if (location.clientId !== data.clientId) {
-    throw new AppError('Location does not belong to the specified client', 400);
   }
 
   const device = await prisma.device.create({
@@ -229,8 +218,8 @@ export async function updateDevice(id: string, data: UpdateDeviceInput, performe
     if (!location) {
       throw new AppError('Location not found', 404);
     }
-    if (location.clientId !== existing.clientId) {
-      throw new AppError('Location does not belong to device client', 400);
+    if (location.workspaceId !== existing.workspaceId) {
+      throw new AppError('Location does not belong to device workspace', 400);
     }
   }
 

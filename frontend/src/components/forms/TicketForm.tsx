@@ -13,6 +13,7 @@ import { Select } from '../ui/Select';
 import { Textarea } from '../ui/Textarea';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../store/authStore';
+import { useWorkspaceContext } from '../../hooks/useWorkspaceContext';
 import { getErrorMessage } from '../../utils/helpers';
 import type { Ticket } from '../../types';
 
@@ -39,12 +40,13 @@ interface Props {
 
 export function TicketForm({ ticket, defaultClientId, defaultDeviceId, onSuccess, onCancel }: Props) {
   const { user } = useAuth();
-  const isAdminOrTech = user?.role === 'ADMIN' || user?.role === 'TECHNICIAN';
+  const { isAdmin, isTechnician } = useWorkspaceContext();
+  const isAdminOrTech = isAdmin || isTechnician;
 
   const { register, handleSubmit, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      clientId: ticket?.clientId ?? defaultClientId ?? (user?.role === 'CLIENT' ? user.clientId : '') ?? '',
+      clientId: ticket?.clientId ?? defaultClientId ?? '',
       locationId: ticket?.locationId ?? '',
       deviceId: ticket?.deviceId ?? defaultDeviceId ?? '',
       type: ticket?.type ?? 'INCIDENT',

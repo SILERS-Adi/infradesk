@@ -1,13 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
-import { validate } from '../../middleware/validate';
 import prisma from '../../lib/prisma';
 import {
   registerAgent, updateMetrics, createAgentTicket,
   getAllRegistrations, approveRegistration, approveRegistrationWithNewClient, deleteRegistration,
 } from './agent.service';
-import {
-  registerSchema, metricsSchema, agentTicketSchema, approveSchema,
-} from './agent.validation';
 
 // Token auth middleware (for agent endpoints)
 export async function agentAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -23,10 +19,10 @@ export async function getStatus(req: Request, res: Response, next: NextFunction)
     const token = (req as any).agentToken as string;
     const reg = await prisma.agentRegistration.findUnique({
       where: { agentToken: token },
-      select: { id: true, status: true, clientId: true, deviceId: true },
+      select: { id: true, status: true, deviceId: true },
     });
     if (!reg) { res.status(404).json({ error: 'Not found' }); return; }
-    res.json({ status: reg.status, clientId: reg.clientId, deviceId: reg.deviceId });
+    res.json({ status: reg.status, deviceId: reg.deviceId });
   } catch (err) { next(err); }
 }
 
@@ -55,21 +51,25 @@ export async function postTicket(req: Request, res: Response, next: NextFunction
 
 export async function getRegistrations(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const regs = await getAllRegistrations();
+    const { agentScopeFilter } = await import('../../middleware/workspace');
+    const regs = await getAllRegistrations({
+      workspaceId: req.workspaceId,
+      scopeFilter: agentScopeFilter(req.membership),
+    });
     res.json(regs);
   } catch (err) { next(err); }
 }
 
 export async function postApprove(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const result = await approveRegistration(req.params.id, req.body);
+    const result = await approveRegistration(req.params.id, req.body, req.user?.userId);
     res.json(result);
   } catch (err) { next(err); }
 }
 
 export async function postApproveNewClient(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const result = await approveRegistrationWithNewClient(req.params.id, req.body);
+    const result = await approveRegistrationWithNewClient(req.params.id, req.body, req.user?.userId);
     res.json(result);
   } catch (err) { next(err); }
 }
@@ -120,7 +120,7 @@ export async function postSystemReboot(req: Request, res: Response, next: NextFu
 
 export async function deleteReg(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    await deleteRegistration(req.params.id);
+    await deleteRegistration(req.params.id, req.user?.userId);
     res.status(204).send();
   } catch (err) { next(err); }
 }
@@ -128,14 +128,18 @@ export async function deleteReg(req: Request, res: Response, next: NextFunction)
 export async function postWakeDevice(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { notifyAgent } = await import('../../utils/websocket');
-    const reg = await prisma.agentRegistration.findUnique({ where: { id: req.params.id } });
+    const reg = await prisma.agentRegistration.findUnique({
+      where: { id: req.params.id },
+      include: { device: { select: { macAddress: true } } },
+    });
     if (!reg) { res.status(404).json({ error: 'Not found' }); return; }
-    if (!reg.macAddress) { res.status(400).json({ error: 'Urządzenie nie ma zapisanego adresu MAC' }); return; }
-    if (!reg.clientId) { res.status(400).json({ error: 'Urządzenie nie jest przypisane do klienta' }); return; }
+    const mac = reg.device?.macAddress;
+    if (!mac) { res.status(400).json({ error: 'Urządzenie nie ma zapisanego adresu MAC' }); return; }
+    if (!reg.workspaceId) { res.status(400).json({ error: 'Urządzenie nie jest przypisane do workspace' }); return; }
 
-    // Znajdź inne aktywne agenty tego klienta — muszą być na tej samej LAN żeby wysłać magic packet
+    // Znajdź inne aktywne agenty tego workspace — muszą być na tej samej LAN żeby wysłać magic packet
     const relayAgents = await prisma.agentRegistration.findMany({
-      where: { clientId: reg.clientId, status: 'ACTIVE', id: { not: reg.id } },
+      where: { workspaceId: reg.workspaceId, status: 'ACTIVE', id: { not: reg.id } },
     });
 
     if (relayAgents.length === 0) {
@@ -144,10 +148,18 @@ export async function postWakeDevice(req: Request, res: Response, next: NextFunc
     }
 
     for (const relay of relayAgents) {
-      notifyAgent(relay.agentToken, { type: 'wake', mac: reg.macAddress });
+      notifyAgent(relay.agentToken, { type: 'wake', mac });
     }
 
-    res.json({ ok: true, mac: reg.macAddress, relayAgents: relayAgents.length });
+    res.json({ ok: true, mac, relayAgents: relayAgents.length });
+  } catch (err) { next(err); }
+}
+
+export async function getAuditData(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { getAuditOverview } = await import('./agent.service');
+    const data = await getAuditOverview(req.workspaceId);
+    res.json(data);
   } catch (err) { next(err); }
 }
 
@@ -160,5 +172,99 @@ export async function getConnectPassword(req: Request, res: Response, next: Next
     const { generateOneTimePassword } = await import('../../utils/rustdesk');
     const password = await generateOneTimePassword(reg.rustdeskId as string);
     res.json({ password, rustdeskId: reg.rustdeskId });
+  } catch (err) { next(err); }
+}
+
+/* ── RustDesk integration endpoints ─────────────────────────────────────── */
+
+export async function getRustdeskPeers(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { getRustDeskPeers } = await import('../../utils/rustdesk');
+    const peers = await getRustDeskPeers();
+
+    // Enrich with InfraDesk device info
+    const where: any = { rustdeskId: { not: null } };
+    if (req.workspaceId) where.workspaceId = req.workspaceId;
+    const devices = await prisma.device.findMany({ where, select: { id: true, name: true, rustdeskId: true } });
+    const deviceMap = new Map(devices.map(d => [d.rustdeskId, d]));
+
+    const enriched = peers.map(p => {
+      const device = deviceMap.get(p.id);
+      return {
+        rustdeskId: p.id,
+        online: p.is_online,
+        lastOnline: p.last_online,
+        deviceName: p.info?.device_name ?? null,
+        ip: p.info?.ip?.replace('::ffff:', '') ?? null,
+        os: p.info?.os ?? null,
+        cpu: p.info?.cpu ?? null,
+        memory: p.info?.memory ?? null,
+        version: p.info?.version ?? null,
+        username: p.info?.username ?? null,
+        infradesk: device ? { deviceId: device.id, deviceName: device.name } : null,
+      };
+    });
+
+    res.json({ total: enriched.length, online: enriched.filter(p => p.online).length, peers: enriched });
+  } catch (err) { next(err); }
+}
+
+export async function getRustdeskSessions(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+    const { getRustDeskAuditConns } = await import('../../utils/rustdesk');
+    const result = await getRustDeskAuditConns(page, limit);
+
+    // Enrich with device names from InfraDesk
+    const where: any = { rustdeskId: { not: null } };
+    if (req.workspaceId) where.workspaceId = req.workspaceId;
+    const devices = await prisma.device.findMany({ where, select: { id: true, name: true, rustdeskId: true } });
+    const deviceMap = new Map(devices.map(d => [d.rustdeskId, d]));
+
+    const sessions = result.data.map(c => {
+      const remoteDevice = deviceMap.get(c.remote);
+      const localDevice = deviceMap.get(c.local);
+      const info = typeof c.info === 'string' ? (() => { try { return JSON.parse(c.info as string); } catch { return {}; } })() : (c.info ?? {});
+      return {
+        id: c.guid,
+        remoteId: c.remote,
+        remoteName: info?.name ?? remoteDevice?.name ?? null,
+        remoteIp: info?.ip ?? null,
+        remoteDevice: remoteDevice ? { id: remoteDevice.id, name: remoteDevice.name } : null,
+        localId: c.local,
+        localDevice: localDevice ? { id: localDevice.id, name: localDevice.name } : null,
+        connType: c.conn_type,
+        startedAt: c.created_at,
+        endedAt: c.end_time,
+        running: !c.end_time,
+      };
+    });
+
+    res.json({ total: result.total, page, limit, sessions });
+  } catch (err) { next(err); }
+}
+
+export async function postRustdeskSync(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { syncPeersWithDevices } = await import('../../utils/rustdesk');
+    const result = await syncPeersWithDevices(prisma, req.workspaceId);
+    res.json(result);
+  } catch (err) { next(err); }
+}
+
+export async function getRustdeskActiveSessions(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { getActiveRustDeskSessions } = await import('../../utils/rustdesk');
+    const sessions = await getActiveRustDeskSessions(prisma);
+    res.json(sessions);
+  } catch (err) { next(err); }
+}
+
+export async function postRustdeskSyncSessions(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { syncCompletedRustDeskSessions } = await import('../../utils/rustdesk');
+    const result = await syncCompletedRustDeskSessions(prisma, req.workspaceId);
+    res.json(result);
   } catch (err) { next(err); }
 }

@@ -137,7 +137,7 @@ export function DeviceForm({ device, defaultClientId, onSuccess, onCancel }: Pro
     queryFn: () => usersApi.getAll(),
     enabled: step === 'device',
   });
-  const workers = allUsers.filter(u => u.role !== 'CLIENT' && u.isActive);
+  const workers = allUsers.filter(u => (u as any).role !== 'CLIENT' && u.isActive);
 
   // Forms
   const deviceForm = useForm<DeviceForm>({

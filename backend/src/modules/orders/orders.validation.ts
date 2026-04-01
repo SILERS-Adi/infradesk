@@ -9,7 +9,7 @@ export const orderItemSchema = z.object({
 });
 
 export const createOrderSchema = z.object({
-  clientId: z.string(),
+  workspaceId: z.string(),
   ticketId: z.string().optional(),
   assignedToUserId: z.string().optional(),
   notes: z.string().optional(),

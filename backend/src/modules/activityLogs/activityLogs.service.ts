@@ -7,11 +7,13 @@ export async function listActivityLogs(params: {
   actionType?: string;
   page?: number;
   limit?: number;
+  workspaceId?: string | null;
 }) {
-  const { entityType, entityId, performedByUserId, actionType, page = 1, limit = 50 } = params;
+  const { entityType, entityId, performedByUserId, actionType, page = 1, limit = 50, workspaceId } = params;
   const skip = (page - 1) * limit;
 
   const where: Record<string, unknown> = {};
+  if (workspaceId) where.workspaceId = workspaceId;
   if (entityType) where.entityType = entityType;
   if (entityId) where.entityId = entityId;
   if (performedByUserId) where.performedByUserId = performedByUserId;
@@ -25,7 +27,7 @@ export async function listActivityLogs(params: {
       orderBy: { createdAt: 'desc' },
       include: {
         performedBy: {
-          select: { id: true, firstName: true, lastName: true, email: true, role: true },
+          select: { id: true, firstName: true, lastName: true, email: true },
         },
       },
     }),

@@ -27,13 +27,16 @@ export function DataTable<T extends object>({
   if (!data.length) return <EmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />;
 
   return (
-    <div className="overflow-x-auto rounded-[14px]" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
-      <table className="min-w-full">
+    <div className="page-card" style={{ overflow: 'hidden' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
-          <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+          <tr style={{ borderBottom: '1px solid var(--border)' }}>
             {columns.map(col => (
-              <th key={col.key} className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.08em]"
-                style={{ color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.02)' }}>
+              <th key={col.key} style={{
+                padding: '10px 14px', textAlign: 'left', fontSize: 10, fontWeight: 700,
+                textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--td)',
+                background: 'var(--hover-bg)',
+              }}>
                 {col.header}
               </th>
             ))}
@@ -43,12 +46,11 @@ export function DataTable<T extends object>({
           {data.map((row, idx) => (
             <tr key={keyExtractor ? keyExtractor(row) : idx}
               onClick={() => onRowClick?.(row)}
-              className={`transition-colors duration-150 ${onRowClick ? 'cursor-pointer' : ''}`}
-              style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}
-              onMouseEnter={(e) => { if (onRowClick) e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}
+              style={{ borderBottom: '1px solid var(--border)', cursor: onRowClick ? 'pointer' : 'default', transition: 'background .15s' }}
+              onMouseEnter={(e) => { if (onRowClick) e.currentTarget.style.background = 'var(--hover-bg)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
               {columns.map(col => (
-                <td key={col.key} className={`px-4 py-3 text-[13px] ${col.className ?? ''}`} style={{ color: 'rgba(255,255,255,0.7)' }}>
+                <td key={col.key} className={col.className} style={{ padding: '10px 14px', fontSize: 12, color: 'var(--ts)' }}>
                   {col.render ? col.render(row) : ((row as Record<string, unknown>)[col.key] as ReactNode)}
                 </td>
               ))}

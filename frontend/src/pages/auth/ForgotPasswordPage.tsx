@@ -21,8 +21,8 @@ export function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#080D19' }}>
-      <div className="absolute inset-0" style={{ background: 'linear-gradient(160deg, #0C1220 0%, #0A0F1E 50%, #0D1525 100%)' }} />
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#040a16' }}>
+      <div className="absolute inset-0" style={{ background: 'linear-gradient(160deg, #060B1A 0%, #040a16 50%, #0D1525 100%)' }} />
 
       <div className="w-full max-w-[420px] relative z-10">
         <div className="text-center mb-8">
@@ -72,7 +72,7 @@ export function ForgotPasswordPage() {
                   </div>
                   <button type="submit" disabled={loading}
                     className="w-full flex items-center justify-center gap-2 py-[14px] rounded-[14px] text-[14px] font-semibold text-white transition-all active:scale-[0.98] disabled:opacity-60"
-                    style={{ background: 'linear-gradient(145deg, #6D28D9, #2563EB)' }}>
+                    style={{ background: 'linear-gradient(135deg, #4f8cff 0%, #6366F1 40%, #8B5CF6 100%)' }}>
                     {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Mail className="h-5 w-5 opacity-60" />}
                     {loading ? 'Wysyłam...' : 'Wyślij link resetujący'}
                   </button>

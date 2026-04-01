@@ -46,7 +46,7 @@ function UsageBar({ pct }: { pct: number }) {
   const clampedPct = Math.min(pct, 100);
   return (
     <div className="flex items-center gap-2">
-      <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+      <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
         <div className="h-full rounded-full transition-all" style={{ width: `${clampedPct}%`, background: color }} />
       </div>
       <span className="text-xs font-bold w-12 text-right" style={{ color }}>{Math.round(pct)}%</span>
@@ -59,7 +59,7 @@ function BillingCard({ b }: { b: ClientBilling }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.025)', border: `1px solid ${b.overHours > 0 ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.06)'}` }}>
+    <div className="rounded-xl overflow-hidden" style={{ background: 'var(--bg-card)', border: `1px solid ${b.overHours > 0 ? 'rgba(239,68,68,0.2)' : 'var(--border)'}` }}>
       {/* Header */}
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
@@ -79,7 +79,7 @@ function BillingCard({ b }: { b: ClientBilling }) {
                   {b.hourlyRate} zł/h
                 </span>
               ) : (
-                <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>Brak stawki</span>
+                <span className="text-[10px]" style={{ color: 'var(--tm)' }}>Brak stawki</span>
               )}
               {/* Onsite / Remote split */}
               {b.onsiteCount > 0 && (
@@ -98,7 +98,7 @@ function BillingCard({ b }: { b: ClientBilling }) {
           </div>
           <div className="text-right flex-shrink-0">
             <p className="text-lg font-bold" style={{ color: '#4ADE80' }}>{fmtMoney(b.totalValue)}</p>
-            <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>{b.billableHours.toFixed(1)}h · {b.sessions.length} sesji</p>
+            <p className="text-xs" style={{ color: 'var(--tm)' }}>{b.billableHours.toFixed(1)}h · {b.sessions.length} sesji</p>
           </div>
         </div>
 
@@ -106,8 +106,8 @@ function BillingCard({ b }: { b: ClientBilling }) {
         {b.hasContract && (
           <div className="mt-3">
             <div className="flex items-center justify-between text-[10px] mb-1">
-              <span style={{ color: 'rgba(255,255,255,0.4)' }}>Wykorzystanie abonamentu</span>
-              <span style={{ color: 'rgba(255,255,255,0.5)' }}>
+              <span style={{ color: 'var(--tm)' }}>Wykorzystanie abonamentu</span>
+              <span style={{ color: 'var(--ts)' }}>
                 {b.billableHours.toFixed(1)}h / {b.contractHours}h
               </span>
             </div>
@@ -123,7 +123,7 @@ function BillingCard({ b }: { b: ClientBilling }) {
 
         {/* Time split bar — onsite vs remote */}
         {b.totalMinutes > 0 && (b.onsiteMinutes > 0 || b.remoteMinutes > 0) && (
-          <div className="mt-3 flex items-center gap-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)' }}>
+          <div className="mt-3 flex items-center gap-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--hover-bg)' }}>
             {b.onsiteMinutes > 0 && (
               <div className="h-full rounded-full" style={{ width: `${(b.onsiteMinutes / b.totalMinutes) * 100}%`, background: '#FB923C' }} />
             )}
@@ -135,10 +135,10 @@ function BillingCard({ b }: { b: ClientBilling }) {
       </div>
 
       {/* Footer — expand sessions */}
-      <div className="flex items-center gap-2 px-4 py-2" style={{ borderTop: '1px solid rgba(255,255,255,0.04)', background: 'rgba(255,255,255,0.015)' }}>
+      <div className="flex items-center gap-2 px-4 py-2" style={{ borderTop: '1px solid var(--border)', background: 'var(--bg-card)' }}>
         <button onClick={() => setExpanded(e => !e)}
           className="flex items-center gap-1 text-[11px] font-medium transition-colors"
-          style={{ color: 'rgba(255,255,255,0.4)' }}>
+          style={{ color: 'var(--tm)' }}>
           {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
           {b.sessions.length} sesji · {b.tasks.length} zadań
         </button>
@@ -157,20 +157,20 @@ function BillingCard({ b }: { b: ClientBilling }) {
 
       {/* Expanded sessions */}
       {expanded && (
-        <div className="px-4 pb-3" style={{ background: 'rgba(255,255,255,0.015)' }}>
+        <div className="px-4 pb-3" style={{ background: 'var(--bg-card)' }}>
           <div className="space-y-1">
             {b.sessions.map(s => {
               const sMin = s.durationMin ?? 0;
               const mode = (s as any).ticket?.serviceMode;
               return (
                 <div key={s.id} className="flex items-center gap-3 text-[11px] py-1.5 px-2 rounded-lg"
-                  style={{ background: 'rgba(255,255,255,0.02)' }}>
+                  style={{ background: 'var(--bg-card)' }}>
                   {mode === 'ONSITE' ? <MapPin className="h-3 w-3 flex-shrink-0" style={{ color: '#FB923C' }} />
                     : mode === 'REMOTE' ? <Monitor className="h-3 w-3 flex-shrink-0" style={{ color: '#60A5FA' }} />
-                    : <Clock className="h-3 w-3 flex-shrink-0" style={{ color: 'rgba(255,255,255,0.2)' }} />}
-                  <span style={{ color: 'rgba(255,255,255,0.5)' }}>{formatDateTime(s.startedAt)}</span>
+                    : <Clock className="h-3 w-3 flex-shrink-0" style={{ color: 'var(--td)' }} />}
+                  <span style={{ color: 'var(--ts)' }}>{formatDateTime(s.startedAt)}</span>
                   {s.ticket && <span className="font-mono text-violet-400">{s.ticket.ticketNumber}</span>}
-                  <span className="font-semibold" style={{ color: 'rgba(255,255,255,0.7)' }}>{fmtDur(sMin)}</span>
+                  <span className="font-semibold" style={{ color: 'var(--ts)' }}>{fmtDur(sMin)}</span>
                   <span className="ml-auto font-semibold" style={{ color: b.hasContract ? '#60A5FA' : '#4ADE80' }}>
                     {b.hasContract ? '' : b.hourlyRate > 0 ? fmtMoney(Math.ceil(sMin / (b.client.billingIntervalMinutes ?? 30)) * ((b.client.billingIntervalMinutes ?? 30) / 60) * b.hourlyRate) : '—'}
                   </span>
@@ -293,43 +293,43 @@ export function BillingPage() {
       <div className="flex items-center gap-3 mb-5">
         <select value={month} onChange={e => setMonth(Number(e.target.value))}
           className="text-sm rounded-xl px-3 py-2 focus:outline-none"
-          style={{ background: '#0E1425', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)' }}>
+          style={{ background: '#0E1425', border: '1px solid var(--border)', color: 'var(--t)' }}>
           {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
         </select>
         <select value={year} onChange={e => setYear(Number(e.target.value))}
           className="text-sm rounded-xl px-3 py-2 focus:outline-none"
-          style={{ background: '#0E1425', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)' }}>
+          style={{ background: '#0E1425', border: '1px solid var(--border)', color: 'var(--t)' }}>
           {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
         </select>
       </div>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="rounded-xl p-5" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="rounded-xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
           <div className="flex items-center gap-2 mb-2">
             <Receipt className="h-4 w-4" style={{ color: '#4ADE80' }} />
-            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Przychód</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Przychód</span>
           </div>
           <p className="text-2xl font-bold text-white/90">{fmtMoney(totalRevenue)}</p>
         </div>
-        <div className="rounded-xl p-5" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="rounded-xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
           <div className="flex items-center gap-2 mb-2">
             <Clock className="h-4 w-4" style={{ color: '#60A5FA' }} />
-            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Godziny</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Godziny</span>
           </div>
           <p className="text-2xl font-bold text-white/90">{totalHours.toFixed(1)}h</p>
         </div>
-        <div className="rounded-xl p-5" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="rounded-xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
           <div className="flex items-center gap-2 mb-2">
             <CheckCircle2 className="h-4 w-4" style={{ color: '#A78BFA' }} />
-            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Abonamenty</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Abonamenty</span>
           </div>
           <p className="text-2xl font-bold text-white/90">{contractClients}</p>
         </div>
-        <div className="rounded-xl p-5" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="rounded-xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
           <div className="flex items-center gap-2 mb-2">
             <Building2 className="h-4 w-4" style={{ color: '#FB923C' }} />
-            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Godzinowo</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Godzinowo</span>
           </div>
           <p className="text-2xl font-bold text-white/90">{hourlyClients}</p>
         </div>
@@ -341,9 +341,9 @@ export function BillingPage() {
           <div className="animate-spin h-6 w-6 border-2 border-violet-500 border-t-transparent rounded-full" />
         </div>
       ) : billingData.length === 0 ? (
-        <div className="rounded-2xl text-center py-16" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <Receipt className="h-10 w-10 mx-auto mb-3" style={{ color: 'rgba(255,255,255,0.1)' }} />
-          <p className="text-[13px]" style={{ color: 'rgba(255,255,255,0.4)' }}>Brak danych w wybranym miesiącu</p>
+        <div className="rounded-2xl text-center py-16" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+          <Receipt className="h-10 w-10 mx-auto mb-3" style={{ color: 'var(--td)' }} />
+          <p className="text-[13px]" style={{ color: 'var(--tm)' }}>Brak danych w wybranym miesiącu</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -352,7 +352,7 @@ export function BillingPage() {
           {/* Total bar */}
           <div className="rounded-xl p-4 flex items-center justify-between"
             style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)' }}>
-            <span className="text-sm font-bold" style={{ color: 'rgba(255,255,255,0.6)' }}>
+            <span className="text-sm font-bold" style={{ color: 'var(--ts)' }}>
               RAZEM: {billingData.length} klientów · {totalHours.toFixed(1)}h
             </span>
             <span className="text-lg font-bold" style={{ color: '#4ADE80' }}>{fmtMoney(totalRevenue)}</span>

@@ -1,4 +1,25 @@
-export type UserRole = 'ADMIN' | 'TECHNICIAN' | 'CLIENT';
+// ── Workspace types ─────────────────────────────────────────────────
+export type WorkspaceType = 'PERSONAL' | 'COMPANY' | 'MSP';
+export type WorkspacePlan = 'FREE' | 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE';
+export type MemberRole = 'OWNER' | 'ADMIN' | 'TECHNICIAN' | 'MEMBER' | 'VIEWER';
+export type ScopeType = 'FULL' | 'SCOPED';
+
+export interface WorkspaceMembership {
+  workspaceId: string;
+  name: string;
+  slug: string;
+  type: WorkspaceType;
+  plan: WorkspacePlan;
+  logoUrl?: string | null;
+  primaryColor?: string | null;
+  role: MemberRole;
+  scopeType: ScopeType;
+  source: string;
+  isDefault: boolean;
+  allowedModules: string[] | null;
+  managedBy: string | null;
+}
+
 export type ClientStatus = 'ACTIVE' | 'INACTIVE';
 export type LocationType = string;
 export type DeviceStatus = 'ACTIVE' | 'INACTIVE' | 'BROKEN' | 'RETIRED' | 'IN_SERVICE';
@@ -18,8 +39,6 @@ export interface User {
   lastName: string;
   email: string;
   phone?: string;
-  role: UserRole;
-  roles: UserRole[];
   permissions?: { viewAll?: boolean; orders?: boolean; billing?: boolean };
   isActive: boolean;
   notificationSettings?: {
@@ -29,8 +48,7 @@ export interface User {
   };
   downloadPin?: string | null;
   avatarUrl?: string | null;
-  clientId?: string;
-  client?: { id: string; name: string };
+  isSuperAdmin?: boolean;
   lastLoginAt?: string;
   notes?: string;
   createdAt: string;
@@ -237,7 +255,7 @@ export interface TicketComment {
   id: string;
   ticketId: string;
   userId: string;
-  user?: { id: string; firstName: string; lastName: string; role: UserRole };
+  user?: { id: string; firstName: string; lastName: string; role?: string };
   comment: string;
   isInternal: boolean;
   createdAt: string;

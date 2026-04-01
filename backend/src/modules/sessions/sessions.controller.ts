@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { startSession, endSession, getSessionsByClient, startMobileSession, pauseSession, resumeSession, getActiveTechSession, listAllSessions, updateSession, deleteSession } from './sessions.service';
+import { sessionScopeFilter } from '../../middleware/workspace';
 
 export async function postStart(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -22,7 +23,7 @@ export async function patchEnd(req: Request, res: Response, next: NextFunction):
 
 export async function getByClient(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const sessions = await getSessionsByClient(req.params.clientId);
+    const sessions = await getSessionsByClient(req.params.workspaceId);
     res.json(sessions);
   } catch (err) { next(err); }
 }
@@ -50,11 +51,13 @@ export async function postResume(req: Request, res: Response, next: NextFunction
 
 export async function getAll(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { techId, clientId, from, to, page, limit } = req.query as Record<string, string>;
+    const { techId, from, to, page, limit } = req.query as Record<string, string>;
     const result = await listAllSessions({
-      techId, clientId, from, to,
+      workspaceId: req.workspaceId,
+      techId, from, to,
       page: page ? parseInt(page) : 1,
       limit: limit ? parseInt(limit) : 50,
+      scopeFilter: sessionScopeFilter(req.membership),
     });
     res.json(result);
   } catch (err) { next(err); }

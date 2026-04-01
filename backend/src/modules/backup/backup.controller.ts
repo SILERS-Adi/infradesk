@@ -4,13 +4,18 @@ import {
   deleteBackupConfig, getBackupHistory, getAgentBackupConfigs,
   reportBackupStart, reportBackupComplete, reportBackupFailed,
 } from './backup.service';
+import { backupScopeFilter, isBackupAccessible } from '../../middleware/workspace';
 
 // ── Admin endpoints ──────────────────────────────────────────────────────────
 
 export async function getConfigs(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { clientId, agentRegId } = req.query as Record<string, string>;
-    const configs = await listBackupConfigs({ clientId, agentRegId });
+    const { agentRegId } = req.query as Record<string, string>;
+    const configs = await listBackupConfigs({
+      workspaceId: req.workspaceId,
+      agentRegId,
+      scopeFilter: backupScopeFilter(req.membership),
+    });
     res.json(configs);
   } catch (err) { next(err); }
 }
@@ -18,27 +23,36 @@ export async function getConfigs(req: Request, res: Response, next: NextFunction
 export async function getConfig(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const config = await getBackupConfig(req.params.id);
+
+    if (req.membership && !isBackupAccessible(req.membership, {
+      agentDeviceId: (config.agent as any)?.deviceId ?? null,
+      agentDeviceLocationId: (config.agent as any)?.device?.locationId ?? null,
+    })) {
+      res.status(403).json({ error: 'Backup config not in your access scope' });
+      return;
+    }
+
     res.json(config);
   } catch (err) { next(err); }
 }
 
 export async function postConfig(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const config = await createBackupConfig(req.body);
+    const config = await createBackupConfig(req.body, req.user?.userId);
     res.status(201).json(config);
   } catch (err) { next(err); }
 }
 
 export async function patchConfig(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const config = await updateBackupConfig(req.params.id, req.body);
+    const config = await updateBackupConfig(req.params.id, req.body, req.user?.userId);
     res.json(config);
   } catch (err) { next(err); }
 }
 
 export async function removeConfig(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    await deleteBackupConfig(req.params.id);
+    await deleteBackupConfig(req.params.id, req.user?.userId);
     res.status(204).send();
   } catch (err) { next(err); }
 }

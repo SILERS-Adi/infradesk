@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { sessionsApi, type WorkSession } from '../../api/sessions';
 import { useAuth } from '../../store/authStore';
+import { useWorkspaceContext } from '../../hooks/useWorkspaceContext';
 import { Clock, Calendar, FileText, User } from 'lucide-react';
 import { formatDate } from '../../utils/helpers';
 
@@ -27,13 +28,13 @@ interface MonthlySummary {
 }
 
 export function PortalBillingPage() {
-  const { user } = useAuth();
-  const clientId = user?.clientId;
+  const { workspace } = useWorkspaceContext();
+  const workspaceId = workspace?.workspaceId;
 
   const { data: sessions = [], isLoading } = useQuery({
-    queryKey: ['portal-billing-sessions', clientId],
-    queryFn: () => sessionsApi.getByClient(clientId!),
-    enabled: !!clientId,
+    queryKey: ['portal-billing-sessions', workspaceId],
+    queryFn: () => sessionsApi.getByClient(workspaceId!),
+    enabled: !!workspaceId,
   });
 
   const monthlySummaries = useMemo(() => {

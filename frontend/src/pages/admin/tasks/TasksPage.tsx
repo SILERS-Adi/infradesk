@@ -22,6 +22,7 @@ import { Input } from '../../../components/ui/Input';
 import { Textarea } from '../../../components/ui/Textarea';
 import { Button } from '../../../components/ui/Button';
 import { useAuth } from '../../../store/authStore';
+import { useWorkspaceContext } from '../../../hooks/useWorkspaceContext';
 import { formatDate, formatDateTime, getErrorMessage } from '../../../utils/helpers';
 import type { Task, TaskStatus } from '../../../types';
 
@@ -39,7 +40,7 @@ const TAB_BADGE_COLORS: Record<TabKey, { bg: string; color: string }> = {
   DONE:        { bg: 'rgba(34,197,94,0.12)',   color: '#4ADE80' },
 };
 
-// ── Timer display ───────────────────────────────────────────────────────────
+// -- Timer display -----------------------------------------------------------
 function formatTimer(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
@@ -53,7 +54,7 @@ function formatDurationShort(min: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-// ── Live timer hook ─────────────────────────────────────────────────────────
+// -- Live timer hook ---------------------------------------------------------
 function useLiveTimer(session: WorkSession | null) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -66,7 +67,7 @@ function useLiveTimer(session: WorkSession | null) {
   return calcWorkSeconds(session.timeEntries);
 }
 
-// ── New task form schema ────────────────────────────────────────────────────
+// -- New task form schema ----------------------------------------------------
 const newTaskSchema = z.object({
   title:            z.string().min(1, 'Tytuł jest wymagany'),
   description:      z.string().optional(),
@@ -77,7 +78,7 @@ const newTaskSchema = z.object({
 });
 type NewTaskForm = z.infer<typeof newTaskSchema>;
 
-// ── Remote panel (RustDesk + online status + WoL) ───────────────────────────
+// -- Remote panel (RustDesk + online status + WoL) ---------------------------
 function RemotePanel({ rustdeskId, deviceName }: { rustdeskId: string; deviceName?: string }) {
   const { data: agents = [] } = useQuery({
     queryKey: ['agents'],
@@ -109,7 +110,7 @@ function RemotePanel({ rustdeskId, deviceName }: { rustdeskId: string; deviceNam
       <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 border"
         style={isOnline
           ? { background: 'rgba(34,197,94,0.12)', borderColor: 'rgba(34,197,94,0.25)', color: '#4ADE80' }
-          : { background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)' }}>
+          : { background: 'var(--hover-bg)', borderColor: 'var(--border)', color: 'var(--tm)' }}>
         {isOnline ? <><Wifi className="h-3 w-3" /> Online</> : <><WifiOff className="h-3 w-3" /> Offline</>}
       </span>
 
@@ -144,7 +145,7 @@ function RemotePanel({ rustdeskId, deviceName }: { rustdeskId: string; deviceNam
   );
 }
 
-// ── AI Suggestion panel ─────────────────────────────────────────────────────
+// -- AI Suggestion panel -----------------------------------------------------
 function AiSuggestionPanel({ title, description, source }: { title: string; description?: string; source?: string }) {
   const [suggestion, setSuggestion] = useState<AiSuggestion | null>(null);
   const [loading, setLoading] = useState(false);
@@ -188,16 +189,16 @@ function AiSuggestionPanel({ title, description, source }: { title: string; desc
               </span>
             )}
             {suggestion.estimatedTime && (
-              <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.4)' }}>~{suggestion.estimatedTime}</span>
+              <span className="text-[10px]" style={{ color: 'var(--tm)' }}>~{suggestion.estimatedTime}</span>
             )}
           </div>
-          <p className="text-[12px]" style={{ color: 'rgba(255,255,255,0.7)' }}>{suggestion.summary}</p>
+          <p className="text-[12px]" style={{ color: 'var(--ts)' }}>{suggestion.summary}</p>
           {suggestion.steps.length > 0 && (
             <div className="space-y-1.5">
               {suggestion.steps.map((step, i) => (
                 <div key={i} className="flex gap-2 text-[11px]">
                   <span className="flex-shrink-0 font-bold" style={{ color: '#C084FC' }}>Krok {i + 1}:</span>
-                  <span style={{ color: 'rgba(255,255,255,0.6)' }}>{step}</span>
+                  <span style={{ color: 'var(--ts)' }}>{step}</span>
                 </div>
               ))}
             </div>
@@ -220,7 +221,7 @@ function AiSuggestionPanel({ title, description, source }: { title: string; desc
   );
 }
 
-// ── Agent contact card — pulls data from agent registration ─────────────────
+// -- Agent contact card -- pulls data from agent registration ----------------
 function AgentContactCard({ task }: { task: Task }) {
   const { data: agents = [] } = useQuery({
     queryKey: ['agents'],
@@ -246,9 +247,9 @@ function AgentContactCard({ task }: { task: Task }) {
           <Monitor className="h-3.5 w-3.5" style={{ color: '#60A5FA' }} />
         </div>
         <div className="min-w-0">
-          <p className="text-[12px] font-medium text-white/80 truncate">{deviceName ?? 'Urządzenie'}</p>
+          <p className="text-[12px] font-medium truncate" style={{ color: 'var(--t)' }}>{deviceName ?? 'Urządzenie'}</p>
           {agent?.currentUser && (
-            <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            <p className="text-[10px]" style={{ color: 'var(--tm)' }}>
               Win: {agent.currentUser}
             </p>
           )}
@@ -261,7 +262,7 @@ function AgentContactCard({ task }: { task: Task }) {
             <User className="h-3 w-3" style={{ color: '#A78BFA' }} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-medium text-white/80 truncate">{userName}</p>
+            <p className="text-[11px] font-medium truncate" style={{ color: 'var(--t)' }}>{userName}</p>
             <div className="flex items-center gap-2 flex-wrap">
               {userPhone && (
                 <a href={`tel:${userPhone}`} className="flex items-center gap-1 text-[10px] text-emerald-400 hover:underline">
@@ -281,7 +282,7 @@ function AgentContactCard({ task }: { task: Task }) {
   );
 }
 
-// ── Task card ───────────────────────────────────────────────────────────────
+// -- Task card ---------------------------------------------------------------
 function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPauseSession, onResumeSession, onEndSession, onEdit }: {
   task: Task;
   activeSessions: WorkSession[];
@@ -342,7 +343,7 @@ function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPaus
     finally { setSavingKm(false); }
   };
 
-  // Contact info — if source is AGENT, reporter is the device, not the user
+  // Contact info -- if source is AGENT, reporter is the device, not the user
   const isAgentTicket = task.ticket?.source === 'AGENT';
   const reporter = task.ticket?.createdBy;
   const reporterName = isAgentTicket
@@ -362,8 +363,8 @@ function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPaus
   const earn = isCon ? 0 : bh * rate;
 
   return (
-    <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.025)', border: `1px solid ${isThisTaskSession ? 'rgba(34,197,94,0.25)' : isThisTaskPaused ? 'rgba(234,179,8,0.25)' : 'rgba(255,255,255,0.06)'}` }}>
-      {/* ── Header row ── */}
+    <div className="rounded-xl overflow-hidden" style={{ background: 'var(--bg-card)', border: `1px solid ${isThisTaskSession ? 'rgba(34,197,94,0.25)' : isThisTaskPaused ? 'rgba(234,179,8,0.25)' : 'var(--border)'}` }}>
+      {/* -- Header row -- */}
       <div className="p-4 pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
@@ -395,9 +396,9 @@ function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPaus
                 </>
               )}
             </div>
-            <p className="font-medium text-white/85">{task.title}</p>
+            <p className="font-medium" style={{ color: 'var(--t)' }}>{task.title}</p>
             {task.ticket?.client && (
-              <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--tm)' }}>
                 <Link to={`/tickets/${task.ticketId}`} className="text-violet-400 hover:underline">{task.ticket.ticketNumber}</Link>
                 {' · '}{task.ticket.client.name}
                 {task.ticket.device && <span> · {task.ticket.device.name}</span>}
@@ -423,8 +424,8 @@ function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPaus
         </div>
       </div>
 
-      {/* ── 2-column body ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr,200px] gap-0" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+      {/* -- 2-column body -- */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr,200px] gap-0" style={{ borderTop: '1px solid var(--border)' }}>
         {/* Left: tools + AI */}
         <div className="p-4 pt-3 space-y-2">
           {/* Remote panel */}
@@ -437,11 +438,11 @@ function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPaus
               <MapPin className="h-3.5 w-3.5 flex-shrink-0" style={{ color: '#FB923C' }} />
               <input type="number" value={km} onChange={e => setKm(e.target.value)} placeholder="Km"
                 className="w-20 px-2 py-1 text-[12px] rounded-lg focus:outline-none"
-                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }} />
-              <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>km</span>
+                style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }} />
+              <span className="text-[11px]" style={{ color: 'var(--tm)' }}>km</span>
               <button onClick={saveKm} disabled={savingKm} className="p-1 rounded-lg transition-colors hover:bg-white/[0.06]">
-                {savingKm ? <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: 'rgba(255,255,255,0.3)' }} />
-                  : <Save className="h-3.5 w-3.5" style={{ color: km !== (task.travelKm?.toString() ?? '') ? '#FB923C' : 'rgba(255,255,255,0.2)' }} />}
+                {savingKm ? <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: 'var(--tm)' }} />
+                  : <Save className="h-3.5 w-3.5" style={{ color: km !== (task.travelKm?.toString() ?? '') ? '#FB923C' : 'var(--td)' }} />}
               </button>
             </div>
           )}
@@ -449,17 +450,17 @@ function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPaus
           <AiSuggestionPanel title={task.title} description={task.description} source={task.ticket?.source} />
           {/* Notes */}
           {task.notes && (
-            <p className="text-xs rounded p-2 whitespace-pre-wrap" style={{ color: 'rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.02)' }}>{task.notes}</p>
+            <p className="text-xs rounded p-2 whitespace-pre-wrap" style={{ color: 'var(--ts)', background: 'var(--hover-bg)' }}>{task.notes}</p>
           )}
         </div>
 
         {/* Right: contact cards */}
-        <div className="p-3 space-y-2 lg:border-l" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
-          {/* Zgłaszający — Agent ticket: urządzenie + użytkownik */}
+        <div className="p-3 space-y-2 lg:border-l" style={{ borderColor: 'var(--border)' }}>
+          {/* Zgłaszający -- Agent ticket: urządzenie + użytkownik */}
           {/* Użytkownik urządzenia (assignedUser = zalogowany przez agenta) */}
           {task.ticket?.device?.assignedUser && (
-            <div className="rounded-lg p-2.5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-              <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(255,255,255,0.25)' }}>Użytkownik urządzenia</div>
+            <div className="rounded-lg p-2.5" style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)' }}>
+              <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--td)' }}>Użytkownik urządzenia</div>
               <div className="flex items-center gap-2">
                 {task.ticket.device.assignedUser.avatarUrl
                   ? <img src={task.ticket.device.assignedUser.avatarUrl} alt="" className="w-7 h-7 rounded-lg object-cover flex-shrink-0" />
@@ -467,7 +468,7 @@ function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPaus
                       <User className="h-3.5 w-3.5" style={{ color: '#4ADE80' }} />
                     </div>}
                 <div className="min-w-0">
-                  <p className="text-[12px] font-medium text-white/80 truncate">{task.ticket.device.assignedUser.firstName} {task.ticket.device.assignedUser.lastName}</p>
+                  <p className="text-[12px] font-medium truncate" style={{ color: 'var(--t)' }}>{task.ticket.device.assignedUser.firstName} {task.ticket.device.assignedUser.lastName}</p>
                   {task.ticket.device.assignedUser.phone && (
                     <a href={`tel:${task.ticket.device.assignedUser.phone}`} className="flex items-center gap-1 text-[10px] text-emerald-400 hover:underline">
                       <Phone className="h-2.5 w-2.5" /> {task.ticket.device.assignedUser.phone}
@@ -486,8 +487,8 @@ function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPaus
           {isAgentTicket ? (
             <AgentContactCard task={task} />
           ) : reporterName ? (
-            <div className="rounded-lg p-2.5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-              <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(255,255,255,0.25)' }}>Zgłaszający</div>
+            <div className="rounded-lg p-2.5" style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)' }}>
+              <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--td)' }}>Zgłaszający</div>
               <div className="flex items-center gap-2">
                 {reporterAvatar
                   ? <img src={reporterAvatar} alt="" className="w-7 h-7 rounded-lg object-cover flex-shrink-0" />
@@ -495,7 +496,7 @@ function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPaus
                       <User className="h-3.5 w-3.5" style={{ color: '#A78BFA' }} />
                     </div>}
                 <div className="min-w-0">
-                  <p className="text-[12px] font-medium text-white/80 truncate">{reporterName}</p>
+                  <p className="text-[12px] font-medium truncate" style={{ color: 'var(--t)' }}>{reporterName}</p>
                   {reporterPhone && (
                     <a href={`tel:${reporterPhone}`} className="flex items-center gap-1 text-[10px] text-emerald-400 hover:underline">
                       <Phone className="h-2.5 w-2.5" /> {reporterPhone}
@@ -508,9 +509,9 @@ function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPaus
           {/* (użytkownik urządzenia przeniesiony na górę) */}
           {/* Kontakt lokalizacji */}
           {locationContact?.contactPersonName && (
-            <div className="rounded-lg p-2.5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-              <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(255,255,255,0.25)' }}>Kontakt lokalizacji</div>
-              <p className="text-[12px] font-medium text-white/80 truncate">{locationContact.contactPersonName}</p>
+            <div className="rounded-lg p-2.5" style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)' }}>
+              <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--td)' }}>Kontakt lokalizacji</div>
+              <p className="text-[12px] font-medium truncate" style={{ color: 'var(--t)' }}>{locationContact.contactPersonName}</p>
               {locationContact.contactPersonPhone && (
                 <a href={`tel:${locationContact.contactPersonPhone}`} className="flex items-center gap-1 text-[10px] text-emerald-400 hover:underline mt-0.5">
                   <Phone className="h-2.5 w-2.5" /> {locationContact.contactPersonPhone}
@@ -520,7 +521,7 @@ function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPaus
           )}
           {/* Przypisany technik */}
           {task.assignedTo && (
-            <div className="text-[10px] pt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>
+            <div className="text-[10px] pt-1" style={{ color: 'var(--tm)' }}>
               Realizuje: {task.assignedTo.firstName} {task.assignedTo.lastName}
             </div>
           )}
@@ -532,9 +533,9 @@ function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPaus
         </div>
       </div>
 
-      {/* ── Action footer ── */}
-      <div className="flex items-center gap-1.5 px-3 py-2" style={{ borderTop: '1px solid rgba(255,255,255,0.04)', background: 'rgba(255,255,255,0.015)' }}>
-        {/* NEW → Start */}
+      {/* -- Action footer -- */}
+      <div className="flex items-center gap-1.5 px-3 py-2" style={{ borderTop: '1px solid var(--border)', background: 'var(--hover-bg)' }}>
+        {/* NEW -> Start */}
         {task.status === 'NEW' && !hasActiveSession && (
           <button onClick={() => { onChangeStatus(task.id, 'IN_PROGRESS'); onStartSession(task); }}
             className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all active:scale-[0.97]"
@@ -543,7 +544,7 @@ function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPaus
           </button>
         )}
 
-        {/* IN_PROGRESS — session controls */}
+        {/* IN_PROGRESS -- session controls */}
         {task.status === 'IN_PROGRESS' && (
           <>
             {!hasActiveSession && (
@@ -577,8 +578,8 @@ function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPaus
             {!hasActiveSession && (
               <button onClick={() => onChangeStatus(task.id, 'DONE')}
                 className="flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-lg transition-colors"
-                style={{ color: 'rgba(255,255,255,0.4)' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; }}
+                style={{ color: 'var(--tm)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--hover-bg)'; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
                 <CheckCircle2 className="h-3.5 w-3.5" /> Zakończ bez sesji
               </button>
@@ -591,15 +592,15 @@ function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPaus
         {/* Edit task */}
         <button onClick={() => onEdit(task)}
           className="p-1.5 rounded-lg transition-colors hover:bg-white/[0.06]" title="Edytuj zadanie">
-          <Edit2 className="h-3.5 w-3.5" style={{ color: 'rgba(255,255,255,0.3)' }} />
+          <Edit2 className="h-3.5 w-3.5" style={{ color: 'var(--tm)' }} />
         </button>
 
         {/* History toggle */}
         {taskSessions.length > 0 && (
           <button onClick={() => setExpanded(e => !e)}
             className="flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-lg transition-colors"
-            style={{ color: 'rgba(255,255,255,0.35)' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; }}
+            style={{ color: 'var(--tm)' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--hover-bg)'; }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
             <Timer className="h-3 w-3" /> {taskSessions.length} sesji
             {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
@@ -609,7 +610,7 @@ function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPaus
         {/* spacer */}
       </div>
 
-      {/* ── Session history + billing ── */}
+      {/* -- Session history + billing -- */}
       {expanded && taskSessions.length > 0 && (() => {
         const client = task.ticket?.client;
         const isContract = client?.hasContract ?? false;
@@ -620,7 +621,7 @@ function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPaus
         const earnings = isContract ? 0 : billableHours * hourlyRate;
 
         return (
-          <div className="px-4 pb-3" style={{ background: 'rgba(255,255,255,0.015)' }}>
+          <div className="px-4 pb-3" style={{ background: 'var(--hover-bg)' }}>
             <div className="space-y-1">
               {taskSessions.map(s => {
                 const sMin = s.durationMin ?? 0;
@@ -628,13 +629,13 @@ function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPaus
                 const sEarnings = isContract ? 0 : sBillable * hourlyRate;
                 const isEditing = editingSession === s.id;
                 return (
-                  <div key={s.id} className="rounded-lg" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                  <div key={s.id} className="rounded-lg" style={{ background: 'var(--hover-bg)' }}>
                     <div className="flex items-center gap-2 text-[11px] py-1.5 px-2">
                       <span className={`w-2 h-2 rounded-full flex-shrink-0 ${s.status === 'ACTIVE' ? 'bg-emerald-500 animate-pulse' : s.status === 'PAUSED' ? 'bg-amber-400' : ''}`}
-                        style={s.status === 'COMPLETED' ? { background: 'rgba(255,255,255,0.15)' } : {}} />
-                      <span style={{ color: 'rgba(255,255,255,0.5)' }}>{formatDateTime(s.startedAt)}</span>
-                      {s.endedAt && <span style={{ color: 'rgba(255,255,255,0.3)' }}>→ {formatDateTime(s.endedAt)}</span>}
-                      <span className="font-semibold" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                        style={s.status === 'COMPLETED' ? { background: 'var(--td)' } : {}} />
+                      <span style={{ color: 'var(--ts)' }}>{formatDateTime(s.startedAt)}</span>
+                      {s.endedAt && <span style={{ color: 'var(--tm)' }}>→ {formatDateTime(s.endedAt)}</span>}
+                      <span className="font-semibold" style={{ color: 'var(--ts)' }}>
                         {sMin ? formatDurationShort(sMin) : s.status === 'ACTIVE' ? 'w toku...' : '—'}
                       </span>
                       <span className="font-semibold" style={{ color: isContract ? '#60A5FA' : '#4ADE80' }}>
@@ -648,11 +649,11 @@ function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPaus
                               setEditStart(s.startedAt.slice(0, 16));
                               setEditEnd(s.endedAt?.slice(0, 16) ?? '');
                             }} className="p-0.5 rounded transition-colors hover:bg-white/[0.06]" title="Edytuj czas">
-                              <Edit2 className="h-3 w-3" style={{ color: 'rgba(255,255,255,0.25)' }} />
+                              <Edit2 className="h-3 w-3" style={{ color: 'var(--td)' }} />
                             </button>
                             <button onClick={() => { if (confirm('Usunąć tę sesję?')) deleteSessionMutation.mutate(s.id); }}
                               className="p-0.5 rounded transition-colors hover:bg-red-500/10" title="Usuń sesję">
-                              <Trash2 className="h-3 w-3" style={{ color: 'rgba(255,255,255,0.15)' }} />
+                              <Trash2 className="h-3 w-3" style={{ color: 'var(--td)' }} />
                             </button>
                           </>
                         )}
@@ -662,25 +663,25 @@ function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPaus
                       <div className="flex items-center gap-2 px-2 pb-2">
                         <input type="datetime-local" value={editStart} onChange={e => setEditStart(e.target.value)}
                           className="text-[11px] px-2 py-1 rounded-lg focus:outline-none"
-                          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)' }} />
-                        <span style={{ color: 'rgba(255,255,255,0.3)' }}>→</span>
+                          style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }} />
+                        <span style={{ color: 'var(--tm)' }}>→</span>
                         <input type="datetime-local" value={editEnd} onChange={e => setEditEnd(e.target.value)}
                           className="text-[11px] px-2 py-1 rounded-lg focus:outline-none"
-                          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)' }} />
+                          style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }} />
                         <button onClick={() => editSessionMutation.mutate({ id: s.id, data: { startedAt: new Date(editStart).toISOString(), endedAt: new Date(editEnd).toISOString() } })}
                           disabled={editSessionMutation.isPending}
                           className="text-[10px] font-semibold px-2 py-1 rounded-lg transition-colors"
                           style={{ background: 'rgba(139,92,246,0.12)', color: '#A78BFA' }}>
                           {editSessionMutation.isPending ? '...' : 'Zapisz'}
                         </button>
-                        <button onClick={() => setEditingSession(null)} className="text-[10px] px-2 py-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Anuluj</button>
+                        <button onClick={() => setEditingSession(null)} className="text-[10px] px-2 py-1" style={{ color: 'var(--tm)' }}>Anuluj</button>
                       </div>
                     )}
                   </div>
                 );
               })}
             </div>
-            <div className="flex items-center justify-between mt-2 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+            <div className="flex items-center justify-between mt-2 pt-2" style={{ borderTop: '1px solid var(--border)' }}>
               <div className="flex items-center gap-2">
                 <Timer className="h-3.5 w-3.5" style={{ color: '#A78BFA' }} />
                 <span className="text-xs font-bold" style={{ color: '#A78BFA' }}>
@@ -693,7 +694,7 @@ function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPaus
                 ) : hourlyRate > 0 ? (
                   <span>{earnings.toFixed(2)} zł ({hourlyRate} zł/h × {billableHours.toFixed(1)}h)</span>
                 ) : (
-                  <span style={{ color: 'rgba(255,255,255,0.3)' }}>Brak stawki</span>
+                  <span style={{ color: 'var(--tm)' }}>Brak stawki</span>
                 )}
               </div>
             </div>
@@ -704,14 +705,14 @@ function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPaus
   );
 }
 
-// ── Main page ───────────────────────────────────────────────────────────────
+// -- Main page ---------------------------------------------------------------
 export function TasksPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabKey>('IN_PROGRESS');
   const [showCreate, setShowCreate] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = useWorkspaceContext().isAdmin;
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ['tasks', { all: isAdmin }],
@@ -730,7 +731,7 @@ export function TasksPage() {
     queryFn: () => usersApi.getAll(),
     enabled: showCreate,
   });
-  const workers = allUsers.filter(u => u.role !== 'CLIENT' && u.isActive);
+  const workers = allUsers.filter(u => (u as any).role !== 'CLIENT' && u.isActive);
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: TaskStatus }) =>
@@ -823,8 +824,8 @@ export function TasksPage() {
         )}
       />
 
-      <div className="rounded-lg mb-6" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="flex" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="rounded-lg mb-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+        <div className="flex" style={{ borderBottom: '1px solid var(--border)' }}>
           {TABS.map(tab => {
             const count = tasks.filter(t => t.status === tab.key).length;
             return (
@@ -832,7 +833,7 @@ export function TasksPage() {
                 className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
                   activeTab === tab.key ? 'border-violet-500 text-violet-400' : 'border-transparent hover:text-white/60'
                 }`}
-                style={activeTab !== tab.key ? { color: 'rgba(255,255,255,0.4)' } : undefined}>
+                style={activeTab !== tab.key ? { color: 'var(--tm)' } : undefined}>
                 {tab.label}
                 {count > 0 && (
                   <span className="text-xs font-bold px-1.5 py-0.5 rounded-full"
@@ -851,7 +852,7 @@ export function TasksPage() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500" />
         </div>
       ) : tabTasks.length === 0 ? (
-        <div className="text-center py-12" style={{ color: 'rgba(255,255,255,0.4)' }}>
+        <div className="text-center py-12" style={{ color: 'var(--tm)' }}>
           <p className="text-sm">Brak zadań w tej kategorii</p>
         </div>
       ) : (
@@ -877,10 +878,10 @@ export function TasksPage() {
           <Input label="Tytuł *" {...form.register('title')} error={form.formState.errors.title?.message} />
           <Textarea label="Opis" rows={2} {...form.register('description')} />
           <div>
-            <label className="block text-xs font-medium mb-1" style={{ color: 'rgba(255,255,255,0.6)' }}>Przypisz do *</label>
+            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--ts)' }}>Przypisz do *</label>
             <select {...form.register('assignedToUserId')}
               className="block w-full rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}>
+              style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}>
               <option value="">— Wybierz osobę —</option>
               {workers.map(u => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
             </select>
@@ -912,7 +913,7 @@ export function TasksPage() {
   );
 }
 
-// ── Edit Task Modal ─────────────────────────────────────────────────────────
+// -- Edit Task Modal ---------------------------------------------------------
 function EditTaskModal({ task, onClose, onSaved }: { task: Task; onClose: () => void; onSaved: () => void }) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? '');
@@ -946,10 +947,10 @@ function EditTaskModal({ task, onClose, onSaved }: { task: Task; onClose: () => 
           <Input label="Szacowany czas (min)" type="number" placeholder="np. 60" value={estimatedMinutes} onChange={e => setEstimatedMinutes(e.target.value)} />
         </div>
         <div>
-          <label className="block text-xs font-medium mb-1" style={{ color: 'rgba(255,255,255,0.6)' }}>Status</label>
+          <label className="block text-xs font-medium mb-1" style={{ color: 'var(--ts)' }}>Status</label>
           <select value={status} onChange={e => setStatus(e.target.value as TaskStatus)}
             className="block w-full rounded-xl px-3 py-2 text-sm focus:outline-none"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}>
+            style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}>
             <option value="NEW">Nowe</option>
             <option value="IN_PROGRESS">W trakcie</option>
             <option value="DONE">Zrealizowane</option>

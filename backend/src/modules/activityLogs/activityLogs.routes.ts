@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { getActivityLogs } from './activityLogs.controller';
-import { authenticate, authorize } from '../../middleware/auth';
+import { authenticate } from '../../middleware/auth';
+import { withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
 
 const router = Router();
 
-router.use(authenticate, authorize('ADMIN', 'TECHNICIAN'));
+router.use(authenticate, withWorkspaceMembership);
 
-router.get('/', getActivityLogs);
+router.get('/', authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), getActivityLogs);
 
 export default router;

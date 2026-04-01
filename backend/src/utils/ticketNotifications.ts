@@ -2,35 +2,25 @@ import prisma from '../lib/prisma';
 import { sendMail } from '../lib/mailer';
 
 /**
- * Wysyła powiadomienie email do klienta powiązanego ze zgłoszeniem.
- * Szuka użytkowników z rolą CLIENT przypisanych do clientId zgłoszenia.
+ * Wysyła powiadomienie email do użytkowników workspace powiązanego ze zgłoszeniem.
  * Nie rzuca błędów — logi w konsoli.
  */
-async function notifyClientUsers(ticketId: string, subject: string, message: string) {
+async function notifyWorkspaceUsers(ticketId: string, subject: string, message: string) {
   try {
     const ticket = await prisma.ticket.findUnique({
       where: { id: ticketId },
       select: {
         ticketNumber: true,
         title: true,
-        clientId: true,
-        client: { select: { name: true, email: true } },
+        workspaceId: true,
+        workspace: { select: { name: true, email: true } },
       },
     });
     if (!ticket) return;
 
-    // Szukaj użytkowników CLIENT przypisanych do tego klienta
-    const clientUsers = await prisma.user.findMany({
-      where: { clientId: ticket.clientId, role: 'CLIENT', isActive: true },
-      select: { email: true, firstName: true },
-    });
-
-    // Dodaj email firmy jeśli istnieje
+    // Collect emails from workspace
     const emails = new Set<string>();
-    for (const u of clientUsers) {
-      if (u.email) emails.add(u.email);
-    }
-    if (ticket.client?.email) emails.add(ticket.client.email);
+    if (ticket.workspace?.email) emails.add(ticket.workspace.email);
 
     if (emails.size === 0) return;
 
@@ -44,7 +34,7 @@ async function notifyClientUsers(ticketId: string, subject: string, message: str
           <h3 style="color: #0f172a; margin: 0 0 16px; font-size: 16px;">${ticket.title}</h3>
           <p style="color: #334155; font-size: 14px; line-height: 1.6; margin: 0 0 16px;">${message}</p>
           <p style="color: #94a3b8; font-size: 12px; margin: 0;">
-            ${ticket.client?.name ?? ''} · InfraDesk
+            ${ticket.workspace?.name ?? ''} · InfraDesk
           </p>
         </div>
       </div>
@@ -56,13 +46,13 @@ async function notifyClientUsers(ticketId: string, subject: string, message: str
       });
     }
   } catch (err) {
-    console.error('notifyClientUsers error:', (err as Error).message);
+    console.error('notifyWorkspaceUsers error:', (err as Error).message);
   }
 }
 
 /** Powiadomienie: zgłoszenie przypisane do technika */
 export function notifyTicketAssigned(ticketId: string, techName: string) {
-  notifyClientUsers(
+  notifyWorkspaceUsers(
     ticketId,
     'Zgłoszenie przypisane',
     `Twoje zgłoszenie zostało przypisane do technika <strong>${techName}</strong>. Wkrótce się z Tobą skontaktujemy.`
@@ -71,7 +61,7 @@ export function notifyTicketAssigned(ticketId: string, techName: string) {
 
 /** Powiadomienie: technik rozpoczął pracę */
 export function notifyTicketWorkStarted(ticketId: string, techName: string) {
-  notifyClientUsers(
+  notifyWorkspaceUsers(
     ticketId,
     'Rozpoczęto pracę',
     `Technik <strong>${techName}</strong> rozpoczął pracę nad Twoim zgłoszeniem.`
@@ -80,7 +70,7 @@ export function notifyTicketWorkStarted(ticketId: string, techName: string) {
 
 /** Powiadomienie: technik zakończył pracę */
 export function notifyTicketWorkCompleted(ticketId: string, techName: string) {
-  notifyClientUsers(
+  notifyWorkspaceUsers(
     ticketId,
     'Praca zakończona',
     `Technik <strong>${techName}</strong> zakończył pracę nad Twoim zgłoszeniem. Jeśli problem nie został rozwiązany, skontaktuj się z nami.`

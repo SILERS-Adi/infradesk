@@ -22,8 +22,11 @@ const colorMap: Record<NonNullable<BadgeProps['color']>, { bg: string; text: str
 export function Badge({ children, color = 'gray', className }: BadgeProps) {
   const c = colorMap[color];
   return (
-    <span className={clsx('inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold', className)}
-      style={{ background: c.bg, color: c.text }}>
+    <span className={clsx(className)} style={{
+      display: 'inline-flex', alignItems: 'center', borderRadius: 20,
+      padding: '2px 10px', fontSize: 10, fontWeight: 600,
+      background: c.bg, color: c.text,
+    }}>
       {children}
     </span>
   );

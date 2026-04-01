@@ -7,7 +7,8 @@ import {
   patchDevice,
   removeDevice,
 } from './devices.controller';
-import { authenticate, authorize } from '../../middleware/auth';
+import { authenticate } from '../../middleware/auth';
+import { withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
 import { validate } from '../../middleware/validate';
 import { createDeviceSchema, updateDeviceSchema } from './devices.validation';
 
@@ -15,11 +16,11 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get('/', authorize('ADMIN', 'TECHNICIAN', 'CLIENT'), getDevices);
-router.get('/:id', authorize('ADMIN', 'TECHNICIAN', 'CLIENT'), getDevice);
-router.get('/:id/qr', authorize('ADMIN', 'TECHNICIAN'), getDeviceQrCode);
-router.post('/', authorize('ADMIN', 'TECHNICIAN'), validate(createDeviceSchema), postDevice);
-router.patch('/:id', authorize('ADMIN', 'TECHNICIAN'), validate(updateDeviceSchema), patchDevice);
-router.delete('/:id', authorize('ADMIN'), removeDevice);
+router.get('/', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'), getDevices);
+router.get('/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'), getDevice);
+router.get('/:id/qr', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), getDeviceQrCode);
+router.post('/', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), validate(createDeviceSchema), postDevice);
+router.patch('/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), validate(updateDeviceSchema), patchDevice);
+router.delete('/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), removeDevice);
 
 export default router;

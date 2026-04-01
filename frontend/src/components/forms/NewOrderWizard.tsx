@@ -144,7 +144,7 @@ export function NewOrderWizard({ onClose, defaultClientId }: Props) {
     queryFn: () => usersApi.getAll(),
     enabled: step === 'service' || step === 'phone' || step === 'quote',
   });
-  const workers = allUsers.filter(u => u.role !== 'CLIENT' && u.isActive);
+  const workers = allUsers.filter(u => (u as any).role !== 'CLIENT' && u.isActive);
 
   // ── Service form ───────────────────────────────────────────────────────────
   const svc = useForm<ServiceForm>({

@@ -77,19 +77,19 @@ function SmtpSettingsCard() {
     <Card title="Ustawienia e-mail (SMTP)">
       <div className="space-y-4">
         {isLoading ? (
-          <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Ładowanie...</p>
+          <p className="text-sm" style={{ color: 'var(--tm)' }}>Ładowanie...</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {fields.map(f => (
               <div key={f.key}>
-                <label className="block text-xs font-medium mb-1" style={{ color: 'rgba(255,255,255,0.5)' }}>{f.label}</label>
+                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--ts)' }}>{f.label}</label>
                 <input
                   type={f.type ?? 'text'}
                   placeholder={f.placeholder}
                   value={currentValues(f.key)}
                   onChange={e => handleChange(f.key, e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
+                  style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}
                 />
               </div>
             ))}
@@ -105,8 +105,8 @@ function SmtpSettingsCard() {
           </Button>
         </div>
 
-        <div className="pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-          <p className="text-sm font-medium mb-3" style={{ color: 'rgba(255,255,255,0.5)' }}>Testuj konfigurację</p>
+        <div className="pt-4" style={{ borderTop: '1px solid var(--border)' }}>
+          <p className="text-sm font-medium mb-3" style={{ color: 'var(--ts)' }}>Testuj konfigurację</p>
           <div className="flex gap-3">
             <input
               type="email"
@@ -114,7 +114,7 @@ function SmtpSettingsCard() {
               value={testEmail}
               onChange={e => setTestEmail(e.target.value)}
               className="flex-1 px-3 py-2.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
+              style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}
             />
             <Button
               variant="secondary"
@@ -143,29 +143,29 @@ function PinRequestsCard() {
     <Card title="Historia próśb o PIN" noPadding>
       <div className="overflow-x-auto">
         {isLoading ? (
-          <p className="text-sm p-5" style={{ color: 'rgba(255,255,255,0.4)' }}>Ładowanie...</p>
+          <p className="text-sm p-5" style={{ color: 'var(--tm)' }}>Ładowanie...</p>
         ) : requests.length === 0 ? (
-          <p className="text-sm p-5 text-center" style={{ color: 'rgba(255,255,255,0.4)' }}>Brak próśb o PIN</p>
+          <p className="text-sm p-5 text-center" style={{ color: 'var(--tm)' }}>Brak próśb o PIN</p>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.02)' }}>
-                <th className="text-left px-5 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>E-mail</th>
-                <th className="text-left px-5 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Data prośby</th>
-                <th className="text-left px-5 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Wygasa</th>
-                <th className="text-left px-5 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Użyty</th>
+              <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-card)' }}>
+                <th className="text-left px-5 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>E-mail</th>
+                <th className="text-left px-5 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Data prośby</th>
+                <th className="text-left px-5 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Wygasa</th>
+                <th className="text-left px-5 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Użyty</th>
               </tr>
             </thead>
             <tbody>
               {requests.map(r => (
                 <tr key={r.id}
                   className="transition-colors duration-150"
-                  style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+                  style={{ borderBottom: '1px solid var(--border)' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--hover-bg)'; }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
-                  <td className="px-5 py-3 text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.8)' }}>{r.email}</td>
-                  <td className="px-5 py-3 text-[13px]" style={{ color: 'rgba(255,255,255,0.5)' }}>{formatDate(r.createdAt)}</td>
-                  <td className="px-5 py-3 text-[13px]" style={{ color: 'rgba(255,255,255,0.5)' }}>{formatDate(r.expiresAt)}</td>
+                  <td className="px-5 py-3 text-[13px] font-medium" style={{ color: 'var(--t)' }}>{r.email}</td>
+                  <td className="px-5 py-3 text-[13px]" style={{ color: 'var(--ts)' }}>{formatDate(r.createdAt)}</td>
+                  <td className="px-5 py-3 text-[13px]" style={{ color: 'var(--ts)' }}>{formatDate(r.expiresAt)}</td>
                   <td className="px-5 py-3">
                     {r.usedAt ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
@@ -174,7 +174,7 @@ function PinRequestsCard() {
                       </span>
                     ) : (
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                        style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.4)' }}>
+                        style={{ background: 'var(--hover-bg)', color: 'var(--tm)' }}>
                         nie użyty
                       </span>
                     )}

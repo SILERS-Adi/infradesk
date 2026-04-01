@@ -9,18 +9,20 @@ import {
   generateDeviceQrCode,
 } from './devices.service';
 import { DeviceStatus, DeviceCriticality } from '@prisma/client';
+import { deviceScopeFilter, isDeviceAccessible } from '../../middleware/workspace';
 
 export async function getDevices(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { clientId, locationId, status, criticality, search, page, limit } = req.query as Record<string, string>;
+    const { locationId, status, criticality, search, page, limit } = req.query as Record<string, string>;
     const result = await listDevices({
-      clientId,
+      workspaceId: req.workspaceId,
       locationId,
       status: status as DeviceStatus | undefined,
       criticality: criticality as DeviceCriticality | undefined,
       search,
       page: page ? parseInt(page, 10) : 1,
       limit: limit ? parseInt(limit, 10) : 20,
+      scopeFilter: deviceScopeFilter(req.membership),
       requestingUser: req.user!,
     });
     res.status(200).json(result);
@@ -32,6 +34,13 @@ export async function getDevices(req: Request, res: Response, next: NextFunction
 export async function getDevice(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const device = await getDeviceById(req.params.id, req.user!);
+
+    // Enforce scope on detail endpoint
+    if (req.membership && !isDeviceAccessible(req.membership, device.id, device.locationId)) {
+      res.status(403).json({ error: 'Device not in your access scope' });
+      return;
+    }
+
     res.status(200).json(device);
   } catch (err) {
     next(err);

@@ -1,7 +1,11 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/auth';
-import { parseVoice, suggestSolution } from './ai.controller';
+import { requireFeature } from '../../middleware/planLimits';
+import { validate } from '../../middleware/validate';
+import { voiceParseSchema, suggestSchema, commandSchema } from './ai.validation';
+import { parseVoice, suggestSolution, parseCommand } from './ai.controller';
 const router = Router();
-router.post('/voice-parse', authenticate, parseVoice);
-router.post('/suggest', authenticate, suggestSolution);
+router.post('/voice-parse', authenticate, requireFeature('ai'), validate(voiceParseSchema), parseVoice);
+router.post('/suggest', authenticate, requireFeature('ai'), validate(suggestSchema), suggestSolution);
+router.post('/command', authenticate, requireFeature('ai'), validate(commandSchema), parseCommand);
 export default router;

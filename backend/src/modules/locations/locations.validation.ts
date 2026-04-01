@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const createLocationSchema = z.object({
-  clientId: z.string().uuid(),
+  workspaceId: z.string().uuid(),
   name: z.string().min(1).max(200),
   type: z.string().optional().default('Biuro'),
   addressLine1: z.string().optional().default('-'),
@@ -17,7 +17,7 @@ export const createLocationSchema = z.object({
   longitude: z.number().optional().nullable(),
 });
 
-export const updateLocationSchema = createLocationSchema.omit({ clientId: true }).partial();
+export const updateLocationSchema = createLocationSchema.omit({ workspaceId: true }).partial();
 
 export type CreateLocationInput = z.infer<typeof createLocationSchema>;
 export type UpdateLocationInput = z.infer<typeof updateLocationSchema>;

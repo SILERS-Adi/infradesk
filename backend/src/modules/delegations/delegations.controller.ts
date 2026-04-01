@@ -4,8 +4,8 @@ import { createDelegationSchema, updateDelegationSchema } from './delegations.va
 
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {
-    const { clientId, assignedToUserId } = req.query as Record<string, string>;
-    res.json(await svc.listDelegations({ clientId, assignedToUserId }));
+    const { assignedToUserId } = req.query as Record<string, string>;
+    res.json(await svc.listDelegations({ assignedToUserId, workspaceId: req.workspaceId }));
   } catch (err) { next(err); }
 }
 export async function get(req: Request, res: Response, next: NextFunction) {

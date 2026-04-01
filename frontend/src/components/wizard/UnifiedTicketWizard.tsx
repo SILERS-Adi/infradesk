@@ -171,7 +171,7 @@ export function UnifiedTicketWizard({ open, onClose, onSuccess, defaultClientId,
   const { data: staffUsers = [] } = useQuery({
     queryKey: ['staff-users'],
     queryFn: () => usersApi.getAll(),
-    select: d => d.filter(u => u.role === 'ADMIN' || u.role === 'TECHNICIAN'),
+    select: d => d.filter(u => (u as any).role === 'ADMIN' || (u as any).role === 'TECHNICIAN'),
   });
 
   // Set default client if provided
@@ -278,10 +278,8 @@ export function UnifiedTicketWizard({ open, onClose, onSuccess, defaultClientId,
       lastName: newUserLast,
       email: newUserEmail,
       phone: newUserPhone || undefined,
-      clientId,
-      role: 'CLIENT_USER' as any,
       password: Math.random().toString(36).slice(-10) + 'A1!',
-    }),
+    } as any),
     onSuccess: (user) => {
       setSelectedUserIds(prev => [...prev, user.id]);
       setShowNewUser(false);
@@ -464,7 +462,7 @@ export function UnifiedTicketWizard({ open, onClose, onSuccess, defaultClientId,
               </p>
               <button onClick={() => { onSuccess(); onClose(); }}
                 className="mt-2 px-6 py-2.5 rounded-xl text-[13px] font-semibold text-white transition-all active:scale-[0.97]"
-                style={{ background: 'linear-gradient(145deg, #6D28D9, #2563EB)' }}>
+                style={{ background: 'linear-gradient(135deg, #4f8cff 0%, #6366F1 40%, #8B5CF6 100%)' }}>
                 Gotowe
               </button>
             </div>
@@ -541,7 +539,7 @@ export function UnifiedTicketWizard({ open, onClose, onSuccess, defaultClientId,
                   <button onClick={() => newLocName.trim() && createLocMutation.mutate()}
                     disabled={!newLocName.trim() || createLocMutation.isPending}
                     className="px-4 py-2 rounded-xl text-[12px] font-semibold text-white transition-all active:scale-[0.97] disabled:opacity-50"
-                    style={{ background: 'linear-gradient(145deg, #6D28D9, #2563EB)' }}>
+                    style={{ background: 'linear-gradient(135deg, #4f8cff 0%, #6366F1 40%, #8B5CF6 100%)' }}>
                     {createLocMutation.isPending ? 'Tworzę...' : 'Dodaj lokalizację'}
                   </button>
                 </div>
@@ -607,7 +605,7 @@ export function UnifiedTicketWizard({ open, onClose, onSuccess, defaultClientId,
                     }}
                       disabled={!newUserFirst.trim() || !newUserLast.trim() || !newUserEmail.trim() || createUserMutation.isPending}
                       className="px-4 py-2 rounded-xl text-[12px] font-semibold text-white transition-all active:scale-[0.97] disabled:opacity-50"
-                      style={{ background: 'linear-gradient(145deg, #6D28D9, #2563EB)' }}>
+                      style={{ background: 'linear-gradient(135deg, #4f8cff 0%, #6366F1 40%, #8B5CF6 100%)' }}>
                       {createUserMutation.isPending ? 'Tworzę...' : 'Zapisz'}
                     </button>
                     <button onClick={() => { setShowNewUser(false); setNewUserFirst(''); setNewUserLast(''); setNewUserEmail(''); setNewUserPhone(''); }}
@@ -732,7 +730,7 @@ export function UnifiedTicketWizard({ open, onClose, onSuccess, defaultClientId,
                       <button onClick={() => { if (newDeviceName.trim()) createDeviceMutation.mutate(); }}
                         disabled={!newDeviceName.trim() || createDeviceMutation.isPending}
                         className="px-4 py-2 rounded-xl text-[12px] font-semibold text-white transition-all active:scale-[0.97] disabled:opacity-50"
-                        style={{ background: 'linear-gradient(145deg, #6D28D9, #2563EB)' }}>
+                        style={{ background: 'linear-gradient(135deg, #4f8cff 0%, #6366F1 40%, #8B5CF6 100%)' }}>
                         {createDeviceMutation.isPending ? 'Tworzę...' : 'Zapisz'}
                       </button>
                       <button onClick={() => { setShowNewDevice(false); setNewDeviceName(''); setNewDeviceIp(''); }}
@@ -904,7 +902,7 @@ export function UnifiedTicketWizard({ open, onClose, onSuccess, defaultClientId,
             </button>
             <button onClick={goNext} disabled={!canNext() || submitting}
               className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-[12px] font-semibold text-white transition-all active:scale-[0.97] disabled:opacity-40"
-              style={{ background: 'linear-gradient(145deg, #6D28D9, #2563EB)', boxShadow: '0 2px 10px rgba(109,40,217,0.18)' }}>
+              style={{ background: 'linear-gradient(135deg, #4f8cff 0%, #6366F1 40%, #8B5CF6 100%)', boxShadow: '0 2px 10px rgba(79,140,255,0.18)' }}>
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : isLast ? (
                 <><Check className="h-3.5 w-3.5" /> Zapisz</>
               ) : (

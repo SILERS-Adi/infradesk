@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getStoredToken, getStoredRefreshToken } from '../store/authStore';
+import { getCurrentWorkspaceId } from '../store/workspaceStore';
 
 const BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -13,6 +14,13 @@ apiClient.interceptors.request.use(config => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  // Inject workspace context header (Etap 2)
+  const wsId = getCurrentWorkspaceId();
+  if (wsId) {
+    config.headers['X-Workspace-Id'] = wsId;
+  }
+
   return config;
 });
 

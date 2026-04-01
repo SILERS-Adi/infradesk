@@ -10,7 +10,8 @@ import {
   cancelTicket,
   removeTicket,
 } from './tickets.controller';
-import { authenticate, authorize } from '../../middleware/auth';
+import { authenticate } from '../../middleware/auth';
+import { withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
 import { validate } from '../../middleware/validate';
 import {
   createTicketSchema,
@@ -24,14 +25,14 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get('/', authorize('ADMIN', 'TECHNICIAN', 'CLIENT'), getTickets);
-router.get('/:id', authorize('ADMIN', 'TECHNICIAN', 'CLIENT'), getTicket);
-router.post('/', authorize('ADMIN', 'TECHNICIAN', 'CLIENT'), validate(createTicketSchema), postTicket);
-router.patch('/:id', authorize('ADMIN', 'TECHNICIAN'), validate(updateTicketSchema), patchTicket);
-router.post('/:id/comments', authorize('ADMIN', 'TECHNICIAN', 'CLIENT'), validate(addCommentSchema), postComment);
-router.post('/:id/assign', authorize('ADMIN', 'TECHNICIAN'), validate(assignTicketSchema), postAssign);
-router.post('/:id/status', authorize('ADMIN', 'TECHNICIAN'), validate(changeStatusSchema), postStatus);
-router.post('/:id/cancel', authenticate, authorize('ADMIN', 'TECHNICIAN'), cancelTicket);
-router.delete('/:id', authorize('ADMIN'), removeTicket);
+router.get('/', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'), getTickets);
+router.get('/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'), getTicket);
+router.post('/', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'), validate(createTicketSchema), postTicket);
+router.patch('/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), validate(updateTicketSchema), patchTicket);
+router.post('/:id/comments', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'), validate(addCommentSchema), postComment);
+router.post('/:id/assign', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), validate(assignTicketSchema), postAssign);
+router.post('/:id/status', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), validate(changeStatusSchema), postStatus);
+router.post('/:id/cancel', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), cancelTicket);
+router.delete('/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), removeTicket);
 
 export default router;

@@ -2,11 +2,13 @@ import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { authenticate, authorize } from '../../middleware/auth';
+import { authenticate } from '../../middleware/auth';
+import { withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
 import { validate } from '../../middleware/validate';
 import {
   agentAuth, postRegister, postMetrics, postTicket,
-  getRegistrations, postApprove, postApproveNewClient, postPushUpdate, postWindowsUpdate, postRestartService, postSystemReboot, postWakeDevice, deleteReg, getStatus, getConnectPassword,
+  getRegistrations, getAuditData, postApprove, postApproveNewClient, postPushUpdate, postWindowsUpdate, postRestartService, postSystemReboot, postWakeDevice, deleteReg, getStatus, getConnectPassword,
+  getRustdeskPeers, getRustdeskSessions, postRustdeskSync, getRustdeskActiveSessions, postRustdeskSyncSessions,
 } from './agent.controller';
 import {
   registerSchema, metricsSchema, agentTicketSchema, approveSchema,
@@ -32,10 +34,12 @@ const upload = multer({
   },
 });
 
+import { agentRegisterLimiter } from '../../middleware/rateLimit';
+
 const router = Router();
 
 // Public — agent registration (no auth required)
-router.post('/register', validate(registerSchema), postRegister);
+router.post('/register', agentRegisterLimiter, validate(registerSchema), postRegister);
 
 // Agent token auth — for agent app
 router.get('/status',   agentAuth, getStatus);
@@ -56,15 +60,24 @@ router.post('/backup/complete',  agentAuth, agentReportComplete);
 router.post('/backup/failed',    agentAuth, agentReportFailed);
 
 // Admin auth — waiting room management
-router.get('/',                     authenticate, authorize('ADMIN', 'TECHNICIAN'), getRegistrations);
-router.post('/:id/approve',         authenticate, authorize('ADMIN'), validate(approveSchema), postApprove);
-router.post('/:id/approve-new-client', authenticate, authorize('ADMIN', 'TECHNICIAN'), postApproveNewClient);
-router.post('/:id/connect',         authenticate, authorize('ADMIN', 'TECHNICIAN'), getConnectPassword);
-router.post('/:id/push-update',     authenticate, authorize('ADMIN'), postPushUpdate);
-router.post('/:id/windows-update',   authenticate, authorize('ADMIN'), postWindowsUpdate);
-router.post('/:id/restart-service',  authenticate, authorize('ADMIN'), postRestartService);
-router.post('/:id/system-reboot',    authenticate, authorize('ADMIN'), postSystemReboot);
-router.post('/:id/wake',             authenticate, authorize('ADMIN', 'TECHNICIAN'), postWakeDevice);
-router.delete('/:id',               authenticate, authorize('ADMIN'), deleteReg);
+router.get('/audit',                authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), getAuditData);
+
+// RustDesk integration (before /:id routes to avoid param matching)
+router.get('/rustdesk/peers',       authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), getRustdeskPeers);
+router.get('/rustdesk/sessions',    authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), getRustdeskSessions);
+router.get('/rustdesk/active',      authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), getRustdeskActiveSessions);
+router.post('/rustdesk/sync',       authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), postRustdeskSync);
+router.post('/rustdesk/sync-sessions', authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), postRustdeskSyncSessions);
+
+router.get('/',                     authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), getRegistrations);
+router.post('/:id/approve',         authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), validate(approveSchema), postApprove);
+router.post('/:id/approve-new-client', authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), postApproveNewClient);
+router.post('/:id/connect',         authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), getConnectPassword);
+router.post('/:id/push-update',     authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), postPushUpdate);
+router.post('/:id/windows-update',   authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), postWindowsUpdate);
+router.post('/:id/restart-service',  authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), postRestartService);
+router.post('/:id/system-reboot',    authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), postSystemReboot);
+router.post('/:id/wake',             authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), postWakeDevice);
+router.delete('/:id',               authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), deleteReg);
 
 export default router;

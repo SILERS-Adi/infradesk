@@ -14,8 +14,8 @@ import { clsx } from 'clsx';
 /* ── helper: dark glass card ─────────────────────────────── */
 const glass = 'rounded-xl border' as const;
 const glassStyle: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.025)',
-  borderColor: 'rgba(255,255,255,0.06)',
+  background: 'var(--bg-card)',
+  borderColor: 'var(--border)',
 };
 
 /* ── MetricBar ───────────────────────────────────────────── */
@@ -24,9 +24,9 @@ function MetricBar({ value, label }: { value?: number; label: string }) {
   const pct = Math.round(value);
   const color = pct > 90 ? 'bg-red-500' : pct > 70 ? 'bg-amber-400' : 'bg-emerald-500';
   return (
-    <div className="flex items-center gap-2 text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
+    <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--ts)' }}>
       <span className="w-12 shrink-0">{label}</span>
-      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
         <div className={clsx('h-full rounded-full transition-all', color)} style={{ width: `${pct}%` }} />
       </div>
       <span className="w-8 text-right font-medium">{pct}%</span>
@@ -39,8 +39,8 @@ function InfoRow({ label, value }: { label: string; value?: string | number | nu
   if (!value && value !== 0) return null;
   return (
     <div className="flex gap-2 text-xs">
-      <span className="w-28 shrink-0" style={{ color: 'rgba(255,255,255,0.3)' }}>{label}</span>
-      <span className="font-medium break-all" style={{ color: 'rgba(255,255,255,0.8)' }}>{value}</span>
+      <span className="w-28 shrink-0" style={{ color: 'var(--tm)' }}>{label}</span>
+      <span className="font-medium break-all" style={{ color: 'var(--t)' }}>{value}</span>
     </div>
   );
 }
@@ -51,7 +51,7 @@ function VersionBadge({ appVersion, latestVersion }: { appVersion?: string | nul
     return (
       <span
         className="inline-flex items-center text-[10px] font-semibold rounded-full px-2 py-0.5 border"
-        style={{ background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)' }}
+        style={{ background: 'var(--hover-bg)', borderColor: 'var(--border)', color: 'var(--tm)' }}
       >
         Brak wersji
       </span>
@@ -150,16 +150,16 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
           <div
             className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
             style={{
-              background: reg.status === 'ACTIVE' ? 'rgba(34,197,94,0.12)' : reg.status === 'PENDING' ? 'rgba(251,191,36,0.12)' : 'rgba(255,255,255,0.04)',
+              background: reg.status === 'ACTIVE' ? 'rgba(34,197,94,0.12)' : reg.status === 'PENDING' ? 'rgba(251,191,36,0.12)' : 'var(--hover-bg)',
             }}
           >
             <Monitor className="h-5 w-5" style={{
-              color: reg.status === 'ACTIVE' ? '#4ADE80' : reg.status === 'PENDING' ? '#FBBF24' : 'rgba(255,255,255,0.3)',
+              color: reg.status === 'ACTIVE' ? '#4ADE80' : reg.status === 'PENDING' ? '#FBBF24' : 'var(--tm)',
             }} />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="font-medium text-sm truncate" style={{ color: 'rgba(255,255,255,0.85)' }}>
+              <p className="font-medium text-sm truncate" style={{ color: 'var(--t)' }}>
                 {reg.hostname ?? 'Nieznany komputer'}
               </p>
               {isOnline
@@ -174,7 +174,7 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
                 : (
                   <span
                     className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 border"
-                    style={{ background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)' }}
+                    style={{ background: 'var(--hover-bg)', borderColor: 'var(--border)', color: 'var(--tm)' }}
                   >
                     <WifiOff className="h-3 w-3" />Offline
                   </span>
@@ -208,7 +208,7 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
                 </span>
               )}
             </div>
-            <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--tm)' }}>
               {reg.ipAddress && <span>{reg.ipAddress} &middot; </span>}
               {reg.osInfo && <span>{reg.osInfo} &middot; </span>}
               {reg.currentUser && <span>{reg.currentUser}</span>}
@@ -246,9 +246,9 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
             <button
               onClick={() => setExpanded(e => !e)}
               className="p-1.5 rounded-lg transition-colors"
-              style={{ color: 'rgba(255,255,255,0.3)' }}
+              style={{ color: 'var(--tm)' }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#A78BFA'; (e.currentTarget as HTMLElement).style.background = 'rgba(139,92,246,0.12)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.3)'; (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--tm)'; (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             >
               {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </button>
@@ -267,11 +267,11 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
 
       {/* Expanded details */}
       {expanded && (
-        <div className="p-4 space-y-4" style={{ borderTop: '1px solid rgba(255,255,255,0.04)', background: 'rgba(255,255,255,0.02)' }}>
+        <div className="p-4 space-y-4" style={{ borderTop: '1px solid var(--border)', background: 'var(--bg-card)' }}>
 
           {/* Hardware */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5 mb-2" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            <p className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5 mb-2" style={{ color: 'var(--tm)' }}>
               <Cpu className="h-3.5 w-3.5" />Sprzet
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
@@ -289,17 +289,17 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
           {/* Disks */}
           {(reg.diskInfo ?? []).length > 0 && (
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5 mb-2" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              <p className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5 mb-2" style={{ color: 'var(--tm)' }}>
                 <HardDrive className="h-3.5 w-3.5" />Dyski
               </p>
               <div className="space-y-1.5">
                 {(reg.diskInfo as DiskInfo[]).map(d => (
                   <div key={d.mountpoint} className="flex items-center gap-3 text-xs">
-                    <span className="w-10 shrink-0" style={{ color: 'rgba(255,255,255,0.4)' }}>{d.mountpoint}</span>
-                    <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                    <span className="w-10 shrink-0" style={{ color: 'var(--tm)' }}>{d.mountpoint}</span>
+                    <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
                       <div className={clsx('h-full rounded-full', d.usedPct > 90 ? 'bg-red-500' : d.usedPct > 70 ? 'bg-amber-400' : 'bg-emerald-500')} style={{ width: `${d.usedPct}%` }} />
                     </div>
-                    <span className="w-36 shrink-0" style={{ color: 'rgba(255,255,255,0.5)' }}>{d.freeGb.toFixed(1)} GB wolne / {d.totalGb.toFixed(1)} GB &middot; {d.fstype}</span>
+                    <span className="w-36 shrink-0" style={{ color: 'var(--ts)' }}>{d.freeGb.toFixed(1)} GB wolne / {d.totalGb.toFixed(1)} GB &middot; {d.fstype}</span>
                   </div>
                 ))}
               </div>
@@ -309,16 +309,16 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
           {/* Network */}
           {(reg.networkIfaces ?? []).filter((i: NetworkIface) => i.ip).length > 0 && (
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5 mb-2" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              <p className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5 mb-2" style={{ color: 'var(--tm)' }}>
                 <Network className="h-3.5 w-3.5" />Siec
               </p>
               <div className="space-y-1">
                 {(reg.networkIfaces as NetworkIface[]).filter(i => i.ip).map(i => (
                   <div key={i.name} className="flex gap-4 text-xs">
-                    <span className={clsx('w-2 h-2 rounded-full mt-0.5 shrink-0', i.isUp ? 'bg-emerald-500' : '')} style={!i.isUp ? { background: 'rgba(255,255,255,0.15)' } : {}} />
-                    <span className="w-40 truncate shrink-0" style={{ color: 'rgba(255,255,255,0.4)' }}>{i.name}</span>
-                    <span className="font-mono" style={{ color: 'rgba(255,255,255,0.8)' }}>{i.ip}</span>
-                    {i.mac && <span className="font-mono" style={{ color: 'rgba(255,255,255,0.3)' }}>{i.mac}</span>}
+                    <span className={clsx('w-2 h-2 rounded-full mt-0.5 shrink-0', i.isUp ? 'bg-emerald-500' : '')} style={!i.isUp ? { background: 'var(--td)' } : {}} />
+                    <span className="w-40 truncate shrink-0" style={{ color: 'var(--tm)' }}>{i.name}</span>
+                    <span className="font-mono" style={{ color: 'var(--t)' }}>{i.ip}</span>
+                    {i.mac && <span className="font-mono" style={{ color: 'var(--tm)' }}>{i.mac}</span>}
                   </div>
                 ))}
               </div>
@@ -329,7 +329,7 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
           {(reg.installedSoftware ?? []).length > 0 && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                <p className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5" style={{ color: 'var(--tm)' }}>
                   <Package className="h-3.5 w-3.5" />Programy ({reg.installedSoftware!.length})
                 </p>
                 <input
@@ -338,22 +338,22 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
                   value={softwareSearch}
                   onChange={e => setSoftwareSearch(e.target.value)}
                   className="text-xs rounded-lg px-2 py-1 w-40 focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
+                  style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}
                 />
               </div>
               <div
                 className="max-h-48 overflow-y-auto rounded-lg"
-                style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}
+                style={{ border: '1px solid var(--border)', background: 'var(--bg-card)' }}
               >
                 {filteredSoftware.map((s: InstalledSoftware, i) => (
                   <div
                     key={i}
                     className="flex items-center gap-3 px-3 py-1.5 text-xs"
-                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+                    style={{ borderBottom: '1px solid var(--border)' }}
                   >
-                    <span className="flex-1 font-medium truncate" style={{ color: 'rgba(255,255,255,0.8)' }}>{s.name}</span>
-                    {s.version && <span className="shrink-0" style={{ color: 'rgba(255,255,255,0.3)' }}>{s.version}</span>}
-                    {s.publisher && <span className="shrink-0 hidden sm:block truncate max-w-[120px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{s.publisher}</span>}
+                    <span className="flex-1 font-medium truncate" style={{ color: 'var(--t)' }}>{s.name}</span>
+                    {s.version && <span className="shrink-0" style={{ color: 'var(--tm)' }}>{s.version}</span>}
+                    {s.publisher && <span className="shrink-0 hidden sm:block truncate max-w-[120px]" style={{ color: 'var(--tm)' }}>{s.publisher}</span>}
                   </div>
                 ))}
               </div>
@@ -365,7 +365,7 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
 
       {/* ── Footer — always visible actions ─────────────────────── */}
       {reg.status === 'ACTIVE' && (
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+        <div style={{ borderTop: '1px solid var(--border)' }}>
           <div className="flex items-center gap-1 px-3 py-2">
             {/* RustDesk */}
             {reg.rustdeskId && (
@@ -435,7 +435,7 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
                 <button
                   onClick={() => setConfirmDelete(false)}
                   className="text-[11px] font-medium px-2.5 py-1 rounded-lg transition-colors"
-                  style={{ color: 'rgba(255,255,255,0.5)' }}
+                  style={{ color: 'var(--ts)' }}
                 >
                   Nie
                 </button>
@@ -444,9 +444,9 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
               <button
                 onClick={() => setConfirmDelete(true)}
                 className="p-1.5 rounded-lg transition-colors"
-                style={{ color: 'rgba(255,255,255,0.2)' }}
+                style={{ color: 'var(--td)' }}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)'; (e.currentTarget as HTMLElement).style.color = '#F87171'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.2)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--td)'; }}
                 title="Usuń agenta"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -463,7 +463,7 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
                   className="flex-1 py-2 rounded-lg text-[11px] font-semibold transition-all"
                   style={winUpdateMode === 'reboot'
                     ? { background: 'rgba(96,165,250,0.15)', color: '#60A5FA', border: '1px solid rgba(96,165,250,0.25)' }
-                    : { background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.06)' }
+                    : { background: 'var(--bg-card)', color: 'var(--tm)', border: '1px solid var(--border)' }
                   }>
                   Przy ponownym uruchomieniu
                 </button>
@@ -471,17 +471,17 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
                   className="flex-1 py-2 rounded-lg text-[11px] font-semibold transition-all"
                   style={winUpdateMode === 'schedule'
                     ? { background: 'rgba(96,165,250,0.15)', color: '#60A5FA', border: '1px solid rgba(96,165,250,0.25)' }
-                    : { background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.06)' }
+                    : { background: 'var(--bg-card)', color: 'var(--tm)', border: '1px solid var(--border)' }
                   }>
                   Zaplanuj restart
                 </button>
               </div>
               {winUpdateMode === 'schedule' && (
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.4)' }}>Restart o:</span>
+                  <span className="text-[11px]" style={{ color: 'var(--tm)' }}>Restart o:</span>
                   <input type="time" value={winUpdateTime} onChange={e => setWinUpdateTime(e.target.value)}
                     className="px-2 py-1.5 rounded-lg text-[12px] focus:outline-none"
-                    style={{ background: '#0E1425', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)' }} />
+                    style={{ background: '#0E1425', border: '1px solid var(--border)', color: 'var(--t)' }} />
                 </div>
               )}
               <div className="flex gap-2">
@@ -492,7 +492,7 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
                 </button>
                 <button onClick={() => setShowWinUpdate(false)}
                   className="px-3 py-2 rounded-lg text-[11px] font-medium transition-colors"
-                  style={{ color: 'rgba(255,255,255,0.4)' }}>
+                  style={{ color: 'var(--tm)' }}>
                   Anuluj
                 </button>
               </div>
@@ -568,11 +568,11 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
   const inputStyle: React.CSSProperties = {
     width: '100%',
     fontSize: '0.875rem',
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.1)',
+    background: 'var(--hover-bg)',
+    border: '1px solid var(--border)',
     borderRadius: '0.5rem',
     padding: '0.5rem 0.75rem',
-    color: 'rgba(255,255,255,0.85)',
+    color: 'var(--t)',
     outline: 'none',
   };
 
@@ -580,7 +580,7 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
     display: 'block',
     fontSize: '0.75rem',
     fontWeight: 500,
-    color: 'rgba(255,255,255,0.5)',
+    color: 'var(--ts)',
     marginBottom: '0.25rem',
   };
 
@@ -588,33 +588,33 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}>
       <div
         className="rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto"
-        style={{ background: 'rgba(14,20,38,0.97)', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(24px)' }}
+        style={{ background: 'rgba(14,20,38,0.97)', border: '1px solid var(--border)', backdropFilter: 'blur(24px)' }}
       >
-        <h2 className="text-lg font-bold" style={{ color: 'rgba(255,255,255,0.85)' }}>Zatwierdz urzadzenie</h2>
+        <h2 className="text-lg font-bold" style={{ color: 'var(--t)' }}>Zatwierdz urzadzenie</h2>
 
         {/* Registration info */}
-        <div className="rounded-xl p-3 text-xs space-y-1" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)' }}>
-          {reg.companyName && <div><span className="font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>Firma:</span> {reg.companyName}</div>}
+        <div className="rounded-xl p-3 text-xs space-y-1" style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--ts)' }}>
+          {reg.companyName && <div><span className="font-medium" style={{ color: 'var(--ts)' }}>Firma:</span> {reg.companyName}</div>}
           {(reg.contactFirstName || reg.contactLastName) && (
-            <div><span className="font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>Kontakt:</span> {[reg.contactFirstName, reg.contactLastName].filter(Boolean).join(' ')}</div>
+            <div><span className="font-medium" style={{ color: 'var(--ts)' }}>Kontakt:</span> {[reg.contactFirstName, reg.contactLastName].filter(Boolean).join(' ')}</div>
           )}
-          {reg.contactEmail && <div><span className="font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>E-mail:</span> {reg.contactEmail}</div>}
-          {reg.nip          && <div><span className="font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>NIP:</span> {reg.nip}</div>}
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.25rem', marginTop: '0.25rem' }}>
-            {reg.hostname  && <div><span className="font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>Komputer:</span> {reg.hostname}</div>}
-            {reg.ipAddress && <div><span className="font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>IP:</span> {reg.ipAddress}</div>}
+          {reg.contactEmail && <div><span className="font-medium" style={{ color: 'var(--ts)' }}>E-mail:</span> {reg.contactEmail}</div>}
+          {reg.nip          && <div><span className="font-medium" style={{ color: 'var(--ts)' }}>NIP:</span> {reg.nip}</div>}
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.25rem', marginTop: '0.25rem' }}>
+            {reg.hostname  && <div><span className="font-medium" style={{ color: 'var(--ts)' }}>Komputer:</span> {reg.hostname}</div>}
+            {reg.ipAddress && <div><span className="font-medium" style={{ color: 'var(--ts)' }}>IP:</span> {reg.ipAddress}</div>}
           </div>
         </div>
 
         {/* Mode toggle */}
-        <div className="flex rounded-xl overflow-hidden text-sm font-medium" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="flex rounded-xl overflow-hidden text-sm font-medium" style={{ border: '1px solid var(--border)' }}>
           <button
             type="button"
             onClick={() => setMode('existing')}
             className="flex-1 py-2.5 transition-colors"
             style={{
-              background: mode === 'existing' ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.02)',
-              color: mode === 'existing' ? '#A78BFA' : 'rgba(255,255,255,0.5)',
+              background: mode === 'existing' ? 'rgba(139,92,246,0.25)' : 'var(--bg-card)',
+              color: mode === 'existing' ? '#A78BFA' : 'var(--ts)',
             }}
           >
             Przypisz do istniejacej firmy
@@ -624,8 +624,8 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
             onClick={() => setMode('new')}
             className="flex-1 py-2.5 transition-colors"
             style={{
-              background: mode === 'new' ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.02)',
-              color: mode === 'new' ? '#A78BFA' : 'rgba(255,255,255,0.5)',
+              background: mode === 'new' ? 'rgba(139,92,246,0.25)' : 'var(--bg-card)',
+              color: mode === 'new' ? '#A78BFA' : 'var(--ts)',
             }}
           >
             Utworz nowa firme
@@ -706,11 +706,12 @@ export function WaitingRoomPage() {
   const [filterClientId, setFilterClientId] = useState('');
   const [search, setSearch] = useState('');
   const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [agentTypeFilter, setAgentTypeFilter] = useState<'ALL' | 'CLIENT' | 'SERVER'>('ALL');
 
   const { data: registrations = [], isLoading } = useQuery({
     queryKey: ['agents'],
     queryFn: () => agentsApi.getAll(),
-    refetchInterval: 15_000,
+    refetchInterval: 30_000,
   });
 
   const { data: latestVersion } = useQuery({
@@ -742,6 +743,7 @@ export function WaitingRoomPage() {
   const clientsWithAgents = allClients.filter(c => registrations.some(r => r.clientId === c.id));
 
   const filtered = registrations.filter(r => {
+    if (agentTypeFilter !== 'ALL' && (r.agentType || 'CLIENT') !== agentTypeFilter) return false;
     if (filterClientId && r.clientId !== filterClientId) return false;
     if (search) {
       const q = search.toLowerCase();
@@ -759,9 +761,9 @@ export function WaitingRoomPage() {
     <div className="space-y-6 max-w-3xl mx-auto">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold" style={{ color: 'rgba(255,255,255,0.85)' }}>Agenty systemowe</h1>
+        <h1 className="text-2xl font-bold" style={{ color: 'var(--t)' }}>Agenty systemowe</h1>
         <div className="flex items-center gap-3 mt-1">
-          <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>
+          <p className="text-sm" style={{ color: 'var(--tm)' }}>
             {registrations.length} {registrations.length === 1 ? 'agent' : 'agentow'} zarejestrowanych
           </p>
           {latestVersion?.version && (() => {
@@ -811,7 +813,7 @@ export function WaitingRoomPage() {
                   </button>
                 )}
                 {noVersion > 0 && (
-                  <span className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                  <span className="text-xs font-medium" style={{ color: 'var(--tm)' }}>
                     {noVersion} bez wersji
                   </span>
                 )}
@@ -821,23 +823,41 @@ export function WaitingRoomPage() {
         </div>
       </div>
 
+      {/* Type tabs */}
+      <div className="flex gap-1 p-1 rounded-lg" style={{ background: 'var(--hover-bg)' }}>
+        {(['ALL', 'CLIENT', 'SERVER'] as const).map(t => {
+          const count = t === 'ALL' ? registrations.length : registrations.filter(r => (r.agentType || 'CLIENT') === t).length;
+          const label = t === 'ALL' ? 'Wszystkie' : t === 'CLIENT' ? 'Komputery' : 'Serwery';
+          return (
+            <button key={t} onClick={() => setAgentTypeFilter(t)}
+              className="px-4 py-1.5 rounded-md text-xs font-medium transition-all"
+              style={{
+                background: agentTypeFilter === t ? 'rgba(79,140,255,0.2)' : 'transparent',
+                color: agentTypeFilter === t ? '#A78BFA' : 'var(--tm)',
+              }}>
+              {label} ({count})
+            </button>
+          );
+        })}
+      </div>
+
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-center">
         <div className="relative flex-1 min-w-[180px] max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'rgba(255,255,255,0.3)' }} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--tm)' }} />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Szukaj (hostname, uzytkownik)..."
             className="w-full pl-9 pr-3 py-2 text-sm rounded-lg focus:outline-none"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
+            style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}
           />
         </div>
         <select
           value={filterClientId}
           onChange={e => setFilterClientId(e.target.value)}
           className="text-sm rounded-lg px-3 py-2 focus:outline-none"
-          style={{ background: '#0E1425', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)' }}
+          style={{ background: '#0E1425', border: '1px solid var(--border)', color: 'var(--t)' }}
         >
           <option value="">Wszystkie firmy</option>
           {clientsWithAgents.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -846,14 +866,14 @@ export function WaitingRoomPage() {
           <button
             onClick={() => { setFilterClientId(''); setSearch(''); }}
             className="text-xs underline"
-            style={{ color: 'rgba(255,255,255,0.4)' }}
+            style={{ color: 'var(--tm)' }}
           >
             Wyczysc filtry
           </button>
         )}
       </div>
 
-      {isLoading && <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Ladowanie...</p>}
+      {isLoading && <p className="text-sm" style={{ color: 'var(--tm)' }}>Ladowanie...</p>}
 
       {pending.length > 0 && (
         <section className="space-y-3">
@@ -894,7 +914,7 @@ export function WaitingRoomPage() {
       )}
 
       {!isLoading && registrations.length === 0 && (
-        <div className="text-center py-16" style={{ color: 'rgba(255,255,255,0.3)' }}>
+        <div className="text-center py-16" style={{ color: 'var(--tm)' }}>
           <Monitor className="h-12 w-12 mx-auto mb-3 opacity-30" />
           <p className="font-medium">Brak agentow</p>
           <p className="text-sm mt-1">Zainstaluj aplikacje na komputerach klientow, aby monitorowac sprzet.</p>

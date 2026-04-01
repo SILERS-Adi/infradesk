@@ -13,6 +13,7 @@ import { Modal } from '../../../components/ui/Modal';
 import { DeviceForm } from '../../../components/forms/DeviceForm';
 import { useDebounce } from '../../../hooks/useDebounce';
 import type { Device } from '../../../types';
+import { useWorkspaceContext } from '../../../hooks/useWorkspaceContext';
 import toast from 'react-hot-toast';
 
 /* ── Device status badge ─────────────────────────────────────────────────── */
@@ -38,7 +39,7 @@ function DeviceStatusBadge({ status }: { status: string }) {
 /* ── Agent badge ─────────────────────────────────────────────────────────── */
 function AgentBadge({ agents }: { agents?: { lastSeen?: string }[] }) {
   const lastSeen = agents?.[0]?.lastSeen;
-  if (!lastSeen) return <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.2)' }}>—</span>;
+  if (!lastSeen) return <span className="text-[11px]" style={{ color: 'var(--td)' }}>—</span>;
   const isOnline = Date.now() - new Date(lastSeen).getTime() < 5 * 60 * 1000;
   return isOnline ? (
     <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold rounded-full px-2 py-0.5"
@@ -47,8 +48,8 @@ function AgentBadge({ agents }: { agents?: { lastSeen?: string }[] }) {
     </span>
   ) : (
     <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold rounded-full px-2 py-0.5"
-      style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.35)' }}>
-      <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.2)' }} />Offline
+      style={{ background: 'var(--hover-bg)', color: 'var(--tm)' }}>
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--td)' }} />Offline
     </span>
   );
 }
@@ -92,7 +93,7 @@ function SortTh({ label, sortKey, currentKey, currentDir, onSort, align }: {
     <th className={`${align === 'center' ? 'text-center' : 'text-left'} px-4 py-3 select-none cursor-pointer group`}
       onClick={() => onSort(sortKey)}>
       <div className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${isActive ? '' : 'group-hover:text-white/50'}`}
-        style={{ color: isActive ? '#A78BFA' : 'rgba(255,255,255,0.3)' }}>
+        style={{ color: isActive ? '#A78BFA' : 'var(--tm)' }}>
         {label}
         {isActive ? (
           currentDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
@@ -106,9 +107,9 @@ function SortTh({ label, sortKey, currentKey, currentDir, onSort, align }: {
 
 /* ── Filter select styles ────────────────────────────────────────────────── */
 const selectStyle: React.CSSProperties = {
-  background: '#0E1425',
-  border: '1px solid rgba(255,255,255,0.1)',
-  color: 'rgba(255,255,255,0.85)',
+  background: 'var(--hover-bg)',
+  border: '1px solid var(--border)',
+  color: 'var(--t)',
 };
 
 const STATUS_OPTIONS = [
@@ -126,6 +127,7 @@ const STATUS_OPTIONS = [
 export function DevicesListPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { canCreate, isScoped } = useWorkspaceContext();
   const [search, setSearch] = useState('');
   const [clientId, setClientId] = useState('');
   const [status, setStatus] = useState('');
@@ -192,26 +194,26 @@ export function DevicesListPage() {
       <PageHeader
         title="Urządzenia"
         subtitle={`${devices.length} urządzeń`}
-        actions={
+        actions={canCreate ? (
           <Button icon={<Plus className="h-4 w-4" />} onClick={() => setShowCreate(true)}>
             Nowe urządzenie
           </Button>
-        }
+        ) : undefined}
       />
 
       {/* ── Filters ────────────────────────────────────────────────────── */}
       <div className="rounded-t-[18px] p-4 flex flex-wrap gap-3 items-center"
-        style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
         <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'rgba(255,255,255,0.25)' }} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--td)' }} />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Szukaj (nazwa, IP, hostname, S/N)..."
             className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl focus:outline-none transition-all placeholder:text-white/20"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
-            onFocus={e => { e.currentTarget.style.borderColor = 'rgba(139,92,246,0.4)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(139,92,246,0.08)'; }}
-            onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.boxShadow = 'none'; }}
+            style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}
+            onFocus={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(139,92,246,0.08)'; }}
+            onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none'; }}
           />
         </div>
         <select value={clientId} onChange={(e) => setClientId(e.target.value)}
@@ -230,7 +232,7 @@ export function DevicesListPage() {
         {(clientId || status) && (
           <button onClick={() => { setClientId(''); setStatus(''); }}
             className="text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-colors hover:bg-white/[0.06]"
-            style={{ color: 'rgba(255,255,255,0.4)' }}>
+            style={{ color: 'var(--tm)' }}>
             Wyczyść filtry
           </button>
         )}
@@ -238,7 +240,7 @@ export function DevicesListPage() {
 
       {/* ── Table ──────────────────────────────────────────────────────── */}
       <div className="rounded-b-[18px] overflow-hidden"
-        style={{ background: 'rgba(255,255,255,0.025)', borderLeft: '1px solid rgba(255,255,255,0.06)', borderRight: '1px solid rgba(255,255,255,0.06)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        style={{ background: 'var(--bg-card)', borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
 
         {isLoading && (
           <div className="flex items-center justify-center py-16">
@@ -247,11 +249,21 @@ export function DevicesListPage() {
         )}
 
         {!isLoading && sortedDevices.length === 0 && (
-          <div className="text-center py-16">
-            <Monitor className="h-10 w-10 mx-auto mb-3" style={{ color: 'rgba(255,255,255,0.1)' }} />
-            <p className="text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.4)' }}>Brak urządzeń</p>
-            <p className="text-[12px] mt-1" style={{ color: 'rgba(255,255,255,0.2)' }}>Dodaj pierwsze urządzenie.</p>
-          </div>
+          isScoped ? (
+            <div className="text-center py-16">
+              <Monitor className="h-10 w-10 mx-auto mb-3" style={{ color: 'var(--accent)', opacity: 0.5 }} />
+              <p className="text-[13px] font-medium" style={{ color: 'var(--accent)' }}>Brak dostępu</p>
+              <p className="text-[12px] mt-1" style={{ color: 'var(--td)', maxWidth: 320, margin: '4px auto 0' }}>
+                Nie masz dostępu do żadnych urządzeń w tym workspace. Skontaktuj się z administratorem.
+              </p>
+            </div>
+          ) : (
+            <div className="text-center py-16">
+              <Monitor className="h-10 w-10 mx-auto mb-3" style={{ color: 'var(--td)' }} />
+              <p className="text-[13px] font-medium" style={{ color: 'var(--tm)' }}>Brak urządzeń</p>
+              <p className="text-[12px] mt-1" style={{ color: 'var(--td)' }}>Dodaj pierwsze urządzenie.</p>
+            </div>
+          )
         )}
 
         {!isLoading && sortedDevices.length > 0 && (
@@ -260,13 +272,13 @@ export function DevicesListPage() {
             <div className="hidden lg:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <tr style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }}>
                     <SortTh label="Urządzenie" sortKey="name" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <SortTh label="Użytkownik" sortKey="user" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
-                    <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>Login</th>
+                    <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Login</th>
                     <SortTh label="Firma" sortKey="client" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <SortTh label="Lokalizacja" sortKey="location" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
-                    <th className="text-center px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>RustDesk</th>
+                    <th className="text-center px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>RustDesk</th>
                     <SortTh label="Agent" sortKey="agent" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} align="center" />
                     <SortTh label="Status" sortKey="status" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} align="center" />
                     <th className="px-3 py-3" />
@@ -277,8 +289,8 @@ export function DevicesListPage() {
                     <tr key={device.id}
                       onClick={() => navigate(`/devices/${device.id}`)}
                       className="cursor-pointer transition-colors duration-150"
-                      style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'; }}
+                      style={{ borderBottom: '1px solid var(--border)' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--hover-bg)'; }}
                       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
 
                       {/* Urządzenie */}
@@ -292,7 +304,7 @@ export function DevicesListPage() {
                           </div>
                           <div className="min-w-0">
                             <div className="text-[13px] font-semibold text-white/85 truncate">{device.name}</div>
-                            <div className="text-[11px] font-mono mt-0.5 truncate" style={{ color: 'rgba(255,255,255,0.25)' }}>
+                            <div className="text-[11px] font-mono mt-0.5 truncate" style={{ color: 'var(--td)' }}>
                               {device.ipAddress ?? device.hostname ?? device.serialNumber ?? ''}
                             </div>
                           </div>
@@ -302,33 +314,33 @@ export function DevicesListPage() {
                       {/* Użytkownik (assignedUser = kto zalogowany przez agenta) */}
                       <td className="px-4 py-3">
                         {device.assignedUser ? (
-                          <span className="text-[13px]" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                          <span className="text-[13px]" style={{ color: 'var(--ts)' }}>
                             {device.assignedUser.firstName} {device.assignedUser.lastName}
                           </span>
                         ) : (
-                          <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.2)' }}>—</span>
+                          <span className="text-[11px]" style={{ color: 'var(--td)' }}>—</span>
                         )}
                       </td>
 
                       {/* Login (Windows username z agenta) */}
                       <td className="px-4 py-3">
                         {device.agents?.[0]?.currentUser ? (
-                          <span className="text-[12px] font-mono" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                          <span className="text-[12px] font-mono" style={{ color: 'var(--tm)' }}>
                             {device.agents[0].currentUser}
                           </span>
                         ) : (
-                          <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.15)' }}>—</span>
+                          <span className="text-[11px]" style={{ color: 'var(--td)' }}>—</span>
                         )}
                       </td>
 
                       {/* Firma */}
                       <td className="px-4 py-3">
-                        <span className="text-[13px]" style={{ color: 'rgba(255,255,255,0.5)' }}>{device.client?.name ?? '—'}</span>
+                        <span className="text-[13px]" style={{ color: 'var(--ts)' }}>{device.client?.name ?? '—'}</span>
                       </td>
 
                       {/* Lokalizacja */}
                       <td className="px-4 py-3">
-                        <span className="text-[12px]" style={{ color: 'rgba(255,255,255,0.35)' }}>{device.location?.name ?? '—'}</span>
+                        <span className="text-[12px]" style={{ color: 'var(--tm)' }}>{device.location?.name ?? '—'}</span>
                       </td>
 
                       {/* RustDesk */}
@@ -342,7 +354,7 @@ export function DevicesListPage() {
                             {device.rustdeskId}
                           </button>
                         ) : (
-                          <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.15)' }}>—</span>
+                          <span className="text-[11px]" style={{ color: 'var(--td)' }}>—</span>
                         )}
                       </td>
 
@@ -362,9 +374,9 @@ export function DevicesListPage() {
                           <button onClick={(e) => handleDownloadQr(device, e)}
                             className="p-1.5 rounded-lg transition-colors hover:bg-white/[0.06]"
                             title="Pobierz QR">
-                            <QrCode className="h-3.5 w-3.5" style={{ color: 'rgba(255,255,255,0.25)' }} />
+                            <QrCode className="h-3.5 w-3.5" style={{ color: 'var(--td)' }} />
                           </button>
-                          <ChevronRight className="h-4 w-4" style={{ color: 'rgba(255,255,255,0.1)' }} />
+                          <ChevronRight className="h-4 w-4" style={{ color: 'var(--td)' }} />
                         </div>
                       </td>
                     </tr>
@@ -379,7 +391,7 @@ export function DevicesListPage() {
                 <div key={device.id}
                   onClick={() => navigate(`/devices/${device.id}`)}
                   className="flex items-center gap-3 px-4 py-3.5 cursor-pointer transition-colors active:bg-white/[0.03]"
-                  style={i < sortedDevices.length - 1 ? { borderBottom: '1px solid rgba(255,255,255,0.04)' } : {}}>
+                  style={i < sortedDevices.length - 1 ? { borderBottom: '1px solid var(--border)' } : {}}>
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                     style={{ background: 'rgba(139,92,246,0.1)' }}>
                     {device.deviceType?.icon
@@ -391,7 +403,7 @@ export function DevicesListPage() {
                       <span className="text-[13px] font-semibold text-white/85 truncate">{device.name}</span>
                       <AgentBadge agents={device.agents} />
                     </div>
-                    <div className="flex items-center gap-2 mt-0.5 text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                    <div className="flex items-center gap-2 mt-0.5 text-[11px]" style={{ color: 'var(--tm)' }}>
                       <span>{device.client?.name}</span>
                       {device.rustdeskId && (
                         <button onClick={(e) => openRustdesk(device.rustdeskId!, e)}

@@ -4,9 +4,8 @@ import { logActivity } from '../../utils/activityLogger';
 import { CreateDelegationInput, UpdateDelegationInput } from './delegations.validation';
 
 const delegationSelect = {
-  id: true, delegationNumber: true, clientId: true, title: true, description: true,
+  id: true, delegationNumber: true, workspaceId: true, title: true, description: true,
   scheduledAt: true, createdAt: true, updatedAt: true,
-  client: { select: { id: true, name: true } },
   createdBy: { select: { id: true, firstName: true, lastName: true } },
   assignedTo: { select: { id: true, firstName: true, lastName: true } },
 };
@@ -17,9 +16,9 @@ async function generateDelegationNumber(): Promise<string> {
   return `DEL-${year}-${String(count + 1).padStart(4, '0')}`;
 }
 
-export async function listDelegations(params: { clientId?: string; assignedToUserId?: string }) {
+export async function listDelegations(params: { assignedToUserId?: string; workspaceId?: string | null }) {
   const where: Record<string, unknown> = {};
-  if (params.clientId) where.clientId = params.clientId;
+  if (params.workspaceId) where.workspaceId = params.workspaceId;
   if (params.assignedToUserId) where.assignedToUserId = params.assignedToUserId;
   return prisma.delegation.findMany({ where, orderBy: { createdAt: 'desc' }, select: delegationSelect });
 }
@@ -34,7 +33,7 @@ export async function createDelegation(data: CreateDelegationInput, createdByUse
   const delegationNumber = await generateDelegationNumber();
   const d = await prisma.delegation.create({
     data: {
-      delegationNumber, clientId: data.clientId, createdByUserId,
+      delegationNumber, workspaceId: data.workspaceId, createdByUserId,
       assignedToUserId: data.assignedToUserId,
       title: data.title, description: data.description,
       scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : undefined,

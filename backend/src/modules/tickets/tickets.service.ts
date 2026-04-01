@@ -15,16 +15,20 @@ import { TicketStatus, TicketType, TicketPriority, TicketSource } from '@prisma/
 
 async function generateTaskNumber(): Promise<string> {
   const year = new Date().getFullYear();
-  const count = await prisma.task.count({
-    where: { taskNumber: { startsWith: `TSK-${year}-` } },
+  const prefix = `TSK-${year}-`;
+  const last = await prisma.task.findFirst({
+    where: { taskNumber: { startsWith: prefix } },
+    orderBy: { taskNumber: 'desc' },
+    select: { taskNumber: true },
   });
-  return `TSK-${year}-${String(count + 1).padStart(4, '0')}`;
+  const lastNum = last ? parseInt(last.taskNumber.replace(prefix, ''), 10) || 0 : 0;
+  return `${prefix}${String(lastNum + 1).padStart(4, '0')}`;
 }
 
 const ticketSelect = {
   id: true,
   ticketNumber: true,
-  clientId: true,
+  workspaceId: true,
   locationId: true,
   deviceId: true,
   createdByUserId: true,
@@ -46,9 +50,8 @@ const ticketSelect = {
   reporterPhone: true,
   createdAt: true,
   updatedAt: true,
-  client: { select: { id: true, name: true } },
   location: { select: { id: true, name: true, city: true } },
-  device: { select: { id: true, name: true, manufacturer: true, model: true, rustdeskId: true, assignedUser: { select: { id: true, firstName: true, lastName: true } } } },
+  device: { select: { id: true, name: true, manufacturer: true, model: true, rustdeskId: true, locationId: true, assignedUser: { select: { id: true, firstName: true, lastName: true } } } },
   createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
   assignedTo: { select: { id: true, firstName: true, lastName: true, email: true } },
 };
@@ -65,7 +68,7 @@ async function generateTicketNumber(): Promise<string> {
 }
 
 export async function listTickets(params: {
-  clientId?: string;
+  workspaceId?: string | null;
   locationId?: string;
   deviceId?: string;
   status?: TicketStatus;
@@ -76,22 +79,20 @@ export async function listTickets(params: {
   search?: string;
   page?: number;
   limit?: number;
-  requestingUser: { role: string; clientId?: string | null };
+  scopeFilter?: Record<string, unknown>;
+  requestingUser?: any;
 }) {
   const {
-    clientId, locationId, deviceId, status, priority, type,
-    assignedToUserId, unassigned, search, page = 1, limit = 20, requestingUser,
+    workspaceId, locationId, deviceId, status, priority, type,
+    assignedToUserId, unassigned, search, page = 1, limit = 20, scopeFilter,
   } = params;
   const skip = (page - 1) * limit;
 
   const where: Record<string, unknown> = {};
 
-  if (requestingUser.role === 'CLIENT') {
-    where.clientId = requestingUser.clientId;
-  } else if (clientId) {
-    where.clientId = clientId;
+  if (workspaceId) {
+    where.workspaceId = workspaceId;
   }
-
   if (locationId) where.locationId = locationId;
   if (deviceId) where.deviceId = deviceId;
   if (status) where.status = status;
@@ -106,6 +107,11 @@ export async function listTickets(params: {
       { ticketNumber: { contains: search, mode: 'insensitive' } },
       { description: { contains: search, mode: 'insensitive' } },
     ];
+  }
+
+  // Apply workspace scope filter (Etap 1C.2)
+  if (scopeFilter && Object.keys(scopeFilter).length > 0) {
+    where.AND = [...((where.AND as any[]) || []), scopeFilter];
   }
 
   const [tickets, total] = await Promise.all([
@@ -132,14 +138,13 @@ export async function listTickets(params: {
 
 export async function getTicketById(
   id: string,
-  requestingUser: { role: string; clientId?: string | null }
+  _requestingUser?: any,
 ) {
   const ticket = await prisma.ticket.findUnique({
     where: { id },
     select: {
       ...ticketSelect,
       comments: {
-        where: requestingUser.role === 'CLIENT' ? { isInternal: false } : {},
         select: {
           id: true,
           ticketId: true,
@@ -148,7 +153,7 @@ export async function getTicketById(
           isInternal: true,
           createdAt: true,
           updatedAt: true,
-          user: { select: { id: true, firstName: true, lastName: true, email: true, role: true } },
+          user: { select: { id: true, firstName: true, lastName: true, email: true } },
         },
         orderBy: { createdAt: 'asc' },
       },
@@ -159,47 +164,27 @@ export async function getTicketById(
     throw new AppError('Ticket not found', 404);
   }
 
-  if (requestingUser.role === 'CLIENT' && ticket.clientId !== requestingUser.clientId) {
-    throw new AppError('Access denied', 403);
-  }
-
   return ticket;
 }
 
 export async function createTicket(
   data: CreateTicketInput,
-  requestingUser: { userId: string; role: string; clientId?: string | null }
+  requestingUser: { userId: string }
 ) {
-  // Auto-fill clientId for CLIENT users
-  if (requestingUser.role === 'CLIENT') {
-    if (!data.clientId) data.clientId = requestingUser.clientId!;
-    if (data.clientId !== requestingUser.clientId) {
-      throw new AppError('Cannot create ticket for another client', 403);
-    }
-  }
+  if (!data.workspaceId) throw new AppError('workspaceId is required', 400);
 
-  if (!data.clientId) throw new AppError('clientId is required', 400);
-
-  const client = await prisma.client.findUnique({ where: { id: data.clientId } });
-  if (!client) throw new AppError('Client not found', 404);
-
-  // Auto-fill locationId — find first location for client if not provided
+  // Auto-fill locationId — find first location for workspace if not provided
   if (!data.locationId) {
-    const loc = await prisma.location.findFirst({ where: { clientId: data.clientId }, select: { id: true } });
+    const loc = await prisma.location.findFirst({ where: { workspaceId: data.workspaceId }, select: { id: true } });
     if (loc) {
       data.locationId = loc.id;
     } else {
       // Create default location
       const newLoc = await prisma.location.create({
-        data: { clientId: data.clientId, name: 'Główna', type: 'OFFICE', addressLine1: '-', postalCode: '', city: client.city ?? '' },
+        data: { workspaceId: data.workspaceId, name: 'Główna', type: 'OFFICE', addressLine1: '-', postalCode: '', city: '' },
       });
       data.locationId = newLoc.id;
     }
-  }
-
-  const location = await prisma.location.findUnique({ where: { id: data.locationId } });
-  if (!location || location.clientId !== data.clientId) {
-    throw new AppError('Location not found or does not belong to client', 404);
   }
 
   const ticketNumber = await generateTicketNumber();
@@ -209,7 +194,7 @@ export async function createTicket(
   const ticket = await prisma.ticket.create({
     data: {
       ticketNumber,
-      clientId: data.clientId,
+      workspaceId: data.workspaceId,
       locationId: data.locationId,
       deviceId: data.deviceId,
       createdByUserId: requestingUser.userId,
@@ -217,9 +202,7 @@ export async function createTicket(
       type: data.type as TicketType,
       priority: data.priority as TicketPriority,
       status: assignedToUserId ? TicketStatus.ASSIGNED : TicketStatus.PENDING,
-      source: requestingUser.role === 'CLIENT'
-        ? TicketSource.CLIENT_PORTAL
-        : data.source as TicketSource,
+      source: data.source as TicketSource,
       title: data.title,
       description: data.description,
       reporterName: data.reporterName,
@@ -245,6 +228,7 @@ export async function createTicket(
     await prisma.task.create({
       data: {
         taskNumber,
+        workspaceId: data.workspaceId,
         ticketId: ticket.id,
         assignedToUserId,
         createdByUserId: requestingUser.userId,
@@ -255,9 +239,9 @@ export async function createTicket(
     });
   }
 
-  // Notify client's active agents
+  // Notify workspace's active agents
   prisma.agentRegistration.findMany({
-    where: { clientId: data.clientId, status: 'ACTIVE' },
+    where: { workspaceId: data.workspaceId, status: 'ACTIVE' },
     select: { agentToken: true },
   }).then(regs => {
     for (const reg of regs) {
@@ -307,20 +291,11 @@ export async function updateTicket(
 export async function addTicketComment(
   ticketId: string,
   data: AddCommentInput,
-  requestingUser: { userId: string; role: string; clientId?: string | null }
+  requestingUser: { userId: string }
 ) {
   const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
   if (!ticket) {
     throw new AppError('Ticket not found', 404);
-  }
-
-  if (requestingUser.role === 'CLIENT') {
-    if (ticket.clientId !== requestingUser.clientId) {
-      throw new AppError('Access denied', 403);
-    }
-    if (data.isInternal) {
-      throw new AppError('Clients cannot create internal comments', 403);
-    }
   }
 
   const comment = await prisma.ticketComment.create({
@@ -331,7 +306,7 @@ export async function addTicketComment(
       isInternal: data.isInternal,
     },
     include: {
-      user: { select: { id: true, firstName: true, lastName: true, email: true, role: true } },
+      user: { select: { id: true, firstName: true, lastName: true, email: true } },
     },
   });
 
@@ -347,7 +322,7 @@ export async function addTicketComment(
   // Powiadom agentów klienta o nowym komentarzu (tylko publiczne)
   if (!data.isInternal) {
     prisma.agentRegistration.findMany({
-      where: { clientId: ticket.clientId, status: 'ACTIVE' },
+      where: { workspaceId: ticket.workspaceId, status: 'ACTIVE' },
       select: { agentToken: true },
     }).then(regs => {
       for (const reg of regs) {
@@ -390,8 +365,8 @@ export async function assignTicket(
 
   if (data.assignedToUserId) {
     const user = await prisma.user.findUnique({ where: { id: data.assignedToUserId } });
-    if (!user || user.role === 'CLIENT') {
-      throw new AppError('Invalid technician user', 400);
+    if (!user) {
+      throw new AppError('Invalid user', 400);
     }
   }
 
@@ -433,6 +408,7 @@ export async function assignTicket(
       await prisma.task.create({
         data: {
           taskNumber,
+          workspaceId: ticket.workspaceId,
           ticketId,
           assignedToUserId: data.assignedToUserId,
           createdByUserId: performedByUserId,
@@ -443,7 +419,7 @@ export async function assignTicket(
       });
     }
 
-    // Powiadom klienta o przypisaniu
+    // Powiadom technika o przypisaniu
     const tech = await prisma.user.findUnique({ where: { id: data.assignedToUserId }, select: { firstName: true, lastName: true } });
     if (tech) notifyTicketAssigned(ticketId, `${tech.firstName} ${tech.lastName}`);
 
@@ -495,7 +471,7 @@ export async function changeTicketStatus(
     RESOLVED: 'Rozwiązane', CLOSED: 'Zamknięte',
   };
   prisma.agentRegistration.findMany({
-    where: { clientId: ticket.clientId, status: 'ACTIVE' },
+    where: { workspaceId: ticket.workspaceId, status: 'ACTIVE' },
     select: { agentToken: true },
   }).then(regs => {
     for (const reg of regs) {
@@ -520,12 +496,12 @@ export async function changeTicketStatus(
   if (['RESOLVED', 'COMPLETED', 'CLOSED'].includes(newStatus)) {
     const ticketData = await prisma.ticket.findUnique({
       where: { id: ticketId },
-      select: { clientId: true, locationId: true, deviceId: true, title: true, ticketNumber: true, resolutionSummary: true },
+      select: { workspaceId: true, locationId: true, deviceId: true, title: true, ticketNumber: true, resolutionSummary: true },
     });
-    if (ticketData?.clientId) {
+    if (ticketData?.workspaceId) {
       await prisma.crmActivity.create({
         data: {
-          clientId: ticketData.clientId,
+          workspaceId: ticketData.workspaceId,
           locationId: ticketData.locationId,
           deviceId: ticketData.deviceId,
           createdByUserId: performedByUserId,

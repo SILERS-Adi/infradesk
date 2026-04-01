@@ -18,6 +18,17 @@ export interface AiSuggestion {
   difficulty: 'EASY' | 'MEDIUM' | 'HARD';
 }
 
+export type CommandAction =
+  | 'CREATE_CLIENT' | 'CREATE_TICKET' | 'CREATE_TASK'
+  | 'CREATE_ORDER' | 'CREATE_DELEGATION'
+  | 'CHANGE_STATUS' | 'ASSIGN_TICKET' | 'ADD_COMMENT'
+  | 'SEARCH' | 'UNKNOWN';
+
+export interface AiCommand {
+  action: CommandAction;
+  params: Record<string, any>;
+}
+
 export const aiApi = {
   parseVoice: async (transcript: string): Promise<VoiceParsed> => {
     const { data } = await apiClient.post<VoiceParsed>('/ai/voice-parse', { transcript });
@@ -26,6 +37,11 @@ export const aiApi = {
 
   suggest: async (params: { title: string; description?: string; source?: string; deviceInfo?: string }): Promise<AiSuggestion> => {
     const { data } = await apiClient.post<AiSuggestion>('/ai/suggest', params);
+    return data;
+  },
+
+  command: async (transcript: string): Promise<AiCommand> => {
+    const { data } = await apiClient.post<AiCommand>('/ai/command', { transcript });
     return data;
   },
 };

@@ -48,13 +48,13 @@ export function ActivityLogsPage() {
     <div>
       <PageHeader title="Logi aktywności" subtitle={`${logs.length} wpisów`} />
 
-      <div className="rounded-lg" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="p-4 flex gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+      <div className="rounded-lg" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+        <div className="p-4 flex gap-3" style={{ borderBottom: '1px solid var(--border)' }}>
           <select
             value={entityType}
             onChange={(e) => setEntityType(e.target.value)}
             className="text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
+            style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}
           >
             <option value="">Wszystkie encje</option>
             {ENTITY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -63,7 +63,7 @@ export function ActivityLogsPage() {
             value={actionType}
             onChange={(e) => setActionType(e.target.value)}
             className="text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)' }}
+            style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}
           >
             <option value="">Wszystkie akcje</option>
             {ACTION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -73,10 +73,10 @@ export function ActivityLogsPage() {
         {isLoading ? <LoadingSpinner /> : (
           <div>
             {logs.length === 0 ? (
-              <p className="text-sm text-center py-8" style={{ color: 'rgba(255,255,255,0.4)' }}>Brak logów</p>
+              <p className="text-sm text-center py-8" style={{ color: 'var(--tm)' }}>Brak logów</p>
             ) : logs.map(log => (
-              <div key={log.id} className="px-6 py-3 flex items-start gap-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                <div className="text-xs w-32 flex-shrink-0 mt-0.5 font-mono" style={{ color: 'rgba(255,255,255,0.3)' }}>
+              <div key={log.id} className="px-6 py-3 flex items-start gap-4" style={{ borderBottom: '1px solid var(--border)' }}>
+                <div className="text-xs w-32 flex-shrink-0 mt-0.5 font-mono" style={{ color: 'var(--tm)' }}>
                   {formatDateTime(log.createdAt)}
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
@@ -84,9 +84,9 @@ export function ActivityLogsPage() {
                   <Badge color={ACTION_COLORS[log.actionType] ?? 'gray'}>{log.actionType}</Badge>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm" style={{ color: 'rgba(255,255,255,0.6)' }}>{log.description}</p>
+                  <p className="text-sm" style={{ color: 'var(--ts)' }}>{log.description}</p>
                   {log.performedBy && (
-                    <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--tm)' }}>
                       {log.performedBy.firstName} {log.performedBy.lastName}
                     </p>
                   )}

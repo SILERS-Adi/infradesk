@@ -1,21 +1,25 @@
 import prisma from '../../lib/prisma';
 import { AppError } from '../../middleware/errorHandler';
+import { logActivity } from '../../utils/activityLogger';
 import { sendMail } from '../../lib/mailer';
 import { CreateBackupConfigInput, UpdateBackupConfigInput } from './backup.validation';
 import { encrypt } from '../../utils/crypto';
 
 // ── Config CRUD ──────────────────────────────────────────────────────────────
 
-export async function listBackupConfigs(params: { clientId?: string; agentRegId?: string }) {
+export async function listBackupConfigs(params: { workspaceId?: string | null; agentRegId?: string; scopeFilter?: Record<string, unknown> }) {
   const where: Record<string, unknown> = {};
-  if (params.clientId) where.clientId = params.clientId;
+  if (params.workspaceId) where.workspaceId = params.workspaceId;
   if (params.agentRegId) where.agentRegId = params.agentRegId;
+
+  if (params.scopeFilter && Object.keys(params.scopeFilter).length > 0) {
+    where.AND = [...((where.AND as any[]) || []), params.scopeFilter];
+  }
 
   return prisma.backupConfig.findMany({
     where,
     include: {
-      agent: { select: { id: true, hostname: true } },
-      client: { select: { id: true, name: true } },
+      agent: { select: { id: true, hostname: true, deviceId: true, device: { select: { locationId: true } } } },
       history: { orderBy: { startedAt: 'desc' }, take: 1 },
     },
     orderBy: { createdAt: 'desc' },
@@ -26,15 +30,14 @@ export async function getBackupConfig(id: string) {
   const config = await prisma.backupConfig.findUnique({
     where: { id },
     include: {
-      agent: { select: { id: true, hostname: true } },
-      client: { select: { id: true, name: true } },
+      agent: { select: { id: true, hostname: true, deviceId: true, device: { select: { locationId: true } } } },
     },
   });
   if (!config) throw new AppError('Backup config not found', 404);
   return config;
 }
 
-export async function createBackupConfig(data: CreateBackupConfigInput) {
+export async function createBackupConfig(data: CreateBackupConfigInput, performedByUserId?: string) {
   // Encrypt SQL password if provided
   let sqlPassEnc = data.sqlPassEnc ?? null;
   if (sqlPassEnc && !sqlPassEnc.includes(':')) {
@@ -48,7 +51,7 @@ export async function createBackupConfig(data: CreateBackupConfigInput) {
     encKey = randomBytes(32).toString('base64url');
   }
 
-  return prisma.backupConfig.create({
+  const config = await prisma.backupConfig.create({
     data: {
       ...data,
       sqlPassEnc,
@@ -56,12 +59,21 @@ export async function createBackupConfig(data: CreateBackupConfigInput) {
     },
     include: {
       agent: { select: { id: true, hostname: true } },
-      client: { select: { id: true, name: true } },
     },
   });
+
+  if (performedByUserId) {
+    await logActivity(prisma, {
+      entityType: 'BackupConfig', entityId: config.id, actionType: 'CREATE',
+      description: `Backup config "${config.name}" created (type=${config.type})`,
+      performedByUserId, workspaceId: config.workspaceId,
+    }).catch(() => {});
+  }
+
+  return config;
 }
 
-export async function updateBackupConfig(id: string, data: UpdateBackupConfigInput) {
+export async function updateBackupConfig(id: string, data: UpdateBackupConfigInput, performedByUserId?: string) {
   const existing = await prisma.backupConfig.findUnique({ where: { id } });
   if (!existing) throw new AppError('Backup config not found', 404);
 
@@ -70,14 +82,35 @@ export async function updateBackupConfig(id: string, data: UpdateBackupConfigInp
     sqlPassEnc = encrypt(sqlPassEnc);
   }
 
-  return prisma.backupConfig.update({
+  const updated = await prisma.backupConfig.update({
     where: { id },
     data: { ...data, sqlPassEnc },
   });
+
+  if (performedByUserId) {
+    await logActivity(prisma, {
+      entityType: 'BackupConfig', entityId: id, actionType: 'UPDATE',
+      description: `Backup config "${existing.name}" updated`,
+      performedByUserId, workspaceId: existing.workspaceId,
+    }).catch(() => {});
+  }
+
+  return updated;
 }
 
-export async function deleteBackupConfig(id: string) {
+export async function deleteBackupConfig(id: string, performedByUserId?: string) {
+  const existing = await prisma.backupConfig.findUnique({ where: { id } });
+  if (!existing) throw new AppError('Backup config not found', 404);
+
   await prisma.backupConfig.delete({ where: { id } });
+
+  if (performedByUserId) {
+    await logActivity(prisma, {
+      entityType: 'BackupConfig', entityId: id, actionType: 'DELETE',
+      description: `Backup config "${existing.name}" deleted`,
+      performedByUserId, workspaceId: existing.workspaceId,
+    }).catch(() => {});
+  }
 }
 
 export async function getBackupHistory(configId: string, limit = 50) {
@@ -141,7 +174,7 @@ export async function reportBackupComplete(historyId: string, data: {
       fileName: data.fileName,
       googleDriveId: data.googleDriveId,
     },
-    include: { config: { include: { client: true } } },
+    include: { config: { include: { workspace: { select: { email: true, name: true } } } } },
   });
 
   await prisma.backupConfig.update({
@@ -149,12 +182,12 @@ export async function reportBackupComplete(historyId: string, data: {
     data: { lastStatus: 'SUCCESS' },
   });
 
-  // Notify client
+  // Notify workspace admin
   try {
-    if (history.config.client?.email) {
+    if (history.config.workspace?.email) {
       const sizeMB = data.sizeBytes ? (data.sizeBytes / 1024 / 1024).toFixed(1) : '?';
       await sendMail(
-        history.config.client.email,
+        history.config.workspace.email,
         `[InfraDesk] Backup "${history.config.name}" — sukces`,
         `<p>Backup <strong>${history.config.name}</strong> zakończony pomyślnie.</p>
          <p>Rozmiar: ${sizeMB} MB | Plik: ${data.fileName ?? 'n/a'}</p>`
@@ -173,7 +206,7 @@ export async function reportBackupFailed(configId: string, error: string) {
       completedAt: new Date(),
       errorMessage: error,
     },
-    include: { config: { include: { client: true } } },
+    include: { config: { include: { workspace: { select: { email: true, name: true } } } } },
   });
 
   await prisma.backupConfig.update({
@@ -181,11 +214,11 @@ export async function reportBackupFailed(configId: string, error: string) {
     data: { lastStatus: 'FAILED' },
   });
 
-  // Notify client + admin
+  // Notify workspace admin
   try {
-    if (history.config.client?.email) {
+    if (history.config.workspace?.email) {
       await sendMail(
-        history.config.client.email,
+        history.config.workspace.email,
         `[InfraDesk] Backup "${history.config.name}" — BŁĄD`,
         `<p>Backup <strong>${history.config.name}</strong> zakończył się błędem.</p>
          <p style="color:red;">${error}</p>

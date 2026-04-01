@@ -1,18 +1,34 @@
 import { NavLink } from 'react-router-dom';
 import {
-  LayoutDashboard, Building2, Monitor,
-  Ticket, ChevronLeft, ChevronRight, X, MessageSquare, Bot, Briefcase, ClipboardList,
-  ShoppingCart, HelpCircle, Download, Settings, HardDrive, KeyRound, Timer,
-  Receipt, Plane, Users, CalendarDays, Sun, Moon, SunMoon,
+  LayoutDashboard, Building2, Monitor, MapPin,
+  Ticket, ChevronLeft, ChevronRight, X, MessageSquare, Bot, ClipboardList,
+  ShoppingCart, Download, Settings, HardDrive, KeyRound, Timer,
+  Receipt, Plane, Users, CalendarDays, Sun, Moon, SunMoon, LinkIcon, ExternalLink,
+  Shield, Activity, Sparkles,
 } from 'lucide-react';
 import { useTheme } from '../../store/themeStore';
+import { useAuth } from '../../store/authStore';
+import { useWorkspaceContext } from '../../hooks/useWorkspaceContext';
 import { clsx } from 'clsx';
 import { useQuery } from '@tanstack/react-query';
 import { ticketsApi } from '../../api/tickets';
 import { tasksApi } from '../../api/tasks';
+import { tenantApi } from '../../api/tenant';
 
-interface NavItem { to: string; label: string; icon: React.ReactNode; badge?: number; }
-interface NavGroup { label: string; items: NavItem[]; }
+interface NavItem {
+  to: string;
+  label: string;
+  icon: React.ReactNode;
+  badge?: number;
+  feature?: string;
+  role?: 'ADMIN' | 'SUPERADMIN';
+}
+
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+  role?: 'ADMIN' | 'SUPERADMIN';
+}
 
 interface SidebarProps {
   collapsed: boolean;
@@ -22,6 +38,10 @@ interface SidebarProps {
 }
 
 export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) {
+  const { user } = useAuth();
+  const isAdmin = useWorkspaceContext().isAdmin;
+  const isSuperAdmin = !!user?.isSuperAdmin;
+
   const { data: queueTickets = [] } = useQuery({
     queryKey: ['tickets-queue'],
     queryFn: () => ticketsApi.getAll({ status: 'PENDING' }),
@@ -32,199 +52,260 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
     queryFn: () => tasksApi.getAll({ all: false }),
     refetchInterval: 30_000, staleTime: 15_000,
   });
+  const { data: tenantUsage } = useQuery({
+    queryKey: ['tenant-usage'],
+    queryFn: tenantApi.getUsage,
+    staleTime: 60_000,
+    retry: false,
+  });
+  const features = new Set(tenantUsage?.features || []);
+  const hasFeature = (f?: string) => !f || features.size === 0 || features.has(f);
   const queueCount = queueTickets.length;
   const myActiveTasksCount = myTasks.filter(t => t.status !== 'DONE').length;
 
   const navGroups: NavGroup[] = [
-    { label: 'PANEL', items: [
-      { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-[18px] w-[18px]" /> },
-    ]},
-    { label: 'KLIENCI', items: [
-      { to: '/clients',     label: 'Klienci',      icon: <Building2 className="h-[18px] w-[18px]" /> },
-      { to: '/users',       label: 'Użytkownicy',  icon: <Users className="h-[18px] w-[18px]" /> },
-      { to: '/credentials', label: 'Dostępy',      icon: <KeyRound className="h-[18px] w-[18px]" /> },
-    ]},
-    { label: 'URZĄDZENIA', items: [
-      { to: '/devices', label: 'Urządzenia', icon: <Monitor className="h-[18px] w-[18px]" /> },
-      { to: '/agents',  label: 'Agenci',     icon: <Bot className="h-[18px] w-[18px]" /> },
-    ]},
-    { label: 'SERWIS', items: [
-      { to: '/tickets', label: 'Zgłoszenia',  icon: <Ticket className="h-[18px] w-[18px]" />, badge: queueCount > 0 ? queueCount : undefined },
-      { to: '/tasks',     label: 'Zadania',     icon: <ClipboardList className="h-[18px] w-[18px]" />, badge: myActiveTasksCount > 0 ? myActiveTasksCount : undefined },
-      { to: '/calendar',  label: 'Kalendarz',   icon: <CalendarDays className="h-[18px] w-[18px]" /> },
-      { to: '/orders',  label: 'Zamówienia',  icon: <ShoppingCart className="h-[18px] w-[18px]" /> },
-      { to: '/delegations', label: 'Delegacje', icon: <Plane className="h-[18px] w-[18px]" /> },
-    ]},
-    { label: 'CRM', items: [
-      { to: '/crm',      label: 'Aktywności', icon: <MessageSquare className="h-[18px] w-[18px]" /> },
-      { to: '/sessions', label: 'Sesje pracy', icon: <Timer className="h-[18px] w-[18px]" /> },
-      { to: '/billing',  label: 'Rozliczenia', icon: <Receipt className="h-[18px] w-[18px]" /> },
-    ]},
-    { label: 'SYSTEM', items: [
-      { to: '/backups',    label: 'Kopie zapasowe', icon: <HardDrive className="h-[18px] w-[18px]" /> },
-      { to: '/downloads',  label: 'Pobieranie',     icon: <Download className="h-[18px] w-[18px]" /> },
-      { to: '/settings',   label: 'Ustawienia',     icon: <Settings className="h-[18px] w-[18px]" /> },
-    ]},
-    { label: 'FIRMA', items: [
-      { to: '/my-company',           label: 'Dane firmy',  icon: <Building2 className="h-[18px] w-[18px]" /> },
-      { to: '/my-company/employees', label: 'Pracownicy',  icon: <Users className="h-[18px] w-[18px]" /> },
-    ]},
+    // ── GŁÓWNE ──
+    {
+      label: '',
+      items: [
+        { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard className="nav-icon" /> },
+      ],
+    },
+
+    // ── INFRASTRUKTURA ──
+    {
+      label: 'INFRASTRUKTURA',
+      items: [
+        { to: '/clients', label: 'Klienci', icon: <Building2 className="nav-icon" /> },
+        { to: '/locations', label: 'Lokalizacje', icon: <MapPin className="nav-icon" /> },
+        { to: '/devices', label: 'Urządzenia', icon: <Monitor className="nav-icon" /> },
+        { to: '/credentials', label: 'Dostępy', icon: <KeyRound className="nav-icon" /> },
+      ],
+    },
+
+    // ── SERWIS ──
+    {
+      label: 'SERWIS',
+      items: [
+        { to: '/tickets', label: 'Zgłoszenia', icon: <Ticket className="nav-icon" />, badge: queueCount > 0 ? queueCount : undefined },
+        { to: '/tasks', label: 'Zadania', icon: <ClipboardList className="nav-icon" />, badge: myActiveTasksCount > 0 ? myActiveTasksCount : undefined },
+        { to: '/calendar', label: 'Kalendarz', icon: <CalendarDays className="nav-icon" /> },
+        { to: '/orders', label: 'Zamówienia', icon: <ShoppingCart className="nav-icon" />, feature: 'orders' },
+        { to: '/delegations', label: 'Delegacje', icon: <Plane className="nav-icon" />, feature: 'delegations' },
+      ],
+    },
+
+    // ── MONITORING ──
+    {
+      label: 'MONITORING',
+      items: [
+        { to: '/agents', label: 'Agenty', icon: <Bot className="nav-icon" /> },
+        { to: '/monitoring', label: 'Audyt & Sieć', icon: <Shield className="nav-icon" />, feature: 'security_audit' },
+        { to: '/backups', label: 'Kopie zapasowe', icon: <HardDrive className="nav-icon" />, feature: 'backup' },
+        { to: '/activity-logs', label: 'Logi aktywności', icon: <Activity className="nav-icon" />, role: 'ADMIN' },
+      ],
+    },
+
+    // ── BIZNES ──
+    {
+      label: 'BIZNES',
+      items: [
+        { to: '/crm', label: 'CRM', icon: <MessageSquare className="nav-icon" />, feature: 'crm' },
+        { to: '/sessions', label: 'Sesje pracy', icon: <Timer className="nav-icon" />, feature: 'sessions' },
+        { to: '/billing', label: 'Rozliczenia', icon: <Receipt className="nav-icon" />, feature: 'billing' },
+        { to: '/ai', label: 'Asystent AI', icon: <Sparkles className="nav-icon" />, feature: 'ai' },
+      ],
+    },
+
+    // ── WSPÓŁPRACA ──
+    {
+      label: 'WSPÓŁPRACA',
+      items: [
+        { to: '/partners', label: 'Partnerzy', icon: <LinkIcon className="nav-icon" />, feature: 'partners' },
+        { to: '/shared', label: 'Infra klientów', icon: <ExternalLink className="nav-icon" />, feature: 'partners' },
+      ],
+    },
+
+    // ── ADMINISTRACJA (ADMIN only) ──
+    {
+      label: 'ADMINISTRACJA',
+      role: 'ADMIN',
+      items: [
+        { to: '/users', label: 'Użytkownicy', icon: <Users className="nav-icon" /> },
+        { to: '/workspace-members', label: 'Członkowie WS', icon: <Shield className="nav-icon" /> },
+        { to: '/settings', label: 'Ustawienia', icon: <Settings className="nav-icon" /> },
+        { to: '/tenant', label: 'Panel & Plan', icon: <Activity className="nav-icon" /> },
+        { to: '/my-company', label: 'Moja firma', icon: <Building2 className="nav-icon" /> },
+        { to: '/child-tenants', label: 'Podmioty', icon: <Building2 className="nav-icon" /> },
+        { to: '/downloads', label: 'Pobieranie', icon: <Download className="nav-icon" /> },
+      ],
+    },
+
+    // ── PLATFORMA (SuperAdmin only) ──
+    {
+      label: 'PLATFORMA',
+      role: 'SUPERADMIN',
+      items: [
+        { to: '/superadmin', label: 'Dashboard SA', icon: <Activity className="nav-icon" /> },
+        { to: '/superadmin/tenants', label: 'Tenanci', icon: <Building2 className="nav-icon" /> },
+        { to: '/superadmin/users', label: 'Użytkownicy SA', icon: <Users className="nav-icon" /> },
+        { to: '/superadmin/pricing', label: 'Stawki', icon: <Receipt className="nav-icon" /> },
+        { to: '/superadmin/email', label: 'Email', icon: <Settings className="nav-icon" /> },
+      ],
+    },
   ];
 
+  const canSeeGroup = (group: NavGroup) => {
+    if (!group.role) return true;
+    if (group.role === 'ADMIN') return isAdmin;
+    if (group.role === 'SUPERADMIN') return isSuperAdmin;
+    return false;
+  };
+
+  const canSeeItem = (item: NavItem) => {
+    if (!hasFeature(item.feature)) return false;
+    if (!item.role) return true;
+    if (item.role === 'ADMIN') return isAdmin;
+    if (item.role === 'SUPERADMIN') return isSuperAdmin;
+    return false;
+  };
+
   return (
-    <aside className={clsx('flex flex-col h-full transition-all duration-300 ease-in-out relative z-[2]', collapsed ? 'w-16' : 'w-[220px]')}
-      style={{
-        background: 'rgba(8, 14, 28, 0.92)',
-        backdropFilter: 'blur(16px) saturate(1.4)',
-        borderRight: '1px solid rgba(255,255,255,0.08)',
-        boxShadow: '8px 0 30px rgba(0,0,0,0.25)',
-      }}>
+    <aside className={clsx('sidebar', collapsed && 'collapsed')}
+      style={collapsed ? { width: 64 } : undefined}>
 
       {/* Logo */}
-      <div className="flex-shrink-0 relative" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.015)' }}>
+      <div className="sidebar-header">
         {mobile && (
-          <button onClick={onClose} className="absolute top-2 right-2 text-white/40 hover:text-white/70 p-1 rounded z-10">
+          <button onClick={onClose} className="absolute top-2 right-2 p-1 rounded z-10"
+            style={{ color: 'var(--tm)' }}>
             <X className="h-4 w-4" />
           </button>
         )}
-        {collapsed ? (
-          <div className="flex items-center justify-center h-14">
-            <img src="/logo-mono.png" alt="" className="w-8 h-8 object-contain opacity-85" />
+        <div className="sidebar-logo">
+          <div className="sidebar-logo-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+            </svg>
           </div>
-        ) : (
-          <div className="flex items-center gap-2.5 px-5 h-14">
-            <img src="/logo-mono.png" alt="" className="w-7 h-7 object-contain opacity-90" />
-            <span className="text-[14px] font-semibold text-white">InfraDesk</span>
-          </div>
-        )}
+          {!collapsed && (
+            <div>
+              <div className="sidebar-logo-text">InfraDesk</div>
+              <div className="sidebar-logo-sub">Panel zarządzania</div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto py-5 px-3 space-y-6">
-        {navGroups.map(group => (
-          <div key={group.label}>
-            {!collapsed && (
-              <p className="text-[10px] font-bold uppercase tracking-[0.08em] px-3 mb-2" style={{ color: 'rgba(255,255,255,0.34)' }}>
-                {group.label}
-              </p>
-            )}
-            <div className="space-y-[3px]">
-              {group.items.map(item => (
+      <nav className="sidebar-nav">
+        {navGroups.map(group => {
+          if (!canSeeGroup(group)) return null;
+          const visibleItems = group.items.filter(canSeeItem);
+          if (visibleItems.length === 0) return null;
+
+          const isPlatform = group.role === 'SUPERADMIN';
+
+          return (
+            <div key={group.label || 'top'}>
+              {!collapsed && group.label && (
+                <p style={{
+                  fontSize: 8,
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  color: isPlatform ? 'rgba(248,113,113,0.5)' : 'var(--td)',
+                  padding: '8px 10px 2px',
+                  ...(isPlatform ? { borderTop: '1px solid rgba(248,113,113,0.1)', marginTop: 4, paddingTop: 10 } : {}),
+                }}>
+                  {group.label}
+                </p>
+              )}
+              {visibleItems.map(item => (
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  end={item.to === '/tickets'}
+                  end={item.to === '/tickets' || item.to === '/superadmin'}
                   onClick={mobile ? onClose : undefined}
                   title={collapsed ? item.label : undefined}
-                  className={({ isActive }) =>
-                    clsx(
-                      'flex items-center rounded-xl text-[13px] font-medium transition-all duration-150 relative',
-                      collapsed ? 'justify-center w-10 h-10 mx-auto' : 'gap-2.5 px-3 py-[9px]',
-                      isActive
-                        ? 'text-white'
-                        : 'text-white/55 hover:text-white/85 hover:bg-white/[0.05]'
-                    )
-                  }
-                  style={({ isActive }) => isActive ? {
-                    background: 'linear-gradient(90deg, rgba(124,58,237,0.18), rgba(37,99,235,0.08))',
-                    border: '1px solid rgba(124,58,237,0.25)',
-                    boxShadow: '0 0 16px rgba(124,58,237,0.08)',
-                  } : {}}
+                  className={({ isActive }) => clsx('nav-item', isActive && 'active')}
+                  style={({ isActive }) => ({
+                    ...(collapsed ? { justifyContent: 'center', padding: '9px' } : {}),
+                    ...(isPlatform && isActive ? { color: '#F87171' } : {}),
+                    ...(isPlatform && !isActive ? { color: 'rgba(248,113,113,0.4)' } : {}),
+                  })}
                 >
                   {item.icon}
-                  {!collapsed && (
-                    <>
-                      <span className="flex-1">{item.label}</span>
-                      {item.badge != null && (
-                        <span className="text-[10px] font-bold px-1.5 py-[1px] rounded-full min-w-[18px] text-center"
-                          style={{ background: 'rgba(239,68,68,0.15)', color: '#F87171' }}>
-                          {item.badge}
-                        </span>
-                      )}
-                    </>
-                  )}
-                  {collapsed && item.badge != null && (
-                    <span className="absolute -top-0.5 -right-0.5 w-[14px] h-[14px] text-[8px] font-bold rounded-full flex items-center justify-center"
-                      style={{ background: '#EF4444', color: '#fff' }}>
-                      {item.badge > 9 ? '9+' : item.badge}
+                  {!collapsed && <span style={{ flex: 1 }}>{item.label}</span>}
+                  {!collapsed && item.badge != null && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 20,
+                      background: 'rgba(239,68,68,0.15)', color: '#F87171',
+                    }}>
+                      {item.badge}
                     </span>
                   )}
                 </NavLink>
               ))}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* Theme switcher */}
       <ThemeSwitcher collapsed={collapsed} />
 
-      {/* FAQ */}
-      <div className="px-2.5 pb-1 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-        <NavLink to="/faq" onClick={mobile ? onClose : undefined} title={collapsed ? 'FAQ' : undefined}
-          className={({ isActive }) => clsx(
-            'flex items-center rounded-xl text-[13px] font-medium transition-all duration-150',
-            collapsed ? 'justify-center w-10 h-10 mx-auto' : 'gap-2.5 px-3 py-[9px]',
-            isActive ? 'text-white bg-white/[0.06]' : 'text-white/45 hover:text-white/70 hover:bg-white/[0.04]'
-          )}>
-          <HelpCircle className="h-[18px] w-[18px]" />
-          {!collapsed && <span className="flex-1">FAQ</span>}
-        </NavLink>
+      {/* Footer */}
+      <div className="sidebar-footer">
+        {!collapsed && (
+          <div className="mode-switch" onClick={onToggle}>
+            <span className="mode-label">Zwiń panel</span>
+            <ChevronLeft style={{ width: 12, height: 12, color: 'var(--tm)' }} />
+          </div>
+        )}
+        {collapsed && (
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <button onClick={onToggle} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--tm)', padding: 8 }}>
+              <ChevronRight style={{ width: 14, height: 14 }} />
+            </button>
+          </div>
+        )}
+        <div className="sidebar-version">InfraDesk v5.0.0 · © SILERS</div>
       </div>
-
-      {/* Toggle */}
-      {!mobile && (
-        <div className="p-2.5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          <button onClick={onToggle}
-            className={clsx(
-              'flex items-center justify-center rounded-xl text-white/40 hover:text-white/65 hover:bg-white/[0.05] transition-colors',
-              collapsed ? 'w-10 h-10 mx-auto' : 'w-full h-9 gap-2 text-xs px-3'
-            )}>
-            {collapsed ? <ChevronRight className="h-4 w-4" /> : <><ChevronLeft className="h-4 w-4" /><span>Zwiń</span></>}
-          </button>
-        </div>
-      )}
     </aside>
   );
 }
 
 function ThemeSwitcher({ collapsed }: { collapsed: boolean }) {
   const { mode, setMode } = useTheme();
-  const modes: { value: 'light' | 'dark' | 'auto'; icon: React.ReactNode; label: string }[] = [
-    { value: 'light', icon: <Sun className="h-3.5 w-3.5" />, label: 'Jasny' },
-    { value: 'auto',  icon: <SunMoon className="h-3.5 w-3.5" />, label: 'Auto' },
-    { value: 'dark',  icon: <Moon className="h-3.5 w-3.5" />, label: 'Ciemny' },
-  ];
 
   if (collapsed) {
     return (
-      <div className="px-2.5 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-        <button
-          onClick={() => setMode(mode === 'dark' ? 'light' : mode === 'light' ? 'auto' : 'dark')}
-          className="flex items-center justify-center w-10 h-10 mx-auto rounded-xl text-white/40 hover:text-white/65 hover:bg-white/[0.05] transition-colors"
-          title={mode === 'auto' ? 'Auto' : mode === 'light' ? 'Jasny' : 'Ciemny'}
-        >
-          {mode === 'light' ? <Sun className="h-[18px] w-[18px]" /> : mode === 'auto' ? <SunMoon className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
+      <div style={{ padding: '8px 6px', borderTop: '1px solid var(--border)' }}>
+        <button onClick={() => setMode(mode === 'dark' ? 'light' : mode === 'light' ? 'auto' : 'dark')}
+          className="theme-toggle" style={{ margin: '0 auto', display: 'flex' }}>
+          {mode === 'light' ? <Sun style={{ width: 14, height: 14 }} /> : <Moon style={{ width: 14, height: 14 }} />}
         </button>
       </div>
     );
   }
 
   return (
-    <div className="px-3 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-      <div className="flex rounded-xl p-0.5" style={{ background: 'rgba(255,255,255,0.04)' }}>
-        {modes.map(m => (
-          <button
-            key={m.value}
-            onClick={() => setMode(m.value)}
-            className={clsx(
-              'flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[11px] font-medium transition-all',
-              mode === m.value ? 'text-white' : 'text-white/35 hover:text-white/55'
-            )}
-            style={mode === m.value ? { background: 'rgba(139,92,246,0.2)', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' } : {}}
-          >
-            {m.icon}
-            {m.label}
+    <div style={{ padding: '8px 10px', borderTop: '1px solid var(--border)' }}>
+      <div style={{ display: 'flex', borderRadius: 8, background: 'var(--glass-bg, rgba(255,255,255,0.04))', border: '1px solid var(--border)', padding: 2 }}>
+        {(['light', 'auto', 'dark'] as const).map(m => (
+          <button key={m} onClick={() => setMode(m)}
+            style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+              padding: '5px 0', borderRadius: 6, fontSize: 10, fontWeight: 500, border: 'none', cursor: 'pointer',
+              color: mode === m ? 'var(--accent, #4F8CFF)' : 'var(--td)',
+              background: mode === m ? 'var(--accent-g, rgba(79,140,255,0.12))' : 'transparent',
+              transition: 'all .2s',
+            }}>
+            {m === 'light' && <Sun style={{ width: 12, height: 12 }} />}
+            {m === 'auto' && <SunMoon style={{ width: 12, height: 12 }} />}
+            {m === 'dark' && <Moon style={{ width: 12, height: 12 }} />}
+            {m === 'light' ? 'Jasny' : m === 'auto' ? 'Auto' : 'Ciemny'}
           </button>
         ))}
       </div>

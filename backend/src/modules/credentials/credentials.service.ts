@@ -7,7 +7,7 @@ import { CredentialCategory } from '@prisma/client';
 
 const credentialSelect = {
   id: true,
-  clientId: true,
+  workspaceId: true,
   locationId: true,
   deviceId: true,
   name: true,
@@ -23,38 +23,39 @@ const credentialSelect = {
   updatedAt: true,
   accessTypeId: true,
   userId: true,
-  client:     { select: { id: true, name: true } },
   location:   { select: { id: true, name: true } },
-  device:     { select: { id: true, name: true } },
+  device:     { select: { id: true, name: true, locationId: true } },
   createdBy:  { select: { id: true, firstName: true, lastName: true, email: true } },
   accessType: { select: { id: true, name: true, slug: true, icon: true, color: true } },
   user:       { select: { id: true, firstName: true, lastName: true } },
 };
 
 export async function listCredentials(params: {
-  clientId?: string;
+  workspaceId?: string | null;
   locationId?: string;
   deviceId?: string;
   category?: CredentialCategory;
   page?: number;
   limit?: number;
-  requestingUser: { role: string; clientId?: string | null };
+  scopeFilter?: Record<string, unknown>;
+  requestingUser?: any;
 }) {
-  const { clientId, locationId, deviceId, category, page = 1, limit = 20, requestingUser } = params;
+  const { workspaceId, locationId, deviceId, category, page = 1, limit = 20, scopeFilter } = params;
   const skip = (page - 1) * limit;
 
   const where: Record<string, unknown> = {};
 
-  if (requestingUser.role === 'CLIENT') {
-    where.clientId = requestingUser.clientId;
-    where.isSharedWithClient = true;
-  } else if (clientId) {
-    where.clientId = clientId;
+  if (workspaceId) {
+    where.workspaceId = workspaceId;
   }
 
   if (locationId) where.locationId = locationId;
   if (deviceId) where.deviceId = deviceId;
   if (category) where.category = category;
+
+  if (scopeFilter && Object.keys(scopeFilter).length > 0) {
+    where.AND = [...((where.AND as any[]) || []), scopeFilter];
+  }
 
   const [credentials, total] = await Promise.all([
     prisma.credential.findMany({
@@ -81,7 +82,7 @@ export async function listCredentials(params: {
 
 export async function getCredentialById(
   id: string,
-  requestingUser: { role: string; clientId?: string | null }
+  _requestingUser?: any,
 ) {
   const credential = await prisma.credential.findUnique({
     where: { id },
@@ -92,18 +93,12 @@ export async function getCredentialById(
     throw new AppError('Credential not found', 404);
   }
 
-  if (requestingUser.role === 'CLIENT') {
-    if (credential.clientId !== requestingUser.clientId || !credential.isSharedWithClient) {
-      throw new AppError('Access denied', 403);
-    }
-  }
-
   return credential;
 }
 
 export async function revealCredential(
   id: string,
-  requestingUser: { role: string; clientId?: string | null; userId: string }
+  requestingUser: { userId: string }
 ) {
   const credential = await prisma.credential.findUnique({
     where: { id },
@@ -112,12 +107,6 @@ export async function revealCredential(
 
   if (!credential) {
     throw new AppError('Credential not found', 404);
-  }
-
-  if (requestingUser.role === 'CLIENT') {
-    if (credential.clientId !== requestingUser.clientId || !credential.isSharedWithClient) {
-      throw new AppError('Access denied', 403);
-    }
   }
 
   let decryptedPassword: string;
@@ -133,7 +122,7 @@ export async function revealCredential(
     actionType: 'VIEW_SECRET',
     description: `Password revealed for credential "${credential.name}"`,
     performedByUserId: requestingUser.userId,
-    metadata: { credentialName: credential.name, clientId: credential.clientId },
+    metadata: { credentialName: credential.name },
   });
 
   return {
@@ -144,30 +133,11 @@ export async function revealCredential(
 }
 
 export async function createCredential(data: CreateCredentialInput, performedByUserId: string) {
-  const client = await prisma.client.findUnique({ where: { id: data.clientId } });
-  if (!client) {
-    throw new AppError('Client not found', 404);
-  }
-
-  if (data.locationId) {
-    const location = await prisma.location.findUnique({ where: { id: data.locationId } });
-    if (!location || location.clientId !== data.clientId) {
-      throw new AppError('Location not found or does not belong to client', 404);
-    }
-  }
-
-  if (data.deviceId) {
-    const device = await prisma.device.findUnique({ where: { id: data.deviceId } });
-    if (!device || device.clientId !== data.clientId) {
-      throw new AppError('Device not found or does not belong to client', 404);
-    }
-  }
-
   const passwordEncrypted = encrypt(data.password);
 
   const credential = await prisma.credential.create({
     data: {
-      clientId:          data.clientId,
+      workspaceId:       data.workspaceId,
       locationId:        data.locationId,
       deviceId:          data.deviceId,
       accessTypeId:      data.accessTypeId,

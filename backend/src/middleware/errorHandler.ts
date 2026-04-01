@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { config } from '../config';
+import { ZodError } from 'zod';
 
 export class AppError extends Error {
   public statusCode: number;
@@ -13,6 +14,17 @@ export class AppError extends Error {
   }
 }
 
+/** Standard error response shape */
+function errorResponse(res: Response, req: Request, status: number, error: string, details?: unknown) {
+  const body: Record<string, unknown> = {
+    error,
+    status,
+    requestId: (req as any).requestId ?? undefined,
+  };
+  if (details) body.details = details;
+  res.status(status).json(body);
+}
+
 export function errorHandler(
   err: Error,
   req: Request,
@@ -20,10 +32,9 @@ export function errorHandler(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   next: NextFunction
 ): void {
+  // Operational errors (thrown intentionally)
   if (err instanceof AppError) {
-    res.status(err.statusCode).json({
-      error: err.message,
-    });
+    errorResponse(res, req, err.statusCode, err.message);
     return;
   }
 
@@ -32,34 +43,39 @@ export function errorHandler(
     const prismaError = err as Error & { code?: string; meta?: { field_name?: string; target?: string[] } };
     if (prismaError.code === 'P2002') {
       const field = prismaError.meta?.target?.[0] || 'field';
-      res.status(409).json({ error: `A record with this ${field} already exists` });
+      errorResponse(res, req, 409, `A record with this ${field} already exists`);
       return;
     }
     if (prismaError.code === 'P2025') {
-      res.status(404).json({ error: 'Record not found' });
+      errorResponse(res, req, 404, 'Record not found');
       return;
     }
     if (prismaError.code === 'P2003') {
-      res.status(400).json({ error: 'Related record not found' });
+      errorResponse(res, req, 400, 'Related record not found');
       return;
     }
   }
 
-  // Validation errors
-  if (err.name === 'ZodError') {
-    res.status(422).json({
-      error: 'Validation failed',
-      details: err.message,
-    });
+  // Zod validation errors
+  if (err instanceof ZodError) {
+    const issues = err.issues.map(i => ({
+      field: i.path.join('.'),
+      message: i.message,
+    }));
+    errorResponse(res, req, 400, 'Validation failed', issues);
     return;
   }
 
+  // Unhandled errors
   console.error('Unhandled error:', err);
 
   const message = config.nodeEnv === 'production' ? 'Internal server error' : err.message;
-
-  res.status(500).json({
+  const body: Record<string, unknown> = {
     error: message,
-    ...(config.nodeEnv !== 'production' && { stack: err.stack }),
-  });
+    status: 500,
+    requestId: (req as any).requestId ?? undefined,
+  };
+  if (config.nodeEnv !== 'production') body.stack = err.stack;
+
+  res.status(500).json(body);
 }

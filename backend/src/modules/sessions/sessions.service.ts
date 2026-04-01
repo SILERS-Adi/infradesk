@@ -3,7 +3,6 @@ import { AppError } from '../../middleware/errorHandler';
 import { notifyTicketWorkStarted, notifyTicketWorkCompleted } from '../../utils/ticketNotifications';
 
 const sessionInclude = {
-  client: { select: { id: true, name: true, hasContract: true, contractHours: true, contractMonthlyValue: true, hourlyRate: true, contractHourlyRateOverLimit: true, billingIntervalMinutes: true } },
   ticket: { select: { id: true, ticketNumber: true, title: true } },
   location: { select: { id: true, name: true } },
   device: { select: { id: true, name: true } },
@@ -23,22 +22,28 @@ function calcWorkMinutes(entries: { startedAt: Date; endedAt: Date | null }[]): 
 // ── List all sessions (admin view) ───────────────────────────────────────────
 
 export async function listAllSessions(params: {
+  workspaceId?: string | null;
   techId?: string;
-  clientId?: string;
   from?: string;
   to?: string;
   page?: number;
   limit?: number;
+  scopeFilter?: Record<string, unknown>;
 }) {
-  const { techId, clientId, from, to, page = 1, limit = 50 } = params;
+  const { workspaceId, techId, from, to, page = 1, limit = 50, scopeFilter } = params;
   const skip = (page - 1) * limit;
   const where: Record<string, unknown> = {};
+  if (workspaceId) where.workspaceId = workspaceId;
   if (techId) where.techId = techId;
-  if (clientId) where.clientId = clientId;
   if (from || to) {
     where.startedAt = {};
     if (from) (where.startedAt as any).gte = new Date(from);
     if (to) (where.startedAt as any).lte = new Date(to);
+  }
+
+  // Apply workspace scope filter (Etap 1C.3)
+  if (scopeFilter && Object.keys(scopeFilter).length > 0) {
+    where.AND = [...((where.AND as any[]) || []), scopeFilter];
   }
 
   const [data, total] = await Promise.all([
@@ -96,20 +101,20 @@ export async function deleteSession(id: string) {
 export async function startSession(techId: string, agentRegId: string) {
   const reg = await prisma.agentRegistration.findUnique({
     where: { id: agentRegId },
-    select: { clientId: true, deviceId: true },
+    select: { workspaceId: true, deviceId: true },
   });
-  if (!reg?.clientId) throw new Error('Agent nie jest przypisany do klienta');
+  if (!reg?.workspaceId) throw new Error('Agent nie jest przypisany do workspace');
 
   const session = await prisma.workSession.create({
     data: {
       techId,
       agentRegId,
-      clientId: reg.clientId,
+      workspaceId: reg.workspaceId,
       deviceId: reg.deviceId ?? undefined,
       startedAt: new Date(),
       status: 'ACTIVE',
     },
-    include: { client: { select: { id: true, name: true } }, device: { select: { id: true, name: true } } },
+    include: { device: { select: { id: true, name: true } } },
   });
 
   // Pierwszy wpis czasu
@@ -164,7 +169,7 @@ export async function endSession(id: string, techId: string, notes?: string) {
 // ── Mobile session ───────────────────────────────────────────────────────────
 
 export async function startMobileSession(techId: string, data: {
-  clientId: string;
+  workspaceId: string;
   ticketId?: string;
   locationId?: string;
   deviceId?: string;
@@ -173,7 +178,7 @@ export async function startMobileSession(techId: string, data: {
   // Allow multiple concurrent sessions (multitasking)
   const session = await prisma.workSession.create({
     data: {
-      clientId: data.clientId,
+      workspaceId: data.workspaceId,
       techId,
       ticketId: data.ticketId ?? null,
       locationId: data.locationId ?? null,
@@ -270,9 +275,9 @@ export async function getActiveTechSession(techId: string) {
 
 // ── Sessions by client ───────────────────────────────────────────────────────
 
-export async function getSessionsByClient(clientId: string) {
+export async function getSessionsByClient(workspaceId: string) {
   return prisma.workSession.findMany({
-    where: { clientId },
+    where: { workspaceId },
     orderBy: { startedAt: 'desc' },
     take: 100,
     include: {
