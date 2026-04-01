@@ -149,6 +149,7 @@ model User {
   assignedDelegations Delegation[] @relation("DelegationAssignedTo")
   techPosition        TechPosition?
   pushSubscriptions   PushSubscription[]
+  workspaceMemberships WorkspaceMembership[]
 }
 
 model TechPosition {
@@ -235,12 +236,17 @@ model Location {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
+  workspaceId           String?
+
   client        Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  workspace     Workspace?    @relation("LocationWorkspace", fields: [workspaceId], references: [id])
   devices       Device[]
   credentials   Credential[]
   tickets       Ticket[]
   crmActivities CrmActivity[]
   workSessions  WorkSession[]
+
+  @@index([workspaceId])
 }
 
 model DeviceType {
@@ -288,6 +294,7 @@ model Device {
   gpsLat               Float?
   gpsLon               Float?
   managerId            String?
+  workspaceId          String?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
 
@@ -296,11 +303,14 @@ model Device {
   location      Location      @relation(fields: [locationId], references: [id])
   deviceType    DeviceType?   @relation(fields: [deviceTypeId], references: [id])
   assignedUser  User?         @relation("DeviceAssignedUser", fields: [assignedUserId], references: [id])
+  workspace     Workspace?    @relation("DeviceWorkspace", fields: [workspaceId], references: [id])
   credentials   Credential[]
   tickets       Ticket[]
   crmActivities CrmActivity[]
   agents        AgentRegistration[]
   workSessions  WorkSession[]
+
+  @@index([workspaceId])
 }
 
 model AccessType {
@@ -334,6 +344,7 @@ model Credential {
   notes             String?
   isSharedWithClient Boolean           @default(false)
   createdByUserId   String
+  workspaceId       String?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
@@ -343,6 +354,9 @@ model Credential {
   createdBy   User        @relation(fields: [createdByUserId], references: [id])
   accessType  AccessType? @relation(fields: [accessTypeId], references: [id])
   user        User?       @relation("CredentialUser", fields: [userId], references: [id])
+  workspace   Workspace?  @relation("CredentialWorkspace", fields: [workspaceId], references: [id])
+
+  @@index([workspaceId])
 }
 
 model Ticket {
@@ -370,17 +384,21 @@ model Ticket {
   updatedAt         DateTime      @updatedAt
   reporterName     String?
   reporterPhone    String?
+  workspaceId      String?
 
   client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
   location    Location  @relation(fields: [locationId], references: [id])
   device      Device?   @relation(fields: [deviceId], references: [id])
   createdBy   User      @relation("TicketCreatedBy", fields: [createdByUserId], references: [id])
   assignedTo  User?     @relation("TicketAssignedTo", fields: [assignedToUserId], references: [id])
+  workspace   Workspace? @relation("TicketWorkspace", fields: [workspaceId], references: [id])
   comments       TicketComment[]
   tasks          Task[]
   orders         Order[]
   workSessions   WorkSession[]
   crmActivities  CrmActivity[] @relation("CrmLinkedTicket")
+
+  @@index([workspaceId])
 }
 
 model TicketComment {
@@ -404,9 +422,13 @@ model ActivityLog {
   description       String
   performedByUserId String?
   metadata          Json?
+  workspaceId       String?
   createdAt         DateTime @default(now())
 
-  performedBy User? @relation(fields: [performedByUserId], references: [id])
+  performedBy User?      @relation(fields: [performedByUserId], references: [id])
+  workspace   Workspace? @relation("ActivityLogWorkspace", fields: [workspaceId], references: [id])
+
+  @@index([workspaceId])
 }
 
 model CrmActivity {
@@ -441,6 +463,7 @@ model CrmActivity {
   quoteValue       Float?
   quoteAttachmentUrl String?
   linkedTicketId   String?
+  workspaceId      String?
 
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
@@ -451,10 +474,12 @@ model CrmActivity {
   createdBy     User      @relation("CrmCreatedBy", fields: [createdByUserId], references: [id])
   assignedTo    User?     @relation("CrmAssignedTo", fields: [assignedToUserId], references: [id])
   linkedTicket  Ticket?   @relation("CrmLinkedTicket", fields: [linkedTicketId], references: [id])
+  workspace     Workspace? @relation("CrmWorkspace", fields: [workspaceId], references: [id])
 
   @@index([clientId])
   @@index([type])
   @@index([occurredAt])
+  @@index([workspaceId])
 }
 
 model WorkSession {
@@ -474,17 +499,21 @@ model WorkSession {
   notes          String?
   createdAt      DateTime  @default(now())
 
+  workspaceId String?
+
   client      Client             @relation(fields: [clientId], references: [id], onDelete: Cascade)
   device      Device?            @relation(fields: [deviceId], references: [id])
   tech        User               @relation("WorkSessionTech", fields: [techId], references: [id])
   ticket      Ticket?            @relation(fields: [ticketId], references: [id])
   location    Location?          @relation(fields: [locationId], references: [id])
+  workspace   Workspace?         @relation("WorkSessionWorkspace", fields: [workspaceId], references: [id])
   timeEntries SessionTimeEntry[]
 
   @@index([clientId])
   @@index([techId])
   @@index([ticketId])
   @@index([status])
+  @@index([workspaceId])
 }
 
 model SessionTimeEntry {
@@ -548,6 +577,7 @@ model AgentRegistration {
   installedSoftware   Json?
   serverMetrics       Json?
   managerId      String?
+  workspaceId    String?
   appVersion     String?
   lastSeen       DateTime?
   createdAt      DateTime    @default(now())
@@ -557,7 +587,10 @@ model AgentRegistration {
   device       Device?  @relation(fields: [deviceId], references: [id])
   assignedUser  User?    @relation("AgentUser", fields: [assignedUserId], references: [id])
   manager       User?    @relation("DeviceManager", fields: [managerId], references: [id])
+  workspace    Workspace? @relation("AgentWorkspace", fields: [workspaceId], references: [id])
   backupConfigs BackupConfig[]
+
+  @@index([workspaceId])
 }
 
 model Setting {
@@ -584,6 +617,7 @@ model BackupConfig {
   retentionDays   Int      @default(30)
   encryptBackups  Boolean  @default(true)
   encryptionKey   String?
+  workspaceId     String?
   lastRunAt       DateTime?
   lastStatus      String?  // SUCCESS | FAILED | RUNNING
   createdAt       DateTime @default(now())
@@ -591,10 +625,12 @@ model BackupConfig {
 
   agent   AgentRegistration @relation(fields: [agentRegId], references: [id])
   client  Client            @relation(fields: [clientId], references: [id])
+  workspace Workspace?      @relation("BackupWorkspace", fields: [workspaceId], references: [id])
   history BackupHistory[]
 
   @@index([agentRegId])
   @@index([clientId])
+  @@index([workspaceId])
 }
 
 model BackupHistory {
@@ -675,9 +711,14 @@ model Task {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
-  ticket     Ticket? @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  assignedTo User    @relation("TaskAssignedTo", fields: [assignedToUserId], references: [id])
-  createdBy  User    @relation("TaskCreatedBy", fields: [createdByUserId], references: [id])
+  workspaceId      String?
+
+  ticket     Ticket?    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  assignedTo User       @relation("TaskAssignedTo", fields: [assignedToUserId], references: [id])
+  createdBy  User       @relation("TaskCreatedBy", fields: [createdByUserId], references: [id])
+  workspace  Workspace? @relation("TaskWorkspace", fields: [workspaceId], references: [id])
+
+  @@index([workspaceId])
 }
 
 model ClientFavorite {
@@ -712,11 +753,16 @@ model Order {
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
+  workspaceId      String?
+
   client     Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
   ticket     Ticket?     @relation(fields: [ticketId], references: [id])
   createdBy  User        @relation("OrderCreatedBy", fields: [createdByUserId], references: [id])
   assignedTo User?       @relation("OrderAssignedTo", fields: [assignedToUserId], references: [id])
+  workspace  Workspace?  @relation("OrderWorkspace", fields: [workspaceId], references: [id])
   items      OrderItem[]
+
+  @@index([workspaceId])
 }
 
 model OrderItem {
@@ -744,7 +790,184 @@ model Delegation {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  client     Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  createdBy  User   @relation("DelegationCreatedBy", fields: [createdByUserId], references: [id])
-  assignedTo User?  @relation("DelegationAssignedTo", fields: [assignedToUserId], references: [id])
+  workspaceId      String?
+
+  client     Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdBy  User       @relation("DelegationCreatedBy", fields: [createdByUserId], references: [id])
+  assignedTo User?      @relation("DelegationAssignedTo", fields: [assignedToUserId], references: [id])
+  workspace  Workspace? @relation("DelegationWorkspace", fields: [workspaceId], references: [id])
+
+  @@index([workspaceId])
+}
+
+// ── Workspace model (migration prep) ────────────────────────────────
+
+enum WorkspaceType {
+  PERSONAL
+  COMPANY
+  MSP
+}
+
+enum WorkspacePlan {
+  FREE
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  TECHNICIAN
+  MEMBER
+  VIEWER
+}
+
+enum ScopeType {
+  FULL
+  SCOPED
+}
+
+enum MembershipSource {
+  DIRECT
+  MSP_ASSIGNED
+  INVITATION
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INVITED
+  REVOKED
+}
+
+enum ManagementStatus {
+  ACTIVE
+  SUSPENDED
+  DETACHED
+}
+
+enum ManagementAccess {
+  FULL_MANAGEMENT
+  REMOTE_SUPPORT
+  MONITORING_ONLY
+}
+
+enum GrantResourceType {
+  LOCATION
+  DEVICE
+}
+
+model Workspace {
+  id String @id @default(uuid())
+  name String
+  slug String @unique
+  type WorkspaceType
+  plan WorkspacePlan @default(FREE)
+  legalName String?
+  taxId String?
+  email String?
+  phone String?
+  website String?
+  addressLine1 String?
+  postalCode String?
+  city String?
+  country String @default("PL")
+  logoUrl String?
+  primaryColor String? @default("#6D28D9")
+  maxAgents Int @default(10)
+  maxUsers Int @default(5)
+  workspaceKey String @unique @default(uuid())
+  isActive Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  memberships WorkspaceMembership[]
+  managedBy WorkspaceManagement[] @relation("ManagedCompany")
+  manages WorkspaceManagement[] @relation("ManagingMsp")
+  settings WorkspaceSetting[]
+  locations Location[] @relation("LocationWorkspace")
+  devices Device[] @relation("DeviceWorkspace")
+  tickets Ticket[] @relation("TicketWorkspace")
+  credentials Credential[] @relation("CredentialWorkspace")
+  agents AgentRegistration[] @relation("AgentWorkspace")
+  tasks Task[] @relation("TaskWorkspace")
+  workSessions WorkSession[] @relation("WorkSessionWorkspace")
+  orders Order[] @relation("OrderWorkspace")
+  delegations Delegation[] @relation("DelegationWorkspace")
+  crmActivities CrmActivity[] @relation("CrmWorkspace")
+  backupConfigs BackupConfig[] @relation("BackupWorkspace")
+  activityLogs ActivityLog[] @relation("ActivityLogWorkspace")
+  @@index([type])
+  @@index([isActive])
+}
+
+model WorkspaceMembership {
+  id String @id @default(uuid())
+  userId String
+  workspaceId String
+  role MemberRole @default(MEMBER)
+  scopeType ScopeType @default(FULL)
+  source MembershipSource @default(DIRECT)
+  allowedModules Json?
+  isDefault Boolean @default(false)
+  status MembershipStatus @default(ACTIVE)
+  managementId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id])
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  management WorkspaceManagement? @relation(fields: [managementId], references: [id])
+  accessGrants AccessGrant[]
+  @@unique([userId, workspaceId])
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([status])
+}
+
+model AccessGrant {
+  id String @id @default(uuid())
+  membershipId String
+  resourceType GrantResourceType
+  resourceId String
+  membership WorkspaceMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  @@unique([membershipId, resourceType, resourceId])
+  @@index([membershipId])
+  @@index([resourceType, resourceId])
+}
+
+model WorkspaceManagement {
+  id String @id @default(uuid())
+  mspWorkspaceId String
+  companyWorkspaceId String
+  status ManagementStatus @default(ACTIVE)
+  accessLevel ManagementAccess @default(FULL_MANAGEMENT)
+  contractHours Int?
+  contractMonthlyValue Float?
+  hourlyRate Float?
+  contractScope String?
+  contractStartDate DateTime?
+  contractEndDate DateTime?
+  billedToMsp Boolean @default(true)
+  detachedAt DateTime?
+  detachedByUserId String?
+  detachReason String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  mspWorkspace Workspace @relation("ManagingMsp", fields: [mspWorkspaceId], references: [id])
+  companyWorkspace Workspace @relation("ManagedCompany", fields: [companyWorkspaceId], references: [id])
+  memberships WorkspaceMembership[]
+  @@unique([mspWorkspaceId, companyWorkspaceId])
+  @@index([mspWorkspaceId])
+  @@index([companyWorkspaceId])
+  @@index([status])
+}
+
+model WorkspaceSetting {
+  id String @id @default(uuid())
+  workspaceId String
+  key String
+  value String
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  @@unique([workspaceId, key])
+  @@index([workspaceId])
 }
