@@ -83,7 +83,8 @@ import { ContractorsPage } from './pages/admin/invoicing/ContractorsPage';
 import { ContractorFormPage } from './pages/admin/invoicing/ContractorFormPage';
 import { ProductsPage } from './pages/admin/invoicing/ProductsPage';
 import { ProductFormPage } from './pages/admin/invoicing/ProductFormPage';
-import { WarehousesPage, PaymentsPage, ReportsPage, ImportPage } from './pages/admin/invoicing/PlaceholderPage';
+import { ReportsPage } from './pages/admin/invoicing/ReportsPage';
+import { WarehousesPage, PaymentsPage, ImportPage } from './pages/admin/invoicing/PlaceholderPage';
 
 // Packaging module (IDS 1.0)
 import { PackagingDashboardPage } from './pages/admin/packaging/PackagingDashboardPage';

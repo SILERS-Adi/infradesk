@@ -32,10 +32,6 @@ export function PaymentsPage() {
   return <PlaceholderPage title="Faktury — Płatności" subtitle="Rozliczenia dokumentów" description="Śledzenie płatności, zaległości, raporty." />;
 }
 
-export function ReportsPage() {
-  return <PlaceholderPage title="Faktury — Raporty" subtitle="Raporty sprzedaży, zakupów, VAT" description="Raporty sprzedażowe, zakupowe, magazynowe i rejestr VAT. Będą dostępne po podłączeniu backendu." />;
-}
-
 export function ImportPage() {
   return <PlaceholderPage title="Faktury — Import" subtitle="Import danych CSV" description="Import kontrahentów i produktów z plików CSV. Będzie dostępny po podłączeniu backendu." />;
 }

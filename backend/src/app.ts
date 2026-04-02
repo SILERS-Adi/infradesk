@@ -43,6 +43,7 @@ import subscriptionsRouter from './modules/subscriptions/subscriptions.routes';
 import invoicingRouter from './modules/invoicing/invoicing.routes';
 import contractorsRouter from './modules/invoicing/contractors.routes';
 import productsRouter from './modules/invoicing/products.routes';
+import invoicingReportsRouter from './modules/invoicing/reports.routes';
 import packagingRouter from './modules/packaging/packaging.routes';
 
 // Middleware
@@ -127,6 +128,7 @@ app.use('/api/subscriptions', subscriptionsRouter);
 app.use('/api/invoicing/documents', invoicingRouter);
 app.use('/api/invoicing/contractors', contractorsRouter);
 app.use('/api/invoicing/products', productsRouter);
+app.use('/api/invoicing/reports', invoicingReportsRouter);
 app.use('/api/packaging/shipments', packagingRouter);
 // Public agent endpoints (no auth)
 app.get('/api/agent/contact', getContactHandler);
