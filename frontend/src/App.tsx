@@ -77,6 +77,7 @@ import SAEmailPage from './pages/superadmin/SAEmailPage';
 import { InvoicingDashboardPage } from './pages/admin/invoicing/InvoicingDashboardPage';
 import { DocumentsListPage } from './pages/admin/invoicing/DocumentsListPage';
 import { DocumentNewPage } from './pages/admin/invoicing/DocumentNewPage';
+import { DocumentEditPage } from './pages/admin/invoicing/DocumentEditPage';
 import { DocumentViewPage } from './pages/admin/invoicing/DocumentViewPage';
 import { ContractorsPage, ProductsPage, WarehousesPage, PaymentsPage, ReportsPage, ImportPage } from './pages/admin/invoicing/PlaceholderPage';
 
@@ -143,6 +144,7 @@ function AdminRoutes() {
         <Route path="invoicing" element={<InvoicingDashboardPage />} />
         <Route path="invoicing/documents" element={<DocumentsListPage />} />
         <Route path="invoicing/documents/new" element={<DocumentNewPage />} />
+        <Route path="invoicing/documents/:id/edit" element={<DocumentEditPage />} />
         <Route path="invoicing/documents/:id" element={<DocumentViewPage />} />
         <Route path="invoicing/contractors" element={<ContractorsPage />} />
         <Route path="invoicing/products" element={<ProductsPage />} />

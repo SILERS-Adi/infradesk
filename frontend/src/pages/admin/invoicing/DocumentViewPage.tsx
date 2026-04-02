@@ -5,8 +5,9 @@ import { Card } from '../../../components/ui/Card';
 import { Badge } from '../../../components/ui/Badge';
 import { Button } from '../../../components/ui/Button';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
+import { Link } from 'react-router-dom';
 import {
-  Download, Printer, Mail, Copy, Trash2,
+  Download, Printer, Mail, Copy, Trash2, Edit3,
   CreditCard, RotateCcw, Building2, User, Calendar, Banknote,
 } from 'lucide-react';
 import api from '../../../api/client';
@@ -157,6 +158,9 @@ export function DocumentViewPage() {
         back="/invoicing/documents"
         actions={
           <div style={{ display: 'flex', gap: 8 }}>
+            <Link to={`/invoicing/documents/${doc.id}/edit`} style={{ textDecoration: 'none' }}>
+              <Button size="sm" variant="secondary" icon={<Edit3 size={14} />}>Edytuj</Button>
+            </Link>
             <Button size="sm" loading={actionLoading === 'pdf'} onClick={downloadPdf} icon={<Download size={14} />}>PDF</Button>
             <Button size="sm" variant="secondary" loading={actionLoading === 'print'} onClick={printDoc} icon={<Printer size={14} />}>Drukuj</Button>
             <Button size="sm" variant="secondary" onClick={() => toast('Funkcja w przygotowaniu')} icon={<Mail size={14} />}>Email</Button>
