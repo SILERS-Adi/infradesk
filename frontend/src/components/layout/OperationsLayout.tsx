@@ -7,7 +7,7 @@ import { TopBar } from './TopBar';
 import { VoiceAssistant } from '../VoiceAssistant';
 
 export function OperationsLayout({ children }: { children: ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const { isAdmin, isMember, isViewer } = useWorkspaceContext();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -18,8 +18,8 @@ export function OperationsLayout({ children }: { children: ReactNode }) {
     </div>
   );
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  // MEMBER/VIEWER without admin/tech role go to portal
-  if (isMember || isViewer) return <Navigate to="/portal" replace />;
+  // MEMBER/VIEWER without admin/tech role go to portal (superadmin bypasses)
+  if ((isMember || isViewer) && !user?.isSuperAdmin) return <Navigate to="/portal" replace />;
 
   return (
     <div className="app app-shell">

@@ -2,7 +2,8 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
-import { AuthProvider, useAuth } from './store/authStore';
+import { AuthProvider, useAuth, getStoredToken } from './store/authStore';
+import { authApi } from './api/auth';
 
 // Layouts
 import { OperationsLayout } from './components/layout/OperationsLayout';
@@ -15,8 +16,6 @@ import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 
 // Admin pages
 import { DashboardPage } from './pages/admin/DashboardPage';
-import { ClientsListPage } from './pages/admin/clients/ClientsListPage';
-import { ClientDetailPage } from './pages/admin/clients/ClientDetailPage';
 import { LocationsListPage } from './pages/admin/locations/LocationsListPage';
 import { LocationDetailPage } from './pages/admin/locations/LocationDetailPage';
 import { DevicesListPage } from './pages/admin/devices/DevicesListPage';
@@ -65,8 +64,6 @@ import LandingPage from './pages/public/LandingPage';
 import LegalPage from './pages/public/LegalPage';
 import ContactPage from './pages/public/ContactPage';
 import AiPanelPage from './pages/public/AiPanelPage';
-import RegisterTenantPage from './pages/auth/RegisterTenantPage';
-import TenantSettingsPage from './pages/admin/TenantSettingsPage';
 import MonitoringPage from './pages/admin/MonitoringPage';
 import AiCommandsPage from './pages/admin/AiCommandsPage';
 import SADashboardPage from './pages/superadmin/SADashboardPage';
@@ -74,9 +71,6 @@ import SATenantsPage from './pages/superadmin/SATenantsPage';
 import SAUsersPage from './pages/superadmin/SAUsersPage';
 import SAConfigPage from './pages/superadmin/SAConfigPage';
 import SAEmailPage from './pages/superadmin/SAEmailPage';
-import ChildTenantsPage from './pages/admin/ChildTenantsPage';
-import PartnersPage from './pages/admin/partners/PartnersPage';
-import SharedDevicesPage from './pages/admin/partners/SharedDevicesPage';
 
 // Mobile pages
 import { MobileLayout } from './components/layout/MobileLayout';
@@ -104,8 +98,6 @@ function AdminRoutes() {
     <OperationsLayout>
       <Routes>
         <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="clients" element={<ClientsListPage />} />
-        <Route path="clients/:id" element={<ClientDetailPage />} />
         <Route path="locations" element={<LocationsListPage />} />
         <Route path="locations/:id" element={<LocationDetailPage />} />
         <Route path="devices" element={<DevicesListPage />} />
@@ -131,10 +123,6 @@ function AdminRoutes() {
         <Route path="my-company/employees" element={<EmployeesPage />} />
         <Route path="backups" element={<BackupPage />} />
         <Route path="downloads" element={<DownloadsPage />} />
-        <Route path="tenant" element={<TenantSettingsPage />} />
-        <Route path="child-tenants" element={<ChildTenantsPage />} />
-        <Route path="partners" element={<PartnersPage />} />
-        <Route path="shared" element={<SharedDevicesPage />} />
         <Route path="ai" element={<AiCommandsPage />} />
         <Route path="superadmin" element={<RequireSuperAdmin><SADashboardPage /></RequireSuperAdmin>} />
         <Route path="superadmin/tenants" element={<RequireSuperAdmin><SATenantsPage /></RequireSuperAdmin>} />
@@ -206,6 +194,18 @@ function AutoLoginHandler() {
   return null;
 }
 
+/** Refreshes user from /auth/me on mount to keep localStorage in sync with DB */
+function UserRefresher() {
+  const { setUser } = useAuth();
+  const done = React.useRef(false);
+  React.useEffect(() => {
+    if (done.current || !getStoredToken()) return;
+    done.current = true;
+    authApi.me().then(setUser).catch(() => {});
+  }, [setUser]);
+  return null;
+}
+
 function RequireSuperAdmin({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   if (!(user as any)?.isSuperAdmin) return <Navigate to="/dashboard" replace />;
@@ -237,9 +237,9 @@ export default function App() {
             }}
           />
           <AutoLoginHandler />
+          <UserRefresher />
           <Routes>
             {/* Auth */}
-            <Route path="/register" element={<RegisterTenantPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />

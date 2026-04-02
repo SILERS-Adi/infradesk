@@ -105,14 +105,17 @@ router.patch('/users/:id', async (req: Request, res: Response, next: NextFunctio
 
 router.get('/stats', async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const [workspaces, users, agents, devices, tickets] = await Promise.all([
+    const [tenants, users, agents, devices, tickets, msp, company, personal] = await Promise.all([
       prisma.workspace.count(),
       prisma.user.count(),
       prisma.agentRegistration.count({ where: { status: 'ACTIVE' } }),
       prisma.device.count(),
       prisma.ticket.count(),
+      prisma.workspace.count({ where: { type: 'MSP' } }),
+      prisma.workspace.count({ where: { type: 'COMPANY' } }),
+      prisma.workspace.count({ where: { type: 'PERSONAL' } }),
     ]);
-    res.json({ workspaces, users, agents, devices, tickets });
+    res.json({ tenants, users, agents, devices, tickets, byType: { msp, business: company, personal } });
   } catch (err) { next(err); }
 });
 

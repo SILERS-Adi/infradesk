@@ -25,6 +25,14 @@ const STORAGE_KEYS = {
   USER: 'infradesk_user',
 };
 
+/** Decode JWT payload without verification (for reading claims like isSuperAdmin) */
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const base64 = token.split('.')[1];
+    return JSON.parse(atob(base64));
+  } catch { return null; }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -42,6 +50,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (accessToken && userStr) {
       try {
         const user = JSON.parse(userStr) as User;
+        // Merge isSuperAdmin from JWT if missing in cached user
+        if (user.isSuperAdmin == null) {
+          const jwt = decodeJwtPayload(accessToken);
+          if (jwt?.isSuperAdmin) user.isSuperAdmin = true;
+        }
         setState({
           user,
           accessToken,
