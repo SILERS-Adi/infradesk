@@ -2,14 +2,16 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Plus, Search, QrCode, Monitor, ExternalLink,
+  Plus, QrCode, Monitor, ExternalLink,
   ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown,
 } from 'lucide-react';
 import { devicesApi } from '../../../api/devices';
-import { clientsApi } from '../../../api/clients';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import { Modal } from '../../../components/ui/Modal';
+import { SearchInput } from '../../../components/ui/SearchInput';
+import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
+import { EmptyState } from '../../../components/ui/EmptyState';
 import { DeviceForm } from '../../../components/forms/DeviceForm';
 import { useDebounce } from '../../../hooks/useDebounce';
 import type { Device } from '../../../types';
@@ -55,7 +57,7 @@ function AgentBadge({ agents }: { agents?: { lastSeen?: string }[] }) {
 }
 
 /* ── Sort helpers ────────────────────────────────────────────────────────── */
-type SortKey = 'name' | 'user' | 'client' | 'location' | 'agent' | 'status';
+type SortKey = 'name' | 'user' | 'location' | 'agent' | 'status';
 type SortDir = 'asc' | 'desc';
 
 function getAgentOnline(d: Device): boolean {
@@ -73,7 +75,6 @@ function sortDevices(devices: Device[], key: SortKey, dir: SortDir): Device[] {
         const uB = b.assignedUser ? `${b.assignedUser.firstName} ${b.assignedUser.lastName}` : '';
         cmp = uA.localeCompare(uB); break;
       }
-      case 'client': cmp = (a.client?.name ?? '').localeCompare(b.client?.name ?? ''); break;
       case 'location': cmp = (a.location?.name ?? '').localeCompare(b.location?.name ?? ''); break;
       case 'agent': cmp = (getAgentOnline(a) ? 1 : 0) - (getAgentOnline(b) ? 1 : 0); break;
       case 'status': cmp = a.status.localeCompare(b.status); break;
@@ -129,7 +130,6 @@ export function DevicesListPage() {
   const qc = useQueryClient();
   const { canCreate, isScoped } = useWorkspaceContext();
   const [search, setSearch] = useState('');
-  const [clientId, setClientId] = useState('');
   const [status, setStatus] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
@@ -137,24 +137,12 @@ export function DevicesListPage() {
   const debouncedSearch = useDebounce(search);
 
   const { data: devices = [], isLoading } = useQuery({
-    queryKey: ['devices', { clientId, status, search: debouncedSearch }],
+    queryKey: ['devices', { status, search: debouncedSearch }],
     queryFn: () => devicesApi.getAll({
-      clientId: clientId || undefined,
       status: status || undefined,
       search: debouncedSearch || undefined,
     }),
   });
-
-  const { data: clients = [] } = useQuery({
-    queryKey: ['clients'],
-    queryFn: () => clientsApi.getAll(),
-  });
-
-  // Only show clients that have devices in the table
-  const clientsInTable = useMemo(() => {
-    const ids = new Set(devices.map(d => d.clientId));
-    return clients.filter(c => ids.has(c.id));
-  }, [devices, clients]);
 
   // Sort
   const handleSort = (key: SortKey) => {
@@ -201,36 +189,17 @@ export function DevicesListPage() {
         ) : undefined}
       />
 
-      {/* ── Filters ────────────────────────────────────────────────────── */}
+      {/* ── Filters (IDS) ────────────────────────────────────────────── */}
       <div className="rounded-t-[18px] p-4 flex flex-wrap gap-3 items-center"
         style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--td)' }} />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Szukaj (nazwa, IP, hostname, S/N)..."
-            className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl focus:outline-none transition-all placeholder:text-white/20"
-            style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}
-            onFocus={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(139,92,246,0.08)'; }}
-            onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none'; }}
-          />
-        </div>
-        <select value={clientId} onChange={(e) => setClientId(e.target.value)}
-          className="text-sm rounded-xl px-3 py-2.5 focus:outline-none appearance-none pr-8"
-          style={selectStyle}>
-          <option value="">Wszyscy klienci</option>
-          {clientsInTable.map(c => (
-            <option key={c.id} value={c.id}>{c.legalName || c.name}</option>
-          ))}
-        </select>
+        <SearchInput value={search} onChange={setSearch} placeholder="Szukaj (nazwa, IP, hostname, S/N)..." />
         <select value={status} onChange={(e) => setStatus(e.target.value)}
           className="text-sm rounded-xl px-3 py-2.5 focus:outline-none appearance-none pr-8"
           style={selectStyle}>
           {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
-        {(clientId || status) && (
-          <button onClick={() => { setClientId(''); setStatus(''); }}
+        {status && (
+          <button onClick={() => { setStatus(''); }}
             className="text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-colors hover:bg-white/[0.06]"
             style={{ color: 'var(--tm)' }}>
             Wyczyść filtry
@@ -242,28 +211,16 @@ export function DevicesListPage() {
       <div className="rounded-b-[18px] overflow-hidden"
         style={{ background: 'var(--bg-card)', borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
 
-        {isLoading && (
-          <div className="flex items-center justify-center py-16">
-            <div className="animate-spin h-6 w-6 border-2 border-violet-500 border-t-transparent rounded-full" />
-          </div>
-        )}
+        {isLoading && <LoadingSpinner />}
 
         {!isLoading && sortedDevices.length === 0 && (
-          isScoped ? (
-            <div className="text-center py-16">
-              <Monitor className="h-10 w-10 mx-auto mb-3" style={{ color: 'var(--accent)', opacity: 0.5 }} />
-              <p className="text-[13px] font-medium" style={{ color: 'var(--accent)' }}>Brak dostępu</p>
-              <p className="text-[12px] mt-1" style={{ color: 'var(--td)', maxWidth: 320, margin: '4px auto 0' }}>
-                Nie masz dostępu do żadnych urządzeń w tym workspace. Skontaktuj się z administratorem.
-              </p>
-            </div>
-          ) : (
-            <div className="text-center py-16">
-              <Monitor className="h-10 w-10 mx-auto mb-3" style={{ color: 'var(--td)' }} />
-              <p className="text-[13px] font-medium" style={{ color: 'var(--tm)' }}>Brak urządzeń</p>
-              <p className="text-[12px] mt-1" style={{ color: 'var(--td)' }}>Dodaj pierwsze urządzenie.</p>
-            </div>
-          )
+          <EmptyState
+            icon={<Monitor style={{ width: 22, height: 22, color: 'var(--td)' }} />}
+            title={isScoped ? 'Brak dostępu' : 'Brak urządzeń'}
+            description={isScoped ? 'Nie masz dostępu do żadnych urządzeń w tym workspace.' : 'Dodaj pierwsze urządzenie.'}
+            scopeEntity={isScoped ? 'devices' : undefined}
+            action={!isScoped && canCreate ? <Button onClick={() => setShowCreate(true)} icon={<Plus className="h-4 w-4" />} size="sm">Nowe urządzenie</Button> : undefined}
+          />
         )}
 
         {!isLoading && sortedDevices.length > 0 && (
@@ -276,7 +233,6 @@ export function DevicesListPage() {
                     <SortTh label="Urządzenie" sortKey="name" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <SortTh label="Użytkownik" sortKey="user" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Login</th>
-                    <SortTh label="Firma" sortKey="client" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <SortTh label="Lokalizacja" sortKey="location" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <th className="text-center px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>RustDesk</th>
                     <SortTh label="Agent" sortKey="agent" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} align="center" />
@@ -331,11 +287,6 @@ export function DevicesListPage() {
                         ) : (
                           <span className="text-[11px]" style={{ color: 'var(--td)' }}>—</span>
                         )}
-                      </td>
-
-                      {/* Firma */}
-                      <td className="px-4 py-3">
-                        <span className="text-[13px]" style={{ color: 'var(--ts)' }}>{device.client?.name ?? '—'}</span>
                       </td>
 
                       {/* Lokalizacja */}
@@ -404,7 +355,7 @@ export function DevicesListPage() {
                       <AgentBadge agents={device.agents} />
                     </div>
                     <div className="flex items-center gap-2 mt-0.5 text-[11px]" style={{ color: 'var(--tm)' }}>
-                      <span>{device.client?.name}</span>
+                      <span>{device.location?.name}</span>
                       {device.rustdeskId && (
                         <button onClick={(e) => openRustdesk(device.rustdeskId!, e)}
                           className="text-[10px] font-semibold px-1.5 py-0.5 rounded"

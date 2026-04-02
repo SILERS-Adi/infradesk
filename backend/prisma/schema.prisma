@@ -988,3 +988,117 @@ model TrustedContact {
 
   @@index([userId])
 }
+
+// ── Invoicing Module ────────────────────────────────────────────────
+
+model InvoiceDocument {
+  id              String                @id @default(uuid())
+  workspaceId     String
+  number          String
+  type            InvoiceDocumentType   @default(SALE_INVOICE)
+  status          InvoiceDocumentStatus @default(DRAFT)
+
+  contractorName  String
+  contractorNip   String?
+
+  totalNet        Decimal               @default(0)
+  totalVat        Decimal               @default(0)
+  totalGross      Decimal               @default(0)
+
+  issuedAt        DateTime              @default(now())
+  dueDate         DateTime?
+  notes           String?
+
+  createdById     String
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  items           InvoiceDocumentItem[]
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, issuedAt])
+  @@index([workspaceId, type])
+}
+
+model InvoiceDocumentItem {
+  id              String   @id @default(uuid())
+  documentId      String
+  name            String
+  quantity        Decimal  @default(1)
+  priceNet        Decimal  @default(0)
+  vatRate         String   @default("23")
+  totalNet        Decimal  @default(0)
+  totalVat        Decimal  @default(0)
+  totalGross      Decimal  @default(0)
+
+  document        InvoiceDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+}
+
+enum InvoiceDocumentType {
+  SALE_INVOICE
+  CORRECTION
+  PROFORMA
+  ADVANCE
+  FINAL
+  RECEIPT
+  PURCHASE_INVOICE
+}
+
+enum InvoiceDocumentStatus {
+  DRAFT
+  ISSUED
+  SENT
+  PAID
+  PARTIALLY_PAID
+  OVERDUE
+  CANCELLED
+}
+
+// ── Packaging Module ────────────────────────────────────────────────
+
+model Shipment {
+  id              String          @id @default(uuid())
+  workspaceId     String
+  orderNumber     String
+  customerName    String
+  customerEmail   String?
+  customerPhone   String?
+  status          ShipmentStatus  @default(PENDING)
+  courier         String          @default("inpost")
+  trackingNumber  String?
+  totalWeight     Int             @default(0)
+  notes           String?
+  createdById     String
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  items           ShipmentItem[]
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, createdAt])
+}
+
+model ShipmentItem {
+  id              String   @id @default(uuid())
+  shipmentId      String
+  name            String
+  sku             String?
+  quantity        Int      @default(1)
+  weight          Int      @default(0)
+
+  shipment        Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@index([shipmentId])
+}
+
+enum ShipmentStatus {
+  PENDING
+  PACKING
+  PACKED
+  SHIPPED
+  DELIVERED
+  ERROR
+  CANCELLED
+}

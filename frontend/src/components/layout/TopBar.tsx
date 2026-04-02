@@ -5,6 +5,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { getInitials } from '../../utils/helpers';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { useWorkspaceContext } from '../../hooks/useWorkspaceContext';
+import { getAllRouteTitles } from '../../modules/registry';
 import type { MemberRole } from '../../types';
 
 const ROUTE_TITLES: Record<string, string> = {
@@ -35,6 +36,8 @@ const ROUTE_TITLES: Record<string, string> = {
   '/child-tenants': 'Podmioty',
   '/downloads': 'Pobieranie',
   '/superadmin': 'SuperAdmin',
+  // Module route titles (from IDS registry)
+  ...getAllRouteTitles(),
 };
 
 const WS_ROLE_LABELS: Record<MemberRole, string> = {

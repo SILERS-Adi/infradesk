@@ -5,6 +5,7 @@ import {
   ShoppingCart, Download, Settings, HardDrive, KeyRound, Timer,
   Receipt, Plane, Users, CalendarDays, Sun, Moon, SunMoon, LinkIcon, ExternalLink,
   Shield, Activity, Sparkles,
+  FileText, Package, Warehouse, CreditCard, BarChart3, Upload,
 } from 'lucide-react';
 import { useTheme } from '../../store/themeStore';
 import { useAuth } from '../../store/authStore';
@@ -105,6 +106,30 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
         { to: '/sessions', label: 'Sesje pracy', icon: <Timer className="nav-icon" />, feature: 'sessions' },
         { to: '/billing', label: 'Rozliczenia', icon: <Receipt className="nav-icon" />, feature: 'billing' },
         { to: '/ai', label: 'Asystent AI', icon: <Sparkles className="nav-icon" />, feature: 'ai' },
+      ],
+    },
+
+    // ── FAKTURY ──
+    {
+      label: 'FAKTURY',
+      items: [
+        { to: '/invoicing', label: 'Dashboard', icon: <LayoutDashboard className="nav-icon" /> },
+        { to: '/invoicing/documents', label: 'Dokumenty', icon: <FileText className="nav-icon" /> },
+        { to: '/invoicing/contractors', label: 'Kontrahenci', icon: <Users className="nav-icon" /> },
+        { to: '/invoicing/products', label: 'Produkty', icon: <Package className="nav-icon" /> },
+        { to: '/invoicing/warehouses', label: 'Magazyn', icon: <Warehouse className="nav-icon" /> },
+        { to: '/invoicing/payments', label: 'Płatności', icon: <CreditCard className="nav-icon" /> },
+        { to: '/invoicing/reports', label: 'Raporty', icon: <BarChart3 className="nav-icon" /> },
+        { to: '/invoicing/import', label: 'Import', icon: <Upload className="nav-icon" /> },
+      ],
+    },
+
+    // ── PAKOWANIE ──
+    {
+      label: 'PAKOWANIE',
+      items: [
+        { to: '/packaging', label: 'Dashboard', icon: <LayoutDashboard className="nav-icon" /> },
+        { to: '/packaging/shipments', label: 'Przesyłki', icon: <Package className="nav-icon" /> },
       ],
     },
 

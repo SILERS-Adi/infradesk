@@ -66,11 +66,25 @@ import ContactPage from './pages/public/ContactPage';
 import AiPanelPage from './pages/public/AiPanelPage';
 import MonitoringPage from './pages/admin/MonitoringPage';
 import AiCommandsPage from './pages/admin/AiCommandsPage';
+import ModuleTemplatePreviewPage from './pages/admin/ModuleTemplatePreviewPage';
 import SADashboardPage from './pages/superadmin/SADashboardPage';
 import SATenantsPage from './pages/superadmin/SATenantsPage';
 import SAUsersPage from './pages/superadmin/SAUsersPage';
 import SAConfigPage from './pages/superadmin/SAConfigPage';
 import SAEmailPage from './pages/superadmin/SAEmailPage';
+
+// Invoicing module (IDS 1.0)
+import { InvoicingDashboardPage } from './pages/admin/invoicing/InvoicingDashboardPage';
+import { DocumentsListPage } from './pages/admin/invoicing/DocumentsListPage';
+import { DocumentNewPage } from './pages/admin/invoicing/DocumentNewPage';
+import { DocumentViewPage } from './pages/admin/invoicing/DocumentViewPage';
+import { ContractorsPage, ProductsPage, WarehousesPage, PaymentsPage, ReportsPage, ImportPage } from './pages/admin/invoicing/PlaceholderPage';
+
+// Packaging module (IDS 1.0)
+import { PackagingDashboardPage } from './pages/admin/packaging/PackagingDashboardPage';
+import { ShipmentsListPage } from './pages/admin/packaging/ShipmentsListPage';
+import { ShipmentDetailPage } from './pages/admin/packaging/ShipmentDetailPage';
+import { ShipmentNewPage } from './pages/admin/packaging/ShipmentNewPage';
 
 // Mobile pages
 import { MobileLayout } from './components/layout/MobileLayout';
@@ -124,6 +138,23 @@ function AdminRoutes() {
         <Route path="backups" element={<BackupPage />} />
         <Route path="downloads" element={<DownloadsPage />} />
         <Route path="ai" element={<AiCommandsPage />} />
+        {/* ids-preview moved to public routes */}
+        {/* Invoicing module */}
+        <Route path="invoicing" element={<InvoicingDashboardPage />} />
+        <Route path="invoicing/documents" element={<DocumentsListPage />} />
+        <Route path="invoicing/documents/new" element={<DocumentNewPage />} />
+        <Route path="invoicing/documents/:id" element={<DocumentViewPage />} />
+        <Route path="invoicing/contractors" element={<ContractorsPage />} />
+        <Route path="invoicing/products" element={<ProductsPage />} />
+        <Route path="invoicing/warehouses" element={<WarehousesPage />} />
+        <Route path="invoicing/payments" element={<PaymentsPage />} />
+        <Route path="invoicing/reports" element={<ReportsPage />} />
+        <Route path="invoicing/import" element={<ImportPage />} />
+        {/* Packaging module */}
+        <Route path="packaging" element={<PackagingDashboardPage />} />
+        <Route path="packaging/shipments" element={<ShipmentsListPage />} />
+        <Route path="packaging/shipments/new" element={<ShipmentNewPage />} />
+        <Route path="packaging/shipments/:id" element={<ShipmentDetailPage />} />
         <Route path="superadmin" element={<RequireSuperAdmin><SADashboardPage /></RequireSuperAdmin>} />
         <Route path="superadmin/tenants" element={<RequireSuperAdmin><SATenantsPage /></RequireSuperAdmin>} />
         <Route path="superadmin/users" element={<RequireSuperAdmin><SAUsersPage /></RequireSuperAdmin>} />
@@ -253,6 +284,9 @@ export default function App() {
             <Route path="/ai-panel" element={<AiPanelPage />} />
             <Route path="/tv" element={<TvDashboardPage />} />
             <Route path="/qr/:qrCodeValue" element={<QrPage />} />
+
+            {/* IDS Preview — public, no auth */}
+            <Route path="/ids-preview" element={<ModuleTemplatePreviewPage />} />
 
             {/* Redirects — old duplicate routes */}
             <Route path="/home" element={<Navigate to="/" replace />} />
