@@ -18,6 +18,7 @@ import { Alert } from '../../../components/ui/Alert';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { fmtPLN } from './utils';
 import { ContractorPicker } from './components/ContractorPicker';
+import { ProductPicker } from './components/ProductPicker';
 
 interface LineItem {
   name: string;
@@ -243,9 +244,13 @@ export function DocumentEditPage() {
                   {items.map((item, idx) => (
                     <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '8px 10px', minWidth: 220 }}>
-                        <input placeholder="Nazwa produktu lub uslugi" value={item.name}
-                          onChange={(e) => updateItem(idx, 'name', e.target.value)}
-                          style={{ width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 'var(--rs)', border: '1px solid var(--border)', background: 'var(--hover-bg)', color: 'var(--t)', outline: 'none' }} />
+                        <ProductPicker
+                          value={item.name}
+                          onTextChange={(text) => updateItem(idx, 'name', text)}
+                          onSelect={(p) => {
+                            setItems(prev => prev.map((it, i) => i === idx ? { ...it, name: p.name, priceNet: p.priceNet, vatRate: p.vatRate } : it));
+                          }}
+                        />
                       </td>
                       <td style={{ padding: '8px 6px', width: 80 }}>
                         <input type="number" min={1} step={1} value={item.quantity}

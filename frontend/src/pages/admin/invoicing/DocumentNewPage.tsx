@@ -12,6 +12,7 @@ import { Button } from '../../../components/ui/Button';
 import { Alert } from '../../../components/ui/Alert';
 import { fmtPLN } from './utils';
 import { ContractorPicker } from './components/ContractorPicker';
+import { ProductPicker } from './components/ProductPicker';
 
 // ── Types ──
 
@@ -251,13 +252,11 @@ export function DocumentNewPage() {
                   {items.map((item, idx) => (
                     <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '8px 10px', minWidth: 220 }}>
-                        <input
-                          placeholder="Nazwa produktu lub usługi"
+                        <ProductPicker
                           value={item.name}
-                          onChange={(e) => updateItem(idx, 'name', e.target.value)}
-                          style={{
-                            width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 'var(--rs)',
-                            border: '1px solid var(--border)', background: 'var(--hover-bg)', color: 'var(--t)', outline: 'none',
+                          onTextChange={(text) => updateItem(idx, 'name', text)}
+                          onSelect={(p) => {
+                            setItems(prev => prev.map((it, i) => i === idx ? { ...it, name: p.name, priceNet: p.priceNet, vatRate: p.vatRate } : it));
                           }}
                         />
                       </td>
