@@ -45,7 +45,7 @@ export async function updateDocument(req: Request, res: Response, next: NextFunc
 export async function deleteDocument(req: Request, res: Response, next: NextFunction) {
   try {
     const ok = await service.deleteDocument(req.params.id, req.workspaceId!);
-    if (!ok) return res.status(404).json({ error: 'Document not found' });
+    if (!ok) { res.status(404).json({ error: 'Document not found' }); return; }
     res.status(204).send();
   } catch (err) { next(err); }
 }
