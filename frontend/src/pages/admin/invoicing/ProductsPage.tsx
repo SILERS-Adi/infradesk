@@ -39,7 +39,7 @@ export function ProductsPage() {
       const { data: res } = await api.get('/invoicing/products', { params });
       setData(res.items || []);
       setTotal(res.total || 0);
-    } catch { toast.error('Nie udalo sie pobrac produktow'); }
+    } catch { toast.error('Nie udało się pobrać produktów'); }
     finally { setLoading(false); }
   }, [page, search]);
 
@@ -51,10 +51,10 @@ export function ProductsPage() {
     setDeleting(true);
     try {
       await api.delete(`/invoicing/products/${deleteTarget.id}`);
-      toast.success('Produkt usuniety');
+      toast.success('Produkt usunięty');
       setDeleteTarget(null);
       load();
-    } catch { toast.error('Nie udalo sie usunac produktu'); }
+    } catch { toast.error('Nie udało się usunąć produktu'); }
     finally { setDeleting(false); }
   };
 
@@ -62,7 +62,7 @@ export function ProductsPage() {
     { key: 'name', header: 'Nazwa', render: r => <span style={{ fontWeight: 600, color: 'var(--t)' }}>{r.name}</span> },
     { key: 'sku', header: 'SKU', render: r => <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--tm)' }}>{r.sku || '—'}</span> },
     { key: 'unit', header: 'Jm', render: r => <span style={{ color: 'var(--tm)' }}>{r.unit}</span> },
-    { key: 'priceNet', header: 'Cena netto', render: r => <span style={{ display: 'block', textAlign: 'right', fontWeight: 600 }}>{fmtPrice(r.priceNet)} zl</span> },
+    { key: 'priceNet', header: 'Cena netto', render: r => <span style={{ display: 'block', textAlign: 'right', fontWeight: 600 }}>{fmtPrice(r.priceNet)} zł</span> },
     { key: 'vatRate', header: 'VAT', render: r => <Badge color="indigo">{r.vatRate}%</Badge> },
     { key: 'actions', header: '', render: r => (
       <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
@@ -79,7 +79,7 @@ export function ProductsPage() {
 
   return (
     <>
-      <PageHeader title="Produkty" subtitle="Katalog produktow i uslug" actions={
+      <PageHeader title="Produkty" subtitle="Katalog produktów i uslug" actions={
         <Link to="/invoicing/products/new" style={{ textDecoration: 'none' }}>
           <Button variant="primary" icon={<Plus size={14} />}>Nowy produkt</Button>
         </Link>
@@ -87,11 +87,11 @@ export function ProductsPage() {
       <div style={{ padding: '0 24px 24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
           <SearchInput value={search} onChange={setSearch} placeholder="Szukaj produktu (nazwa, SKU)..." />
-          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--tm)' }}>{total} produktow</span>
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--tm)' }}>{total} produktów</span>
         </div>
         <DataTable columns={columns} data={data} loading={loading} keyExtractor={r => r.id}
           onRowClick={r => navigate(`/invoicing/products/${r.id}/edit`)}
-          emptyTitle="Brak produktow" emptyDescription="Dodaj pierwszy produkt."
+          emptyTitle="Brak produktów" emptyDescription="Dodaj pierwszy produkt."
           emptyAction={<Link to="/invoicing/products/new" style={{ textDecoration: 'none' }}><Button variant="primary" size="sm" icon={<Plus size={14} />}>Dodaj produkt</Button></Link>}
         />
         <Pagination page={page} total={total} perPage={50} onPageChange={setPage} />

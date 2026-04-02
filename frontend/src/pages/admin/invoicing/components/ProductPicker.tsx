@@ -142,7 +142,7 @@ export function ProductPicker({ value, onTextChange, onSelect, placeholder }: Pr
                 </div>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ts)' }}>{fmtPrice(p.priceNet)} zl</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ts)' }}>{fmtPrice(p.priceNet)} zł</div>
                 <div style={{ fontSize: 10, color: 'var(--tm)' }}>VAT {p.vatRate}%</div>
               </div>
             </button>

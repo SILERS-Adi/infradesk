@@ -45,7 +45,7 @@ export function ContractorFormPage() {
       setAddress(data.address || '');
       setNotes(data.notes || '');
     } catch {
-      toast.error('Nie udalo sie pobrac kontrahenta');
+      toast.error('Nie udało się pobrać kontrahenta');
       navigate('/invoicing/contractors');
     } finally {
       setLoading(false);
@@ -84,7 +84,7 @@ export function ContractorFormPage() {
       }
       navigate('/invoicing/contractors');
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Nie udalo sie zapisac');
+      toast.error(err?.response?.data?.error || 'Nie udało się zapisać');
     } finally {
       setSaving(false);
     }
@@ -98,13 +98,13 @@ export function ContractorFormPage() {
     <>
       <PageHeader
         title={isEdit ? `Edytuj: ${name}` : 'Nowy kontrahent'}
-        subtitle={isEdit ? 'Zmien dane kontrahenta' : 'Dodaj nowego klienta lub dostawce'}
+        subtitle={isEdit ? 'Zmień dane kontrahenta' : 'Dodaj nowego klienta lub dostawcę'}
         back="/invoicing/contractors"
       />
       <div style={{ padding: '0 24px 120px', maxWidth: 720, margin: '0 auto' }}>
         {Object.keys(errors).length > 0 && (
           <div style={{ marginBottom: 20 }}>
-            <Alert type="error" title="Popraw bledy">{Object.values(errors).map((e, i) => <div key={i}>• {e}</div>)}</Alert>
+            <Alert type="error" title="Popraw błędy">{Object.values(errors).map((e, i) => <div key={i}>• {e}</div>)}</Alert>
           </div>
         )}
 

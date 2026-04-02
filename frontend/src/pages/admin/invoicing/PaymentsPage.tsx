@@ -79,7 +79,7 @@ export function PaymentsPage() {
       const { data: res } = await api.get('/invoicing/payments', { params });
       setData(res.items || []);
       setTotal(res.total || 0);
-    } catch { toast.error('Nie udalo sie pobrac platnosci'); }
+    } catch { toast.error('Nie udało się pobrać płatności'); }
     finally { setLoading(false); }
   }, [page, search, statusFilter]);
 
@@ -95,11 +95,11 @@ export function PaymentsPage() {
         amount: parseFloat(payAmount),
         method: payMethod,
       });
-      toast.success('Platnosc zarejestrowana');
+      toast.success('Płatność zarejestrowana');
       setPayModal(null);
       setPayAmount('');
       load();
-    } catch { toast.error('Nie udalo sie dodac platnosci'); }
+    } catch { toast.error('Nie udało się dodać płatności'); }
     finally { setPaying(false); }
   };
 
@@ -124,9 +124,9 @@ export function PaymentsPage() {
       </Link>
     )},
     { key: 'contractorName', header: 'Kontrahent' },
-    { key: 'gross', header: 'Kwota', render: r => <span style={{ display: 'block', textAlign: 'right' }}>{fmtPLN(r.gross)} zl</span> },
-    { key: 'paid', header: 'Zaplacono', render: r => <span style={{ display: 'block', textAlign: 'right', color: r.paid > 0 ? '#4ADE80' : 'var(--tm)' }}>{fmtPLN(r.paid)} zl</span> },
-    { key: 'remaining', header: 'Pozostalo', render: r => <span style={{ display: 'block', textAlign: 'right', fontWeight: 600, color: r.remaining > 0 ? '#F87171' : '#4ADE80' }}>{fmtPLN(r.remaining)} zl</span> },
+    { key: 'gross', header: 'Kwota', render: r => <span style={{ display: 'block', textAlign: 'right' }}>{fmtPLN(r.gross)} zł</span> },
+    { key: 'paid', header: 'Zapłacono', render: r => <span style={{ display: 'block', textAlign: 'right', color: r.paid > 0 ? '#4ADE80' : 'var(--tm)' }}>{fmtPLN(r.paid)} zł</span> },
+    { key: 'remaining', header: 'Pozostało', render: r => <span style={{ display: 'block', textAlign: 'right', fontWeight: 600, color: r.remaining > 0 ? '#F87171' : '#4ADE80' }}>{fmtPLN(r.remaining)} zł</span> },
     { key: 'dueDate', header: 'Termin', render: r => <span style={{ color: r.paymentStatus === 'overdue' ? '#F87171' : 'var(--tm)' }}>{r.dueDate || '—'}</span> },
     { key: 'paymentStatus', header: 'Status', render: r => {
       const s = PAY_STATUS[r.paymentStatus] || PAY_STATUS.unpaid;
@@ -142,14 +142,14 @@ export function PaymentsPage() {
 
   return (
     <>
-      <PageHeader title="Platnosci" subtitle="Rozliczenia dokumentow sprzedazowych" />
+      <PageHeader title="Platnosci" subtitle="Rozliczenia dokumentów sprzedazowych" />
 
       <div style={{ padding: '0 24px 24px' }}>
         {/* KPI */}
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
-          <KpiCard label="Do rozliczenia" value={`${fmtPLN(totalGross)} zl`} icon={<CreditCard size={20} color="#fff" />} color="var(--accent)" />
-          <KpiCard label="Zaplacono" value={`${fmtPLN(totalPaid)} zl`} icon={<CreditCard size={20} color="#fff" />} color="#4ADE80" />
-          <KpiCard label="Pozostalo" value={`${fmtPLN(totalRemaining)} zl`} icon={<CreditCard size={20} color="#fff" />} color={totalRemaining > 0 ? '#F87171' : '#4ADE80'} />
+          <KpiCard label="Do rozliczenia" value={`${fmtPLN(totalGross)} zł`} icon={<CreditCard size={20} color="#fff" />} color="var(--accent)" />
+          <KpiCard label="Zapłacono" value={`${fmtPLN(totalPaid)} zł`} icon={<CreditCard size={20} color="#fff" />} color="#4ADE80" />
+          <KpiCard label="Pozostało" value={`${fmtPLN(totalRemaining)} zł`} icon={<CreditCard size={20} color="#fff" />} color={totalRemaining > 0 ? '#F87171' : '#4ADE80'} />
           <KpiCard label="Przeterminowane" value={String(overdueCount)} icon={<CreditCard size={20} color="#fff" />} color={overdueCount > 0 ? '#F87171' : '#4ADE80'} />
         </div>
 
@@ -159,12 +159,12 @@ export function PaymentsPage() {
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={selectStyle}>
             {STATUS_FILTER.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
-          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--tm)' }}>{total} dokumentow</span>
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--tm)' }}>{total} dokumentów</span>
         </div>
 
         <DataTable columns={columns} data={data} loading={loading} keyExtractor={r => r.documentId}
           onRowClick={r => navigate(`/invoicing/documents/${r.documentId}`)}
-          emptyTitle="Brak dokumentow" emptyDescription="Wystaw pierwszy dokument, aby sledzic platnosci."
+          emptyTitle="Brak dokumentów" emptyDescription="Wystaw pierwszy dokument, aby sledzic płatności."
         />
         <Pagination page={page} total={total} perPage={50} onPageChange={setPage} />
       </div>
@@ -174,7 +174,7 @@ export function PaymentsPage() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setPayModal(null)}>Anuluj</Button>
-            <Button variant="primary" onClick={handlePay} loading={paying} disabled={!payAmount}>Zaplac</Button>
+            <Button variant="primary" onClick={handlePay} loading={paying} disabled={!payAmount}>Zapłać</Button>
           </>
         }>
         {payModal && (
@@ -183,11 +183,11 @@ export function PaymentsPage() {
               Dokument: <strong style={{ color: 'var(--t)' }}>{payModal.documentNumber}</strong>
             </div>
             <div style={{ fontSize: 13, color: 'var(--ts)' }}>
-              Pozostalo: <strong style={{ color: '#F87171' }}>{fmtPLN(payModal.remaining)} zl</strong>
+              Pozostało: <strong style={{ color: '#F87171' }}>{fmtPLN(payModal.remaining)} zł</strong>
             </div>
-            <Input label="Kwota platnosci (PLN)" type="number" min="0.01" step="0.01" value={payAmount}
+            <Input label="Kwota płatności (PLN)" type="number" min="0.01" step="0.01" value={payAmount}
               onChange={e => setPayAmount(e.target.value)} />
-            <Select label="Metoda platnosci" options={METHOD_OPTIONS} value={payMethod}
+            <Select label="Metoda płatności" options={METHOD_OPTIONS} value={payMethod}
               onChange={e => setPayMethod(e.target.value)} />
           </div>
         )}

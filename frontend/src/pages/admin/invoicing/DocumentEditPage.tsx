@@ -96,7 +96,7 @@ export function DocumentEditPage() {
         })));
       }
     } catch {
-      toast.error('Nie udalo sie pobrac dokumentu');
+      toast.error('Nie udało się pobrać dokumentu');
       navigate('/invoicing/documents');
     } finally {
       setLoading(false);
@@ -126,7 +126,7 @@ export function DocumentEditPage() {
     if (!number.trim()) e.number = 'Numer dokumentu jest wymagany';
     if (!contractorName.trim()) e.contractorName = 'Nazwa kontrahenta jest wymagana';
     if (!issuedAt) e.issuedAt = 'Data wystawienia jest wymagana';
-    if (items.every(i => !i.name.trim())) e.items = 'Dodaj przynajmniej jedna pozycje z nazwa';
+    if (items.every(i => !i.name.trim())) e.items = 'Dodaj przynajmniej jedną pozycję z nazwą';
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -162,7 +162,7 @@ export function DocumentEditPage() {
       toast.success('Dokument zapisany');
       navigate(`/invoicing/documents/${id}`);
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Nie udalo sie zapisac dokumentu');
+      toast.error(err?.response?.data?.error || 'Nie udało się zapisać dokumentu');
     } finally {
       setSaving(false);
     }
@@ -181,7 +181,7 @@ export function DocumentEditPage() {
     <>
       <PageHeader
         title={`Edytuj ${docNumber}`}
-        subtitle="Zmien dane dokumentu i zapisz"
+        subtitle="Zmień dane dokumentu i zapisz"
         back={`/invoicing/documents/${id}`}
       />
 
@@ -189,7 +189,7 @@ export function DocumentEditPage() {
 
         {Object.keys(errors).length > 0 && (
           <div style={{ marginBottom: 20 }}>
-            <Alert type="error" title="Popraw bledy w formularzu">
+            <Alert type="error" title="Popraw błędy w formularzu">
               {Object.values(errors).map((e, i) => <div key={i}>• {e}</div>)}
             </Alert>
           </div>
@@ -203,7 +203,7 @@ export function DocumentEditPage() {
               error={errors.number} />
             <Input label="Data wystawienia" type="date" value={issuedAt}
               onChange={(e) => setIssuedAt(e.target.value)} error={errors.issuedAt} />
-            <Input label="Termin platnosci" type="date" value={dueDate}
+            <Input label="Termin płatności" type="date" value={dueDate}
               onChange={(e) => setDueDate(e.target.value)} />
           </div>
         </Card>
@@ -291,12 +291,12 @@ export function DocumentEditPage() {
                 style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: '1px solid var(--border)', borderRadius: 'var(--rs)', padding: '6px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--accent)', transition: 'var(--trf)' }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--accent-g)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}>
-                <Plus size={14} /> Dodaj pozycje
+                <Plus size={14} /> Dodaj pozycję
               </button>
               <div style={{ display: 'flex', gap: 24, fontSize: 13 }}>
                 <span style={{ color: 'var(--tm)' }}>Netto: <strong style={{ color: 'var(--ts)' }}>{fmtPLN(totalNet)}</strong></span>
                 <span style={{ color: 'var(--tm)' }}>VAT: <strong style={{ color: 'var(--ts)' }}>{fmtPLN(totalVat)}</strong></span>
-                <span style={{ color: 'var(--tm)' }}>Brutto: <strong style={{ color: 'var(--t)', fontSize: 15 }}>{fmtPLN(totalGross)} zl</strong></span>
+                <span style={{ color: 'var(--tm)' }}>Brutto: <strong style={{ color: 'var(--t)', fontSize: 15 }}>{fmtPLN(totalGross)} zł</strong></span>
               </div>
             </div>
 

@@ -41,7 +41,7 @@ export function ContractorsPage() {
       setData(res.items || []);
       setTotal(res.total || 0);
     } catch {
-      toast.error('Nie udalo sie pobrac kontrahentow');
+      toast.error('Nie udało się pobrać kontrahentów');
     } finally {
       setLoading(false);
     }
@@ -55,11 +55,11 @@ export function ContractorsPage() {
     setDeleting(true);
     try {
       await api.delete(`/invoicing/contractors/${deleteTarget.id}`);
-      toast.success('Kontrahent usuniety');
+      toast.success('Kontrahent usunięty');
       setDeleteTarget(null);
       load();
     } catch {
-      toast.error('Nie udalo sie usunac kontrahenta');
+      toast.error('Nie udało się usunąć kontrahenta');
     } finally {
       setDeleting(false);
     }
@@ -94,11 +94,11 @@ export function ContractorsPage() {
       <div style={{ padding: '0 24px 24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
           <SearchInput value={search} onChange={setSearch} placeholder="Szukaj kontrahenta..." />
-          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--tm)' }}>{total} kontrahentow</span>
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--tm)' }}>{total} kontrahentów</span>
         </div>
         <DataTable columns={columns} data={data} loading={loading} keyExtractor={r => r.id}
           onRowClick={r => navigate(`/invoicing/contractors/${r.id}/edit`)}
-          emptyTitle="Brak kontrahentow" emptyDescription="Dodaj pierwszego kontrahenta."
+          emptyTitle="Brak kontrahentów" emptyDescription="Dodaj pierwszego kontrahenta."
           emptyAction={<Link to="/invoicing/contractors/new" style={{ textDecoration: 'none' }}><Button variant="primary" size="sm" icon={<Plus size={14} />}>Dodaj kontrahenta</Button></Link>}
         />
         <Pagination page={page} total={total} perPage={50} onPageChange={setPage} />

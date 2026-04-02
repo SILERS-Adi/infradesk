@@ -60,7 +60,7 @@ export function ProductFormPage() {
       setVatRate(data.vatRate || '23');
       setNotes(data.notes || '');
     } catch {
-      toast.error('Nie udalo sie pobrac produktu');
+      toast.error('Nie udało się pobrać produktu');
       navigate('/invoicing/products');
     } finally { setLoading(false); }
   }, [id, navigate]);
@@ -70,7 +70,7 @@ export function ProductFormPage() {
   function validate(): boolean {
     const e: Record<string, string> = {};
     if (!name.trim()) e.name = 'Nazwa jest wymagana';
-    if (priceNet && isNaN(Number(priceNet))) e.priceNet = 'Cena musi byc liczba';
+    if (priceNet && isNaN(Number(priceNet))) e.priceNet = 'Cena musi być liczbą';
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -96,7 +96,7 @@ export function ProductFormPage() {
       }
       navigate('/invoicing/products');
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Nie udalo sie zapisac');
+      toast.error(err?.response?.data?.error || 'Nie udało się zapisać');
     } finally { setSaving(false); }
   }
 
@@ -104,10 +104,10 @@ export function ProductFormPage() {
 
   return (
     <>
-      <PageHeader title={isEdit ? `Edytuj: ${name}` : 'Nowy produkt'} subtitle={isEdit ? 'Zmien dane produktu' : 'Dodaj nowy produkt lub usluge'} back="/invoicing/products" />
+      <PageHeader title={isEdit ? `Edytuj: ${name}` : 'Nowy produkt'} subtitle={isEdit ? 'Zmień dane produktu' : 'Dodaj nowy produkt lub usługę'} back="/invoicing/products" />
       <div style={{ padding: '0 24px 120px', maxWidth: 720, margin: '0 auto' }}>
         {Object.keys(errors).length > 0 && (
-          <div style={{ marginBottom: 20 }}><Alert type="error" title="Popraw bledy">{Object.values(errors).map((e, i) => <div key={i}>• {e}</div>)}</Alert></div>
+          <div style={{ marginBottom: 20 }}><Alert type="error" title="Popraw błędy">{Object.values(errors).map((e, i) => <div key={i}>• {e}</div>)}</Alert></div>
         )}
         <Card title="Dane produktu">
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
