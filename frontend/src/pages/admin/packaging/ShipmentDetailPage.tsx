@@ -3,8 +3,8 @@
  * Connected to: GET /api/packaging/shipments/:id
  */
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Package, User, Truck, Calendar, Copy, Trash2, Printer, MapPin } from 'lucide-react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Package, User, Truck, Calendar, Copy, Trash2, Printer, MapPin, Edit3 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../../api/client';
 import { PageHeader } from '../../../components/ui/PageHeader';
@@ -96,6 +96,9 @@ export function ShipmentDetailPage() {
       <PageHeader title={`Przesyłka ${shipment.orderNumber}`} subtitle={`ID: ${id}`} back="/packaging/shipments"
         actions={
           <div style={{ display: 'flex', gap: 8 }}>
+            <Link to={`/packaging/shipments/${id}/edit`} style={{ textDecoration: 'none' }}>
+              <Button size="sm" variant="secondary" icon={<Edit3 size={14} />}>Edytuj</Button>
+            </Link>
             <Button size="sm" variant="secondary" icon={<Printer size={14} />}>Etykieta</Button>
             <Button size="sm" variant="secondary" icon={<Copy size={14} />}>Duplikuj</Button>
           </div>

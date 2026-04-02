@@ -147,9 +147,11 @@ export const packagingModule: ModuleDefinition = {
   navItems: [
     { to: '/packaging', label: 'Dashboard', icon: null },
     { to: '/packaging/shipments', label: 'Przesyłki', icon: null },
+    { to: '/packaging/reports', label: 'Statystyki', icon: null },
   ],
   routeTitles: {
     '/packaging': 'Pakowanie',
+    '/packaging/reports': 'Pakowanie — Statystyki',
     '/packaging/shipments': 'Pakowanie — Przesyłki',
     '/packaging/shipments/new': 'Pakowanie — Nowa przesyłka',
   },

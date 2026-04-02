@@ -46,6 +46,7 @@ import productsRouter from './modules/invoicing/products.routes';
 import invoicingReportsRouter from './modules/invoicing/reports.routes';
 import invoicingPaymentsRouter from './modules/invoicing/payments.routes';
 import packagingRouter from './modules/packaging/packaging.routes';
+import packagingReportsRouter from './modules/packaging/reports.routes';
 
 // Middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -132,6 +133,7 @@ app.use('/api/invoicing/products', productsRouter);
 app.use('/api/invoicing/reports', invoicingReportsRouter);
 app.use('/api/invoicing/payments', invoicingPaymentsRouter);
 app.use('/api/packaging/shipments', packagingRouter);
+app.use('/api/packaging/reports', packagingReportsRouter);
 // Public agent endpoints (no auth)
 app.get('/api/agent/contact', getContactHandler);
 app.get('/api/agent/faq',     getFaqHandler);
