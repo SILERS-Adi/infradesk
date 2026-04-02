@@ -38,6 +38,7 @@ export const COURIER_FILTER_OPTIONS = [
   { value: 'inpost', label: 'InPost' },
   { value: 'dpd', label: 'DPD' },
   { value: 'ups', label: 'UPS' },
+  { value: 'fedex', label: 'FedEx' },
   { value: 'dhl', label: 'DHL' },
   { value: 'poczta', label: 'Poczta Polska' },
   { value: 'odbior', label: 'Odbiór osobisty' },

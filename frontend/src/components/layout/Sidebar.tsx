@@ -129,6 +129,7 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
       label: 'PAKOWANIE',
       items: [
         { to: '/packaging', label: 'Dashboard', icon: <LayoutDashboard className="nav-icon" /> },
+        { to: '/packaging/board', label: 'Board', icon: <Package className="nav-icon" /> },
         { to: '/packaging/shipments', label: 'Przesyłki', icon: <Package className="nav-icon" /> },
         { to: '/packaging/reports', label: 'Statystyki', icon: <BarChart3 className="nav-icon" /> },
       ],

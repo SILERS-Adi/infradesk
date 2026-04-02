@@ -28,7 +28,9 @@ export function ShipmentNewPage() {
   const [orderNumber, setOrderNumber] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [courier, setCourier] = useState('inpost');
+  const [trackingNumber, setTrackingNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<LineItem[]>([{ ...EMPTY_ITEM }]);
 
@@ -57,6 +59,8 @@ export function ShipmentNewPage() {
         orderNumber: orderNumber.trim(),
         customerName: customerName.trim(),
         customerEmail: customerEmail.trim() || undefined,
+        customerPhone: customerPhone.trim() || undefined,
+        trackingNumber: trackingNumber.trim() || undefined,
         courier,
         status,
         notes: notes.trim() || undefined,
@@ -92,6 +96,7 @@ export function ShipmentNewPage() {
             <Input label="Numer zamówienia" placeholder="np. ALG-98236" value={orderNumber}
               onChange={e => { setOrderNumber(e.target.value); setErrors(p => { const { orderNumber: _, ...r } = p; return r; }); }} error={errors.orderNumber} />
             <Select label="Kurier" options={COURIER_OPTIONS} value={courier} onChange={e => setCourier(e.target.value)} />
+            <Input label="Numer tracking" placeholder="np. INP0012345678" value={trackingNumber} onChange={e => setTrackingNumber(e.target.value)} />
           </div>
         </Card>
 
@@ -101,6 +106,7 @@ export function ShipmentNewPage() {
               <Input label="Nazwa klienta" placeholder="np. Jan Kowalski" value={customerName}
                 onChange={e => { setCustomerName(e.target.value); setErrors(p => { const { customerName: _, ...r } = p; return r; }); }} error={errors.customerName} />
               <Input label="Email" placeholder="jan@example.com" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} />
+              <Input label="Telefon" placeholder="+48 600 100 200" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
             </div>
           </Card>
         </div>

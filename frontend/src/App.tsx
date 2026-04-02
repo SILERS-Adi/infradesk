@@ -94,6 +94,7 @@ import { ShipmentDetailPage } from './pages/admin/packaging/ShipmentDetailPage';
 import { ShipmentNewPage } from './pages/admin/packaging/ShipmentNewPage';
 import { ShipmentEditPage } from './pages/admin/packaging/ShipmentEditPage';
 import { PackagingReportsPage } from './pages/admin/packaging/PackagingReportsPage';
+import { PackagingBoardPage } from './pages/admin/packaging/PackagingBoardPage';
 
 // Mobile pages
 import { MobileLayout } from './components/layout/MobileLayout';
@@ -170,6 +171,7 @@ function AdminRoutes() {
         <Route path="packaging/shipments/new" element={<ShipmentNewPage />} />
         <Route path="packaging/shipments/:id/edit" element={<ShipmentEditPage />} />
         <Route path="packaging/shipments/:id" element={<ShipmentDetailPage />} />
+        <Route path="packaging/board" element={<PackagingBoardPage />} />
         <Route path="packaging/reports" element={<PackagingReportsPage />} />
         <Route path="superadmin" element={<RequireSuperAdmin><SADashboardPage /></RequireSuperAdmin>} />
         <Route path="superadmin/tenants" element={<RequireSuperAdmin><SATenantsPage /></RequireSuperAdmin>} />

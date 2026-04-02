@@ -33,7 +33,9 @@ export function ShipmentEditPage() {
   const [orderNumber, setOrderNumber] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [courier, setCourier] = useState('inpost');
+  const [trackingNumber, setTrackingNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<LineItem[]>([{ ...EMPTY_ITEM }]);
 
@@ -46,7 +48,9 @@ export function ShipmentEditPage() {
       setOrderNumber(data.orderNumber || '');
       setCustomerName(data.clientName || '');
       setCustomerEmail(data.clientEmail || '');
+      setCustomerPhone(data.clientPhone || '');
       setCourier(data.courier || 'inpost');
+      setTrackingNumber(data.trackingNumber || '');
       setNotes(data.notes || '');
       if (data.items?.length > 0) {
         setItems(data.items.map((it: any) => ({
@@ -86,7 +90,9 @@ export function ShipmentEditPage() {
         orderNumber: orderNumber.trim(),
         customerName: customerName.trim(),
         customerEmail: customerEmail.trim() || undefined,
+        customerPhone: customerPhone.trim() || undefined,
         courier,
+        trackingNumber: trackingNumber.trim() || undefined,
         notes: notes.trim() || undefined,
         items: items.filter(i => i.name.trim()).map(i => ({
           name: i.name.trim(), sku: i.sku.trim() || undefined, quantity: i.quantity, weight: i.weight,
@@ -116,6 +122,7 @@ export function ShipmentEditPage() {
             <Input label="Numer zamówienia" value={orderNumber}
               onChange={e => { setOrderNumber(e.target.value); setErrors(p => { const { orderNumber: _, ...r } = p; return r; }); }} error={errors.orderNumber} />
             <Select label="Kurier" options={COURIER_OPTIONS} value={courier} onChange={e => setCourier(e.target.value)} />
+            <Input label="Numer tracking" value={trackingNumber} onChange={e => setTrackingNumber(e.target.value)} />
           </div>
         </Card>
 
@@ -125,6 +132,7 @@ export function ShipmentEditPage() {
               <Input label="Nazwa klienta" value={customerName}
                 onChange={e => { setCustomerName(e.target.value); setErrors(p => { const { customerName: _, ...r } = p; return r; }); }} error={errors.customerName} />
               <Input label="Email" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} />
+              <Input label="Telefon" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
             </div>
           </Card>
         </div>

@@ -105,11 +105,35 @@ export function ShipmentDetailPage() {
         }
       />
       <div style={{ padding: '0 24px 24px', maxWidth: 1100 }}>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        {/* Status badges */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
           <Badge color={sb.color}>{sb.label}</Badge>
           <Badge color={cr.color}>{cr.label}</Badge>
           {shipment.trackingNumber && <Badge color="indigo">Tracking: {shipment.trackingNumber}</Badge>}
         </div>
+
+        {/* Progress bar */}
+        {(() => {
+          const steps = ['pending', 'packing', 'packed', 'shipped', 'delivered'];
+          const labels = ['Oczekuje', 'Pakowanie', 'Spakowane', 'Wysłane', 'Dostarczone'];
+          const currentIdx = steps.indexOf(shipment.status);
+          const progress = currentIdx >= 0 ? ((currentIdx + 1) / steps.length) * 100 : 0;
+          return (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                {labels.map((label, i) => (
+                  <span key={i} style={{
+                    fontSize: 10, fontWeight: 600,
+                    color: i <= currentIdx ? 'var(--accent)' : 'var(--td)',
+                  }}>{label}</span>
+                ))}
+              </div>
+              <div style={{ height: 4, borderRadius: 2, background: 'var(--hover-bg)' }}>
+                <div style={{ height: '100%', borderRadius: 2, background: 'var(--accent)', width: `${progress}%`, transition: 'width 0.3s ease' }} />
+              </div>
+            </div>
+          );
+        })()}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
           <Card noPadding>
