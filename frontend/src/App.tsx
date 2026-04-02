@@ -96,6 +96,13 @@ import { ShipmentEditPage } from './pages/admin/packaging/ShipmentEditPage';
 import { PackagingReportsPage } from './pages/admin/packaging/PackagingReportsPage';
 import { PackagingBoardPage } from './pages/admin/packaging/PackagingBoardPage';
 
+// Service module (IDS 1.0)
+import { ServiceDashboardPage } from './pages/admin/service/ServiceDashboardPage';
+import { InspectionsListPage } from './pages/admin/service/InspectionsListPage';
+import { InspectionFormPage } from './pages/admin/service/InspectionFormPage';
+import { VehiclesListPage } from './pages/admin/service/VehiclesListPage';
+import { VehicleFormPage } from './pages/admin/service/VehicleFormPage';
+
 // Mobile pages
 import { MobileLayout } from './components/layout/MobileLayout';
 import { MobileDashboardPage } from './pages/mobile/MobileDashboardPage';
@@ -173,6 +180,15 @@ function AdminRoutes() {
         <Route path="packaging/shipments/:id" element={<ShipmentDetailPage />} />
         <Route path="packaging/board" element={<PackagingBoardPage />} />
         <Route path="packaging/reports" element={<PackagingReportsPage />} />
+        {/* Service module */}
+        <Route path="service" element={<ServiceDashboardPage />} />
+        <Route path="service/inspections" element={<InspectionsListPage />} />
+        <Route path="service/inspections/new" element={<InspectionFormPage />} />
+        <Route path="service/inspections/:id/edit" element={<InspectionFormPage />} />
+        <Route path="service/inspections/:id" element={<InspectionFormPage />} />
+        <Route path="service/vehicles" element={<VehiclesListPage />} />
+        <Route path="service/vehicles/new" element={<VehicleFormPage />} />
+        <Route path="service/vehicles/:id/edit" element={<VehicleFormPage />} />
         <Route path="superadmin" element={<RequireSuperAdmin><SADashboardPage /></RequireSuperAdmin>} />
         <Route path="superadmin/tenants" element={<RequireSuperAdmin><SATenantsPage /></RequireSuperAdmin>} />
         <Route path="superadmin/users" element={<RequireSuperAdmin><SAUsersPage /></RequireSuperAdmin>} />

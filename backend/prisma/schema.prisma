@@ -1152,3 +1152,72 @@ enum ShipmentStatus {
   ERROR
   CANCELLED
 }
+
+// ── Service Module (SKP / Serwis) ───────────────────────────────────
+
+model ServiceVehicle {
+  id              String   @id @default(uuid())
+  workspaceId     String
+  plate           String
+  vin             String?
+  brand           String
+  model           String
+  year            Int?
+  ownerName       String
+  ownerPhone      String?
+  ownerEmail      String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  inspections     ServiceInspection[]
+
+  @@index([workspaceId])
+  @@index([workspaceId, plate])
+}
+
+model ServiceInspection {
+  id              String              @id @default(uuid())
+  workspaceId     String
+  vehicleId       String
+  inspectionNumber String
+  type            ServiceInspectionType @default(PERIODIC)
+  status          ServiceInspectionStatus @default(SCHEDULED)
+  result          ServiceInspectionResult?
+  scheduledAt     DateTime
+  completedAt     DateTime?
+  technicianName  String?
+  notes           String?
+  mileage         Int?
+  createdById     String
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  vehicle         ServiceVehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, scheduledAt])
+  @@index([vehicleId])
+}
+
+enum ServiceInspectionType {
+  PERIODIC
+  TECHNICAL
+  GAS_INSTALLATION
+  ADR
+  TAXI
+  OTHER
+}
+
+enum ServiceInspectionStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ServiceInspectionResult {
+  POSITIVE
+  NEGATIVE
+  CONDITIONAL
+}

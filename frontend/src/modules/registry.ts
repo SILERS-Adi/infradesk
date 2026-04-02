@@ -128,9 +128,17 @@ export const serviceModule: ModuleDefinition = {
   basePath: '/service',
   featureFlag: 'service',
   sidebarLabel: 'SERWIS SKP',
-  navItems: [],
+  navItems: [
+    { to: '/service', label: 'Dashboard', icon: null },
+    { to: '/service/inspections', label: 'Przeglądy', icon: null },
+    { to: '/service/vehicles', label: 'Pojazdy', icon: null },
+  ],
   routeTitles: {
     '/service': 'Serwis',
+    '/service/inspections': 'Serwis — Przeglądy',
+    '/service/inspections/new': 'Serwis — Nowy przegląd',
+    '/service/vehicles': 'Serwis — Pojazdy',
+    '/service/vehicles/new': 'Serwis — Nowy pojazd',
   },
 };
 

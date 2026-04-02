@@ -5,7 +5,7 @@ import {
   ShoppingCart, Download, Settings, HardDrive, KeyRound, Timer,
   Receipt, Plane, Users, CalendarDays, Sun, Moon, SunMoon, LinkIcon, ExternalLink,
   Shield, Activity, Sparkles,
-  FileText, Package, Warehouse, CreditCard, BarChart3, Upload,
+  FileText, Package, Warehouse, CreditCard, BarChart3, Upload, Car, ClipboardCheck,
 } from 'lucide-react';
 import { useTheme } from '../../store/themeStore';
 import { useAuth } from '../../store/authStore';
@@ -132,6 +132,16 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
         { to: '/packaging/board', label: 'Board', icon: <Package className="nav-icon" /> },
         { to: '/packaging/shipments', label: 'Przesyłki', icon: <Package className="nav-icon" /> },
         { to: '/packaging/reports', label: 'Statystyki', icon: <BarChart3 className="nav-icon" /> },
+      ],
+    },
+
+    // ── SERWIS SKP ──
+    {
+      label: 'SERWIS SKP',
+      items: [
+        { to: '/service', label: 'Dashboard', icon: <LayoutDashboard className="nav-icon" /> },
+        { to: '/service/inspections', label: 'Przeglądy', icon: <ClipboardCheck className="nav-icon" /> },
+        { to: '/service/vehicles', label: 'Pojazdy', icon: <Car className="nav-icon" /> },
       ],
     },
 

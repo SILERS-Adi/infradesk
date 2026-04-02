@@ -45,6 +45,8 @@ import contractorsRouter from './modules/invoicing/contractors.routes';
 import productsRouter from './modules/invoicing/products.routes';
 import invoicingReportsRouter from './modules/invoicing/reports.routes';
 import invoicingPaymentsRouter from './modules/invoicing/payments.routes';
+import serviceVehiclesRouter from './modules/service/vehicles.routes';
+import serviceInspectionsRouter from './modules/service/inspections.routes';
 import packagingRouter from './modules/packaging/packaging.routes';
 import packagingReportsRouter from './modules/packaging/reports.routes';
 
@@ -134,6 +136,8 @@ app.use('/api/invoicing/reports', invoicingReportsRouter);
 app.use('/api/invoicing/payments', invoicingPaymentsRouter);
 app.use('/api/packaging/shipments', packagingRouter);
 app.use('/api/packaging/reports', packagingReportsRouter);
+app.use('/api/service/vehicles', serviceVehiclesRouter);
+app.use('/api/service/inspections', serviceInspectionsRouter);
 // Public agent endpoints (no auth)
 app.get('/api/agent/contact', getContactHandler);
 app.get('/api/agent/faq',     getFaqHandler);
