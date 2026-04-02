@@ -18,7 +18,7 @@ export async function listShipments(req: Request, res: Response, next: NextFunct
 export async function getShipment(req: Request, res: Response, next: NextFunction) {
   try {
     const shipment = await service.getShipment(req.params.id, req.workspaceId!);
-    if (!shipment) return res.status(404).json({ error: 'Shipment not found' });
+    if (!shipment) { res.status(404).json({ error: 'Shipment not found' }); return; }
     res.json(shipment);
   } catch (err) { next(err); }
 }
@@ -35,7 +35,7 @@ export async function updateShipment(req: Request, res: Response, next: NextFunc
   try {
     const data = updateShipmentSchema.parse(req.body);
     const shipment = await service.updateShipment(req.params.id, data, req.workspaceId!);
-    if (!shipment) return res.status(404).json({ error: 'Shipment not found' });
+    if (!shipment) { res.status(404).json({ error: 'Shipment not found' }); return; }
     res.json(shipment);
   } catch (err) { next(err); }
 }
@@ -43,7 +43,7 @@ export async function updateShipment(req: Request, res: Response, next: NextFunc
 export async function deleteShipment(req: Request, res: Response, next: NextFunction) {
   try {
     const ok = await service.deleteShipment(req.params.id, req.workspaceId!);
-    if (!ok) return res.status(404).json({ error: 'Shipment not found' });
+    if (!ok) { res.status(404).json({ error: 'Shipment not found' }); return; }
     res.status(204).send();
   } catch (err) { next(err); }
 }

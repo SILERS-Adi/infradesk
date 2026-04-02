@@ -20,7 +20,7 @@ export async function listDocuments(req: Request, res: Response, next: NextFunct
 export async function getDocument(req: Request, res: Response, next: NextFunction) {
   try {
     const doc = await service.getDocument(req.params.id, req.workspaceId!);
-    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    if (!doc) { res.status(404).json({ error: 'Document not found' }); return; }
     res.json(doc);
   } catch (err) { next(err); }
 }
@@ -37,7 +37,7 @@ export async function updateDocument(req: Request, res: Response, next: NextFunc
   try {
     const data = updateDocumentSchema.parse(req.body);
     const doc = await service.updateDocument(req.params.id, data, req.workspaceId!);
-    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    if (!doc) { res.status(404).json({ error: 'Document not found' }); return; }
     res.json(doc);
   } catch (err) { next(err); }
 }
