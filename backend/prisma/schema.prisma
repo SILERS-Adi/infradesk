@@ -1073,6 +1073,22 @@ model InvoicingContractor {
   @@index([workspaceId, name])
 }
 
+model InvoicingProduct {
+  id              String   @id @default(uuid())
+  workspaceId     String
+  name            String
+  sku             String?
+  unit            String   @default("szt")
+  priceNet        Decimal  @default(0)
+  vatRate         String   @default("23")
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@index([workspaceId, name])
+}
+
 // ── Packaging Module ────────────────────────────────────────────────
 
 model Shipment {

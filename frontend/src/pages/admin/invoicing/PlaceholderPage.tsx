@@ -24,10 +24,6 @@ export function PlaceholderPage({ title, subtitle, description }: PlaceholderPag
   );
 }
 
-export function ProductsPage() {
-  return <PlaceholderPage title="Faktury — Produkty" subtitle="Katalog produktów i usług" description="Zarządzanie produktami, cenami, stawkami VAT." />;
-}
-
 export function WarehousesPage() {
   return <PlaceholderPage title="Faktury — Magazyn" subtitle="Stany magazynowe" description="Przegląd stanów, ruchy magazynowe, alerty niskiego stanu." />;
 }
