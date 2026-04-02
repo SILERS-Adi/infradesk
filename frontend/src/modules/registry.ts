@@ -106,6 +106,8 @@ export const invoicingModule: ModuleDefinition = {
     '/invoicing/documents/new': 'Faktury — Nowy dokument',
     '/invoicing/documents/:id/edit': 'Faktury — Edycja dokumentu',
     '/invoicing/contractors': 'Faktury — Kontrahenci',
+    '/invoicing/contractors/new': 'Faktury — Nowy kontrahent',
+    '/invoicing/contractors/:id/edit': 'Faktury — Edycja kontrahenta',
     '/invoicing/products': 'Faktury — Produkty',
     '/invoicing/warehouses': 'Faktury — Magazyn',
     '/invoicing/payments': 'Faktury — Płatności',

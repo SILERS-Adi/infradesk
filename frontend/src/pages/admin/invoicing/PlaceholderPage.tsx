@@ -24,10 +24,6 @@ export function PlaceholderPage({ title, subtitle, description }: PlaceholderPag
   );
 }
 
-export function ContractorsPage() {
-  return <PlaceholderPage title="Faktury — Kontrahenci" subtitle="Zarządzanie kontrahentami" description="Lista kontrahentów, dodawanie, edycja, historia dokumentów." />;
-}
-
 export function ProductsPage() {
   return <PlaceholderPage title="Faktury — Produkty" subtitle="Katalog produktów i usług" description="Zarządzanie produktami, cenami, stawkami VAT." />;
 }

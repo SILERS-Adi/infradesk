@@ -41,6 +41,7 @@ import partnersRouter from './modules/partners/partners.routes';
 import superadminRouter from './modules/superadmin/superadmin.routes';
 import subscriptionsRouter from './modules/subscriptions/subscriptions.routes';
 import invoicingRouter from './modules/invoicing/invoicing.routes';
+import contractorsRouter from './modules/invoicing/contractors.routes';
 import packagingRouter from './modules/packaging/packaging.routes';
 
 // Middleware
@@ -123,6 +124,7 @@ app.use('/api/partners', partnersRouter);
 app.use('/api/superadmin', superadminRouter);
 app.use('/api/subscriptions', subscriptionsRouter);
 app.use('/api/invoicing/documents', invoicingRouter);
+app.use('/api/invoicing/contractors', contractorsRouter);
 app.use('/api/packaging/shipments', packagingRouter);
 // Public agent endpoints (no auth)
 app.get('/api/agent/contact', getContactHandler);

@@ -79,7 +79,9 @@ import { DocumentsListPage } from './pages/admin/invoicing/DocumentsListPage';
 import { DocumentNewPage } from './pages/admin/invoicing/DocumentNewPage';
 import { DocumentEditPage } from './pages/admin/invoicing/DocumentEditPage';
 import { DocumentViewPage } from './pages/admin/invoicing/DocumentViewPage';
-import { ContractorsPage, ProductsPage, WarehousesPage, PaymentsPage, ReportsPage, ImportPage } from './pages/admin/invoicing/PlaceholderPage';
+import { ContractorsPage } from './pages/admin/invoicing/ContractorsPage';
+import { ContractorFormPage } from './pages/admin/invoicing/ContractorFormPage';
+import { ProductsPage, WarehousesPage, PaymentsPage, ReportsPage, ImportPage } from './pages/admin/invoicing/PlaceholderPage';
 
 // Packaging module (IDS 1.0)
 import { PackagingDashboardPage } from './pages/admin/packaging/PackagingDashboardPage';
@@ -147,6 +149,8 @@ function AdminRoutes() {
         <Route path="invoicing/documents/:id/edit" element={<DocumentEditPage />} />
         <Route path="invoicing/documents/:id" element={<DocumentViewPage />} />
         <Route path="invoicing/contractors" element={<ContractorsPage />} />
+        <Route path="invoicing/contractors/new" element={<ContractorFormPage />} />
+        <Route path="invoicing/contractors/:id/edit" element={<ContractorFormPage />} />
         <Route path="invoicing/products" element={<ProductsPage />} />
         <Route path="invoicing/warehouses" element={<WarehousesPage />} />
         <Route path="invoicing/payments" element={<PaymentsPage />} />
