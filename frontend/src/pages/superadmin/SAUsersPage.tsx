@@ -26,7 +26,7 @@ export default function SAUsersPage() {
         <table className="w-full text-sm">
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--hover-bg)' }}>
-              {['Użytkownik', 'Tenant', 'Rola', 'SA', 'Ostatnie logowanie', 'Status'].map(h => (
+              {['Użytkownik', 'Workspace', 'Rola', 'SA', 'Ostatnie logowanie', 'Status'].map(h => (
                 <th key={h} className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>{h}</th>
               ))}
             </tr>

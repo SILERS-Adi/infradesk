@@ -8,7 +8,7 @@ export default function SADashboardPage() {
   if (isLoading) return <div className="flex items-center justify-center h-48"><Loader2 className="h-6 w-6 animate-spin text-red-400" /></div>;
 
   const cards = [
-    { label: 'Tenanci', value: stats?.tenants, icon: Building2, color: '#F87171' },
+    { label: 'Workspace\'y', value: stats?.tenants, icon: Building2, color: '#F87171' },
     { label: 'Użytkownicy', value: stats?.users, icon: Users, color: '#60A5FA' },
     { label: 'Agenci online', value: stats?.agents, icon: Monitor, color: '#4ADE80' },
     { label: 'Urządzenia', value: stats?.devices, icon: Server, color: '#A78BFA' },
@@ -38,17 +38,17 @@ export default function SADashboardPage() {
         <div className="rounded-xl p-4" style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)' }}>
           <p className="text-[10px] font-bold uppercase tracking-wider text-violet-400/50">MSP</p>
           <p className="text-3xl font-bold text-violet-400 mt-1">{stats?.byType?.msp ?? 0}</p>
-          <p className="text-xs mt-1" style={{ color: 'var(--tm)' }}>Firmy IT zarządzające klientami</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--tm)' }}>Workspace'y IT zarządzające klientami</p>
         </div>
         <div className="rounded-xl p-4" style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.12)' }}>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-blue-400/50">Business</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-blue-400/50">Company</p>
           <p className="text-3xl font-bold text-blue-400 mt-1">{stats?.byType?.business ?? 0}</p>
-          <p className="text-xs mt-1" style={{ color: 'var(--tm)' }}>Firmy zarządzające własną infra</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--tm)' }}>Workspace'y firmowe</p>
         </div>
         <div className="rounded-xl p-4" style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.12)' }}>
           <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-400/50">Personal</p>
           <p className="text-3xl font-bold text-emerald-400 mt-1">{stats?.byType?.personal ?? 0}</p>
-          <p className="text-xs mt-1" style={{ color: 'var(--tm)' }}>Użytkownicy domowi</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--tm)' }}>Workspace'y osobiste</p>
         </div>
       </div>
     </div>
