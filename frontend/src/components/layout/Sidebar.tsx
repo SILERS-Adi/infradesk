@@ -13,7 +13,6 @@ import { clsx } from 'clsx';
 import { useQuery } from '@tanstack/react-query';
 import { ticketsApi } from '../../api/tickets';
 import { tasksApi } from '../../api/tasks';
-import { tenantApi } from '../../api/tenant';
 
 interface NavItem {
   to: string;
@@ -52,14 +51,7 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
     queryFn: () => tasksApi.getAll({ all: false }),
     refetchInterval: 30_000, staleTime: 15_000,
   });
-  const { data: tenantUsage } = useQuery({
-    queryKey: ['tenant-usage'],
-    queryFn: tenantApi.getUsage,
-    staleTime: 60_000,
-    retry: false,
-  });
-  const features = new Set(tenantUsage?.features || []);
-  const hasFeature = (f?: string) => !f || features.size === 0 || features.has(f);
+  const hasFeature = (_f?: string) => true; // All features available in workspace
   const queueCount = queueTickets.length;
   const myActiveTasksCount = myTasks.filter(t => t.status !== 'DONE').length;
 
@@ -76,7 +68,6 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
     {
       label: 'INFRASTRUKTURA',
       items: [
-        { to: '/clients', label: 'Klienci', icon: <Building2 className="nav-icon" /> },
         { to: '/locations', label: 'Lokalizacje', icon: <MapPin className="nav-icon" /> },
         { to: '/devices', label: 'Urządzenia', icon: <Monitor className="nav-icon" /> },
         { to: '/credentials', label: 'Dostępy', icon: <KeyRound className="nav-icon" /> },
@@ -117,26 +108,14 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
       ],
     },
 
-    // ── WSPÓŁPRACA ──
-    {
-      label: 'WSPÓŁPRACA',
-      items: [
-        { to: '/partners', label: 'Partnerzy', icon: <LinkIcon className="nav-icon" />, feature: 'partners' },
-        { to: '/shared', label: 'Infra klientów', icon: <ExternalLink className="nav-icon" />, feature: 'partners' },
-      ],
-    },
-
     // ── ADMINISTRACJA (ADMIN only) ──
     {
       label: 'ADMINISTRACJA',
       role: 'ADMIN',
       items: [
-        { to: '/users', label: 'Użytkownicy', icon: <Users className="nav-icon" /> },
-        { to: '/workspace-members', label: 'Członkowie WS', icon: <Shield className="nav-icon" /> },
+        { to: '/workspace-members', label: 'Członkowie', icon: <Users className="nav-icon" /> },
         { to: '/settings', label: 'Ustawienia', icon: <Settings className="nav-icon" /> },
-        { to: '/tenant', label: 'Panel & Plan', icon: <Activity className="nav-icon" /> },
-        { to: '/my-company', label: 'Moja firma', icon: <Building2 className="nav-icon" /> },
-        { to: '/child-tenants', label: 'Podmioty', icon: <Building2 className="nav-icon" /> },
+        { to: '/my-company', label: 'Workspace', icon: <Building2 className="nav-icon" /> },
         { to: '/downloads', label: 'Pobieranie', icon: <Download className="nav-icon" /> },
       ],
     },
@@ -147,9 +126,8 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
       role: 'SUPERADMIN',
       items: [
         { to: '/superadmin', label: 'Dashboard SA', icon: <Activity className="nav-icon" /> },
-        { to: '/superadmin/tenants', label: 'Tenanci', icon: <Building2 className="nav-icon" /> },
+        { to: '/superadmin/tenants', label: 'Workspace\'y', icon: <Building2 className="nav-icon" /> },
         { to: '/superadmin/users', label: 'Użytkownicy SA', icon: <Users className="nav-icon" /> },
-        { to: '/superadmin/pricing', label: 'Stawki', icon: <Receipt className="nav-icon" /> },
         { to: '/superadmin/email', label: 'Email', icon: <Settings className="nav-icon" /> },
       ],
     },
