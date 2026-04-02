@@ -1014,6 +1014,7 @@ model InvoiceDocument {
   updatedAt       DateTime              @updatedAt
 
   items           InvoiceDocumentItem[]
+  payments        InvoicingPayment[]
 
   @@index([workspaceId, status])
   @@index([workspaceId, issuedAt])
@@ -1071,6 +1072,22 @@ model InvoicingContractor {
 
   @@index([workspaceId])
   @@index([workspaceId, name])
+}
+
+model InvoicingPayment {
+  id              String          @id @default(uuid())
+  workspaceId     String
+  documentId      String
+  amount          Decimal
+  paidAt          DateTime        @default(now())
+  method          String          @default("przelew")
+  notes           String?
+  createdAt       DateTime        @default(now())
+
+  document        InvoiceDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([documentId])
 }
 
 model InvoicingProduct {

@@ -28,10 +28,6 @@ export function WarehousesPage() {
   return <PlaceholderPage title="Faktury — Magazyn" subtitle="Stany magazynowe" description="Przegląd stanów, ruchy magazynowe, alerty niskiego stanu." />;
 }
 
-export function PaymentsPage() {
-  return <PlaceholderPage title="Faktury — Płatności" subtitle="Rozliczenia dokumentów" description="Śledzenie płatności, zaległości, raporty." />;
-}
-
 export function ImportPage() {
   return <PlaceholderPage title="Faktury — Import" subtitle="Import danych CSV" description="Import kontrahentów i produktów z plików CSV. Będzie dostępny po podłączeniu backendu." />;
 }
