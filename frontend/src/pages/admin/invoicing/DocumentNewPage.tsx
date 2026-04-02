@@ -11,6 +11,7 @@ import { Textarea } from '../../../components/ui/Textarea';
 import { Button } from '../../../components/ui/Button';
 import { Alert } from '../../../components/ui/Alert';
 import { fmtPLN } from './utils';
+import { ContractorPicker } from './components/ContractorPicker';
 
 // ── Types ──
 
@@ -206,6 +207,11 @@ export function DocumentNewPage() {
         {/* Kontrahent */}
         <div style={{ marginTop: 20 }}>
           <Card title="Kontrahent">
+            <ContractorPicker onSelect={(c) => {
+              setContractorName(c.name);
+              setContractorNip(c.nip);
+              setErrors(prev => { const { contractorName: _, ...rest } = prev; return rest; });
+            }} />
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
               <Input
                 label="Nazwa kontrahenta"

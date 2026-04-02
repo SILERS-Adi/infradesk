@@ -17,6 +17,7 @@ import { Button } from '../../../components/ui/Button';
 import { Alert } from '../../../components/ui/Alert';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { fmtPLN } from './utils';
+import { ContractorPicker } from './components/ContractorPicker';
 
 interface LineItem {
   name: string;
@@ -208,6 +209,11 @@ export function DocumentEditPage() {
 
         <div style={{ marginTop: 20 }}>
           <Card title="Kontrahent">
+            <ContractorPicker onSelect={(c) => {
+              setContractorName(c.name);
+              setContractorNip(c.nip);
+              setErrors(prev => { const { contractorName: _, ...rest } = prev; return rest; });
+            }} />
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
               <Input label="Nazwa kontrahenta" value={contractorName}
                 onChange={(e) => { setContractorName(e.target.value); setErrors(prev => { const { contractorName: _, ...rest } = prev; return rest; }); }}
