@@ -88,15 +88,35 @@ app.use(requestLogger);
 // Workspace resolution
 app.use(resolveWorkspace);
 
-// Require workspace for data endpoints (prevent cross-workspace data leaks)
-app.use('/api', (req, res, next) => {
-  // Skip workspace requirement for these paths
-  const skip = ['/api/auth', '/api/superadmin', '/api/workspaces', '/api/push', '/api/agent', '/api/qr'];
-  if (skip.some(p => req.path.startsWith(p.replace('/api', '')))) return next();
+// Auto-resolve workspace if not set — find user's single/default membership
+app.use('/api', async (req, _res, next) => {
+  const skip = ['/auth', '/superadmin', '/workspaces', '/push', '/agent', '/qr', '/health'];
+  if (skip.some(p => req.path.startsWith(p))) return next();
   if (req.method === 'OPTIONS') return next();
-  // If authenticated but no workspace resolved — block
-  if (req.headers.authorization && !req.workspaceId) {
-    return res.status(400).json({ error: 'No workspace selected. Please select a workspace.' });
+
+  // If already resolved by header/subdomain — continue
+  if (req.workspaceId) return next();
+
+  // If authenticated but no workspace — try to auto-resolve from user's memberships
+  if (req.headers.authorization) {
+    try {
+      const { authenticate: authFn } = require('./middleware/auth');
+      // Parse user from token (lightweight — just decode, don't call full middleware)
+      const token = req.headers.authorization.replace('Bearer ', '');
+      const jwt = require('./utils/jwt');
+      const payload = jwt.verifyAccessToken(token);
+      if (payload?.userId) {
+        const membership = await prisma.workspaceMembership.findFirst({
+          where: { userId: payload.userId, status: 'ACTIVE' },
+          include: { workspace: { select: { id: true, slug: true, type: true, isActive: true } } },
+          orderBy: { createdAt: 'asc' },
+        });
+        if (membership?.workspace?.isActive) {
+          req.workspaceId = membership.workspace.id;
+          req.workspace = { id: membership.workspace.id, slug: membership.workspace.slug, type: membership.workspace.type, source: 'header' as const };
+        }
+      }
+    } catch { /* silent — continue without workspace */ }
   }
   next();
 });

@@ -16,7 +16,10 @@ apiClient.interceptors.request.use(config => {
   }
 
   // Inject workspace context header
-  const wsId = getCurrentWorkspaceId() || localStorage.getItem('infradesk_workspace');
+  let wsId = getCurrentWorkspaceId();
+  if (!wsId) {
+    try { wsId = localStorage.getItem('infradesk_workspace'); } catch { /* localStorage unavailable */ }
+  }
   if (wsId) {
     config.headers['X-Workspace-Id'] = wsId;
   }
