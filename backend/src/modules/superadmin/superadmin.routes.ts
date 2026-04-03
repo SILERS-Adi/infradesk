@@ -109,7 +109,10 @@ router.delete('/tenants/:id', async (req: Request, res: Response, next: NextFunc
       prisma.workspace.delete({ where: { id: wsId } }),
     ]);
     res.status(204).send();
-  } catch (err) { next(err); }
+  } catch (err: any) {
+    console.error('DELETE workspace error:', err?.message || err);
+    res.status(400).json({ error: err?.message || 'Delete failed', code: err?.code });
+  }
 });
 
 // ── All Users (global) ──────────────────────────────────────────────
