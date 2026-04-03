@@ -217,6 +217,43 @@ export default function RegisterPage() {
                 {showPassword ? <EyeOff size={16} color="var(--tm)" /> : <Eye size={16} color="var(--tm)" />}
               </button>
             </div>
+            {/* Password strength indicator */}
+            {password.length > 0 && (() => {
+              const checks = [
+                password.length >= 8,
+                /[A-Z]/.test(password),
+                /[a-z]/.test(password),
+                /[0-9]/.test(password),
+                /[^A-Za-z0-9]/.test(password),
+              ];
+              const score = checks.filter(Boolean).length;
+              const labels = ['Bardzo słabe', 'Słabe', 'Średnie', 'Dobre', 'Silne', 'Bardzo silne'];
+              const colors = ['#EF4444', '#F59E0B', '#F59E0B', '#10B981', '#059669', '#059669'];
+              return (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+                    {[0,1,2,3,4].map(i => (
+                      <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i < score ? colors[score] : (isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'), transition: 'all 0.3s ease' }} />
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: colors[score] }}>{labels[score]}</span>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {[
+                        { ok: password.length >= 8, label: '8+' },
+                        { ok: /[A-Z]/.test(password), label: 'A-Z' },
+                        { ok: /[0-9]/.test(password), label: '0-9' },
+                        { ok: /[^A-Za-z0-9]/.test(password), label: '@#!' },
+                      ].map(r => (
+                        <span key={r.label} style={{ fontSize: 10, fontWeight: 600, color: r.ok ? '#059669' : 'var(--tm)', transition: 'color 0.2s' }}>
+                          {r.ok ? <Check size={10} style={{ display: 'inline', verticalAlign: '-1px' }} /> : null} {r.label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Submit */}
