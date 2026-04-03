@@ -1042,6 +1042,9 @@ export default function ConfiguratorPage() {
                 </span>
               </div>
             </div>
+            <div style={{ textAlign: 'right', marginBottom: 20 }}>
+              <span style={{ fontSize: 11, color: '#94A3B8', fontWeight: 500 }}>Wszystkie ceny netto</span>
+            </div>
 
             {/* CTA */}
             <button className="cfg-cta-btn" style={{
