@@ -31,7 +31,9 @@ export function WorkspaceSwitcher() {
   const { workspaces, current, switchWorkspace, setWorkspaces, isLoading } = useWorkspace();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [dropPos, setDropPos] = useState({ top: 0, left: 0 });
   const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
   // Fetch workspaces
   const { data } = useQuery({
@@ -67,7 +69,15 @@ export function WorkspaceSwitcher() {
     <div ref={ref} style={{ position: 'relative' }}>
       {/* Trigger */}
       <button
-        onClick={() => hasMultiple && setOpen(!open)}
+        ref={btnRef}
+        onClick={() => {
+          if (!hasMultiple) return;
+          if (!open && btnRef.current) {
+            const rect = btnRef.current.getBoundingClientRect();
+            setDropPos({ top: rect.bottom + 6, left: rect.left });
+          }
+          setOpen(!open);
+        }}
         style={{
           display: 'flex', alignItems: 'center', gap: 6,
           padding: '4px 10px', borderRadius: 8,
@@ -95,11 +105,12 @@ export function WorkspaceSwitcher() {
       {/* Dropdown */}
       {open && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 6px)', left: 0,
-          minWidth: 240, maxHeight: 320, overflowY: 'auto',
+          position: 'fixed', top: dropPos.top, left: dropPos.left,
+          minWidth: 280, maxHeight: 400, overflowY: 'auto',
           background: 'var(--bg2)', border: '1px solid var(--border-l)',
-          borderRadius: 10, padding: 4,
-          boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
+          borderRadius: 12, padding: 4,
+          boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
+          backdropFilter: 'blur(12px)',
           zIndex: 9999,
         }}>
           {workspaces.map(ws => {
