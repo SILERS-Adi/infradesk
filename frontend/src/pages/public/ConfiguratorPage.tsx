@@ -6,7 +6,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Monitor, FileText, Package, Car, Headphones, Check,
-  ChevronRight, Plug, Shield, Zap, ArrowRight, MessageCircle,
+  ChevronRight, Plug, Zap, ArrowRight, MessageCircle,
   Building2, Users, Globe, ShoppingCart, Scan, Calendar, Sparkles,
 } from 'lucide-react';
 
@@ -95,10 +95,7 @@ export default function ConfiguratorPage() {
       <header style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(248,250,252,0.72)', backdropFilter: 'blur(20px) saturate(1.8)', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 40px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 34, height: 34, borderRadius: 9, background: 'linear-gradient(135deg, #4F46E5, #7C3AED)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(79,70,229,0.35)' }}>
-              <Shield size={17} color="#fff" />
-            </div>
-            <span style={{ fontSize: 17, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.03em' }}>InfraDesk</span>
+            <img src="/logo-dark.png" alt="InfraDesk" style={{ height: 36, objectFit: 'contain' }} />
           </div>
           <Link to="/login" style={{ fontSize: 14, fontWeight: 500, color: '#64748B', textDecoration: 'none', transition: `color 0.15s ${easeOut}` }}
             onMouseEnter={e => { e.currentTarget.style.color = '#4F46E5'; }} onMouseLeave={e => { e.currentTarget.style.color = '#64748B'; }}>

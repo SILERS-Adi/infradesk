@@ -98,7 +98,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
         <button onClick={onMenuClick} style={{ color: 'var(--tm)', padding: 4, background: 'none', border: 'none', cursor: 'pointer' }}>
           <Menu style={{ width: 18, height: 18 }} />
         </button>
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ts)' }}>InfraDesk</span>
+        <img src="/logo-icon.png" alt="InfraDesk" style={{ height: 22, width: 22, objectFit: 'contain' }} />
       </div>
 
       {/* Workspace switcher */}

@@ -206,17 +206,8 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
           </button>
         )}
         <div className="sidebar-logo">
-          <div className="sidebar-logo-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
-            </svg>
-          </div>
-          {!collapsed && (
-            <div>
-              <div className="sidebar-logo-text">InfraDesk</div>
-              <div className="sidebar-logo-sub">Panel zarządzania</div>
-            </div>
-          )}
+          <img src={collapsed ? "/logo-icon.png" : "/logo.png"} alt="InfraDesk"
+            style={collapsed ? { height: 28, width: 28, objectFit: 'contain' } : { height: 32, objectFit: 'contain' }} />
         </div>
       </div>
 

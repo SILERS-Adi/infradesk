@@ -26,8 +26,7 @@ export function ForgotPasswordPage() {
 
       <div className="w-full max-w-[420px] relative z-10">
         <div className="text-center mb-8">
-          <img src="/logo.png" alt="" className="h-14 mx-auto mb-3" />
-          <h1 className="text-[20px] font-semibold text-white/85">InfraDesk</h1>
+          <img src="/logo.png" alt="InfraDesk" className="h-16 mx-auto mb-3" />
         </div>
 
         <div className="rounded-[22px] overflow-hidden" style={{

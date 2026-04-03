@@ -3,7 +3,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   LayoutDashboard, ListChecks, Monitor, ShoppingCart,
-  Plus, X, Building2, Ticket, Phone, QrCode, LogOut, MapPin, Search, Settings, RefreshCw,
+  Plus, X, Ticket, Phone, QrCode, LogOut, MapPin, Search, Settings, RefreshCw,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../store/authStore';
@@ -23,7 +23,7 @@ const TABS = [
 ];
 
 const ADD_ACTIONS = [
-  { label: 'Firmę', desc: 'Nowy klient', icon: Building2, path: '/clients', color: '#8B5CF6' },
+  { label: 'Lokalizację', desc: 'Nowa lokalizacja', icon: MapPin, path: '/locations', color: '#8B5CF6' },
   { label: 'Zgłoszenie', desc: 'Nowy serwis', icon: Ticket, path: '/m/tickets/new', color: '#22D3EE' },
   { label: 'Zamówienie', desc: 'Towar / sprzęt', icon: ShoppingCart, path: '/orders', color: '#FBBF24' },
   { label: 'CRM', desc: 'Telefon, email, spotkanie', icon: Phone, path: '/crm', color: '#34D399' },
@@ -79,8 +79,7 @@ export function MobileLayout({ children }: Props) {
       <header className="relative z-10 px-5 pb-2 flex items-center justify-between safe-area-pt" style={{ paddingTop: 'max(16px, env(safe-area-inset-top, 16px))' }}>
         {/* Logo: [icon] InfraDesk — icon 20-25% larger */}
         <div className="flex items-center gap-[7px]">
-          <img src="/logo.png" alt="" className="h-[30px] w-auto" />
-          <span className="text-[15px] font-semibold tracking-[-0.01em]" style={{ color: 'rgba(255,255,255,0.7)' }}>InfraDesk</span>
+          <img src="/logo.png" alt="InfraDesk" className="h-[30px] w-auto" />
         </div>
         {/* Right: search, GPS, avatar — compact */}
         <div className="flex items-center gap-2">

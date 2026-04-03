@@ -181,7 +181,7 @@ export function TvDashboardPage() {
       {/* ── TOP BAR ─────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <img src="/logo.png" alt="InfraDesk" style={{ height: 40, objectFit: 'contain' }} />
+          <img src="/logo.png" alt="InfraDesk" style={{ height: 44, objectFit: 'contain' }} />
           <div style={{ width: 1, height: 32, background: '#1e293b' }} />
           <div>
             <div style={{ fontSize: 15, color: '#94a3b8', fontWeight: 500 }}>
