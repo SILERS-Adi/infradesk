@@ -35,6 +35,7 @@ export function WorkspaceSwitcher() {
   const [dropPos, setDropPos] = useState({ top: 0, left: 0 });
   const ref = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
 
   // Fetch workspaces
   const { data } = useQuery({
@@ -52,14 +53,18 @@ export function WorkspaceSwitcher() {
     }
   }, [data, setWorkspaces]);
 
-  // Close on outside click
+  // Close on outside click (check both trigger ref and portal dropdown ref)
   useEffect(() => {
+    if (!open) return;
     function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (ref.current?.contains(target)) return;
+      if (dropRef.current?.contains(target)) return;
+      setOpen(false);
     }
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
+  }, [open]);
 
   if (!isAuthenticated || isLoading || !current) return null;
 
@@ -105,7 +110,7 @@ export function WorkspaceSwitcher() {
 
       {/* Dropdown — rendered via Portal to escape .main overflow:hidden */}
       {open && createPortal(
-        <div style={{
+        <div ref={dropRef} style={{
           position: 'fixed', top: dropPos.top, left: dropPos.left,
           minWidth: 280, maxHeight: 400, overflowY: 'auto',
           background: 'var(--bg2)', border: '1px solid var(--border-l)',
