@@ -7,7 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
 enum DeviceStatus {
   ACTIVE
   INACTIVE
@@ -138,116 +137,126 @@ enum GrantResourceType {
 
 // ── SuperAdmin global config ────────────────────────────────────────
 model PlatformConfig {
-  id                    String   @id @default("global")
+  id                   String   @id @default("global")
   // Stawki pomocy zdalnej
-  remoteHelpBasePrice   Float    @default(89)
-  remoteHelpHourlyRate  Float    @default(120)
-  remoteHelpCurrency    String   @default("PLN")
+  remoteHelpBasePrice  Float    @default(89)
+  remoteHelpHourlyRate Float    @default(120)
+  remoteHelpCurrency   String   @default("PLN")
   // Bramka płatności (mBank/imoje)
-  paymentGateway        String   @default("imoje")
-  paymentMerchantId     String?
-  paymentServiceId      String?
-  paymentApiKey         String?
-  paymentEnabled        Boolean  @default(false)
+  paymentGateway       String   @default("imoje")
+  paymentMerchantId    String?
+  paymentServiceId     String?
+  paymentApiKey        String?
+  paymentEnabled       Boolean  @default(false)
   // Email — Powiadomienia
-  notifySmtpHost        String?
-  notifySmtpPort        Int?     @default(587)
-  notifySmtpUser        String?
-  notifySmtpPass        String?
-  notifySmtpFrom        String?
-  notifySmtpFromName    String?  @default("InfraDesk")
+  notifySmtpHost       String?
+  notifySmtpPort       Int?     @default(587)
+  notifySmtpUser       String?
+  notifySmtpPass       String?
+  notifySmtpFrom       String?
+  notifySmtpFromName   String?  @default("InfraDesk")
   // Email — Alerty
-  alertSmtpHost         String?
-  alertSmtpPort         Int?     @default(587)
-  alertSmtpUser         String?
-  alertSmtpPass         String?
-  alertSmtpFrom         String?
-  alertSmtpFromName     String?  @default("InfraDesk Alert")
+  alertSmtpHost        String?
+  alertSmtpPort        Int?     @default(587)
+  alertSmtpUser        String?
+  alertSmtpPass        String?
+  alertSmtpFrom        String?
+  alertSmtpFromName    String?  @default("InfraDesk Alert")
   // Ogólne
-  platformName          String   @default("InfraDesk")
-  supportEmail          String?
-  supportPhone          String?
-  updatedAt             DateTime @updatedAt
+  platformName         String   @default("InfraDesk")
+  supportEmail         String?
+  supportPhone         String?
+  updatedAt            DateTime @updatedAt
 }
 
 // ── Workspace ───────────────────────────────────────────────────────
 
 model Workspace {
-  id              String         @id @default(uuid())
-  name            String
-  slug            String         @unique
-  type            WorkspaceType
-  plan            WorkspacePlan  @default(FREE)
+  id   String        @id @default(uuid())
+  name String
+  slug String        @unique
+  type WorkspaceType
+  plan WorkspacePlan @default(FREE)
 
-  legalName       String?
-  taxId           String?
-  email           String?
-  phone           String?
-  website         String?
-  addressLine1    String?
-  postalCode      String?
-  city            String?
-  country         String         @default("PL")
-  logoUrl         String?
-  primaryColor    String?        @default("#6D28D9")
+  legalName    String?
+  taxId        String?
+  email        String?
+  phone        String?
+  website      String?
+  addressLine1 String?
+  postalCode   String?
+  city         String?
+  country      String  @default("PL")
+  logoUrl      String?
+  primaryColor String? @default("#6D28D9")
 
-  maxAgents       Int            @default(10)
-  maxUsers        Int            @default(5)
-  enabledModules  String[]       @default(["helpdesk"])
+  maxAgents      Int      @default(10)
+  maxUsers       Int      @default(5)
+  enabledModules String[] @default(["helpdesk"])
 
   // Subscription
-  subscriptionStatus  String     @default("TRIAL")   // TRIAL | ACTIVE | EXPIRED | PAUSED
-  trialEndDate        DateTime?
-  billingCycle        String     @default("MONTHLY")  // MONTHLY | YEARLY
-  monthlyPrice        Float      @default(0)
-  lastConfig          Json?                           // saved configurator state for renewal
-  paidUntil           DateTime?
+  subscriptionStatus String    @default("TRIAL") // TRIAL | ACTIVE | EXPIRED | PAUSED
+  trialEndDate       DateTime?
+  billingCycle       String    @default("MONTHLY") // MONTHLY | YEARLY
+  monthlyPrice       Float     @default(0)
+  lastConfig         Json? // saved configurator state for renewal
+  paidUntil          DateTime?
 
-  workspaceKey    String         @unique @default(uuid())
-  isActive        Boolean        @default(true)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  workspaceKey String   @unique @default(uuid())
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  memberships         WorkspaceMembership[]
-  managedBy           WorkspaceManagement[]   @relation("ManagedCompany")
-  manages             WorkspaceManagement[]   @relation("ManagingMsp")
-  settings            WorkspaceSetting[]
-  locations           Location[]              @relation("LocationWorkspace")
-  devices             Device[]                @relation("DeviceWorkspace")
-  tickets             Ticket[]                @relation("TicketWorkspace")
-  credentials         Credential[]            @relation("CredentialWorkspace")
-  agents              AgentRegistration[]     @relation("AgentWorkspace")
-  tasks               Task[]                  @relation("TaskWorkspace")
-  workSessions        WorkSession[]           @relation("WorkSessionWorkspace")
-  orders              Order[]                 @relation("OrderWorkspace")
-  delegations         Delegation[]            @relation("DelegationWorkspace")
-  crmActivities       CrmActivity[]           @relation("CrmWorkspace")
-  backupConfigs       BackupConfig[]          @relation("BackupWorkspace")
-  activityLogs        ActivityLog[]           @relation("ActivityLogWorkspace")
-  sharingInvitations  SharingInvitation[]
+  memberships        WorkspaceMembership[]
+  managedBy          WorkspaceManagement[] @relation("ManagedCompany")
+  manages            WorkspaceManagement[] @relation("ManagingMsp")
+  settings           WorkspaceSetting[]
+  locations          Location[]            @relation("LocationWorkspace")
+  devices            Device[]              @relation("DeviceWorkspace")
+  tickets            Ticket[]              @relation("TicketWorkspace")
+  credentials        Credential[]          @relation("CredentialWorkspace")
+  agents             AgentRegistration[]   @relation("AgentWorkspace")
+  tasks              Task[]                @relation("TaskWorkspace")
+  workSessions       WorkSession[]         @relation("WorkSessionWorkspace")
+  orders             Order[]               @relation("OrderWorkspace")
+  delegations        Delegation[]          @relation("DelegationWorkspace")
+  crmActivities      CrmActivity[]         @relation("CrmWorkspace")
+  backupConfigs      BackupConfig[]        @relation("BackupWorkspace")
+  activityLogs       ActivityLog[]         @relation("ActivityLogWorkspace")
+  sharingInvitations SharingInvitation[]
+
+  // PakOps relations
+  packingCustomers PackingCustomer[] @relation("PackingCustomerWorkspace")
+  packingSessions  PackingSession[]  @relation("PackingSessionWorkspace")
+  pickingSessions  PickingSession[]  @relation("PickingSessionWorkspace")
+  packingBatches   PackingBatch[]    @relation("PackingBatchWorkspace")
+  couriers         Courier[]         @relation("CourierWorkspace")
+  carriers         Carrier[]         @relation("CarrierWorkspace")
+  allegroAccounts  AllegroAccount[]  @relation("AllegroAccountWorkspace")
+  syncLogs         SyncLog[]         @relation("SyncLogWorkspace")
 
   @@index([type])
   @@index([isActive])
 }
 
 model WorkspaceMembership {
-  id              String            @id @default(uuid())
-  userId          String
-  workspaceId     String
-  role            MemberRole        @default(MEMBER)
-  scopeType       ScopeType         @default(FULL)
-  source          MembershipSource  @default(DIRECT)
-  allowedModules  Json?
-  isDefault       Boolean           @default(false)
-  status          MembershipStatus  @default(ACTIVE)
-  managementId    String?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id             String           @id @default(uuid())
+  userId         String
+  workspaceId    String
+  role           MemberRole       @default(MEMBER)
+  scopeType      ScopeType        @default(FULL)
+  source         MembershipSource @default(DIRECT)
+  allowedModules Json?
+  isDefault      Boolean          @default(false)
+  status         MembershipStatus @default(ACTIVE)
+  managementId   String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
-  user            User              @relation(fields: [userId], references: [id])
-  workspace       Workspace         @relation(fields: [workspaceId], references: [id])
-  management      WorkspaceManagement? @relation(fields: [managementId], references: [id])
-  accessGrants    AccessGrant[]
+  user         User                 @relation(fields: [userId], references: [id])
+  workspace    Workspace            @relation(fields: [workspaceId], references: [id])
+  management   WorkspaceManagement? @relation(fields: [managementId], references: [id])
+  accessGrants AccessGrant[]
 
   @@unique([userId, workspaceId])
   @@index([workspaceId])
@@ -256,12 +265,12 @@ model WorkspaceMembership {
 }
 
 model AccessGrant {
-  id              String            @id @default(uuid())
-  membershipId    String
-  resourceType    GrantResourceType
-  resourceId      String
+  id           String            @id @default(uuid())
+  membershipId String
+  resourceType GrantResourceType
+  resourceId   String
 
-  membership      WorkspaceMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  membership WorkspaceMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
 
   @@unique([membershipId, resourceType, resourceId])
   @@index([membershipId])
@@ -269,12 +278,12 @@ model AccessGrant {
 }
 
 model WorkspaceManagement {
-  id                   String            @id @default(uuid())
-  mspWorkspaceId       String
-  companyWorkspaceId   String
+  id                 String @id @default(uuid())
+  mspWorkspaceId     String
+  companyWorkspaceId String
 
-  status               ManagementStatus  @default(ACTIVE)
-  accessLevel          ManagementAccess  @default(FULL_MANAGEMENT)
+  status      ManagementStatus @default(ACTIVE)
+  accessLevel ManagementAccess @default(FULL_MANAGEMENT)
 
   contractHours        Int?
   contractMonthlyValue Float?
@@ -282,18 +291,18 @@ model WorkspaceManagement {
   contractScope        String?
   contractStartDate    DateTime?
   contractEndDate      DateTime?
-  billedToMsp          Boolean           @default(true)
+  billedToMsp          Boolean   @default(true)
 
-  detachedAt           DateTime?
-  detachedByUserId     String?
-  detachReason         String?
+  detachedAt       DateTime?
+  detachedByUserId String?
+  detachReason     String?
 
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  mspWorkspace         Workspace         @relation("ManagingMsp", fields: [mspWorkspaceId], references: [id])
-  companyWorkspace     Workspace         @relation("ManagedCompany", fields: [companyWorkspaceId], references: [id])
-  memberships          WorkspaceMembership[]
+  mspWorkspace     Workspace             @relation("ManagingMsp", fields: [mspWorkspaceId], references: [id])
+  companyWorkspace Workspace             @relation("ManagedCompany", fields: [companyWorkspaceId], references: [id])
+  memberships      WorkspaceMembership[]
 
   @@unique([mspWorkspaceId, companyWorkspaceId])
   @@index([mspWorkspaceId])
@@ -302,13 +311,13 @@ model WorkspaceManagement {
 }
 
 model WorkspaceSetting {
-  id           String    @id @default(uuid())
-  workspaceId  String
-  key          String
-  value        String
-  updatedAt    DateTime  @updatedAt
+  id          String   @id @default(uuid())
+  workspaceId String
+  key         String
+  value       String
+  updatedAt   DateTime @updatedAt
 
-  workspace    Workspace @relation(fields: [workspaceId], references: [id])
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
 
   @@unique([workspaceId, key])
   @@index([workspaceId])
@@ -334,12 +343,12 @@ enum QuoteStatus {
 }
 
 model User {
-  id            String    @id @default(uuid())
-  firstName     String
-  lastName      String
-  email         String    @unique
-  phone         String?
-  passwordHash  String
+  id                   String    @id @default(uuid())
+  firstName            String
+  lastName             String
+  email                String    @unique
+  phone                String?
+  passwordHash         String
   isActive             Boolean   @default(true)
   isSuperAdmin         Boolean   @default(false)
   emailVerified        Boolean   @default(false)
@@ -348,36 +357,36 @@ model User {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
-  downloadPin   String?
-  avatarUrl     String?
+  downloadPin String?
+  avatarUrl   String?
 
   workspaceMemberships WorkspaceMembership[]
 
-  createdTickets    Ticket[]        @relation("TicketCreatedBy")
-  assignedTickets   Ticket[]        @relation("TicketAssignedTo")
-  ticketComments    TicketComment[]
-  createdCredentials Credential[]
-  activityLogs      ActivityLog[]
-  assignedDevices      Device[]        @relation("DeviceAssignedUser")
-  assignedCredentials  Credential[]    @relation("CredentialUser")
-  createdCrmActivities  CrmActivity[] @relation("CrmCreatedBy")
-  assignedCrmActivities CrmActivity[] @relation("CrmAssignedTo")
+  createdTickets        Ticket[]            @relation("TicketCreatedBy")
+  assignedTickets       Ticket[]            @relation("TicketAssignedTo")
+  ticketComments        TicketComment[]
+  createdCredentials    Credential[]
+  activityLogs          ActivityLog[]
+  assignedDevices       Device[]            @relation("DeviceAssignedUser")
+  assignedCredentials   Credential[]        @relation("CredentialUser")
+  createdCrmActivities  CrmActivity[]       @relation("CrmCreatedBy")
+  assignedCrmActivities CrmActivity[]       @relation("CrmAssignedTo")
   agentRegistrations    AgentRegistration[] @relation("AgentUser")
-  workSessions          WorkSession[] @relation("WorkSessionTech")
+  workSessions          WorkSession[]       @relation("WorkSessionTech")
   managedDevices        AgentRegistration[] @relation("DeviceManager")
-  managedDevicesDirect  Device[]      @relation("DeviceDirectManager")
-  createdTasks  Task[] @relation("TaskCreatedBy")
-  assignedTasks Task[] @relation("TaskAssignedTo")
-  createdOrders    Order[]         @relation("OrderCreatedBy")
-  assignedOrders   Order[]         @relation("OrderAssignedTo")
-  createdDelegations Delegation[]  @relation("DelegationCreatedBy")
-  assignedDelegations Delegation[] @relation("DelegationAssignedTo")
-  techPosition        TechPosition?
-  subscriptions       Subscription[]
-  trustedContacts     TrustedContact[]
-  pushSubscriptions   PushSubscription[]
-  notifications       Notification[]  @relation("NotificationRecipient")
-  sentNotifications   Notification[]  @relation("NotificationSender")
+  managedDevicesDirect  Device[]            @relation("DeviceDirectManager")
+  createdTasks          Task[]              @relation("TaskCreatedBy")
+  assignedTasks         Task[]              @relation("TaskAssignedTo")
+  createdOrders         Order[]             @relation("OrderCreatedBy")
+  assignedOrders        Order[]             @relation("OrderAssignedTo")
+  createdDelegations    Delegation[]        @relation("DelegationCreatedBy")
+  assignedDelegations   Delegation[]        @relation("DelegationAssignedTo")
+  techPosition          TechPosition?
+  subscriptions         Subscription[]
+  trustedContacts       TrustedContact[]
+  pushSubscriptions     PushSubscription[]
+  notifications         Notification[]      @relation("NotificationRecipient")
+  sentNotifications     Notification[]      @relation("NotificationSender")
 }
 
 model TechPosition {
@@ -393,23 +402,23 @@ model TechPosition {
 }
 
 model Location {
-  id                    String   @id @default(uuid())
-  workspaceId           String
-  name                  String
-  type                  String
-  addressLine1          String
-  addressLine2          String?
-  postalCode            String
-  city                  String
-  country               String   @default("PL")
-  contactPersonName     String?
-  contactPersonPhone    String?
-  contactPersonEmail    String?
-  notes                 String?
-  latitude              Float?
-  longitude             Float?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                 String   @id @default(uuid())
+  workspaceId        String
+  name               String
+  type               String
+  addressLine1       String
+  addressLine2       String?
+  postalCode         String
+  city               String
+  country            String   @default("PL")
+  contactPersonName  String?
+  contactPersonPhone String?
+  contactPersonEmail String?
+  notes              String?
+  latitude           Float?
+  longitude          Float?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   workspace     Workspace     @relation("LocationWorkspace", fields: [workspaceId], references: [id])
   devices       Device[]
@@ -428,52 +437,52 @@ model DeviceType {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  devices   Device[]
+  devices Device[]
 }
 
 model Device {
-  id                   String            @id @default(uuid())
-  workspaceId          String
-  locationId           String
-  deviceTypeId         String?
-  name                 String
-  assetTag             String?
-  manufacturer         String?
-  model                String?
-  serialNumber         String?
-  hostname             String?
-  ipAddress            String?
-  macAddress           String?
-  operatingSystem      String?
-  osVersion            String?
-  warrantyUntil        DateTime?
-  purchaseDate         DateTime?
-  status               DeviceStatus      @default(ACTIVE)
-  criticality          DeviceCriticality @default(MEDIUM)
-  qrCodeValue          String            @unique @default(uuid())
-  description          String?
-  internalNotes        String?
-  clientVisibleNotes   String?
-  rustdeskId           String?
-  rdpAddress           String?
-  sshAddress           String?
-  anydeskId            String?
-  teamviewerId         String?
-  customRemoteLink     String?
-  assignedUserId       String?
-  installationDate     DateTime?
-  warrantyMonths       Int?
-  gpsLat               Float?
-  gpsLon               Float?
-  managerId            String?
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
+  id                 String            @id @default(uuid())
+  workspaceId        String
+  locationId         String
+  deviceTypeId       String?
+  name               String
+  assetTag           String?
+  manufacturer       String?
+  model              String?
+  serialNumber       String?
+  hostname           String?
+  ipAddress          String?
+  macAddress         String?
+  operatingSystem    String?
+  osVersion          String?
+  warrantyUntil      DateTime?
+  purchaseDate       DateTime?
+  status             DeviceStatus      @default(ACTIVE)
+  criticality        DeviceCriticality @default(MEDIUM)
+  qrCodeValue        String            @unique @default(uuid())
+  description        String?
+  internalNotes      String?
+  clientVisibleNotes String?
+  rustdeskId         String?
+  rdpAddress         String?
+  sshAddress         String?
+  anydeskId          String?
+  teamviewerId       String?
+  customRemoteLink   String?
+  assignedUserId     String?
+  installationDate   DateTime?
+  warrantyMonths     Int?
+  gpsLat             Float?
+  gpsLon             Float?
+  managerId          String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
-  workspace     Workspace     @relation("DeviceWorkspace", fields: [workspaceId], references: [id])
-  manager       User?         @relation("DeviceDirectManager", fields: [managerId], references: [id])
-  location      Location      @relation(fields: [locationId], references: [id])
-  deviceType    DeviceType?   @relation(fields: [deviceTypeId], references: [id])
-  assignedUser  User?         @relation("DeviceAssignedUser", fields: [assignedUserId], references: [id])
+  workspace     Workspace           @relation("DeviceWorkspace", fields: [workspaceId], references: [id])
+  manager       User?               @relation("DeviceDirectManager", fields: [managerId], references: [id])
+  location      Location            @relation(fields: [locationId], references: [id])
+  deviceType    DeviceType?         @relation(fields: [deviceTypeId], references: [id])
+  assignedUser  User?               @relation("DeviceAssignedUser", fields: [assignedUserId], references: [id])
   credentials   Credential[]
   tickets       Ticket[]
   crmActivities CrmActivity[]
@@ -484,85 +493,85 @@ model Device {
 }
 
 model AccessType {
-  id          String       @id @default(uuid())
-  name        String       @unique
-  slug        String       @unique
-  icon        String?
-  color       String?      @default("#6366f1")
-  isSystem    Boolean      @default(false)
-  sortOrder   Int          @default(0)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id        String   @id @default(uuid())
+  name      String   @unique
+  slug      String   @unique
+  icon      String?
+  color     String?  @default("#6366f1")
+  isSystem  Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   credentials Credential[]
 }
 
 model Credential {
-  id                String             @id @default(uuid())
-  workspaceId       String
-  locationId        String?
-  deviceId          String?
-  accessTypeId      String?
-  userId            String?
-  name              String
-  category          CredentialCategory @default(OTHER)
-  username          String?
-  passwordEncrypted String
-  urlOrHost         String?
-  port              Int?
-  additionalData    String?
-  notes             String?
-  isSharedWithClient Boolean           @default(false)
-  createdByUserId   String
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  id                 String             @id @default(uuid())
+  workspaceId        String
+  locationId         String?
+  deviceId           String?
+  accessTypeId       String?
+  userId             String?
+  name               String
+  category           CredentialCategory @default(OTHER)
+  username           String?
+  passwordEncrypted  String
+  urlOrHost          String?
+  port               Int?
+  additionalData     String?
+  notes              String?
+  isSharedWithClient Boolean            @default(false)
+  createdByUserId    String
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
-  workspace   Workspace   @relation("CredentialWorkspace", fields: [workspaceId], references: [id])
-  location    Location?   @relation(fields: [locationId], references: [id])
-  device      Device?     @relation(fields: [deviceId], references: [id])
-  createdBy   User        @relation(fields: [createdByUserId], references: [id])
-  accessType  AccessType? @relation(fields: [accessTypeId], references: [id])
-  user        User?       @relation("CredentialUser", fields: [userId], references: [id])
+  workspace  Workspace   @relation("CredentialWorkspace", fields: [workspaceId], references: [id])
+  location   Location?   @relation(fields: [locationId], references: [id])
+  device     Device?     @relation(fields: [deviceId], references: [id])
+  createdBy  User        @relation(fields: [createdByUserId], references: [id])
+  accessType AccessType? @relation(fields: [accessTypeId], references: [id])
+  user       User?       @relation("CredentialUser", fields: [userId], references: [id])
 
   @@index([workspaceId])
 }
 
 model Ticket {
-  id                String        @id @default(uuid())
-  ticketNumber      String        @unique
+  id                String         @id @default(uuid())
+  ticketNumber      String         @unique
   workspaceId       String
   locationId        String
   deviceId          String?
   createdByUserId   String
   assignedToUserId  String?
-  type              TicketType    @default(INCIDENT)
+  type              TicketType     @default(INCIDENT)
   priority          TicketPriority @default(MEDIUM)
-  status            TicketStatus  @default(PENDING)
-  source            TicketSource  @default(INTERNAL)
+  status            TicketStatus   @default(PENDING)
+  source            TicketSource   @default(INTERNAL)
   title             String
   description       String
   resolutionSummary String?
-  reportedAt        DateTime      @default(now())
+  reportedAt        DateTime       @default(now())
   dueAt             DateTime?
   resolvedAt        DateTime?
   closedAt          DateTime?
-  billedInContract  Boolean       @default(false)
+  billedInContract  Boolean        @default(false)
   serviceMode       String?
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  reporterName     String?
-  reporterPhone    String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  reporterName      String?
+  reporterPhone     String?
 
-  workspace   Workspace          @relation("TicketWorkspace", fields: [workspaceId], references: [id])
-  location    Location  @relation(fields: [locationId], references: [id])
-  device      Device?   @relation(fields: [deviceId], references: [id])
-  createdBy   User      @relation("TicketCreatedBy", fields: [createdByUserId], references: [id])
-  assignedTo  User?     @relation("TicketAssignedTo", fields: [assignedToUserId], references: [id])
-  comments       TicketComment[]
-  tasks          Task[]
-  orders         Order[]
-  workSessions   WorkSession[]
-  crmActivities  CrmActivity[] @relation("CrmLinkedTicket")
+  workspace     Workspace       @relation("TicketWorkspace", fields: [workspaceId], references: [id])
+  location      Location        @relation(fields: [locationId], references: [id])
+  device        Device?         @relation(fields: [deviceId], references: [id])
+  createdBy     User            @relation("TicketCreatedBy", fields: [createdByUserId], references: [id])
+  assignedTo    User?           @relation("TicketAssignedTo", fields: [assignedToUserId], references: [id])
+  comments      TicketComment[]
+  tasks         Task[]
+  orders        Order[]
+  workSessions  WorkSession[]
+  crmActivities CrmActivity[]   @relation("CrmLinkedTicket")
 
   @@index([workspaceId])
 }
@@ -598,7 +607,7 @@ model ActivityLog {
 }
 
 model CrmActivity {
-  id               String          @id @default(uuid())
+  id               String  @id @default(uuid())
   workspaceId      String
   locationId       String?
   deviceId         String?
@@ -612,33 +621,33 @@ model CrmActivity {
   followUpRequired Boolean         @default(false)
 
   // PHONE
-  contactPerson    String?
+  contactPerson String?
 
   // EMAIL
-  subject          String?
-  attachmentUrls   String?
+  subject        String?
+  attachmentUrls String?
 
   // MEETING
-  meetingPlace     String?
-  participants     String?
-  reminderAt       DateTime?
+  meetingPlace String?
+  participants String?
+  reminderAt   DateTime?
 
   // QUOTE
-  quoteDescription String?
-  quoteStatus      QuoteStatus?
-  quoteValue       Float?
+  quoteDescription   String?
+  quoteStatus        QuoteStatus?
+  quoteValue         Float?
   quoteAttachmentUrl String?
-  linkedTicketId   String?
+  linkedTicketId     String?
 
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  workspace  Workspace  @relation("CrmWorkspace", fields: [workspaceId], references: [id])
-  location   Location?  @relation(fields: [locationId], references: [id])
-  device     Device?    @relation(fields: [deviceId], references: [id])
-  createdBy     User      @relation("CrmCreatedBy", fields: [createdByUserId], references: [id])
-  assignedTo    User?     @relation("CrmAssignedTo", fields: [assignedToUserId], references: [id])
-  linkedTicket  Ticket?   @relation("CrmLinkedTicket", fields: [linkedTicketId], references: [id])
+  workspace    Workspace @relation("CrmWorkspace", fields: [workspaceId], references: [id])
+  location     Location? @relation(fields: [locationId], references: [id])
+  device       Device?   @relation(fields: [deviceId], references: [id])
+  createdBy    User      @relation("CrmCreatedBy", fields: [createdByUserId], references: [id])
+  assignedTo   User?     @relation("CrmAssignedTo", fields: [assignedToUserId], references: [id])
+  linkedTicket Ticket?   @relation("CrmLinkedTicket", fields: [linkedTicketId], references: [id])
 
   @@index([type])
   @@index([occurredAt])
@@ -690,62 +699,62 @@ model SessionTimeEntry {
 }
 
 model AgentRegistration {
-  id             String      @id @default(uuid())
-  workspaceId    String?
-  agentToken     String      @unique @default(uuid())
-  agentType      String      @default("CLIENT")
-  status         AgentStatus @default(PENDING)
-  nip            String?
-  deviceId       String?
-  assignedUserId String?
+  id                  String      @id @default(uuid())
+  workspaceId         String?
+  agentToken          String      @unique @default(uuid())
+  agentType           String      @default("CLIENT")
+  status              AgentStatus @default(PENDING)
+  nip                 String?
+  deviceId            String?
+  assignedUserId      String?
   // Sieć / system
-  hostname       String?
-  ipAddress      String?
-  osInfo         String?
-  windowsVersion String?
-  domain         String?
-  currentUser    String?
-  serialNumber   String?
-  lastBootTime   String?
+  hostname            String?
+  ipAddress           String?
+  osInfo              String?
+  windowsVersion      String?
+  domain              String?
+  currentUser         String?
+  serialNumber        String?
+  lastBootTime        String?
   // CPU / RAM / GPU
-  cpuModel       String?
-  cpuCores       Int?
-  cpuThreads     Int?
-  ramTotalGb     Float?
-  gpuModel       String?
-  motherboard    String?
-  rustdeskId     String?
+  cpuModel            String?
+  cpuCores            Int?
+  cpuThreads          Int?
+  ramTotalGb          Float?
+  gpuModel            String?
+  motherboard         String?
+  rustdeskId          String?
   // Dane rejestracyjne (z formularza agenta)
-  companyName           String?
-  contactFirstName      String?
-  contactLastName       String?
-  contactPhone          String?
-  contactEmail          String?
-  contactPasswordHash   String?
-  registrationNotes     String?
-  allowRustdesk       Boolean  @default(true)
-  allowMonitoring     Boolean  @default(true)
+  companyName         String?
+  contactFirstName    String?
+  contactLastName     String?
+  contactPhone        String?
+  contactEmail        String?
+  contactPasswordHash String?
+  registrationNotes   String?
+  allowRustdesk       Boolean     @default(true)
+  allowMonitoring     Boolean     @default(true)
   // Metryki bieżące
-  cpuUsage       Float?
-  ramUsage       Float?
-  diskFree       Float?
-  diskTotal      Float?
-  cpuTempC       Float?
+  cpuUsage            Float?
+  ramUsage            Float?
+  diskFree            Float?
+  diskTotal           Float?
+  cpuTempC            Float?
   // JSON — dyski, interfejsy sieciowe, zainstalowane programy
   diskInfo            Json?
   networkIfaces       Json?
   installedSoftware   Json?
   serverMetrics       Json?
-  managerId      String?
-  appVersion     String?
-  lastSeen       DateTime?
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  managerId           String?
+  appVersion          String?
+  lastSeen            DateTime?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
 
-  workspace    Workspace? @relation("AgentWorkspace", fields: [workspaceId], references: [id])
-  device       Device?    @relation(fields: [deviceId], references: [id])
-  assignedUser  User?     @relation("AgentUser", fields: [assignedUserId], references: [id])
-  manager       User?     @relation("DeviceManager", fields: [managerId], references: [id])
+  workspace     Workspace?     @relation("AgentWorkspace", fields: [workspaceId], references: [id])
+  device        Device?        @relation(fields: [deviceId], references: [id])
+  assignedUser  User?          @relation("AgentUser", fields: [assignedUserId], references: [id])
+  manager       User?          @relation("DeviceManager", fields: [managerId], references: [id])
   backupConfigs BackupConfig[]
 
   @@index([workspaceId])
@@ -759,27 +768,27 @@ model Setting {
 }
 
 model BackupConfig {
-  id              String   @id @default(uuid())
-  workspaceId     String
-  agentRegId      String
-  name            String
-  type            String   // SQL_MYSQL | SQL_POSTGRES | SQL_MSSQL | FOLDER
-  enabled         Boolean  @default(true)
-  sqlHost         String?
-  sqlPort         Int?
-  sqlUser         String?
-  sqlPassEnc      String?
-  sqlDatabases    String?
-  folderPath      String?
+  id                String    @id @default(uuid())
+  workspaceId       String
+  agentRegId        String
+  name              String
+  type              String // SQL_MYSQL | SQL_POSTGRES | SQL_MSSQL | FOLDER
+  enabled           Boolean   @default(true)
+  sqlHost           String?
+  sqlPort           Int?
+  sqlUser           String?
+  sqlPassEnc        String?
+  sqlDatabases      String?
+  folderPath        String?
   googleDriveFolder String?
-  cronSchedule    String   @default("0 2 * * *")
-  retentionDays   Int      @default(30)
-  encryptBackups  Boolean  @default(true)
-  encryptionKey   String?
-  lastRunAt       DateTime?
-  lastStatus      String?  // SUCCESS | FAILED | RUNNING
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  cronSchedule      String    @default("0 2 * * *")
+  retentionDays     Int       @default(30)
+  encryptBackups    Boolean   @default(true)
+  encryptionKey     String?
+  lastRunAt         DateTime?
+  lastStatus        String? // SUCCESS | FAILED | RUNNING
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   workspace Workspace         @relation("BackupWorkspace", fields: [workspaceId], references: [id])
   agent     AgentRegistration @relation(fields: [agentRegId], references: [id])
@@ -790,16 +799,16 @@ model BackupConfig {
 }
 
 model BackupHistory {
-  id              String    @id @default(uuid())
-  backupConfigId  String
-  status          String    // RUNNING | SUCCESS | FAILED
-  startedAt       DateTime  @default(now())
-  completedAt     DateTime?
-  sizeBytes       BigInt?
-  fileName        String?
-  googleDriveId   String?
-  errorMessage    String?
-  createdAt       DateTime  @default(now())
+  id             String    @id @default(uuid())
+  backupConfigId String
+  status         String // RUNNING | SUCCESS | FAILED
+  startedAt      DateTime  @default(now())
+  completedAt    DateTime?
+  sizeBytes      BigInt?
+  fileName       String?
+  googleDriveId  String?
+  errorMessage   String?
+  createdAt      DateTime  @default(now())
 
   config BackupConfig @relation(fields: [backupConfigId], references: [id], onDelete: Cascade)
 
@@ -826,24 +835,24 @@ model PasswordResetToken {
 }
 
 model SharingInvitation {
-  id                String    @id @default(uuid())
-  fromWorkspaceId   String
-  toEmail           String
-  accessLevel       String    @default("FULL_MANAGEMENT") // FULL_MANAGEMENT | REMOTE_SUPPORT | MONITORING_ONLY
-  scope             String    @default("ALL")             // ALL | SELECTED
-  deviceIds         Json      @default("[]")
-  locationIds       Json      @default("[]")
-  direction         String    @default("INVITE")          // INVITE | REQUEST
-  message           String?
-  token             String    @unique
-  status            String    @default("PENDING")         // PENDING | ACCEPTED | DECLINED | EXPIRED
-  expiresAt         DateTime
-  createdByUserId   String
-  acceptedByUserId  String?
-  acceptedAt        DateTime?
-  createdAt         DateTime  @default(now())
+  id               String    @id @default(uuid())
+  fromWorkspaceId  String
+  toEmail          String
+  accessLevel      String    @default("FULL_MANAGEMENT") // FULL_MANAGEMENT | REMOTE_SUPPORT | MONITORING_ONLY
+  scope            String    @default("ALL") // ALL | SELECTED
+  deviceIds        Json      @default("[]")
+  locationIds      Json      @default("[]")
+  direction        String    @default("INVITE") // INVITE | REQUEST
+  message          String?
+  token            String    @unique
+  status           String    @default("PENDING") // PENDING | ACCEPTED | DECLINED | EXPIRED
+  expiresAt        DateTime
+  createdByUserId  String
+  acceptedByUserId String?
+  acceptedAt       DateTime?
+  createdAt        DateTime  @default(now())
 
-  fromWorkspace     Workspace @relation(fields: [fromWorkspaceId], references: [id])
+  fromWorkspace Workspace @relation(fields: [fromWorkspaceId], references: [id])
 
   @@index([toEmail])
   @@index([fromWorkspaceId])
@@ -904,10 +913,10 @@ model Task {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
-  workspace  Workspace  @relation("TaskWorkspace", fields: [workspaceId], references: [id])
-  ticket     Ticket?    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  assignedTo User       @relation("TaskAssignedTo", fields: [assignedToUserId], references: [id])
-  createdBy  User       @relation("TaskCreatedBy", fields: [createdByUserId], references: [id])
+  workspace  Workspace @relation("TaskWorkspace", fields: [workspaceId], references: [id])
+  ticket     Ticket?   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  assignedTo User      @relation("TaskAssignedTo", fields: [assignedToUserId], references: [id])
+  createdBy  User      @relation("TaskCreatedBy", fields: [createdByUserId], references: [id])
 
   @@index([workspaceId])
 }
@@ -966,25 +975,25 @@ model Delegation {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  workspace  Workspace  @relation("DelegationWorkspace", fields: [workspaceId], references: [id])
-  createdBy  User       @relation("DelegationCreatedBy", fields: [createdByUserId], references: [id])
-  assignedTo User?      @relation("DelegationAssignedTo", fields: [assignedToUserId], references: [id])
+  workspace  Workspace @relation("DelegationWorkspace", fields: [workspaceId], references: [id])
+  createdBy  User      @relation("DelegationCreatedBy", fields: [createdByUserId], references: [id])
+  assignedTo User?     @relation("DelegationAssignedTo", fields: [assignedToUserId], references: [id])
 
   @@index([workspaceId])
 }
 
 // ── In-app notifications ────────────────────────────────────────────
 model Notification {
-  id          String    @id @default(uuid())
-  userId      String
-  fromUserId  String?
-  title       String
-  message     String
-  readAt      DateTime?
-  createdAt   DateTime  @default(now())
+  id         String    @id @default(uuid())
+  userId     String
+  fromUserId String?
+  title      String
+  message    String
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
 
-  user        User      @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
-  fromUser    User?     @relation("NotificationSender", fields: [fromUserId], references: [id])
+  user     User  @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  fromUser User? @relation("NotificationSender", fields: [fromUserId], references: [id])
 
   @@index([userId])
   @@index([createdAt])
@@ -992,45 +1001,45 @@ model Notification {
 
 // ── Abonamenty (Netflix, telefon, ubezpieczenie itd.) ────────────────
 model Subscription {
-  id              String    @id @default(uuid())
-  userId          String
-  name            String
-  category        String    @default("OTHER")
-  amount          Float?
-  currency        String    @default("PLN")
-  billingCycle    String    @default("MONTHLY")
-  nextPayment     DateTime?
-  login           String?
-  passwordEnc     String?
-  pin             String?
-  phone           String?
-  url             String?
-  notes           String?
-  isActive        Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id           String    @id @default(uuid())
+  userId       String
+  name         String
+  category     String    @default("OTHER")
+  amount       Float?
+  currency     String    @default("PLN")
+  billingCycle String    @default("MONTHLY")
+  nextPayment  DateTime?
+  login        String?
+  passwordEnc  String?
+  pin          String?
+  phone        String?
+  url          String?
+  notes        String?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
 // ── Zaufana osoba (na wypadek śmierci / niedostępności) ──────────────
 model TrustedContact {
-  id              String    @id @default(uuid())
-  userId          String
-  firstName       String
-  lastName        String
-  email           String
-  phone           String?
-  relationship    String?
-  accessPin       String
-  notes           String?
-  isActive        Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id           String   @id @default(uuid())
+  userId       String
+  firstName    String
+  lastName     String
+  email        String
+  phone        String?
+  relationship String?
+  accessPin    String
+  notes        String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
@@ -1038,29 +1047,29 @@ model TrustedContact {
 // ── Invoicing Module ────────────────────────────────────────────────
 
 model InvoiceDocument {
-  id              String                @id @default(uuid())
-  workspaceId     String
-  number          String
-  type            InvoiceDocumentType   @default(SALE_INVOICE)
-  status          InvoiceDocumentStatus @default(DRAFT)
+  id          String                @id @default(uuid())
+  workspaceId String
+  number      String
+  type        InvoiceDocumentType   @default(SALE_INVOICE)
+  status      InvoiceDocumentStatus @default(DRAFT)
 
-  contractorName  String
-  contractorNip   String?
+  contractorName String
+  contractorNip  String?
 
-  totalNet        Decimal               @default(0)
-  totalVat        Decimal               @default(0)
-  totalGross      Decimal               @default(0)
+  totalNet   Decimal @default(0)
+  totalVat   Decimal @default(0)
+  totalGross Decimal @default(0)
 
-  issuedAt        DateTime              @default(now())
-  dueDate         DateTime?
-  notes           String?
+  issuedAt DateTime  @default(now())
+  dueDate  DateTime?
+  notes    String?
 
-  createdById     String
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  items           InvoiceDocumentItem[]
-  payments        InvoicingPayment[]
+  items    InvoiceDocumentItem[]
+  payments InvoicingPayment[]
 
   @@index([workspaceId, status])
   @@index([workspaceId, issuedAt])
@@ -1068,17 +1077,17 @@ model InvoiceDocument {
 }
 
 model InvoiceDocumentItem {
-  id              String   @id @default(uuid())
-  documentId      String
-  name            String
-  quantity        Decimal  @default(1)
-  priceNet        Decimal  @default(0)
-  vatRate         String   @default("23")
-  totalNet        Decimal  @default(0)
-  totalVat        Decimal  @default(0)
-  totalGross      Decimal  @default(0)
+  id         String  @id @default(uuid())
+  documentId String
+  name       String
+  quantity   Decimal @default(1)
+  priceNet   Decimal @default(0)
+  vatRate    String  @default("23")
+  totalNet   Decimal @default(0)
+  totalVat   Decimal @default(0)
+  totalGross Decimal @default(0)
 
-  document        InvoiceDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document InvoiceDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@index([documentId])
 }
@@ -1104,49 +1113,49 @@ enum InvoiceDocumentStatus {
 }
 
 model InvoicingContractor {
-  id              String   @id @default(uuid())
-  workspaceId     String
-  name            String
-  nip             String?
-  email           String?
-  phone           String?
-  city            String?
-  address         String?
-  notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String
+  nip         String?
+  email       String?
+  phone       String?
+  city        String?
+  address     String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([workspaceId])
   @@index([workspaceId, name])
 }
 
 model InvoicingPayment {
-  id              String          @id @default(uuid())
-  workspaceId     String
-  documentId      String
-  amount          Decimal
-  paidAt          DateTime        @default(now())
-  method          String          @default("przelew")
-  notes           String?
-  createdAt       DateTime        @default(now())
+  id          String   @id @default(uuid())
+  workspaceId String
+  documentId  String
+  amount      Decimal
+  paidAt      DateTime @default(now())
+  method      String   @default("przelew")
+  notes       String?
+  createdAt   DateTime @default(now())
 
-  document        InvoiceDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document InvoiceDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId])
   @@index([documentId])
 }
 
 model InvoicingProduct {
-  id              String   @id @default(uuid())
-  workspaceId     String
-  name            String
-  sku             String?
-  unit            String   @default("szt")
-  priceNet        Decimal  @default(0)
-  vatRate         String   @default("23")
-  notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String
+  sku         String?
+  unit        String   @default("szt")
+  priceNet    Decimal  @default(0)
+  vatRate     String   @default("23")
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([workspaceId])
   @@index([workspaceId, name])
@@ -1155,36 +1164,69 @@ model InvoicingProduct {
 // ── Packaging Module ────────────────────────────────────────────────
 
 model Shipment {
-  id              String          @id @default(uuid())
-  workspaceId     String
-  orderNumber     String
-  customerName    String
-  customerEmail   String?
-  customerPhone   String?
-  status          ShipmentStatus  @default(PENDING)
-  courier         String          @default("inpost")
-  trackingNumber  String?
-  totalWeight     Int             @default(0)
-  notes           String?
-  createdById     String
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  id             String         @id @default(uuid())
+  workspaceId    String
+  orderNumber    String
+  customerName   String
+  customerEmail  String?
+  customerPhone  String?
+  status         ShipmentStatus @default(PENDING)
+  courier        String         @default("inpost")
+  trackingNumber String?
+  totalWeight    Int            @default(0)
+  notes          String?
+  createdById    String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  // PakOps extended fields
+  externalId       String?
+  source           ShipmentSource?
+  paymentStatus    String?
+  totalAmount      Float?
+  currency         String?         @default("PLN")
+  codAmount        Float?
+  deliveryCost     Float?
+  buyerNote        String?
+  internalNote     String?
+  addressName      String?
+  addressStreet    String?
+  addressCity      String?
+  addressZip       String?
+  addressPhone     String?
+  addressCountry   String?         @default("PL")
+  deliveryMethod   String?
+  deliveryPointId  String?
+  paidAt           DateTime?
+  shippedAt        DateTime?
+  dispatchDeadline DateTime?
+  wantsInvoice     Boolean?        @default(false)
+  invoiceCompany   String?
+  invoiceNip       String?
+  invoiceAddress   String?
+  customerId       String?
 
   items           ShipmentItem[]
+  customer        PackingCustomer?        @relation(fields: [customerId], references: [id])
+  packingSessions PackingSession[]
+  batchOrders     PackingBatchOrder[]
+  statusHistory   ShipmentStatusHistory[]
 
   @@index([workspaceId, status])
   @@index([workspaceId, createdAt])
+  @@index([externalId])
+  @@index([customerId])
 }
 
 model ShipmentItem {
-  id              String   @id @default(uuid())
-  shipmentId      String
-  name            String
-  sku             String?
-  quantity        Int      @default(1)
-  weight          Int      @default(0)
+  id         String  @id @default(uuid())
+  shipmentId String
+  name       String
+  sku        String?
+  quantity   Int     @default(1)
+  weight     Int     @default(0)
 
-  shipment        Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
 
   @@index([shipmentId])
 }
@@ -1199,47 +1241,333 @@ enum ShipmentStatus {
   CANCELLED
 }
 
-model PackingOrder {
-  id                String              @id @default(uuid())
-  workspaceId       String
-  externalOrderId   String?
-  status            PackingOrderStatus  @default(NEW)
-  paymentStatus     String              @default("pending")
-  totalAmount       Decimal             @default(0)
-  currency          String              @default("PLN")
-  buyerNote         String?
-  internalNote      String?
-  addressName       String?
-  addressStreet     String?
-  addressCity       String?
-  addressZip        String?
-  addressPhone      String?
-  deliveryMethod    String?
-  deliveryPointId   String?
-  courierName       String?
-  trackingNumber    String?
-  dispatchDeadline  DateTime?
-  paidAt            DateTime?
-  shippedAt         DateTime?
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+enum ShipmentSource {
+  ALLEGRO
+  MANUAL
+  API
+}
 
-  items             PackingOrderItem[]
+enum PackingSessionStatus {
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum PickingSessionStatus {
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum PackingBatchMode {
+  DATE
+  COURIER
+}
+
+enum PackingBatchStatus {
+  OPEN
+  PICKING
+  PACKED
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+enum AllegroEnvironment {
+  PRODUCTION
+  SANDBOX
+}
+
+enum SyncType {
+  ORDERS
+  OFFERS
+  RETURNS
+  FULL
+}
+
+enum SyncStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+  PARTIAL
+}
+
+// ── PakOps: Customer ───────────────────────────────────────────────
+
+model PackingCustomer {
+  id            String    @id @default(uuid())
+  workspaceId   String
+  allegroUserId String?
+  login         String?
+  email         String?
+  firstName     String?
+  lastName      String?
+  companyName   String?
+  phone         String?
+  addressStreet String?
+  addressCity   String?
+  addressZip    String?
+  nip           String?
+  notes         String?
+  totalOrders   Int       @default(0)
+  totalSpent    Float     @default(0)
+  firstOrderAt  DateTime?
+  lastOrderAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  workspace Workspace  @relation("PackingCustomerWorkspace", fields: [workspaceId], references: [id])
+  shipments Shipment[]
+
+  @@unique([workspaceId, allegroUserId])
+  @@index([workspaceId])
+  @@index([workspaceId, email])
+}
+
+// ── PakOps: Packing Session ────────────────────────────────────────
+
+model PackingSession {
+  id           String               @id @default(uuid())
+  shipmentId   String
+  userId       String
+  status       PackingSessionStatus @default(IN_PROGRESS)
+  itemsChecked Json?
+  notes        String?
+  startedAt    DateTime             @default(now())
+  completedAt  DateTime?
+  workspaceId  String
+
+  shipment  Shipment       @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  workspace Workspace      @relation("PackingSessionWorkspace", fields: [workspaceId], references: [id])
+  photos    PackingPhoto[]
+
+  @@index([shipmentId])
+  @@index([workspaceId, status])
+  @@index([userId])
+}
+
+// ── PakOps: Picking Session ────────────────────────────────────────
+
+model PickingSession {
+  id          String               @id @default(uuid())
+  userId      String
+  status      PickingSessionStatus @default(IN_PROGRESS)
+  itemsToPick Json?
+  orderIds    Json?
+  startedAt   DateTime             @default(now())
+  completedAt DateTime?
+  workspaceId String
+
+  workspace Workspace @relation("PickingSessionWorkspace", fields: [workspaceId], references: [id])
+
+  @@index([workspaceId, status])
+  @@index([userId])
+}
+
+// ── PakOps: Packing Batch ──────────────────────────────────────────
+
+model PackingBatch {
+  id          String             @id @default(uuid())
+  name        String
+  mode        PackingBatchMode   @default(DATE)
+  courierName String?
+  courierId   String?
+  status      PackingBatchStatus @default(OPEN)
+  takenById   String?
+  workspaceId String
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  workspace Workspace           @relation("PackingBatchWorkspace", fields: [workspaceId], references: [id])
+  orders    PackingBatchOrder[]
+
+  @@index([workspaceId, status])
+}
+
+model PackingBatchOrder {
+  id         String @id @default(uuid())
+  batchId    String
+  shipmentId String
+
+  batch    PackingBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  shipment Shipment     @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, shipmentId])
+  @@index([batchId])
+  @@index([shipmentId])
+}
+
+// ── PakOps: Courier & Carrier ──────────────────────────────────────
+
+model Courier {
+  id            String   @id @default(uuid())
+  name          String
+  logoUrl       String?
+  pickupTime    String?
+  worksSaturday Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  workspaceId   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  workspace Workspace @relation("CourierWorkspace", fields: [workspaceId], references: [id])
+  carriers  Carrier[]
+
+  @@index([workspaceId])
+  @@index([workspaceId, isActive])
+}
+
+model Carrier {
+  id          String   @id @default(uuid())
+  name        String
+  code        String?
+  pickupTime  String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  courierId   String
+  workspaceId String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  courier   Courier   @relation(fields: [courierId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation("CarrierWorkspace", fields: [workspaceId], references: [id])
+
+  @@index([workspaceId])
+  @@index([courierId])
+}
+
+// ── PakOps: Packing Photo ──────────────────────────────────────────
+
+model PackingPhoto {
+  id          String   @id @default(uuid())
+  sessionId   String
+  filename    String
+  contentType String   @default("image/jpeg")
+  data        Bytes
+  createdAt   DateTime @default(now())
+
+  session PackingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+// ── PakOps: Allegro Integration ────────────────────────────────────
+
+model AllegroAccount {
+  id                    String             @id @default(uuid())
+  name                  String
+  clientId              String
+  clientSecretEncrypted String
+  redirectUri           String?
+  environment           AllegroEnvironment @default(PRODUCTION)
+  isActive              Boolean            @default(true)
+  workspaceId           String
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  workspace Workspace      @relation("AllegroAccountWorkspace", fields: [workspaceId], references: [id])
+  tokens    AllegroToken[]
+  syncLogs  SyncLog[]
+
+  @@index([workspaceId])
+  @@index([workspaceId, isActive])
+}
+
+model AllegroToken {
+  id                    String   @id @default(uuid())
+  accountId             String
+  accessTokenEncrypted  String
+  refreshTokenEncrypted String
+  tokenType             String   @default("bearer")
+  expiresAt             DateTime
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  account AllegroAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([expiresAt])
+}
+
+// ── PakOps: Sync Log ───────────────────────────────────────────────
+
+model SyncLog {
+  id           String     @id @default(uuid())
+  accountId    String
+  syncType     SyncType
+  status       SyncStatus @default(RUNNING)
+  itemsSynced  Int        @default(0)
+  errorMessage String?
+  startedAt    DateTime   @default(now())
+  finishedAt   DateTime?
+  workspaceId  String
+
+  account   AllegroAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  workspace Workspace      @relation("SyncLogWorkspace", fields: [workspaceId], references: [id])
+
+  @@index([workspaceId])
+  @@index([accountId, syncType])
+  @@index([startedAt])
+}
+
+// ── PakOps: Shipment Status History ────────────────────────────────
+
+model ShipmentStatusHistory {
+  id          String   @id @default(uuid())
+  shipmentId  String
+  oldStatus   String?
+  newStatus   String
+  changedById String?
+  note        String?
+  createdAt   DateTime @default(now())
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@index([shipmentId])
+  @@index([createdAt])
+}
+
+model PackingOrder {
+  id               String             @id @default(uuid())
+  workspaceId      String
+  externalOrderId  String?
+  status           PackingOrderStatus @default(NEW)
+  paymentStatus    String             @default("pending")
+  totalAmount      Decimal            @default(0)
+  currency         String             @default("PLN")
+  buyerNote        String?
+  internalNote     String?
+  addressName      String?
+  addressStreet    String?
+  addressCity      String?
+  addressZip       String?
+  addressPhone     String?
+  deliveryMethod   String?
+  deliveryPointId  String?
+  courierName      String?
+  trackingNumber   String?
+  dispatchDeadline DateTime?
+  paidAt           DateTime?
+  shippedAt        DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  items PackingOrderItem[]
 
   @@index([workspaceId, status])
   @@index([workspaceId, createdAt])
 }
 
 model PackingOrderItem {
-  id              String       @id @default(uuid())
-  orderId         String
-  name            String
-  sku             String?
-  quantity        Int          @default(1)
-  unitPrice       Decimal      @default(0)
-  imageUrl        String?
+  id        String  @id @default(uuid())
+  orderId   String
+  name      String
+  sku       String?
+  quantity  Int     @default(1)
+  unitPrice Decimal @default(0)
+  imageUrl  String?
 
-  order           PackingOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order PackingOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
 }
@@ -1260,44 +1588,44 @@ enum PackingOrderStatus {
 // ── Service Module (SKP / Serwis) ───────────────────────────────────
 
 model ServiceVehicle {
-  id              String   @id @default(uuid())
-  workspaceId     String
-  plate           String
-  vin             String?
-  brand           String
-  model           String
-  year            Int?
-  ownerName       String
-  ownerPhone      String?
-  ownerEmail      String?
-  notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id          String   @id @default(uuid())
+  workspaceId String
+  plate       String
+  vin         String?
+  brand       String
+  model       String
+  year        Int?
+  ownerName   String
+  ownerPhone  String?
+  ownerEmail  String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  inspections     ServiceInspection[]
+  inspections ServiceInspection[]
 
   @@index([workspaceId])
   @@index([workspaceId, plate])
 }
 
 model ServiceInspection {
-  id              String              @id @default(uuid())
-  workspaceId     String
-  vehicleId       String
+  id               String                   @id @default(uuid())
+  workspaceId      String
+  vehicleId        String
   inspectionNumber String
-  type            ServiceInspectionType @default(PERIODIC)
-  status          ServiceInspectionStatus @default(SCHEDULED)
-  result          ServiceInspectionResult?
-  scheduledAt     DateTime
-  completedAt     DateTime?
-  technicianName  String?
-  notes           String?
-  mileage         Int?
-  createdById     String
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  type             ServiceInspectionType    @default(PERIODIC)
+  status           ServiceInspectionStatus  @default(SCHEDULED)
+  result           ServiceInspectionResult?
+  scheduledAt      DateTime
+  completedAt      DateTime?
+  technicianName   String?
+  notes            String?
+  mileage          Int?
+  createdById      String
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
 
-  vehicle         ServiceVehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicle ServiceVehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, status])
   @@index([workspaceId, scheduledAt])
