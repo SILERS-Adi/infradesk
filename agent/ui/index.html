@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Asystent Home</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="light.css">
+  <link rel="stylesheet" href="aicore.css">
+  <style>
+    .splash{position:fixed;inset:0;background:#040810;display:flex;align-items:center;justify-content:center;z-index:9999;transition:opacity .6s ease}
+    .splash.fade-out{opacity:0;pointer-events:none}
+    .splash video{width:100%;height:100%;object-fit:cover}
+  </style>
+</head>
+<body>
+
+<!-- Splash — fullscreen video -->
+<div class="splash" id="splash">
+  <video autoplay muted playsinline id="splashVideo">
+    <source src="logo.mp4" type="video/mp4">
+  </video>
+</div>
+
+<div class="app">
+  <div class="app-ambient">
+    <div class="app-ambient-orb"></div>
+    <div class="app-ambient-orb"></div>
+    <div class="app-ambient-orb"></div>
+  </div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <img src="logo_dark.png" alt="InfraDesk" class="sidebar-logo-img sidebar-logo-dark">
+      <img src="logo_light.png" alt="InfraDesk" class="sidebar-logo-img sidebar-logo-light">
+    </div>
+    <nav class="sidebar-nav">
+      <a class="nav-item active" data-page="overview"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Stan systemu</a>
+      <a class="nav-item" data-page="security"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Bezpieczeństwo</a>
+      <a class="nav-item" data-page="performance"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Pełna diagnoza</a>
+      <a class="nav-item" data-page="monitoring"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Monitoring</a>
+      <a class="nav-item" data-page="autostart"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>Autostart</a>
+      <a class="nav-item" data-page="network"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0114.08 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>Sieć i Internet</a>
+      <a class="nav-item" data-page="ai_repair"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 014 4c0 1.95-2 3-2 8h-4c0-5-2-6.05-2-8a4 4 0 014-4z"/><line x1="10" y1="22" x2="14" y2="22"/><line x1="10" y1="18" x2="14" y2="18"/></svg>Naprawa AI</a>
+      <a class="nav-item" data-page="vault"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/><circle cx="12" cy="16" r="1"/></svg>Sejf</a>
+      <a class="nav-item nav-pro" data-page="pro"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Wersja Pro</a>
+      <a class="nav-item" data-page="help"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>Pomoc zdalna</a>
+      <a class="nav-item" data-page="settings"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Ustawienia</a>
+      <a class="nav-item" data-page="feedback"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>Opinie</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user" id="sidebarUser" style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:6px;border-radius:8px;background:rgba(255,255,255,.02);border:1px solid var(--border,rgba(255,255,255,.05))">
+        <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--accent,#4F8CFF),#8B5CF6);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0" id="userAvatar">?</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:10px;font-weight:600;color:var(--t,#EEF2FA);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="userName">--</div>
+          <div style="font-size:8px;color:var(--td,#3D4660)" id="userHost">--</div>
+        </div>
+      </div>
+      <button onclick="doLogout()" style="width:100%;padding:7px;border-radius:8px;border:1px solid rgba(239,68,68,.15);background:rgba(239,68,68,.04);color:#EF4444;font-size:10px;font-weight:500;cursor:pointer;font-family:inherit;transition:all .2s;margin-bottom:8px" onmouseover="this.style.background='rgba(239,68,68,.1)'" onmouseout="this.style.background='rgba(239,68,68,.04)'">Wyloguj</button>
+      <div class="theme-switcher" id="themeSwitcher">
+        <button class="theme-opt" data-theme="auto" title="Automatyczny">&#x2600;/&#x1F319;</button>
+        <button class="theme-opt" data-theme="light" title="Jasny">&#x2600;</button>
+        <button class="theme-opt" data-theme="dark" title="Ciemny">&#x1F319;</button>
+      </div>
+      <div class="sidebar-version">v6.0.0 · Asystent Home</div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="topbar">
+      <div class="topbar-tab active">Przegląd</div>
+      <div class="topbar-tab">Stan systemu</div>
+      <div class="topbar-spacer"></div>
+      <div class="topbar-info">Asystent Home · v6.0.0</div>
+    </div>
+    <div class="content">
+      <div class="content-header">
+        <div class="content-title" id="contentTitle">Witaj</div>
+        <div class="content-subtitle">Kompleksowa optymalizacja komputera</div>
+      </div>
+
+      <!-- HERO -->
+      <section class="hero fade-up">
+        <!-- Canvas cosmic background -->
+        <canvas class="hero-canvas" id="heroCanvas"></canvas>
+        <div class="hero-overlay"></div>
+        <div class="hero-highlight"></div>
+
+        <div class="hero-left">
+          <div class="hero-greeting" id="heroGreeting">Witaj</div>
+          <div class="hero-title" id="heroTitle">System działa prawidłowo</div>
+          <div class="hero-status">
+            <div class="hero-status-dot" id="statusDot"></div>
+            <div class="hero-status-text" id="statusText">Stan systemu: dobry</div>
+          </div>
+          <button class="hero-cta" id="ctaButton">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Optymalizuj system
+          </button>
+        </div>
+
+        <div class="hero-right">
+          <div class="ring-wrapper">
+            <div class="ring-outer-glow"></div>
+            <div class="ring-container">
+              <canvas class="ring-canvas" id="ringCanvas" width="180" height="180"></canvas>
+              <div class="ring-center">
+                <div class="ring-value" id="ringValue">0%</div>
+                <div class="ring-label">Stan systemu</div>
+              </div>
+            </div>
+            <div class="ring-status-area">
+              <div class="ring-status-label">Stan systemu</div>
+              <div class="ring-status-value good" id="ringStatus">DOBRY</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Cards -->
+      <section class="cards">
+        <div class="card fade-up fade-up-1">
+          <div class="card-header">
+            <div class="card-icon memory"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M9 2v2M15 20v2M9 20v2M2 15h2M2 9h2M20 15h2M20 9h2"/></svg></div>
+            <div class="card-badge blue">Optymalizuj</div>
+          </div>
+          <div class="card-value blue" id="cardMemory">—</div>
+          <div class="card-title">Pamięć systemowa</div>
+          <div class="card-desc">Do optymalizacji</div>
+        </div>
+        <div class="card fade-up fade-up-2">
+          <div class="card-header">
+            <div class="card-icon browser"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg></div>
+            <div class="card-badge purple">Wyczyść</div>
+          </div>
+          <div class="card-value purple" id="cardBrowser">—</div>
+          <div class="card-title">Przeglądarki</div>
+          <div class="card-desc">Cache do usunięcia</div>
+        </div>
+        <div class="card fade-up fade-up-3">
+          <div class="card-header">
+            <div class="card-icon perf"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+            <div class="card-badge green">Sprawdź</div>
+          </div>
+          <div class="card-value green" id="cardPerf">—</div>
+          <div class="card-title">Wydajność</div>
+          <div class="card-desc">System działa stabilnie</div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="aicore.js"></script>
+<script src="script.js"></script>
+<script>
+/* Splash dismiss */
+(function(){
+  function dismissSplash(){
+    const s=document.getElementById('splash');
+    if(s&&!s.classList.contains('fade-out')){s.classList.add('fade-out');setTimeout(()=>s.remove(),700)}
+  }
+  const v=document.getElementById('splashVideo');
+  if(v){v.addEventListener('ended',dismissSplash);v.addEventListener('error',dismissSplash)}
+  setTimeout(dismissSplash,3500);
+})();
+
+/* Set user info */
+function _setUserInfo(info) {
+  if (!info) return;
+  const user = info.currentUser || 'Użytkownik';
+  const host = info.hostname || '';
+  const initials = user.substring(0, 2).toUpperCase();
+  const el = document.getElementById('userName');
+  const av = document.getElementById('userAvatar');
+  const hst = document.getElementById('userHost');
+  const title = document.getElementById('contentTitle');
+  if (el) el.textContent = user;
+  if (av) av.textContent = initials;
+  if (hst) hst.textContent = host;
+  if (title) title.textContent = 'Witaj, ' + user;
+}
+
+/* Load user info */
+if (typeof py === 'function') {
+  setTimeout(() => { py('get_system_info').then(_setUserInfo); }, 500);
+}
+
+/* Logout */
+window.doLogout = async function() {
+  if (confirm('Na pewno chcesz się wylogować?')) {
+    await py('logout');
+  }
+};
+</script>
+</body>
+</html>
