@@ -159,9 +159,11 @@ export const packagingModule: ModuleDefinition = {
   ],
   routeTitles: {
     '/packaging': 'Pakowanie',
+    '/packaging/orders': 'Pakowanie — Zamówienia',
+    '/packaging/packing': 'Pakowanie — Stacja pakowania',
     '/packaging/board': 'Pakowanie — Board',
     '/packaging/reports': 'Pakowanie — Statystyki',
-    '/packaging/shipments': 'Pakowanie — Przesyłki',
+    '/packaging/shipments': 'Pakowanie — Wysyłki',
     '/packaging/shipments/new': 'Pakowanie — Nowa przesyłka',
   },
 };

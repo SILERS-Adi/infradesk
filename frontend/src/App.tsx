@@ -95,6 +95,8 @@ import { ShipmentNewPage } from './pages/admin/packaging/ShipmentNewPage';
 import { ShipmentEditPage } from './pages/admin/packaging/ShipmentEditPage';
 import { PackagingReportsPage } from './pages/admin/packaging/PackagingReportsPage';
 import { PackagingBoardPage } from './pages/admin/packaging/PackagingBoardPage';
+import { OrdersListPage } from './pages/admin/packaging/OrdersListPage';
+import { PackingStationPage } from './pages/admin/packaging/PackingStationPage';
 
 // Service module (IDS 1.0)
 import { ServiceDashboardPage } from './pages/admin/service/ServiceDashboardPage';
@@ -179,6 +181,8 @@ function AdminRoutes() {
         <Route path="packaging/shipments/:id/edit" element={<ShipmentEditPage />} />
         <Route path="packaging/shipments/:id" element={<ShipmentDetailPage />} />
         <Route path="packaging/board" element={<PackagingBoardPage />} />
+        <Route path="packaging/orders" element={<OrdersListPage />} />
+        <Route path="packaging/packing" element={<PackingStationPage />} />
         <Route path="packaging/reports" element={<PackagingReportsPage />} />
         {/* Service module */}
         <Route path="service" element={<ServiceDashboardPage />} />

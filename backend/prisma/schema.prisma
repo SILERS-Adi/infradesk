@@ -1153,6 +1153,64 @@ enum ShipmentStatus {
   CANCELLED
 }
 
+model PackingOrder {
+  id                String              @id @default(uuid())
+  workspaceId       String
+  externalOrderId   String?
+  status            PackingOrderStatus  @default(NEW)
+  paymentStatus     String              @default("pending")
+  totalAmount       Decimal             @default(0)
+  currency          String              @default("PLN")
+  buyerNote         String?
+  internalNote      String?
+  addressName       String?
+  addressStreet     String?
+  addressCity       String?
+  addressZip        String?
+  addressPhone      String?
+  deliveryMethod    String?
+  deliveryPointId   String?
+  courierName       String?
+  trackingNumber    String?
+  dispatchDeadline  DateTime?
+  paidAt            DateTime?
+  shippedAt         DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  items             PackingOrderItem[]
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, createdAt])
+}
+
+model PackingOrderItem {
+  id              String       @id @default(uuid())
+  orderId         String
+  name            String
+  sku             String?
+  quantity        Int          @default(1)
+  unitPrice       Decimal      @default(0)
+  imageUrl        String?
+
+  order           PackingOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+enum PackingOrderStatus {
+  NEW
+  PAID
+  PICKING
+  PICKED
+  PACKING
+  PACKED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
 // ── Service Module (SKP / Serwis) ───────────────────────────────────
 
 model ServiceVehicle {
