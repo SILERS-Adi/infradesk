@@ -597,11 +597,10 @@ export default function ConfiguratorPage() {
   const toggleModule = (id: string) => {
     if (id === 'infra') {
       if (activeModules.has('infra')) {
-        // If auto-included, don't allow deactivation
-        if (infraAutoIncluded) return;
-        // Deactivate
+        // Deactivate (allowed even if auto-included)
         setActiveModules(prev => { const n = new Set(prev); n.delete('infra'); return n; });
         setInfraConfig(defaultInfraConfig);
+        setInfraAutoIncluded(false);
       } else {
         // Open modal to configure
         setInfraModal(true);
@@ -622,13 +621,19 @@ export default function ConfiguratorPage() {
     triggerPricePulse();
   };
 
-  // After every activeModules change, check auto-include
+  // After every activeModules change, check auto-include / auto-remove
   useEffect(() => {
     const hasNonInfra = Array.from(activeModules).some(id => id !== 'infra');
     if (hasNonInfra && !activeModules.has('infra')) {
       checkAutoIncludeInfra(activeModules);
     }
-  }, [activeModules, checkAutoIncludeInfra]);
+    // Auto-remove infra if it was auto-included and no other modules left
+    if (!hasNonInfra && activeModules.has('infra') && infraAutoIncluded) {
+      setActiveModules(prev => { const n = new Set(prev); n.delete('infra'); return n; });
+      setInfraConfig(defaultInfraConfig);
+      setInfraAutoIncluded(false);
+    }
+  }, [activeModules, checkAutoIncludeInfra, infraAutoIncluded]);
 
   const toggleAddon = (id: string) => {
     setActiveAddons(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -737,7 +742,7 @@ export default function ConfiguratorPage() {
     };
 
     // Determine if infra toggle should be disabled (auto-included)
-    const infraToggleDisabled = isInfra && active && infraAutoIncluded;
+    const infraToggleDisabled = false; // always allow toggle
 
     return (
       <FadeInSection key={mod.id} delay={modIdx * 80}>
