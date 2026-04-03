@@ -341,6 +341,7 @@ model User {
   passwordHash  String
   isActive             Boolean   @default(true)
   isSuperAdmin         Boolean   @default(false)
+  emailVerified        Boolean   @default(false)
   notificationSettings Json?
   lastLoginAt          DateTime?
   createdAt            DateTime  @default(now())
@@ -816,6 +817,16 @@ model DownloadPinRequest {
 
 model PasswordResetToken {
   id        String    @id @default(uuid())
+  email     String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  userId    String
   email     String
   token     String    @unique
   expiresAt DateTime

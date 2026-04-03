@@ -281,6 +281,11 @@ export async function registerService(data: RegisterInput) {
     performedByUserId: result.user.id,
   });
 
+  // Send verification email (non-blocking)
+  sendVerificationEmail(result.user.id, data.email).catch(err => {
+    console.error('Failed to send verification email:', err.message);
+  });
+
   return {
     accessToken,
     refreshToken,
@@ -298,6 +303,86 @@ export async function registerService(data: RegisterInput) {
       type: result.workspace.type,
     },
   };
+}
+
+/* ── Email Verification ──────────────────────────────────────────────── */
+
+export async function sendVerificationEmail(userId: string, email: string) {
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48h
+
+  await prisma.emailVerificationToken.create({
+    data: { userId, email, token, expiresAt },
+  });
+
+  const verifyUrl = `${process.env.FRONTEND_URL || 'https://infradesk.pl'}/verify-email?token=${token}`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+      <h2 style="color: #1e40af;">Potwierdź adres e-mail — InfraDesk</h2>
+      <p>Dziękujemy za rejestrację! Kliknij poniższy przycisk, aby potwierdzić swój adres e-mail:</p>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${verifyUrl}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(145deg, #6D28D9, #2563EB); color: #fff; text-decoration: none; border-radius: 12px; font-weight: bold; font-size: 16px;">
+          Potwierdź e-mail
+        </a>
+      </div>
+      <p style="color: #6b7280; font-size: 14px;">Link jest ważny przez <strong>48 godzin</strong>.</p>
+      <p style="color: #6b7280; font-size: 14px;">Jeśli nie rejestrowałeś/-aś się w InfraDesk, zignoruj tę wiadomość.</p>
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
+      <p style="color: #9ca3af; font-size: 11px;">InfraDesk by SILERS · infradesk.pl</p>
+    </div>
+  `;
+
+  await sendMail(email, 'Potwierdź adres e-mail — InfraDesk', html);
+}
+
+export async function verifyEmailService(token: string) {
+  const record = await prisma.emailVerificationToken.findUnique({ where: { token } });
+  if (!record) throw new AppError('Nieprawidłowy link weryfikacyjny', 400);
+  if (record.usedAt) throw new AppError('Ten link został już wykorzystany', 400);
+  if (record.expiresAt < new Date()) throw new AppError('Link wygasł — zaloguj się i poproś o nowy', 400);
+
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: record.userId }, data: { emailVerified: true } }),
+    prisma.emailVerificationToken.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
+  ]);
+
+  // Return user info for auto-login
+  const user = await prisma.user.findUnique({ where: { id: record.userId } });
+  if (!user) throw new AppError('Użytkownik nie znaleziony', 404);
+
+  // Find workspace for redirect
+  const membership = await prisma.workspaceMembership.findFirst({
+    where: { userId: user.id, status: 'ACTIVE' },
+    select: { workspace: { select: { id: true, slug: true, type: true } } },
+    orderBy: { isDefault: 'desc' },
+  });
+
+  const payload: JwtPayload = { userId: user.id, email: user.email, isSuperAdmin: user.isSuperAdmin };
+  const accessToken = signAccessToken(payload);
+  const refreshToken = signRefreshToken(payload);
+
+  return {
+    accessToken,
+    refreshToken,
+    user: { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email, isSuperAdmin: user.isSuperAdmin },
+    workspace: membership?.workspace ?? null,
+  };
+}
+
+export async function resendVerificationEmail(userId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new AppError('Użytkownik nie znaleziony', 404);
+  if (user.emailVerified) throw new AppError('Email jest już zweryfikowany', 400);
+
+  // Invalidate old tokens
+  await prisma.emailVerificationToken.updateMany({
+    where: { userId, usedAt: null },
+    data: { usedAt: new Date() },
+  });
+
+  await sendVerificationEmail(userId, user.email);
+  return { sent: true };
 }
 
 export async function checkSlugAvailability(slug: string): Promise<boolean> {

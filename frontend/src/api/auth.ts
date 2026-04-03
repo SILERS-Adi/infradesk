@@ -33,6 +33,11 @@ export const authApi = {
     return data;
   },
 
+  resendVerification: async (): Promise<{ sent: boolean }> => {
+    const { data } = await apiClient.post('/auth/resend-verification');
+    return data;
+  },
+
   logout: async (): Promise<void> => {
     await apiClient.post('/auth/logout');
   },

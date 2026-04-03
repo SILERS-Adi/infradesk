@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { loginService, refreshTokenService, getMeService, forgotPasswordService, resetPasswordService, registerService, checkSlugAvailability } from './auth.service';
+import { loginService, refreshTokenService, getMeService, forgotPasswordService, resetPasswordService, registerService, checkSlugAvailability, verifyEmailService, resendVerificationEmail } from './auth.service';
 import prisma from '../../lib/prisma';
 import { signAccessToken, signRefreshToken, JwtPayload } from '../../utils/jwt';
 import { verifyRefreshToken } from '../../utils/jwt';
@@ -133,4 +133,23 @@ export async function checkSlug(req: Request, res: Response, next: NextFunction)
 export async function logout(req: Request, res: Response): Promise<void> {
   clearAuthCookies(res);
   res.json({ success: true });
+}
+
+export async function verifyEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { token } = req.body;
+    if (!token) { res.status(400).json({ error: 'Token jest wymagany' }); return; }
+    const result = await verifyEmailService(token);
+    setAuthCookies(res, result.accessToken, result.refreshToken);
+    res.json(result);
+  } catch (err) { next(err); }
+}
+
+export async function resendVerification(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) { res.status(401).json({ error: 'Auth required' }); return; }
+    const result = await resendVerificationEmail(userId);
+    res.json(result);
+  } catch (err) { next(err); }
 }
