@@ -165,7 +165,7 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
       role: 'SUPERADMIN',
       items: [
         { to: '/superadmin', label: 'Dashboard SA', icon: <Activity className="nav-icon" /> },
-        { to: '/superadmin/tenants', label: 'Firmy', icon: <Building2 className="nav-icon" /> },
+        { to: '/superadmin/tenants', label: 'Workspace\'y', icon: <Building2 className="nav-icon" /> },
         { to: '/superadmin/users', label: 'Użytkownicy SA', icon: <Users className="nav-icon" /> },
         { to: '/superadmin/email', label: 'Email', icon: <Settings className="nav-icon" /> },
       ],
