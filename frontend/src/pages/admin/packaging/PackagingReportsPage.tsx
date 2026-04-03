@@ -1,105 +1,194 @@
 /**
- * IDS 1.0 — Packaging Reports
- * Connected to: GET /api/packaging/reports/stats
+ * IDS 1.0 — PakOps Reports (Full)
+ * Date range, summary stats, charts
+ * Connected to: GET /api/packaging/dashboard/stats, /dashboard/chart
  */
-import { useState, useEffect, useCallback } from 'react';
-import { Package, Truck, Weight, BarChart3 } from 'lucide-react';
+import { useState } from 'react';
+import { Package, Truck, BarChart3, TrendingUp, Calendar } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import api from '../../../api/client';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { Card } from '../../../components/ui/Card';
 import { KpiCard } from '../../../components/ui/KpiCard';
 import { Badge } from '../../../components/ui/Badge';
-import { DataTable, type Column } from '../../../components/ui/DataTable';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
-import { STATUS_MAP, COURIER_MAP } from './constants';
-import { fmtWeight } from './utils';
-import type { BadgeColor } from './types';
+import { ORDER_STATUS, COURIER_MAP } from './constants';
+import { fmtMoney, fmtWeight } from './utils';
+import type { DashboardStats, DashboardChartPoint, BadgeColor } from './types';
 
-interface StatsData {
-  total: number;
-  totalWeight: number;
-  totalItems: number;
-  byStatus: { status: string; count: number }[];
-  byCourier: { courier: string; count: number; weight: number }[];
-  dailyStats: { date: string; count: number }[];
-}
+type Range = '7' | '14' | '30' | '90';
 
 export function PackagingReportsPage() {
-  const [data, setData] = useState<StatsData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState<Range>('30');
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data: res } = await api.get('/packaging/reports/stats');
-      setData(res);
-    } catch {
-      toast.error('Nie udało się pobrać statystyk');
-    } finally { setLoading(false); }
-  }, []);
+  const { data: stats, isLoading: loadingStats } = useQuery<DashboardStats>({
+    queryKey: ['packaging', 'reports', 'stats'],
+    queryFn: async () => { const { data } = await api.get('/packaging/dashboard/stats'); return data; },
+  });
 
-  useEffect(() => { load(); }, [load]);
+  const { data: chart, isLoading: loadingChart } = useQuery<DashboardChartPoint[]>({
+    queryKey: ['packaging', 'reports', 'chart', range],
+    queryFn: async () => { const { data } = await api.get('/packaging/dashboard/chart', { params: { days: range } }); return data; },
+  });
 
-  if (loading) return <><PageHeader title="Pakowanie — Statystyki" /><LoadingSpinner /></>;
-  if (!data) return <><PageHeader title="Pakowanie — Statystyki" /><div style={{ padding: 24, color: 'var(--tm)' }}>Brak danych</div></>;
+  // Also try old reports endpoint for extra data
+  const { data: oldStats } = useQuery<any>({
+    queryKey: ['packaging', 'reports', 'legacy'],
+    queryFn: async () => {
+      try { const { data } = await api.get('/packaging/reports/stats'); return data; }
+      catch { return null; }
+    },
+  });
 
-  const maxDaily = Math.max(...data.dailyStats.map(d => d.count), 1);
+  if (loadingStats) return <><PageHeader title="Raporty pakowania" /><LoadingSpinner /></>;
 
-  const courierColumns: Column<{ courier: string; count: number; weight: number }>[] = [
-    { key: 'courier', header: 'Kurier', render: r => <Badge color={(COURIER_MAP[r.courier]?.color || 'gray') as BadgeColor}>{COURIER_MAP[r.courier]?.label || r.courier}</Badge> },
-    { key: 'count', header: 'Przesyłek', render: r => <span style={{ display: 'block', textAlign: 'right', fontWeight: 600 }}>{r.count}</span> },
-    { key: 'weight', header: 'Łączna waga', render: r => <span style={{ display: 'block', textAlign: 'right' }}>{fmtWeight(r.weight)}</span> },
-  ];
+  const s = stats || {} as DashboardStats;
+  const chartData = chart || [];
+  const maxOrders = Math.max(...chartData.map(c => c.orders), 1);
+  const maxRevenue = Math.max(...chartData.map(c => c.revenue), 1);
+  const totalOrders = chartData.reduce((sum, c) => sum + c.orders, 0);
+  const totalRevenue = chartData.reduce((sum, c) => sum + c.revenue, 0);
+  const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+  const statusEntries = Object.entries(s).filter(([key]) =>
+    ['NEW', 'PAID', 'PICKING', 'PACKING', 'PACKED', 'SHIPPED', 'DELIVERED', 'CANCELLED'].includes(key)
+  );
+  const totalCount = statusEntries.reduce((sum, [, val]) => sum + (typeof val === 'number' ? val : 0), 0);
+
+  const rangeLabel = (r: Range) => ({ '7': '7 dni', '14': '14 dni', '30': '30 dni', '90': '90 dni' }[r]);
 
   return (
     <>
-      <PageHeader title="Pakowanie — Statystyki" subtitle="Podsumowanie przesyłek i pakowania" />
+      <PageHeader title="Raporty pakowania" subtitle="Statystyki i analiza operacji" />
       <div style={{ padding: '0 24px 24px' }}>
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
-          <KpiCard label="Przesyłek" value={String(data.total)} icon={<Package size={20} color="#fff" />} color="var(--accent)" />
-          <KpiCard label="Pozycji" value={String(data.totalItems)} icon={<BarChart3 size={20} color="#fff" />} color="#60A5FA" />
-          <KpiCard label="Łączna waga" value={fmtWeight(data.totalWeight)} icon={<Truck size={20} color="#fff" />} color="#4ADE80" />
-          <KpiCard label="Kurierów" value={String(data.byCourier.length)} icon={<Truck size={20} color="#fff" />} color="#FBBF24" />
+        {/* Date range selector */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 20, padding: 4, borderRadius: 10, background: 'var(--hover-bg)' }}>
+          {(['7', '14', '30', '90'] as Range[]).map(r => (
+            <button key={r} onClick={() => setRange(r)}
+              style={{
+                padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                fontSize: 12, fontWeight: 600, transition: 'all .15s',
+                background: range === r ? 'var(--accent)' : 'transparent',
+                color: range === r ? '#fff' : 'var(--tm)',
+              }}>
+              {rangeLabel(r)}
+            </button>
+          ))}
+        </div>
+
+        {/* Summary KPIs */}
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
+          <KpiCard label="Zamówień (okres)" value={String(totalOrders)} icon={<Package size={20} color="#fff" />} color="var(--accent)" />
+          <KpiCard label="Przychód (okres)" value={`${fmtMoney(totalRevenue)} zł`} icon={<TrendingUp size={20} color="#fff" />} color="#4ADE80" />
+          <KpiCard label="Średnia wartość" value={`${fmtMoney(avgOrderValue)} zł`} icon={<BarChart3 size={20} color="#fff" />} color="#60A5FA" />
+          <KpiCard label="Przychód dzisiaj" value={`${fmtMoney(s.revenueToday || 0)} zł`} icon={<Calendar size={20} color="#fff" />} color="#FBBF24" />
+          <KpiCard label="Przychód miesiąc" value={`${fmtMoney(s.revenueMonth || 0)} zł`} icon={<Truck size={20} color="#fff" />} color="#A78BFA" />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, marginBottom: 24 }}>
-          <Card title="Przesyłki dziennie">
-            {data.dailyStats.length === 0 ? (
+          {/* Chart */}
+          <Card title={`Zamówienia i przychody (${rangeLabel(range)})`}>
+            {loadingChart ? <LoadingSpinner /> : chartData.length === 0 ? (
               <div style={{ padding: 30, textAlign: 'center', color: 'var(--tm)', fontSize: 13 }}>Brak danych</div>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 180, padding: '0 4px', overflow: 'hidden' }}>
-                {data.dailyStats.slice(-31).map((d, i) => {
-                  const h = Math.max(2, (d.count / maxDaily) * 160);
+              <div>
+                <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 11, color: 'var(--tm)' }}>
+                  <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: 'var(--accent)', marginRight: 4 }} />Zamówienia</span>
+                  <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#4ADE80', marginRight: 4 }} />Przychód</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 200, padding: '0 4px', overflow: 'hidden' }}>
+                  {chartData.map((d, i) => {
+                    const hOrders = Math.max(4, (d.orders / maxOrders) * 180);
+                    const hRevenue = Math.max(2, (d.revenue / maxRevenue) * 180);
+                    return (
+                      <div key={i} style={{ flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <div title={`${d.date}: ${d.orders} zam. / ${fmtMoney(d.revenue)} zł`}
+                          style={{ display: 'flex', gap: 1, alignItems: 'flex-end', width: '100%', justifyContent: 'center' }}>
+                          <div style={{ width: '40%', maxWidth: 14, height: hOrders, borderRadius: '3px 3px 0 0', background: 'var(--accent)', opacity: 0.85 }} />
+                          <div style={{ width: '40%', maxWidth: 14, height: hRevenue, borderRadius: '3px 3px 0 0', background: '#4ADE80', opacity: 0.7 }} />
+                        </div>
+                        {chartData.length <= 14 && (
+                          <div style={{ fontSize: 9, color: 'var(--tm)', marginTop: 4, whiteSpace: 'nowrap' }}>{d.date.slice(5)}</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Axis labels for larger ranges */}
+                {chartData.length > 14 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 9, color: 'var(--tm)' }}>
+                    <span>{chartData[0]?.date.slice(5)}</span>
+                    <span>{chartData[Math.floor(chartData.length / 2)]?.date.slice(5)}</span>
+                    <span>{chartData[chartData.length - 1]?.date.slice(5)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+
+          {/* Status breakdown */}
+          <Card title="Podział wg statusu">
+            {statusEntries.length === 0 ? (
+              <div style={{ padding: 12, fontSize: 12, color: 'var(--tm)' }}>Brak danych</div>
+            ) : (
+              <div>
+                {statusEntries.map(([status, count]) => {
+                  const st = ORDER_STATUS[status] || { label: status, color: 'gray' as BadgeColor };
+                  const pct = totalCount > 0 ? ((count as number) / totalCount) * 100 : 0;
                   return (
-                    <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: '1 1 0', minWidth: 0 }}>
-                      <div title={`${d.date}: ${d.count} przesyłek`}
-                        style={{ width: '100%', maxWidth: 32, height: h, borderRadius: '4px 4px 0 0', background: 'linear-gradient(180deg, var(--accent), var(--accent-s))', opacity: 0.85 }} />
-                      {data.dailyStats.length <= 14 && (
-                        <div style={{ fontSize: 9, color: 'var(--tm)', marginTop: 4, whiteSpace: 'nowrap' }}>{d.date.slice(5)}</div>
-                      )}
+                    <div key={status} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <Badge color={st.color}>{st.label}</Badge>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--t)' }}>{count as number}</span>
+                      </div>
+                      <div style={{ height: 3, borderRadius: 2, background: 'var(--border)' }}>
+                        <div style={{ height: '100%', borderRadius: 2, background: 'var(--accent)', width: `${pct}%`, transition: 'width 0.3s' }} />
+                      </div>
                     </div>
                   );
                 })}
               </div>
             )}
           </Card>
-
-          <Card title="Statusy">
-            {data.byStatus.map(s => (
-              <div key={s.status} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                <Badge color={(STATUS_MAP[s.status]?.color || 'gray') as BadgeColor}>{STATUS_MAP[s.status]?.label || s.status}</Badge>
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--t)' }}>{s.count}</span>
-              </div>
-            ))}
-          </Card>
         </div>
 
-        <Card title="Kurierzy" noPadding>
-          <DataTable columns={courierColumns} data={data.byCourier} keyExtractor={r => r.courier}
-            emptyTitle="Brak danych" emptyDescription="Brak przesyłek." />
-        </Card>
+        {/* Legacy stats if available */}
+        {oldStats && oldStats.byCourier && oldStats.byCourier.length > 0 && (
+          <Card title="Podział wg kuriera" noPadding>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                    {['Kurier', 'Przesyłek', 'Waga'].map(h => (
+                      <th key={h} style={{
+                        padding: '10px 14px', fontSize: 10, fontWeight: 700, color: 'var(--td)',
+                        textTransform: 'uppercase', letterSpacing: '0.06em', background: 'var(--hover-bg)',
+                        textAlign: h !== 'Kurier' ? 'right' : 'left',
+                      }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {oldStats.byCourier.map((c: any) => (
+                    <tr key={c.courier} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '10px 14px' }}>
+                        <Badge color={(COURIER_MAP[c.courier]?.color || 'gray') as BadgeColor}>
+                          {COURIER_MAP[c.courier]?.label || c.courier}
+                        </Badge>
+                      </td>
+                      <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600, fontSize: 13, color: 'var(--t)' }}>{c.count}</td>
+                      <td style={{ padding: '10px 14px', textAlign: 'right', fontSize: 13, color: 'var(--ts)' }}>{fmtWeight(c.weight)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
       </div>
     </>
   );
 }
+
+export default PackagingReportsPage;

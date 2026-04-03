@@ -1,5 +1,5 @@
 // ============================================================================
-// IDS 1.0 — Packaging Module Utils
+// IDS 1.0 — Packaging Module Utils (PakOps Full)
 // ============================================================================
 
 export function fmtWeight(g: number): string {
@@ -17,4 +17,13 @@ export function fmtTime(iso: string): string {
 
 export function fmtDateTime(iso: string): string {
   return `${fmtDate(iso)} ${fmtTime(iso)}`;
+}
+
+export function fmtMoney(n: number | string): string {
+  return Number(n).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+export function fmtPercent(value: number, total: number): number {
+  if (total === 0) return 0;
+  return Math.round((value / total) * 100);
 }

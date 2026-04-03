@@ -6,6 +6,7 @@ import {
   Receipt, Plane, Users, CalendarDays, Sun, Moon, SunMoon, LinkIcon, ExternalLink,
   Shield, Activity, Sparkles, Share2,
   FileText, Package, Warehouse, CreditCard, BarChart3, Upload, Car, ClipboardCheck,
+  Truck, Layers, Waves,
 } from 'lucide-react';
 import { useTheme } from '../../store/themeStore';
 import { useAuth } from '../../store/authStore';
@@ -135,11 +136,15 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
       module: 'packaging',
       items: [
         { to: '/packaging', label: 'Dashboard', icon: <LayoutDashboard className="nav-icon" /> },
-        { to: '/packaging/orders', label: 'Zamówienia', icon: <Package className="nav-icon" /> },
+        { to: '/packaging/orders', label: 'Zamówienia', icon: <ShoppingCart className="nav-icon" /> },
+        { to: '/packaging/picking', label: 'Zbieranie', icon: <ClipboardList className="nav-icon" /> },
         { to: '/packaging/packing', label: 'Pakowanie', icon: <Package className="nav-icon" /> },
-        { to: '/packaging/board', label: 'Board', icon: <Package className="nav-icon" /> },
-        { to: '/packaging/shipments', label: 'Wysyłki', icon: <Package className="nav-icon" /> },
-        { to: '/packaging/reports', label: 'Statystyki', icon: <BarChart3 className="nav-icon" /> },
+        { to: '/packaging/board', label: 'Batche', icon: <Layers className="nav-icon" /> },
+        { to: '/packaging/shipments', label: 'Wysyłki', icon: <Truck className="nav-icon" /> },
+        { to: '/packaging/carriers', label: 'Kurierzy', icon: <Truck className="nav-icon" /> },
+        { to: '/packaging/customers', label: 'Klienci', icon: <Users className="nav-icon" /> },
+        { to: '/packaging/waves', label: 'Fale', icon: <Waves className="nav-icon" /> },
+        { to: '/packaging/reports', label: 'Raporty', icon: <BarChart3 className="nav-icon" /> },
       ],
     },
 

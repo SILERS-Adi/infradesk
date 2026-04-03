@@ -94,7 +94,7 @@ import { ReportsPage } from './pages/admin/invoicing/ReportsPage';
 import { PaymentsPage } from './pages/admin/invoicing/PaymentsPage';
 import { WarehousesPage, ImportPage } from './pages/admin/invoicing/PlaceholderPage';
 
-// Packaging module (IDS 1.0)
+// Packaging module (IDS 1.0 — PakOps Full)
 import { PackagingDashboardPage } from './pages/admin/packaging/PackagingDashboardPage';
 import { ShipmentsListPage } from './pages/admin/packaging/ShipmentsListPage';
 import { ShipmentDetailPage } from './pages/admin/packaging/ShipmentDetailPage';
@@ -104,6 +104,10 @@ import { PackagingReportsPage } from './pages/admin/packaging/PackagingReportsPa
 import { PackagingBoardPage } from './pages/admin/packaging/PackagingBoardPage';
 import { OrdersListPage } from './pages/admin/packaging/OrdersListPage';
 import { PackingStationPage } from './pages/admin/packaging/PackingStationPage';
+import { PickingPage } from './pages/admin/packaging/PickingPage';
+import { CarriersPage } from './pages/admin/packaging/CarriersPage';
+import { PackingCustomersPage } from './pages/admin/packaging/PackingCustomersPage';
+import { WavesPage } from './pages/admin/packaging/WavesPage';
 
 // Service module (IDS 1.0)
 import { ServiceDashboardPage } from './pages/admin/service/ServiceDashboardPage';
@@ -192,6 +196,10 @@ function AdminRoutes() {
         <Route path="packaging/board" element={<PackagingBoardPage />} />
         <Route path="packaging/orders" element={<OrdersListPage />} />
         <Route path="packaging/packing" element={<PackingStationPage />} />
+        <Route path="packaging/picking" element={<PickingPage />} />
+        <Route path="packaging/carriers" element={<CarriersPage />} />
+        <Route path="packaging/customers" element={<PackingCustomersPage />} />
+        <Route path="packaging/waves" element={<WavesPage />} />
         <Route path="packaging/reports" element={<PackagingReportsPage />} />
         {/* Service module */}
         <Route path="service" element={<ServiceDashboardPage />} />
