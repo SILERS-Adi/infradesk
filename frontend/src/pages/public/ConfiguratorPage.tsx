@@ -9,6 +9,7 @@ import {
   ChevronRight, Plug, Zap, ArrowRight, MessageCircle,
   Building2, Users, Globe, ShoppingCart, Scan, Calendar, Sparkles, Settings2,
 } from 'lucide-react';
+import { useTheme } from '../../store/themeStore';
 
 // ── Types ──
 interface ModuleDef { id: string; name: string; description: string; icon: React.ElementType; features: string[]; priceFrom: number; hasModal?: boolean; }
@@ -155,25 +156,27 @@ function FadeInSection({ children, delay = 0 }: { children: React.ReactNode; del
 
 // ── Stepped slider ──
 function StepSlider({ steps, value, onChange, label }: { steps: { label: string; price: number }[]; value: number; onChange: (v: number) => void; label: string }) {
+  const { resolved } = useTheme();
+  const isLight = resolved === 'light';
   const ease = 'cubic-bezier(0.16,1,0.3,1)';
   return (
     <div style={{ marginBottom: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-        <span style={{ fontSize: 14, fontWeight: 600, color: '#334155' }}>{label}</span>
+        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--t)' }}>{label}</span>
         <span style={{ fontSize: 14, fontWeight: 750, color: '#4F46E5', fontVariantNumeric: 'tabular-nums' }}>
           {steps[value].label} — {steps[value].price === 0 ? 'w cenie' : `${steps[value].price} zł`}
         </span>
       </div>
       <div style={{ position: 'relative', height: 40, display: 'flex', alignItems: 'center' }}>
         {/* Track */}
-        <div style={{ position: 'absolute', left: 0, right: 0, height: 6, borderRadius: 3, background: '#E2E8F0' }} />
+        <div style={{ position: 'absolute', left: 0, right: 0, height: 6, borderRadius: 3, background: isLight ? '#E2E8F0' : 'rgba(255,255,255,0.1)' }} />
         <div style={{ position: 'absolute', left: 0, height: 6, borderRadius: 3, background: 'linear-gradient(90deg, #4F46E5, #7C3AED)', width: `${(value / (steps.length - 1)) * 100}%`, transition: `width 0.25s ${ease}` }} />
         {/* Steps dots */}
         {steps.map((_, i) => (
           <div key={i} onClick={() => onChange(i)} style={{
             position: 'absolute', left: `${(i / (steps.length - 1)) * 100}%`, transform: 'translateX(-50%)',
             width: i === value ? 20 : 10, height: i === value ? 20 : 10, borderRadius: '50%',
-            background: i <= value ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : '#CBD5E1',
+            background: i <= value ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : isLight ? '#CBD5E1' : 'rgba(255,255,255,0.15)',
             border: i === value ? '3px solid #fff' : 'none',
             boxShadow: i === value ? '0 2px 8px rgba(79,70,229,0.4)' : 'none',
             cursor: 'pointer', transition: `all 0.25s ${ease}`, zIndex: 2,
@@ -186,7 +189,7 @@ function StepSlider({ steps, value, onChange, label }: { steps: { label: string;
       {/* Step labels */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
         {steps.map((s, i) => (
-          <span key={i} style={{ fontSize: 10, color: i === value ? '#4F46E5' : '#94A3B8', fontWeight: i === value ? 700 : 400, transition: `all 0.2s ease`, minWidth: 0, textAlign: 'center' }}>{s.label}</span>
+          <span key={i} style={{ fontSize: 10, color: i === value ? '#4F46E5' : 'var(--tm)', fontWeight: i === value ? 700 : 400, transition: `all 0.2s ease`, minWidth: 0, textAlign: 'center' }}>{s.label}</span>
         ))}
       </div>
     </div>
@@ -196,6 +199,8 @@ function StepSlider({ steps, value, onChange, label }: { steps: { label: string;
 // ── Infra Config Modal ──
 function InfraModal({ open, initial, onApply, onCancel }: { open: boolean; initial: InfraConfig; onApply: (cfg: InfraConfig) => void; onCancel: () => void }) {
   const [cfg, setCfg] = useState<InfraConfig>(initial);
+  const { resolved } = useTheme();
+  const isLight = resolved === 'light';
   const ease = 'cubic-bezier(0.16,1,0.3,1)';
   const pricing = calcInfraPrice(cfg);
 
@@ -220,7 +225,7 @@ function InfraModal({ open, initial, onApply, onCancel }: { open: boolean; initi
     }}>
       <div onClick={e => e.stopPropagation()} style={{
         width: '100%', maxWidth: 660, maxHeight: '90vh', overflowY: 'auto',
-        background: '#fff', borderRadius: 24, padding: '36px 40px',
+        background: 'var(--bg-card)', borderRadius: 24, padding: '36px 40px',
         boxShadow: '0 25px 80px rgba(0,0,0,0.2), 0 8px 24px rgba(0,0,0,0.1)',
         animation: 'cfgModalIn 0.35s cubic-bezier(0.16,1,0.3,1)',
       }}>
@@ -231,19 +236,19 @@ function InfraModal({ open, initial, onApply, onCancel }: { open: boolean; initi
               <Monitor size={22} color="#fff" />
             </div>
             <div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em' }}>Zarządzanie IT</div>
-              <div style={{ fontSize: 13, color: '#64748B' }}>Skonfiguruj moduł pod swoje potrzeby</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--t)', letterSpacing: '-0.02em' }}>Zarządzanie IT</div>
+              <div style={{ fontSize: 13, color: 'var(--ts)' }}>Skonfiguruj moduł pod swoje potrzeby</div>
             </div>
           </div>
-          <button onClick={onCancel} style={{ width: 36, height: 36, borderRadius: 10, border: '1px solid #E2E8F0', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: `all 0.2s ease` }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#F1F5F9'; }} onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}>
-            <X size={16} color="#64748B" />
+          <button onClick={onCancel} style={{ width: 36, height: 36, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-card)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: `all 0.2s ease` }}
+            onMouseEnter={e => { e.currentTarget.style.background = isLight ? '#F1F5F9' : 'rgba(255,255,255,0.06)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-card)'; }}>
+            <X size={16} color="var(--ts)" />
           </button>
         </div>
 
         {/* Mode selector */}
         <div style={{ marginBottom: 32 }}>
-          <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#94A3B8', marginBottom: 14 }}>Tryb</div>
+          <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--tm)', marginBottom: 14 }}>Tryb</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             {([
               { id: 'solo' as const, name: 'SOLO', desc: 'Dla jednej firmy', icon: Building2 },
@@ -254,22 +259,22 @@ function InfraModal({ open, initial, onApply, onCancel }: { open: boolean; initi
               return (
                 <div key={m.id} onClick={() => setCfg({ ...cfg, mode: m.id })} style={{
                   padding: '22px 24px', borderRadius: 16, cursor: 'pointer',
-                  background: sel ? 'linear-gradient(160deg, #EEF2FF, #F5F3FF)' : '#FAFBFC',
-                  border: `2px solid ${sel ? '#818CF8' : '#E2E8F0'}`,
+                  background: sel ? (isLight ? 'linear-gradient(160deg, #EEF2FF, #F5F3FF)' : 'rgba(79,70,229,0.1)') : (isLight ? '#FAFBFC' : 'rgba(255,255,255,0.03)'),
+                  border: `2px solid ${sel ? '#818CF8' : 'var(--border)'}`,
                   boxShadow: sel ? '0 0 0 3px rgba(99,102,241,0.1)' : 'none',
                   transition: `all 0.25s ${ease}`,
                   transform: sel ? 'scale(1.01)' : 'scale(1)',
                 }}
                   onMouseEnter={e => { if (!sel) e.currentTarget.style.borderColor = '#C7D2FE'; }}
-                  onMouseLeave={e => { if (!sel) e.currentTarget.style.borderColor = '#E2E8F0'; }}
+                  onMouseLeave={e => { if (!sel) e.currentTarget.style.borderColor = ''; }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 10, background: sel ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: `all 0.25s ${ease}` }}>
-                      <MI size={18} color={sel ? '#fff' : '#94A3B8'} />
+                    <div style={{ width: 34, height: 34, borderRadius: 10, background: sel ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : (isLight ? '#E2E8F0' : 'rgba(255,255,255,0.08)'), display: 'flex', alignItems: 'center', justifyContent: 'center', transition: `all 0.25s ${ease}` }}>
+                      <MI size={18} color={sel ? '#fff' : 'var(--tm)'} />
                     </div>
-                    <span style={{ fontSize: 18, fontWeight: 800, color: sel ? '#4F46E5' : '#0F172A', transition: `color 0.2s ease` }}>{m.name}</span>
+                    <span style={{ fontSize: 18, fontWeight: 800, color: sel ? '#4F46E5' : 'var(--t)', transition: `color 0.2s ease` }}>{m.name}</span>
                   </div>
-                  <div style={{ fontSize: 13, color: '#64748B', paddingLeft: 46 }}>{m.desc}</div>
+                  <div style={{ fontSize: 13, color: 'var(--ts)', paddingLeft: 46 }}>{m.desc}</div>
                 </div>
               );
             })}
@@ -278,7 +283,7 @@ function InfraModal({ open, initial, onApply, onCancel }: { open: boolean; initi
 
         {/* Sliders */}
         <div style={{ marginBottom: 32 }}>
-          <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#94A3B8', marginBottom: 20 }}>Konfiguracja</div>
+          <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--tm)', marginBottom: 20 }}>Konfiguracja</div>
           {cfg.mode === 'solo' ? (
             <>
               <StepSlider label="Stanowiska" steps={SOLO_SEATS} value={cfg.soloSeats} onChange={v => setCfg({ ...cfg, soloSeats: v })} />
@@ -298,23 +303,23 @@ function InfraModal({ open, initial, onApply, onCancel }: { open: boolean; initi
           {pricing.lines.map((l, i) => (
             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: i < pricing.lines.length - 1 ? '1px solid rgba(16,185,129,0.1)' : 'none' }}>
               <span style={{ fontSize: 14, color: '#064E3B', fontWeight: 500 }}>{l.label}</span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}>{l.price === 0 ? 'w cenie' : `${l.price} zł`}</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--t)', fontVariantNumeric: 'tabular-nums' }}>{l.price === 0 ? 'w cenie' : `${l.price} zł`}</span>
             </div>
           ))}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 14, marginTop: 8, borderTop: '2px solid rgba(16,185,129,0.2)' }}>
             <span style={{ fontSize: 16, fontWeight: 750, color: '#064E3B' }}>Razem:</span>
-            <span style={{ fontSize: 28, fontWeight: 900, color: '#059669', letterSpacing: '-0.03em' }}>{pricing.total} zł<span style={{ fontSize: 14, fontWeight: 400, color: '#64748B' }}> / msc</span></span>
+            <span style={{ fontSize: 28, fontWeight: 900, color: '#059669', letterSpacing: '-0.03em' }}>{pricing.total} zł<span style={{ fontSize: 14, fontWeight: 400, color: 'var(--ts)' }}> / msc</span></span>
           </div>
         </div>
 
         {/* Actions */}
         <div style={{ display: 'flex', gap: 12 }}>
           <button onClick={onCancel} style={{
-            flex: 1, padding: '16px 20px', borderRadius: 14, border: '1px solid #E2E8F0', background: '#fff',
-            color: '#64748B', fontSize: 15, fontWeight: 650, cursor: 'pointer', transition: `all 0.2s ${ease}`,
+            flex: 1, padding: '16px 20px', borderRadius: 14, border: '1px solid var(--border)', background: 'var(--bg-card)',
+            color: 'var(--ts)', fontSize: 15, fontWeight: 650, cursor: 'pointer', transition: `all 0.2s ${ease}`,
           }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#F8FAFC'; e.currentTarget.style.borderColor = '#CBD5E1'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#E2E8F0'; }}
+            onMouseEnter={e => { e.currentTarget.style.background = isLight ? '#F8FAFC' : 'rgba(255,255,255,0.06)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = ''; }}
           >Anuluj</button>
           <button onClick={() => onApply(cfg)} style={{
             flex: 2, padding: '16px 20px', borderRadius: 14, border: 'none',
@@ -395,6 +400,8 @@ function generateScenario(modules: Set<string>, infraCfg: InfraConfig): Scenario
 
 // ── Scenario Modal ──
 function ScenarioModal({ open, steps, onClose }: { open: boolean; steps: ScenarioStep[]; onClose: () => void }) {
+  const { resolved } = useTheme();
+  const isLight = resolved === 'light';
   const [current, setCurrent] = useState(0);
   const [autoplay, setAutoplay] = useState(true);
   const [stepKey, setStepKey] = useState(0); // force re-animate
@@ -436,12 +443,12 @@ function ScenarioModal({ open, steps, onClose }: { open: boolean; steps: Scenari
       animation: 'cfgFadeIn 0.2s ease',
     }}>
       <div onClick={e => e.stopPropagation()} style={{
-        width: '100%', maxWidth: 700, background: '#fff', borderRadius: 28, overflow: 'hidden',
+        width: '100%', maxWidth: 700, background: 'var(--bg-card)', borderRadius: 28, overflow: 'hidden',
         boxShadow: '0 30px 100px rgba(0,0,0,0.25), 0 10px 30px rgba(0,0,0,0.12)',
         animation: 'cfgModalIn 0.35s cubic-bezier(0.16,1,0.3,1)',
       }}>
         {/* Progress bar */}
-        <div style={{ height: 4, background: '#E2E8F0' }}>
+        <div style={{ height: 4, background: isLight ? '#E2E8F0' : 'rgba(255,255,255,0.08)' }}>
           <div style={{ height: '100%', background: 'linear-gradient(90deg, #4F46E5, #7C3AED)', width: `${progress}%`, transition: `width 0.5s ${ease}`, borderRadius: 2 }} />
         </div>
 
@@ -449,16 +456,16 @@ function ScenarioModal({ open, steps, onClose }: { open: boolean; steps: Scenari
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 36 }}>
             <div>
-              <div style={{ fontSize: 22, fontWeight: 850, color: '#0F172A', letterSpacing: '-0.02em', marginBottom: 4 }}>
+              <div style={{ fontSize: 22, fontWeight: 850, color: 'var(--t)', letterSpacing: '-0.02em', marginBottom: 4 }}>
                 {finished ? 'Twój system jest gotowy' : 'Zobacz, jak działa Twój system'}
               </div>
-              <div style={{ fontSize: 14, color: '#64748B' }}>
+              <div style={{ fontSize: 14, color: 'var(--ts)' }}>
                 {finished ? 'Wszystkie procesy zautomatyzowane i gotowe do pracy.' : `Krok ${current + 1} z ${steps.length} — na podstawie Twojej konfiguracji`}
               </div>
             </div>
-            <button onClick={onClose} style={{ width: 36, height: 36, borderRadius: 10, border: '1px solid #E2E8F0', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#F1F5F9'; }} onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}>
-              <X size={16} color="#64748B" />
+            <button onClick={onClose} style={{ width: 36, height: 36, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-card)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              onMouseEnter={e => { e.currentTarget.style.background = isLight ? '#F1F5F9' : 'rgba(255,255,255,0.06)'; }} onMouseLeave={e => { e.currentTarget.style.background = ''; }}>
+              <X size={16} color="var(--ts)" />
             </button>
           </div>
 
@@ -468,10 +475,10 @@ function ScenarioModal({ open, steps, onClose }: { open: boolean; steps: Scenari
               <div style={{ width: 80, height: 80, borderRadius: 24, background: 'linear-gradient(135deg, #4F46E5, #7C3AED)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', boxShadow: '0 10px 30px rgba(79,70,229,0.35)' }}>
                 <Check size={40} color="#fff" strokeWidth={2.5} />
               </div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--t)', marginBottom: 8 }}>
                 {steps.length} kroków — w pełni automatycznie
               </div>
-              <div style={{ fontSize: 15, color: '#64748B', marginBottom: 36 }}>
+              <div style={{ fontSize: 15, color: 'var(--ts)', marginBottom: 36 }}>
                 System robi to za Ciebie. Codziennie, bezbłędnie, bez wysiłku.
               </div>
               <a href="/register" style={{
@@ -497,7 +504,7 @@ function ScenarioModal({ open, steps, onClose }: { open: boolean; steps: Scenari
                 {steps.map((_, i) => (
                   <div key={i} onClick={() => { setCurrent(i); setStepKey(k => k + 1); setAutoplay(false); }} style={{
                     width: i === current ? 32 : 10, height: 10, borderRadius: 5, cursor: 'pointer',
-                    background: i < current ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : i === current ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : '#E2E8F0',
+                    background: i < current ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : i === current ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : (isLight ? '#E2E8F0' : 'rgba(255,255,255,0.1)'),
                     transition: `all 0.3s ${ease}`,
                     opacity: i <= current ? 1 : 0.5,
                   }} />
@@ -507,7 +514,7 @@ function ScenarioModal({ open, steps, onClose }: { open: boolean; steps: Scenari
               {/* Current step card */}
               <div key={stepKey} style={{
                 padding: 36, borderRadius: 20, minHeight: 180,
-                background: 'linear-gradient(160deg, #F8FAFC, #EEF2FF, #F5F3FF)',
+                background: isLight ? 'linear-gradient(160deg, #F8FAFC, #EEF2FF, #F5F3FF)' : 'rgba(79,70,229,0.06)',
                 border: '1px solid rgba(99,102,241,0.1)',
                 animation: 'cfgStepIn 0.5s cubic-bezier(0.16,1,0.3,1)',
                 display: 'flex', alignItems: 'center', gap: 28,
@@ -522,22 +529,22 @@ function ScenarioModal({ open, steps, onClose }: { open: boolean; steps: Scenari
                 </div>
                 <div>
                   <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#818CF8', marginBottom: 8 }}>Krok {current + 1}</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', marginBottom: 8, letterSpacing: '-0.02em' }}>{step.title}</div>
-                  <div style={{ fontSize: 15, color: '#64748B', lineHeight: 1.6 }}>{step.desc}</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--t)', marginBottom: 8, letterSpacing: '-0.02em' }}>{step.title}</div>
+                  <div style={{ fontSize: 15, color: 'var(--ts)', lineHeight: 1.6 }}>{step.desc}</div>
                 </div>
               </div>
 
               {/* Navigation */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 28 }}>
                 <button onClick={() => { if (current > 0) { setCurrent(c => c - 1); setStepKey(k => k + 1); setAutoplay(false); } }} disabled={current === 0} style={{
-                  padding: '12px 24px', borderRadius: 12, border: '1px solid #E2E8F0', background: '#fff',
-                  color: current === 0 ? '#CBD5E1' : '#64748B', fontSize: 14, fontWeight: 650, cursor: current === 0 ? 'default' : 'pointer',
+                  padding: '12px 24px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg-card)',
+                  color: current === 0 ? 'var(--td)' : 'var(--ts)', fontSize: 14, fontWeight: 650, cursor: current === 0 ? 'default' : 'pointer',
                   transition: `all 0.2s ease`, opacity: current === 0 ? 0.5 : 1,
                 }}>Wstecz</button>
 
                 <button onClick={() => { setAutoplay(!autoplay); }} style={{
-                  padding: '8px 16px', borderRadius: 10, border: '1px solid #E2E8F0', background: autoplay ? 'rgba(79,70,229,0.06)' : '#fff',
-                  color: '#64748B', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s ease',
+                  padding: '8px 16px', borderRadius: 10, border: '1px solid var(--border)', background: autoplay ? 'rgba(79,70,229,0.06)' : 'var(--bg-card)',
+                  color: 'var(--ts)', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s ease',
                 }}>
                   {autoplay ? 'Pauza' : 'Autoplay'}
                 </button>
@@ -564,6 +571,8 @@ function ScenarioModal({ open, steps, onClose }: { open: boolean; steps: Scenari
 
 // ── Component ──
 export default function ConfiguratorPage() {
+  const { resolved } = useTheme();
+  const isLight = resolved === 'light';
   const [activeModules, setActiveModules] = useState<Set<string>>(new Set());
   const [activeAddons, setActiveAddons] = useState<Set<string>>(new Set(['onboarding']));
   const [pricePulse, setPricePulse] = useState(false);
@@ -756,8 +765,8 @@ export default function ConfiguratorPage() {
         <div onClick={onCardClick} style={{
           padding: 32, borderRadius: 22, cursor: 'pointer', minHeight: 320,
           display: 'flex', flexDirection: 'column' as const,
-          background: active ? 'linear-gradient(160deg, #EEF2FF 0%, #F5F3FF 50%, #fff 100%)' : '#fff',
-          border: `2px solid ${active ? '#818CF8' : '#E2E8F0'}`,
+          background: active ? (isLight ? 'linear-gradient(160deg, #EEF2FF 0%, #F5F3FF 50%, #fff 100%)' : 'rgba(79,70,229,0.08)') : 'var(--bg-card)',
+          border: `2px solid ${active ? '#818CF8' : 'var(--border)'}`,
           boxShadow: active
             ? '0 0 0 4px rgba(99,102,241,0.1), 0 12px 32px rgba(79,70,229,0.12), 0 2px 4px rgba(79,70,229,0.06)'
             : '0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.02)',
@@ -765,19 +774,19 @@ export default function ConfiguratorPage() {
           transform: clicked ? 'scale(1.03)' : active ? 'scale(1.02)' : 'scale(1)',
         }}
           onMouseEnter={e => { if (!active) { e.currentTarget.style.borderColor = '#C7D2FE'; e.currentTarget.style.boxShadow = '0 12px 28px rgba(0,0,0,0.07), 0 4px 8px rgba(0,0,0,0.03)'; e.currentTarget.style.transform = 'translateY(-3px)'; } }}
-          onMouseLeave={e => { if (!active) { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.02)'; e.currentTarget.style.transform = 'scale(1)'; } }}
+          onMouseLeave={e => { if (!active) { e.currentTarget.style.borderColor = ''; e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.02)'; e.currentTarget.style.transform = 'scale(1)'; } }}
         >
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
             <div style={{ position: 'relative' }}>
               <div style={{
                 width: 52, height: 52, borderRadius: 16,
-                background: active ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : 'linear-gradient(135deg, #F1F5F9, #E2E8F0)',
+                background: active ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : (isLight ? 'linear-gradient(135deg, #F1F5F9, #E2E8F0)' : 'rgba(255,255,255,0.06)'),
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 transition: `all 0.35s ${ease}`,
                 boxShadow: active ? '0 6px 16px rgba(79,70,229,0.35)' : '0 1px 3px rgba(0,0,0,0.06)',
                 transform: clicked ? 'rotate(-8deg) scale(1.1)' : 'rotate(0deg) scale(1)',
               }}>
-                <Icon size={26} color={active ? '#fff' : '#64748B'} strokeWidth={1.7} />
+                <Icon size={26} color={active ? '#fff' : 'var(--ts)'} strokeWidth={1.7} />
               </div>
               {/* GRATIS badge for auto-included infra */}
               {isInfra && active && infraAutoIncluded && isDefaultInfraConfig(infraConfig) && (
@@ -793,7 +802,7 @@ export default function ConfiguratorPage() {
             {/* Toggle */}
             <div onClick={infraToggleDisabled ? undefined : onToggleClick} style={{
               width: 44, height: 26, borderRadius: 13, padding: 2, cursor: infraToggleDisabled ? 'default' : 'pointer',
-              background: active ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : '#E2E8F0',
+              background: active ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : (isLight ? '#E2E8F0' : 'rgba(255,255,255,0.1)'),
               transition: `all 0.35s ${ease}`,
               boxShadow: active ? '0 2px 8px rgba(79,70,229,0.35)' : 'inset 0 1px 3px rgba(0,0,0,0.1)',
               opacity: infraToggleDisabled ? 0.6 : 1,
@@ -808,7 +817,7 @@ export default function ConfiguratorPage() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: isInfra && active ? 8 : 14 }}>
-            <span style={{ fontSize: 18, fontWeight: 750, color: '#0F172A', letterSpacing: '-0.02em' }}>{mod.name}</span>
+            <span style={{ fontSize: 18, fontWeight: 750, color: 'var(--t)', letterSpacing: '-0.02em' }}>{mod.name}</span>
           </div>
 
           {/* Infra active + auto-included: show gratis info */}
@@ -829,7 +838,7 @@ export default function ConfiguratorPage() {
           ) : isInfra && active ? (
             /* Infra active: show summary + change button instead of features */
             <div>
-              <div style={{ fontSize: 14, color: '#64748B', marginBottom: 16 }}>{infraSummary(infraConfig)}</div>
+              <div style={{ fontSize: 14, color: 'var(--ts)', marginBottom: 16 }}>{infraSummary(infraConfig)}</div>
               <button onClick={e => { e.stopPropagation(); setInfraModal(true); }} style={{
                 padding: '10px 20px', borderRadius: 12, border: '1px solid #C7D2FE', background: 'rgba(79,70,229,0.04)',
                 color: '#4F46E5', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
@@ -849,18 +858,18 @@ export default function ConfiguratorPage() {
                   opacity: active ? 1 : 0.7,
                   transition: `opacity 0.3s ${easeOut} ${fi * 40}ms`,
                 }}>
-                  <div style={{ width: 18, height: 18, borderRadius: 5, background: active ? 'rgba(79,70,229,0.1)' : '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: `all 0.25s ${easeOut} ${fi * 40}ms` }}>
-                    <Check size={11} color={active ? '#4F46E5' : '#94A3B8'} strokeWidth={2.5} />
+                  <div style={{ width: 18, height: 18, borderRadius: 5, background: active ? 'rgba(79,70,229,0.1)' : (isLight ? '#F1F5F9' : 'rgba(255,255,255,0.04)'), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: `all 0.25s ${easeOut} ${fi * 40}ms` }}>
+                    <Check size={11} color={active ? '#4F46E5' : 'var(--tm)'} strokeWidth={2.5} />
                   </div>
-                  <span style={{ fontSize: 14, color: active ? '#334155' : '#64748B', fontWeight: 450, transition: `color 0.2s ${easeOut}` }}>{f}</span>
+                  <span style={{ fontSize: 14, color: active ? 'var(--t)' : 'var(--ts)', fontWeight: 450, transition: `color 0.2s ${easeOut}` }}>{f}</span>
                 </div>
               ))}
             </div>
           )}
 
-          <div style={{ paddingTop: 16, marginTop: 'auto', borderTop: `1px solid ${active ? 'rgba(99,102,241,0.12)' : '#F1F5F9'}`, transition: `border-color 0.3s ${easeOut}` }}>
-            <span style={{ fontSize: 26, fontWeight: 850, color: active ? '#4F46E5' : '#0F172A', letterSpacing: '-0.03em', transition: `color 0.25s ${easeOut}` }}>{priceLabel}</span>
-            <span style={{ fontSize: 15, fontWeight: 400, color: '#94A3B8', marginLeft: 4 }}>/ miesiąc</span>
+          <div style={{ paddingTop: 16, marginTop: 'auto', borderTop: `1px solid ${active ? 'rgba(99,102,241,0.12)' : 'var(--border)'}`, transition: `border-color 0.3s ${easeOut}` }}>
+            <span style={{ fontSize: 26, fontWeight: 850, color: active ? '#4F46E5' : 'var(--t)', letterSpacing: '-0.03em', transition: `color 0.25s ${easeOut}` }}>{priceLabel}</span>
+            <span style={{ fontSize: 15, fontWeight: 400, color: 'var(--tm)', marginLeft: 4 }}>/ miesiąc</span>
           </div>
         </div>
       </FadeInSection>
@@ -868,7 +877,7 @@ export default function ConfiguratorPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC', color: '#0F172A', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", scrollBehavior: 'smooth' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--t)', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", scrollBehavior: 'smooth' }}>
 
       {/* Modals */}
       <InfraModal open={infraModal} initial={infraConfig} onApply={handleInfraApply} onCancel={() => setInfraModal(false)} />
@@ -883,18 +892,18 @@ export default function ConfiguratorPage() {
           animation: 'cfgFadeIn 0.2s ease',
         }}>
           <div onClick={e => e.stopPropagation()} style={{
-            width: '100%', maxWidth: 440, background: '#fff', borderRadius: 22, padding: '32px 36px',
+            width: '100%', maxWidth: 440, background: 'var(--bg-card)', borderRadius: 22, padding: '32px 36px',
             boxShadow: '0 25px 80px rgba(0,0,0,0.2)', animation: 'cfgModalIn 0.3s cubic-bezier(0.16,1,0.3,1)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
               <div style={{ width: 44, height: 44, borderRadius: 14, background: 'linear-gradient(135deg, #F59E0B, #EAB308)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Monitor size={22} color="#fff" />
               </div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: '#0F172A' }}>Wyłączyć Zarządzanie IT?</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--t)' }}>Wyłączyć Zarządzanie IT?</div>
             </div>
-            <p style={{ fontSize: 14, color: '#64748B', lineHeight: 1.7, marginBottom: 24 }}>
+            <p style={{ fontSize: 14, color: 'var(--ts)', lineHeight: 1.7, marginBottom: 24 }}>
               Dzięki temu modułowi możemy połączyć się zdalnie z Twoim środowiskiem i udzielać wsparcia technicznego w ramach współpracy.<br /><br />
-              <span style={{ fontWeight: 600, color: '#334155' }}>Czy na pewno chcesz wyłączyć ten moduł?</span>
+              <span style={{ fontWeight: 600, color: 'var(--t)' }}>Czy na pewno chcesz wyłączyć ten moduł?</span>
             </p>
             <div style={{ display: 'flex', gap: 12 }}>
               <button onClick={() => setShowInfraConfirm(false)} style={{
@@ -914,11 +923,11 @@ export default function ConfiguratorPage() {
                 setShowInfraConfirm(false);
                 triggerPricePulse();
               }} style={{
-                padding: '14px 20px', borderRadius: 12, border: '1px solid #E2E8F0', background: '#fff',
-                color: '#64748B', fontSize: 14, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s ease',
+                padding: '14px 20px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg-card)',
+                color: 'var(--ts)', fontSize: 14, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s ease',
               }}
-                onMouseEnter={e => { e.currentTarget.style.background = '#F8FAFC'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}
+                onMouseEnter={e => { e.currentTarget.style.background = isLight ? '#F8FAFC' : 'rgba(255,255,255,0.06)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = ''; }}
               >Tak, wyłącz</button>
             </div>
           </div>
@@ -926,19 +935,19 @@ export default function ConfiguratorPage() {
       )}
 
       {/* ── AMBIENT GLOW ── */}
-      <div style={{ position: 'fixed', top: -200, left: '30%', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle, rgba(79,70,229,0.04) 0%, transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
-      <div style={{ position: 'fixed', top: 200, right: '-10%', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle, rgba(124,58,237,0.03) 0%, transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
-      <div style={{ position: 'fixed', bottom: -100, left: '10%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(16,185,129,0.025) 0%, transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
+      <div style={{ position: 'fixed', top: -200, left: '30%', width: 600, height: 600, borderRadius: '50%', background: `radial-gradient(circle, rgba(79,70,229,${isLight ? '0.04' : '0.06'}) 0%, transparent 70%)`, pointerEvents: 'none', zIndex: 0 }} />
+      <div style={{ position: 'fixed', top: 200, right: '-10%', width: 500, height: 500, borderRadius: '50%', background: `radial-gradient(circle, rgba(124,58,237,${isLight ? '0.03' : '0.05'}) 0%, transparent 70%)`, pointerEvents: 'none', zIndex: 0 }} />
+      <div style={{ position: 'fixed', bottom: -100, left: '10%', width: 400, height: 400, borderRadius: '50%', background: `radial-gradient(circle, rgba(16,185,129,${isLight ? '0.025' : '0.04'}) 0%, transparent 70%)`, pointerEvents: 'none', zIndex: 0 }} />
 
       {/* ── TOP BAR ── */}
-      <header style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(248,250,252,0.72)', backdropFilter: 'blur(20px) saturate(1.8)', borderBottom: '1px solid rgba(0,0,0,0.05)', transition: 'box-shadow 0.3s ease' }}>
+      <header style={{ position: 'sticky', top: 0, zIndex: 50, background: isLight ? 'rgba(248,250,252,0.72)' : 'rgba(10,15,30,0.7)', backdropFilter: 'blur(20px) saturate(1.8)', borderBottom: '1px solid var(--border)', transition: 'box-shadow 0.3s ease' }}>
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 40px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <img src="/logo-dark.png" alt="InfraDesk" style={{ height: 44, objectFit: 'contain' }} />
+            <img src={isLight ? '/logo-dark.png' : '/logo.png'} alt="InfraDesk" style={{ height: 44, objectFit: 'contain' }} />
           </div>
-          <Link to="/login" style={{ fontSize: 14, fontWeight: 500, color: '#64748B', textDecoration: 'none', transition: `all 0.2s ${easeOut}` }}
+          <Link to="/login" style={{ fontSize: 14, fontWeight: 500, color: 'var(--ts)', textDecoration: 'none', transition: `all 0.2s ${easeOut}` }}
             onMouseEnter={e => { e.currentTarget.style.color = '#4F46E5'; e.currentTarget.style.transform = 'translateX(2px)'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = '#64748B'; e.currentTarget.style.transform = 'translateX(0)'; }}>
+            onMouseLeave={e => { e.currentTarget.style.color = ''; e.currentTarget.style.transform = 'translateX(0)'; }}>
             Masz konto? <span style={{ fontWeight: 600 }}>Zaloguj się →</span>
           </Link>
         </div>
@@ -961,10 +970,10 @@ export default function ConfiguratorPage() {
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10B981', boxShadow: '0 0 8px rgba(16,185,129,0.6)', animation: 'cfgPulse 2s ease-in-out infinite' }} />
                 14 dni za darmo — bez karty
               </div>
-              <h1 style={{ fontSize: 48, fontWeight: 850, color: '#0F172A', letterSpacing: '-0.04em', lineHeight: 1.08, margin: '0 0 20px' }}>
+              <h1 style={{ fontSize: 48, fontWeight: 850, color: 'var(--t)', letterSpacing: '-0.04em', lineHeight: 1.08, margin: '0 0 20px' }}>
                 Zbuduj system dla swojej<br />firmy w 5 minut
               </h1>
-              <p style={{ fontSize: 20, color: '#64748B', lineHeight: 1.6, maxWidth: 540, margin: 0, fontWeight: 400 }}>
+              <p style={{ fontSize: 20, color: 'var(--ts)', lineHeight: 1.6, maxWidth: 540, margin: 0, fontWeight: 400 }}>
                 Wybierz moduły, połącz z używanymi systemami<br />i zacznij bez ryzyka.
               </p>
             </section>
@@ -975,7 +984,7 @@ export default function ConfiguratorPage() {
             <section>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 28 }}>
                 <Sparkles size={16} color="#4F46E5" />
-                <h2 style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#94A3B8', margin: 0 }}>Wybierz moduły</h2>
+                <h2 style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--tm)', margin: 0 }}>Wybierz moduły</h2>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 24 }}>
                 {MODULES.map((mod, i) => renderModuleCard(mod, i))}
@@ -988,7 +997,7 @@ export default function ConfiguratorPage() {
             <section style={{ marginTop: 64 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 28 }}>
                 <Zap size={16} color="#4F46E5" />
-                <h2 style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#94A3B8', margin: 0 }}>Dodatkowe opcje</h2>
+                <h2 style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--tm)', margin: 0 }}>Dodatkowe opcje</h2>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {ADDONS.map((addon, ai) => {
@@ -998,40 +1007,40 @@ export default function ConfiguratorPage() {
                     <FadeInSection key={addon.id} delay={ai * 80}>
                       <div onClick={() => toggleAddon(addon.id)} style={{
                         display: 'flex', alignItems: 'center', gap: 20, padding: 28, borderRadius: 18, cursor: 'pointer',
-                        background: active ? 'linear-gradient(160deg, #EEF2FF, #F5F3FF, #fff)' : '#fff',
-                        border: `2px solid ${active ? '#818CF8' : '#E2E8F0'}`,
+                        background: active ? (isLight ? 'linear-gradient(160deg, #EEF2FF, #F5F3FF, #fff)' : 'rgba(79,70,229,0.08)') : 'var(--bg-card)',
+                        border: `2px solid ${active ? '#818CF8' : 'var(--border)'}`,
                         boxShadow: active ? '0 0 0 4px rgba(99,102,241,0.08), 0 8px 20px rgba(79,70,229,0.08)' : '0 1px 3px rgba(0,0,0,0.03), 0 4px 12px rgba(0,0,0,0.02)',
                         transition: `all 0.3s ${ease}`,
                       }}
                         onMouseEnter={e => { if (!active) { e.currentTarget.style.borderColor = '#C7D2FE'; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.06)'; } }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = active ? '#818CF8' : '#E2E8F0'; e.currentTarget.style.transform = 'translateY(0)'; if (!active) e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.03), 0 4px 12px rgba(0,0,0,0.02)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = active ? '#818CF8' : ''; e.currentTarget.style.transform = 'translateY(0)'; if (!active) e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.03), 0 4px 12px rgba(0,0,0,0.02)'; }}
                       >
                         <div style={{
                           width: 48, height: 48, borderRadius: 14, flexShrink: 0,
-                          background: active ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : 'linear-gradient(135deg, #F1F5F9, #E2E8F0)',
+                          background: active ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : (isLight ? 'linear-gradient(135deg, #F1F5F9, #E2E8F0)' : 'rgba(255,255,255,0.06)'),
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           boxShadow: active ? '0 6px 16px rgba(79,70,229,0.3)' : '0 1px 3px rgba(0,0,0,0.06)',
                           transition: `all 0.3s ${ease}`,
                         }}>
-                          <Icon size={24} color={active ? '#fff' : '#64748B'} strokeWidth={1.7} />
+                          <Icon size={24} color={active ? '#fff' : 'var(--ts)'} strokeWidth={1.7} />
                         </div>
                         <div style={{ flex: 1 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                            <span style={{ fontSize: 17, fontWeight: 750, color: '#0F172A' }}>{addon.name}</span>
+                            <span style={{ fontSize: 17, fontWeight: 750, color: 'var(--t)' }}>{addon.name}</span>
                             {addon.badge && <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 12px', borderRadius: 12, background: 'linear-gradient(135deg, #ECFDF5, #D1FAE5)', color: '#059669', letterSpacing: '0.02em', boxShadow: '0 1px 4px rgba(16,185,129,0.1)' }}>{addon.badge}</span>}
                           </div>
-                          <div style={{ fontSize: 14, color: '#64748B', lineHeight: 1.5 }}>{addon.description}</div>
+                          <div style={{ fontSize: 14, color: 'var(--ts)', lineHeight: 1.5 }}>{addon.description}</div>
                         </div>
                         <div style={{ textAlign: 'right', flexShrink: 0, marginRight: 6 }}>
                           {addon.price ? (
-                            <div><span style={{ fontSize: 20, fontWeight: 850, color: active ? '#4F46E5' : '#0F172A', transition: `color 0.25s ${easeOut}` }}>{addon.price} zł</span><span style={{ fontSize: 13, color: '#94A3B8' }}> / msc</span></div>
+                            <div><span style={{ fontSize: 20, fontWeight: 850, color: active ? '#4F46E5' : 'var(--t)', transition: `color 0.25s ${easeOut}` }}>{addon.price} zł</span><span style={{ fontSize: 13, color: 'var(--tm)' }}> / msc</span></div>
                           ) : (
                             <div style={{ fontSize: 15, fontWeight: 750, color: '#059669' }}>Gratis</div>
                           )}
                         </div>
                         <div style={{
                           width: 44, height: 26, borderRadius: 13, padding: 2, flexShrink: 0,
-                          background: active ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : '#E2E8F0',
+                          background: active ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : (isLight ? '#E2E8F0' : 'rgba(255,255,255,0.1)'),
                           transition: `all 0.35s ${ease}`,
                           boxShadow: active ? '0 2px 8px rgba(79,70,229,0.35)' : 'inset 0 1px 3px rgba(0,0,0,0.1)',
                         }}>
@@ -1053,22 +1062,22 @@ export default function ConfiguratorPage() {
          <div style={{ position: 'sticky', top: 88 }}>
           <div style={{
             padding: 36, borderRadius: 24,
-            background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(24px) saturate(1.8)',
-            border: '1px solid rgba(0,0,0,0.06)',
+            background: isLight ? 'rgba(255,255,255,0.7)' : 'rgba(10,15,30,0.7)', backdropFilter: 'blur(24px) saturate(1.8)',
+            border: '1px solid var(--border)',
             boxShadow: '0 4px 40px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04), 0 20px 60px rgba(0,0,0,0.03)',
             transition: `box-shadow 0.4s ${easeOut}`,
           }}>
-            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0F172A', marginBottom: 20, letterSpacing: '-0.02em' }}>Twoja konfiguracja</h3>
+            <h3 style={{ fontSize: 18, fontWeight: 800, color: 'var(--t)', marginBottom: 20, letterSpacing: '-0.02em' }}>Twoja konfiguracja</h3>
 
             {/* Billing cycle toggle */}
-            <div style={{ display: 'flex', gap: 0, marginBottom: 24, background: '#F1F5F9', borderRadius: 12, padding: 3 }}>
+            <div style={{ display: 'flex', gap: 0, marginBottom: 24, background: isLight ? '#F1F5F9' : 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 3 }}>
               {(['monthly', 'yearly'] as const).map(cycle => {
                 const sel = billingCycle === cycle;
                 return (
                   <button key={cycle} onClick={() => setBillingCycle(cycle)} style={{
                     flex: 1, padding: '10px 12px', borderRadius: 10, border: 'none',
-                    background: sel ? '#fff' : 'transparent',
-                    color: sel ? '#0F172A' : '#64748B',
+                    background: sel ? 'var(--bg-card)' : 'transparent',
+                    color: sel ? 'var(--t)' : 'var(--ts)',
                     fontSize: 13, fontWeight: sel ? 700 : 500, cursor: 'pointer',
                     boxShadow: sel ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
                     transition: `all 0.25s ${ease}`,
@@ -1079,30 +1088,30 @@ export default function ConfiguratorPage() {
                 );
               })}
             </div>
-            {isYearly && <div style={{ fontSize: 12, color: '#64748B', marginBottom: 20, marginTop: -12, textAlign: 'center' }}>Większość firm wybiera rozliczenie roczne</div>}
+            {isYearly && <div style={{ fontSize: 12, color: 'var(--ts)', marginBottom: 20, marginTop: -12, textAlign: 'center' }}>Większość firm wybiera rozliczenie roczne</div>}
 
             {pricing.items.length === 0 ? (
               <div style={{ padding: '36px 0', textAlign: 'center', animation: `cfgFadeIn 0.4s ${ease}` }}>
-                <div style={{ width: 60, height: 60, borderRadius: 18, background: 'linear-gradient(135deg, #F1F5F9, #E2E8F0)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+                <div style={{ width: 60, height: 60, borderRadius: 18, background: isLight ? 'linear-gradient(135deg, #F1F5F9, #E2E8F0)' : 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
                   <Package size={26} color="#94A3B8" />
                 </div>
-                <div style={{ fontSize: 15, color: '#94A3B8', fontWeight: 500 }}>Wybierz moduły,<br />aby zobaczyć wycenę</div>
+                <div style={{ fontSize: 15, color: 'var(--tm)', fontWeight: 500 }}>Wybierz moduły,<br />aby zobaczyć wycenę</div>
               </div>
             ) : (
               <div style={{ marginBottom: 28 }}>
                 {pricing.items.map((item, i) => (
                   <div key={i} style={{
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 8px',
-                    borderBottom: '1px solid #F1F5F9',
+                    borderBottom: '1px solid var(--border)',
                     animation: `cfgSlideUp 0.35s ${ease} ${i * 50}ms both`,
                     background: flashItems.has(i) ? 'rgba(79,70,229,0.04)' : 'transparent',
                     transition: 'background 0.4s ease', borderRadius: 8, marginLeft: -8, marginRight: -8,
                   }}>
                     <div>
-                      <span style={{ fontSize: 14, color: '#334155', fontWeight: 500, display: 'block' }}>{item.name}</span>
-                      {item.sub && <span style={{ fontSize: 12, color: '#94A3B8', fontWeight: 450, display: 'block', marginTop: 2 }}>{item.sub}</span>}
+                      <span style={{ fontSize: 14, color: 'var(--t)', fontWeight: 500, display: 'block' }}>{item.name}</span>
+                      {item.sub && <span style={{ fontSize: 12, color: 'var(--tm)', fontWeight: 450, display: 'block', marginTop: 2 }}>{item.sub}</span>}
                     </div>
-                    <span style={{ fontSize: 14, fontWeight: 750, color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}>{item.price} zł</span>
+                    <span style={{ fontSize: 14, fontWeight: 750, color: 'var(--t)', fontVariantNumeric: 'tabular-nums' }}>{item.price} zł</span>
                   </div>
                 ))}
               </div>
@@ -1135,23 +1144,23 @@ export default function ConfiguratorPage() {
                     <div style={{ position: 'relative' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
                         <span style={{ fontSize: 14, fontWeight: 500, color: '#064E3B' }}>Po 14 dniach:</span>
-                        <span style={{ fontSize: 24, fontWeight: 900, color: '#0F172A', fontVariantNumeric: 'tabular-nums', transform: pricePulse ? 'scale(1.06)' : 'scale(1)', transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)', display: 'inline-block' }}>
-                          <AnimatedPrice value={yearlyMonthEq} /> zł<span style={{ fontSize: 13, fontWeight: 400, color: '#94A3B8' }}> / msc</span>
+                        <span style={{ fontSize: 24, fontWeight: 900, color: 'var(--t)', fontVariantNumeric: 'tabular-nums', transform: pricePulse ? 'scale(1.06)' : 'scale(1)', transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)', display: 'inline-block' }}>
+                          <AnimatedPrice value={yearlyMonthEq} /> zł<span style={{ fontSize: 13, fontWeight: 400, color: 'var(--tm)' }}> / msc</span>
                         </span>
                       </div>
-                      <div style={{ textAlign: 'right', fontSize: 12, color: '#64748B', marginBottom: 8 }}>
+                      <div style={{ textAlign: 'right', fontSize: 12, color: 'var(--ts)', marginBottom: 8 }}>
                         przy płatności rocznej
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                         <span style={{ fontSize: 13, color: '#064E3B', fontWeight: 500 }}>Razem za rok:</span>
                         <div style={{ textAlign: 'right' }}>
-                          <span style={{ fontSize: 18, fontWeight: 850, color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}><AnimatedPrice value={yearlyDisc} /> zł</span>
+                          <span style={{ fontSize: 18, fontWeight: 850, color: 'var(--t)', fontVariantNumeric: 'tabular-nums' }}><AnimatedPrice value={yearlyDisc} /> zł</span>
                         </div>
                       </div>
                       {m > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: 12, color: '#94A3B8' }}>Bez rabatu:</span>
-                          <span style={{ fontSize: 13, color: '#94A3B8', textDecoration: 'line-through', fontVariantNumeric: 'tabular-nums' }}>{yearlyBase} zł</span>
+                          <span style={{ fontSize: 12, color: 'var(--tm)' }}>Bez rabatu:</span>
+                          <span style={{ fontSize: 13, color: 'var(--tm)', textDecoration: 'line-through', fontVariantNumeric: 'tabular-nums' }}>{yearlyBase} zł</span>
                         </div>
                       )}
                       {yearlySave > 0 && (
@@ -1164,8 +1173,8 @@ export default function ConfiguratorPage() {
                   ) : (
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', position: 'relative' }}>
                       <span style={{ fontSize: 14, fontWeight: 500, color: '#064E3B' }}>Po 14 dniach:</span>
-                      <span style={{ fontSize: 22, fontWeight: 850, color: '#0F172A', fontVariantNumeric: 'tabular-nums', transform: pricePulse ? 'scale(1.08)' : 'scale(1)', transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)', display: 'inline-block' }}>
-                        <AnimatedPrice value={m} /> zł <span style={{ fontSize: 14, fontWeight: 400, color: '#94A3B8' }}>/ msc</span>
+                      <span style={{ fontSize: 22, fontWeight: 850, color: 'var(--t)', fontVariantNumeric: 'tabular-nums', transform: pricePulse ? 'scale(1.08)' : 'scale(1)', transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)', display: 'inline-block' }}>
+                        <AnimatedPrice value={m} /> zł <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--tm)' }}>/ msc</span>
                       </span>
                     </div>
                   )}
@@ -1173,7 +1182,7 @@ export default function ConfiguratorPage() {
               );
             })()}
             <div style={{ textAlign: 'right', marginBottom: 20 }}>
-              <span style={{ fontSize: 11, color: '#94A3B8', fontWeight: 500 }}>Wszystkie ceny netto</span>
+              <span style={{ fontSize: 11, color: 'var(--tm)', fontWeight: 500 }}>Wszystkie ceny netto</span>
             </div>
 
             {/* CTA */}
@@ -1195,19 +1204,19 @@ export default function ConfiguratorPage() {
               {isYearly ? 'Rozpocznij za darmo i oszczędź 10%' : 'Rozpocznij za darmo'} {!isYearly && <span style={{ opacity: 0.65, fontWeight: 500 }}>(14 dni)</span>} <ArrowRight size={18} />
             </Link>
 
-            <p style={{ textAlign: 'center', fontSize: 12, color: '#94A3B8', marginTop: 12, fontWeight: 450, lineHeight: 1.5 }}>
+            <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--tm)', marginTop: 12, fontWeight: 450, lineHeight: 1.5 }}>
               Możesz zacząć za darmo i skonfigurować wszystko z nami bezpłatnie.
             </p>
 
             <button style={{
               width: '100%', padding: '15px 20px', borderRadius: 16, marginTop: 12,
-              border: '1px solid #E2E8F0', background: 'rgba(255,255,255,0.8)',
-              color: '#334155', fontSize: 14, fontWeight: 650, cursor: 'pointer',
+              border: '1px solid var(--border)', background: isLight ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.04)',
+              color: 'var(--t)', fontSize: 14, fontWeight: 650, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               transition: `all 0.25s ${ease}`, backdropFilter: 'blur(8px)',
             }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = '#A5B4FC'; e.currentTarget.style.background = 'linear-gradient(135deg, #F5F3FF, #EEF2FF)'; e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(79,70,229,0.08)'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.background = 'rgba(255,255,255,0.8)'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = '#A5B4FC'; e.currentTarget.style.background = isLight ? 'linear-gradient(135deg, #F5F3FF, #EEF2FF)' : 'rgba(79,70,229,0.08)'; e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(79,70,229,0.08)'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.background = isLight ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.04)'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
               onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.98)'; }}
               onMouseUp={e => { e.currentTarget.style.transform = 'translateY(-1px)'; }}
             >
@@ -1221,7 +1230,7 @@ export default function ConfiguratorPage() {
                   <div style={{ width: 18, height: 18, borderRadius: 5, background: 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <Check size={11} color="#059669" strokeWidth={3} />
                   </div>
-                  <span style={{ fontSize: 13, color: '#64748B', fontWeight: 475 }}>{t}</span>
+                  <span style={{ fontSize: 13, color: 'var(--ts)', fontWeight: 475 }}>{t}</span>
                 </div>
               ))}
             </div>
@@ -1231,16 +1240,16 @@ export default function ConfiguratorPage() {
           {activeModules.size > 0 && (
             <div style={{
               marginTop: 20, padding: '28px 28px', borderRadius: 20, textAlign: 'center',
-              background: 'linear-gradient(160deg, #EEF2FF 0%, #F5F3FF 40%, #fff 100%)',
+              background: isLight ? 'linear-gradient(160deg, #EEF2FF 0%, #F5F3FF 40%, #fff 100%)' : 'rgba(79,70,229,0.06)',
               border: '1px solid rgba(99,102,241,0.1)',
               boxShadow: '0 2px 16px rgba(79,70,229,0.06)',
               animation: `cfgSlideUp 0.4s ${ease}`,
             }}>
               <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#818CF8', marginBottom: 8 }}>Podgląd działania</div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em', marginBottom: 6 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--t)', letterSpacing: '-0.02em', marginBottom: 6 }}>
                 Jak to będzie działać?
               </div>
-              <div style={{ fontSize: 13, color: '#64748B', marginBottom: 18, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 13, color: 'var(--ts)', marginBottom: 18, lineHeight: 1.5 }}>
                 Interaktywny scenariusz na podstawie Twojej konfiguracji.
               </div>
               <button onClick={() => setScenarioOpen(true)} style={{

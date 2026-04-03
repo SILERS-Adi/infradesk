@@ -3,8 +3,11 @@ import { Link, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Lock, ArrowLeft, CheckCircle, Loader2 } from 'lucide-react';
 import { authApi } from '../../api/auth';
+import { useTheme } from '../../store/themeStore';
 
 export function ResetPasswordPage() {
+  const { resolved } = useTheme();
+  const isLight = resolved === 'light';
   const [params] = useSearchParams();
   const token = params.get('token') || '';
   const [password, setPassword] = useState('');
@@ -29,9 +32,9 @@ export function ResetPasswordPage() {
 
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#040a16' }}>
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--bg)' }}>
         <div className="text-center">
-          <p className="text-white/60 mb-4">Brak tokenu resetowania w linku.</p>
+          <p className="mb-4" style={{ color: 'var(--ts)' }}>Brak tokenu resetowania w linku.</p>
           <Link to="/login" className="text-violet-400 text-sm hover:underline">Powrót do logowania</Link>
         </div>
       </div>
@@ -39,17 +42,17 @@ export function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#040a16' }}>
-      <div className="absolute inset-0" style={{ background: 'linear-gradient(160deg, #060B1A 0%, #040a16 50%, #0D1525 100%)' }} />
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--bg)' }}>
+      <div className="absolute inset-0" style={{ background: isLight ? 'var(--bg)' : 'linear-gradient(160deg, #060B1A 0%, #040a16 50%, #0D1525 100%)' }} />
 
       <div className="w-full max-w-[420px] relative z-10">
         <div className="text-center mb-8">
-          <img src="/logo.png" alt="InfraDesk" style={{ height: 100, margin: '0 auto 12px' }} />
+          <img src={isLight ? '/logo-dark.png' : '/logo.png'} alt="InfraDesk" style={{ height: 100, margin: '0 auto 12px' }} />
         </div>
 
         <div className="rounded-[22px] overflow-hidden" style={{
-          background: 'rgba(255,255,255,0.025)',
-          border: '1px solid rgba(255,255,255,0.06)',
+          background: isLight ? 'var(--bg-card)' : 'rgba(255,255,255,0.025)',
+          border: '1px solid var(--border)',
           backdropFilter: 'blur(16px)',
         }}>
           <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #6D28D9, #2563EB, transparent)' }} />
@@ -60,8 +63,8 @@ export function ResetPasswordPage() {
                   style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)' }}>
                   <CheckCircle className="h-8 w-8" style={{ color: '#22C55E' }} />
                 </div>
-                <h2 className="text-[20px] font-semibold text-white/90 mb-2">Hasło zmienione</h2>
-                <p className="text-[13px] mb-6" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                <h2 className="text-[20px] font-semibold text-[color:var(--t)] mb-2">Hasło zmienione</h2>
+                <p className="text-[13px] mb-6" style={{ color: 'var(--tm)' }}>
                   Możesz teraz zalogować się nowym hasłem.
                 </p>
                 <Link to="/login"
@@ -72,33 +75,33 @@ export function ResetPasswordPage() {
               </div>
             ) : (
               <>
-                <h2 className="text-[22px] font-semibold text-white/90 mb-1">Nowe hasło</h2>
-                <p className="text-[13px] mb-6" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                <h2 className="text-[22px] font-semibold text-[color:var(--t)] mb-1">Nowe hasło</h2>
+                <p className="text-[13px] mb-6" style={{ color: 'var(--ts)' }}>
                   Ustaw nowe hasło do swojego konta
                 </p>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
-                    <label className="block text-[11px] font-medium uppercase tracking-[0.08em] mb-2" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                    <label className="block text-[11px] font-medium uppercase tracking-[0.08em] mb-2" style={{ color: 'var(--ts)' }}>
                       Nowe hasło
                     </label>
                     <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'rgba(255,255,255,0.2)' }} />
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--td)' }} />
                       <input type="password" placeholder="Min. 6 znaków" value={password}
                         onChange={e => setPassword(e.target.value)}
-                        className="w-full pl-11 pr-4 py-[14px] rounded-[14px] text-[14px] outline-none placeholder:text-white/20"
-                        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.9)' }} />
+                        className="w-full pl-11 pr-4 py-[14px] rounded-[14px] text-[14px] outline-none placeholder:opacity-30"
+                        style={{ background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--t)' }} />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium uppercase tracking-[0.08em] mb-2" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                    <label className="block text-[11px] font-medium uppercase tracking-[0.08em] mb-2" style={{ color: 'var(--ts)' }}>
                       Powtórz hasło
                     </label>
                     <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'rgba(255,255,255,0.2)' }} />
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--td)' }} />
                       <input type="password" placeholder="Powtórz hasło" value={confirm}
                         onChange={e => setConfirm(e.target.value)}
-                        className="w-full pl-11 pr-4 py-[14px] rounded-[14px] text-[14px] outline-none placeholder:text-white/20"
-                        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.9)' }} />
+                        className="w-full pl-11 pr-4 py-[14px] rounded-[14px] text-[14px] outline-none placeholder:opacity-30"
+                        style={{ background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--t)' }} />
                     </div>
                   </div>
                   <button type="submit" disabled={loading}
@@ -113,11 +116,11 @@ export function ResetPasswordPage() {
 
             <div className="mt-6 text-center">
               <Link to="/login" className="inline-flex items-center gap-1.5 text-[12px] transition-colors hover:text-violet-400"
-                style={{ color: 'rgba(255,255,255,0.3)' }}>
+                style={{ color: 'var(--tm)' }}>
                 <ArrowLeft className="h-3.5 w-3.5" /> Powrót do logowania
               </Link>
             </div>
-            <p className="text-center text-[10px] mt-6" style={{ color: 'rgba(255,255,255,0.15)' }}>
+            <p className="text-center text-[10px] mt-6" style={{ color: 'var(--td)' }}>
               InfraDesk © {new Date().getFullYear()} · by SILERS
             </p>
           </div>

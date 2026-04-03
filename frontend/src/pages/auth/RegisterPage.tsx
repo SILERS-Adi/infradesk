@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Building2, User, ArrowRight, Eye, EyeOff, Check, Loader2, Globe } from 'lucide-react';
 import { authApi } from '../../api/auth';
+import { useTheme } from '../../store/themeStore';
 
 type AccountType = 'company' | 'personal';
 
@@ -16,6 +17,8 @@ function slugify(text: string): string {
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const { resolved } = useTheme();
+  const isLight = resolved === 'light';
 
   const [accountType, setAccountType] = useState<AccountType>('company');
   const [firstName, setFirstName] = useState('');
@@ -93,31 +96,34 @@ export default function RegisterPage() {
 
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '14px 16px', borderRadius: 12,
-    border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)',
-    color: '#fff', fontSize: 14, fontWeight: 500, outline: 'none',
+    border: '1px solid var(--border)', background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)',
+    color: 'var(--t)', fontSize: 14, fontWeight: 500, outline: 'none',
     transition: 'all 0.2s ease',
   };
 
   const labelStyle: React.CSSProperties = {
-    fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)', marginBottom: 6, display: 'block',
+    fontSize: 12, fontWeight: 600, color: 'var(--ts)', marginBottom: 6, display: 'block',
   };
 
+  const inputFocusBorder = 'rgba(99,102,241,0.4)';
+  const inputBlurBorder = 'var(--border)';
+
   return (
-    <div style={{ minHeight: '100vh', background: '#040a16', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--t)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       {/* Background glow */}
-      <div style={{ position: 'fixed', top: -200, left: '20%', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle, rgba(79,70,229,0.06) 0%, transparent 70%)', pointerEvents: 'none' }} />
-      <div style={{ position: 'fixed', bottom: -100, right: '10%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(124,58,237,0.04) 0%, transparent 70%)', pointerEvents: 'none' }} />
+      <div style={{ position: 'fixed', top: -200, left: '20%', width: 600, height: 600, borderRadius: '50%', background: `radial-gradient(circle, rgba(79,70,229,${isLight ? '0.04' : '0.06'}) 0%, transparent 70%)`, pointerEvents: 'none' }} />
+      <div style={{ position: 'fixed', bottom: -100, right: '10%', width: 400, height: 400, borderRadius: '50%', background: `radial-gradient(circle, rgba(124,58,237,${isLight ? '0.03' : '0.04'}) 0%, transparent 70%)`, pointerEvents: 'none' }} />
 
       <div style={{ width: '100%', maxWidth: 480, position: 'relative', zIndex: 1 }}>
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
-          <img src="/logo.png" alt="InfraDesk" style={{ height: 60, objectFit: 'contain', marginBottom: 12 }} />
-          <div style={{ fontSize: 20, fontWeight: 800, color: 'rgba(255,255,255,0.9)', letterSpacing: '-0.02em' }}>Utwórz konto</div>
-          <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>14 dni za darmo — bez karty</div>
+          <img src={isLight ? '/logo-dark.png' : '/logo.png'} alt="InfraDesk" style={{ height: 60, objectFit: 'contain', marginBottom: 12 }} />
+          <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--t)', letterSpacing: '-0.02em', opacity: 0.9 }}>Utwórz konto</div>
+          <div style={{ fontSize: 14, color: 'var(--tm)', marginTop: 4 }}>14 dni za darmo — bez karty</div>
         </div>
 
         {/* Account type toggle */}
-        <div style={{ display: 'flex', gap: 0, background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 3, marginBottom: 28, border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ display: 'flex', gap: 0, background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 3, marginBottom: 28, border: `1px solid var(--border)` }}>
           {([
             { id: 'company' as const, label: 'Firma', icon: Building2 },
             { id: 'personal' as const, label: 'Osoba prywatna', icon: User },
@@ -128,7 +134,7 @@ export default function RegisterPage() {
               <button key={t.id} onClick={() => setAccountType(t.id)} style={{
                 flex: 1, padding: '12px 16px', borderRadius: 12, border: 'none',
                 background: sel ? 'rgba(79,70,229,0.2)' : 'transparent',
-                color: sel ? '#A5B4FC' : 'rgba(255,255,255,0.4)',
+                color: sel ? '#A5B4FC' : 'var(--tm)',
                 fontSize: 14, fontWeight: sel ? 700 : 500, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 transition: `all 0.25s ${ease}`,
@@ -145,12 +151,12 @@ export default function RegisterPage() {
             <div style={{ marginBottom: 20, animation: 'regFadeIn 0.3s ease' }}>
               <label style={labelStyle}>Nazwa firmy</label>
               <input value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="np. PKS Garwolin Sp. z o.o."
-                style={inputStyle} onFocus={e => { e.target.style.borderColor = 'rgba(99,102,241,0.4)'; }} onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; }} />
+                style={inputStyle} onFocus={e => { e.target.style.borderColor = 'rgba(99,102,241,0.4)'; }} onBlur={e => { e.target.style.borderColor = ''; }} />
 
               <div style={{ marginTop: 16 }}>
                 <label style={labelStyle}>Krótka nazwa firmy <span style={{ color: '#EF4444' }}>*</span></label>
                 <input value={companyShortName} onChange={e => setCompanyShortName(e.target.value)} placeholder="np. PKS Garwolin" required minLength={3}
-                  style={inputStyle} onFocus={e => { e.target.style.borderColor = 'rgba(99,102,241,0.4)'; }} onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; }} />
+                  style={inputStyle} onFocus={e => { e.target.style.borderColor = 'rgba(99,102,241,0.4)'; }} onBlur={e => { e.target.style.borderColor = ''; }} />
                 {/* Subdomain preview */}
                 {slugPreview && (
                   <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -165,9 +171,9 @@ export default function RegisterPage() {
               </div>
 
               <div style={{ marginTop: 16 }}>
-                <label style={labelStyle}>NIP <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: 400 }}>(opcjonalnie)</span></label>
+                <label style={labelStyle}>NIP <span style={{ color: 'var(--td)', fontWeight: 400 }}>(opcjonalnie)</span></label>
                 <input value={taxId} onChange={e => setTaxId(e.target.value)} placeholder="np. 8261234567"
-                  style={inputStyle} onFocus={e => { e.target.style.borderColor = 'rgba(99,102,241,0.4)'; }} onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; }} />
+                  style={inputStyle} onFocus={e => { e.target.style.borderColor = 'rgba(99,102,241,0.4)'; }} onBlur={e => { e.target.style.borderColor = ''; }} />
               </div>
             </div>
           )}
@@ -177,25 +183,25 @@ export default function RegisterPage() {
             <div>
               <label style={labelStyle}>Imię <span style={{ color: '#EF4444' }}>*</span></label>
               <input value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Jan" required minLength={2}
-                style={inputStyle} onFocus={e => { e.target.style.borderColor = 'rgba(99,102,241,0.4)'; }} onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; }} />
+                style={inputStyle} onFocus={e => { e.target.style.borderColor = 'rgba(99,102,241,0.4)'; }} onBlur={e => { e.target.style.borderColor = ''; }} />
             </div>
             <div>
               <label style={labelStyle}>Nazwisko <span style={{ color: '#EF4444' }}>*</span></label>
               <input value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Kowalski" required minLength={2}
-                style={inputStyle} onFocus={e => { e.target.style.borderColor = 'rgba(99,102,241,0.4)'; }} onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; }} />
+                style={inputStyle} onFocus={e => { e.target.style.borderColor = 'rgba(99,102,241,0.4)'; }} onBlur={e => { e.target.style.borderColor = ''; }} />
             </div>
           </div>
 
           <div style={{ marginBottom: 16 }}>
             <label style={labelStyle}>Email <span style={{ color: '#EF4444' }}>*</span></label>
             <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="jan@firma.pl" required
-              style={inputStyle} onFocus={e => { e.target.style.borderColor = 'rgba(99,102,241,0.4)'; }} onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; }} />
+              style={inputStyle} onFocus={e => { e.target.style.borderColor = 'rgba(99,102,241,0.4)'; }} onBlur={e => { e.target.style.borderColor = ''; }} />
           </div>
 
           <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>Telefon <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: 400 }}>(opcjonalnie)</span></label>
+            <label style={labelStyle}>Telefon <span style={{ color: 'var(--td)', fontWeight: 400 }}>(opcjonalnie)</span></label>
             <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+48 500 000 000"
-              style={inputStyle} onFocus={e => { e.target.style.borderColor = 'rgba(99,102,241,0.4)'; }} onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; }} />
+              style={inputStyle} onFocus={e => { e.target.style.borderColor = 'rgba(99,102,241,0.4)'; }} onBlur={e => { e.target.style.borderColor = ''; }} />
           </div>
 
           <div style={{ marginBottom: 28 }}>
@@ -204,10 +210,10 @@ export default function RegisterPage() {
               <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
                 placeholder="Min. 8 znaków, wielka litera, cyfra, znak specjalny" required minLength={8}
                 style={{ ...inputStyle, paddingRight: 44 }}
-                onFocus={e => { e.target.style.borderColor = 'rgba(99,102,241,0.4)'; }} onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; }} />
+                onFocus={e => { e.target.style.borderColor = 'rgba(99,102,241,0.4)'; }} onBlur={e => { e.target.style.borderColor = ''; }} />
               <button type="button" onClick={() => setShowPassword(!showPassword)}
                 style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
-                {showPassword ? <EyeOff size={16} color="rgba(255,255,255,0.3)" /> : <Eye size={16} color="rgba(255,255,255,0.3)" />}
+                {showPassword ? <EyeOff size={16} color="var(--tm)" /> : <Eye size={16} color="var(--tm)" />}
               </button>
             </div>
           </div>
@@ -231,12 +237,12 @@ export default function RegisterPage() {
 
         {/* Footer */}
         <div style={{ textAlign: 'center', marginTop: 24 }}>
-          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>Masz już konto? </span>
+          <span style={{ fontSize: 13, color: 'var(--tm)' }}>Masz już konto? </span>
           <Link to="/login" style={{ fontSize: 13, fontWeight: 600, color: '#818CF8', textDecoration: 'none' }}>Zaloguj się</Link>
         </div>
 
         {isCompany && (
-          <div style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: 'rgba(255,255,255,0.25)', lineHeight: 1.6 }}>
+          <div style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: 'var(--td)', lineHeight: 1.6 }}>
             Po rejestracji Twoja firma będzie dostępna pod<br />
             <span style={{ color: '#818CF8', fontFamily: 'monospace' }}>{slugPreview || 'nazwafirmy'}.infradesk.pl</span>
           </div>
