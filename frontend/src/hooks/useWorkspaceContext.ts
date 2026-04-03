@@ -33,9 +33,9 @@ export function useWorkspaceContext() {
   const canManageUsers = !isPreview && (isOwner || role === 'ADMIN');
   const canManageSettings = !isPreview && (isOwner || role === 'ADMIN');
 
-  // Module access
-  const allowedModules = current?.allowedModules ?? null;
-  const hasModule = (mod: string) => !allowedModules || allowedModules.includes(mod);
+  // Module access — workspace-level enabledModules
+  const enabledModules = current?.enabledModules ?? ['helpdesk'];
+  const hasModule = (mod: string) => enabledModules.includes(mod);
 
   return {
     workspace: current,

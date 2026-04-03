@@ -17,6 +17,7 @@ export interface WorkspaceMembership {
   source: string;
   isDefault: boolean;
   allowedModules: string[] | null;
+  enabledModules: string[];
   managedBy: string | null;
 }
 

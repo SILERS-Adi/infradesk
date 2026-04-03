@@ -28,6 +28,7 @@ interface NavGroup {
   label: string;
   items: NavItem[];
   role?: 'ADMIN' | 'SUPERADMIN';
+  module?: string; // if set, group only visible when module enabled for workspace
 }
 
 interface SidebarProps {
@@ -39,7 +40,7 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) {
   const { user } = useAuth();
-  const isAdmin = useWorkspaceContext().isAdmin;
+  const { isAdmin, hasModule } = useWorkspaceContext();
   const isSuperAdmin = !!user?.isSuperAdmin;
 
   const { data: queueTickets = [] } = useQuery({
@@ -112,6 +113,7 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
     // ── FAKTURY ──
     {
       label: 'FAKTURY',
+      module: 'invoicing',
       items: [
         { to: '/invoicing', label: 'Dashboard', icon: <LayoutDashboard className="nav-icon" /> },
         { to: '/invoicing/documents', label: 'Dokumenty', icon: <FileText className="nav-icon" /> },
@@ -127,6 +129,7 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
     // ── PAKOWANIE ──
     {
       label: 'PAKOWANIE',
+      module: 'packaging',
       items: [
         { to: '/packaging', label: 'Dashboard', icon: <LayoutDashboard className="nav-icon" /> },
         { to: '/packaging/orders', label: 'Zamówienia', icon: <Package className="nav-icon" /> },
@@ -140,6 +143,7 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
     // ── SERWIS SKP ──
     {
       label: 'SERWIS SKP',
+      module: 'service',
       items: [
         { to: '/service', label: 'Dashboard', icon: <LayoutDashboard className="nav-icon" /> },
         { to: '/service/inspections', label: 'Przeglądy', icon: <ClipboardCheck className="nav-icon" /> },
@@ -173,6 +177,7 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
   ];
 
   const canSeeGroup = (group: NavGroup) => {
+    if (group.module && !hasModule(group.module)) return false;
     if (!group.role) return true;
     if (group.role === 'ADMIN') return isAdmin;
     if (group.role === 'SUPERADMIN') return isSuperAdmin;

@@ -192,7 +192,7 @@ app.get('/api/workspaces/my', authenticate, async (req, res, next) => {
         workspace: {
           select: {
             id: true, name: true, slug: true, type: true, plan: true,
-            logoUrl: true, primaryColor: true, isActive: true,
+            logoUrl: true, primaryColor: true, isActive: true, enabledModules: true,
             managedBy: {
               where: { status: 'ACTIVE' },
               select: { mspWorkspace: { select: { id: true, name: true, slug: true } } },
@@ -217,6 +217,7 @@ app.get('/api/workspaces/my', authenticate, async (req, res, next) => {
       source: m.source,
       isDefault: m.isDefault,
       allowedModules: m.allowedModules,
+      enabledModules: m.workspace.enabledModules ?? ['helpdesk'],
       managedBy: (m.workspace.managedBy as any)?.[0]?.mspWorkspace?.name ?? null,
     }));
 

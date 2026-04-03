@@ -57,6 +57,7 @@ export default function SATenantsPage() {
       email: ws.email || '', phone: ws.phone || '', website: ws.website || '',
       addressLine1: ws.addressLine1 || '', postalCode: ws.postalCode || '', city: ws.city || '', country: ws.country || 'PL',
       maxAgents: ws.maxAgents ?? 10, maxUsers: ws.maxUsers ?? 5,
+      enabledModules: ws.enabledModules ?? ['helpdesk'],
       isActive: ws.isActive,
     });
   };
@@ -278,6 +279,35 @@ export default function SATenantsPage() {
                 </div>
               </div>
             </div>
+
+              <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--td)', marginTop: 8 }}>MODUŁY</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {[
+                  { id: 'helpdesk', label: 'Helpdesk' },
+                  { id: 'invoicing', label: 'Faktury' },
+                  { id: 'packaging', label: 'Pakowanie' },
+                  { id: 'service', label: 'Serwis SKP' },
+                ].map(mod => {
+                  const enabled = (editData.enabledModules || []).includes(mod.id);
+                  return (
+                    <label key={mod.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
+                      background: enabled ? 'rgba(99,102,241,0.12)' : 'var(--hover-bg)',
+                      border: `1px solid ${enabled ? 'rgba(99,102,241,0.3)' : 'var(--border)'}`,
+                      fontSize: 12, fontWeight: 600, color: enabled ? 'var(--accent)' : 'var(--tm)',
+                    }}>
+                      <input type="checkbox" checked={enabled}
+                        onChange={() => {
+                          const mods = editData.enabledModules || [];
+                          setEditData({ ...editData, enabledModules: enabled ? mods.filter((m: string) => m !== mod.id) : [...mods, mod.id] });
+                        }}
+                        style={{ accentColor: 'var(--accent)' }} />
+                      {mod.label}
+                    </label>
+                  );
+                })}
+              </div>
+
             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
               <button onClick={() => setEditId(null)} style={{
                 flex: 1, padding: '10px 16px', borderRadius: 10, border: '1px solid var(--border)',
