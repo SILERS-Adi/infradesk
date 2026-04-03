@@ -474,8 +474,8 @@ function ScenarioModal({ open, steps, onClose }: { open: boolean; steps: Scenari
               <div style={{ fontSize: 15, color: '#64748B', marginBottom: 36 }}>
                 System robi to za Ciebie. Codziennie, bezbłędnie, bez wysiłku.
               </div>
-              <button onClick={onClose} style={{
-                padding: '18px 48px', borderRadius: 16, border: 'none',
+              <a href="/register" style={{
+                padding: '18px 48px', borderRadius: 16, border: 'none', textDecoration: 'none',
                 background: 'linear-gradient(135deg, #4F46E5, #6D28D9)', color: '#fff',
                 fontSize: 16, fontWeight: 750, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 10,
                 boxShadow: '0 6px 20px rgba(79,70,229,0.35)',
@@ -487,7 +487,7 @@ function ScenarioModal({ open, steps, onClose }: { open: boolean; steps: Scenari
                 onMouseUp={e => { e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)'; }}
               >
                 Rozpocznij za darmo <span style={{ opacity: 0.6 }}>(14 dni)</span> <ArrowRight size={18} />
-              </button>
+              </a>
             </div>
           ) : (
             /* ── Step display ── */
@@ -1177,8 +1177,8 @@ export default function ConfiguratorPage() {
             </div>
 
             {/* CTA */}
-            <button className="cfg-cta-btn" style={{
-              width: '100%', padding: '18px 20px', borderRadius: 16, border: 'none',
+            <Link to="/register" className="cfg-cta-btn" style={{
+              width: '100%', padding: '18px 20px', borderRadius: 16, border: 'none', textDecoration: 'none',
               background: 'linear-gradient(135deg, #4F46E5 0%, #6D28D9 100%)',
               color: '#fff', fontSize: 16, fontWeight: 750, cursor: 'pointer', letterSpacing: '-0.01em',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
@@ -1193,7 +1193,7 @@ export default function ConfiguratorPage() {
               onMouseUp={e => { e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)'; e.currentTarget.style.boxShadow = '0 10px 28px rgba(79,70,229,0.4), 0 4px 8px rgba(79,70,229,0.15), 0 0 40px rgba(99,102,241,0.15)'; }}
             >
               {isYearly ? 'Rozpocznij za darmo i oszczędź 10%' : 'Rozpocznij za darmo'} {!isYearly && <span style={{ opacity: 0.65, fontWeight: 500 }}>(14 dni)</span>} <ArrowRight size={18} />
-            </button>
+            </Link>
 
             <p style={{ textAlign: 'center', fontSize: 12, color: '#94A3B8', marginTop: 12, fontWeight: 450, lineHeight: 1.5 }}>
               Możesz zacząć za darmo i skonfigurować wszystko z nami bezpłatnie.
