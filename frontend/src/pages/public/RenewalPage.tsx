@@ -82,18 +82,28 @@ export default function RenewalPage() {
     navigate(`/konfigurator?mode=renewal${configParam ? `&config=${configParam}` : ''}`);
   };
 
-  const handlePayOnline = () => {
-    toast('Płatność online — wkrótce dostępna', { icon: '🔜' });
-    // TODO: Stripe/payment integration
+  const handlePayOnline = async () => {
+    try {
+      const res = await apiClient.post('/billing/create-payment', {
+        workspaceId: current?.workspaceId,
+        billingCycle: sub.billingCycle,
+        amount: sub.billingCycle === 'YEARLY' ? Math.round(sub.monthlyPrice * 12 * 0.9) : sub.monthlyPrice,
+      });
+      if (res.data.message) toast(res.data.message, { icon: '💳', duration: 5000 });
+    } catch {
+      toast.error('Nie udało się zainicjować płatności');
+    }
   };
 
+  const [sendingProforma, setSendingProforma] = useState(false);
   const handleProforma = async () => {
+    setSendingProforma(true);
     try {
-      toast.success('Proforma wysłana na adres email workspace');
-      // TODO: backend endpoint to generate and send proforma
+      const res = await apiClient.post('/billing/send-proforma', { workspaceId: current?.workspaceId });
+      toast.success(`Proforma wysłana na ${res.data.sentTo || 'adres email'}`);
     } catch {
       toast.error('Nie udało się wysłać proformy');
-    }
+    } finally { setSendingProforma(false); }
   };
 
   return (
