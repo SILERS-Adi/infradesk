@@ -153,19 +153,19 @@ export function UnifiedTicketWizard({ open, onClose, onSuccess, defaultClientId,
     queryFn: () => clientsApi.getOne(defaultClientId!),
     enabled: !!defaultClientId && !selectedClient,
   });
+  // In workspace model, locations/devices/users are workspace-scoped (X-Workspace-Id header)
   const { data: locations = [] } = useQuery({
-    queryKey: ['locations', { clientId }],
-    queryFn: () => locationsApi.getAll({ clientId }),
-    enabled: !!clientId,
+    queryKey: ['locations-wizard'],
+    queryFn: () => locationsApi.getAll(),
   });
   const { data: devices = [] } = useQuery({
-    queryKey: ['devices', { clientId }],
-    queryFn: () => devicesApi.getAll({ clientId }),
-    enabled: !!clientId && selectedTypes.has('SERVICE'),
+    queryKey: ['devices-wizard'],
+    queryFn: () => devicesApi.getAll(),
+    enabled: selectedTypes.has('SERVICE'),
   });
   const { data: clientUsers = [] } = useQuery({
-    queryKey: ['users', { clientId }],
-    queryFn: () => usersApi.getAll({ clientId }),
+    queryKey: ['users-wizard'],
+    queryFn: () => usersApi.getAll(),
     enabled: !!clientId,
   });
   const { data: staffUsers = [] } = useQuery({
@@ -204,7 +204,7 @@ export function UnifiedTicketWizard({ open, onClose, onSuccess, defaultClientId,
   // ── Step navigation ────────────────────────────────────────────────────
   const getSteps = useCallback((): WizardStep[] => {
     const s: WizardStep[] = ['priority'];
-    if (!defaultClientId) s.push('client');
+    // Client step skipped — in workspace model, client = workspace (already selected)
     s.push('location', 'user', 'source', 'type_select');
     if (selectedTypes.has('SERVICE')) s.push('service_form');
     if (selectedTypes.has('ORDER')) s.push('order_form');
