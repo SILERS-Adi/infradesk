@@ -197,7 +197,7 @@ export function PublicDownloadsPage() {
   const APPS: AppCard[] = [
     { icon: <Monitor className="h-6 w-6" />, name: 'Asystent Home', description: 'Dla użytkowników domowych. Monitoring, czyszczenie systemu, audyt bezpieczeństwa, pomoc zdalna. Bezpłatny.', color: 'emerald',
       files: [
-        { label: 'Asystent Home — Windows', url: '/downloads/Asystent%20InfraDesk.exe', badge: 'v6.0.0', primary: true, size: '~40 MB' },
+        { label: 'Asystent Home — Windows', url: '/downloads/Asystent%20Home.exe', badge: 'v6.0.0', primary: true, size: '~40 MB' },
       ],
       notes: ['Wymaga Windows 10 lub nowszego', 'Monitoring, audyt, czyszczenie, pomoc zdalna', 'Bezpłatny dla użytkowników domowych'],
     },

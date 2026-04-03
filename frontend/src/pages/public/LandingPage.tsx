@@ -74,7 +74,7 @@ export default function LandingPage() {
 
         {/* Download cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
-          <a href="/downloads/Asystent%20InfraDesk.exe"
+          <a href="/downloads/Asystent%20Home.exe"
             className="group rounded-2xl p-5 text-left transition-all hover:scale-[1.02] active:scale-[0.98]"
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
             <div className="flex items-center gap-3 mb-3">
@@ -195,7 +195,7 @@ export default function LandingPage() {
               <div className="text-xs mt-0.5" style={{ color: 'var(--tm)' }}>Technik połączy się z Twoim komputerem</div>
             </div>
           </div>
-          <a href="/downloads/Asystent%20InfraDesk.exe"
+          <a href="/downloads/Asystent%20Home.exe"
             className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white"
             style={{ background: 'linear-gradient(145deg, #059669, #0EA5E9)', boxShadow: '0 4px 20px rgba(5,150,105,0.3)' }}>
             <Download className="h-4 w-4" /> Pobierz Asystent InfraDesk — za darmo
