@@ -219,6 +219,18 @@ function DownloadsWithPin({ agentVersion, compact }: { agentVersion?: string | n
 
 /* ══════════════════════════════════════════════════════════════════════════ */
 
+function getReturnTo(): string | null {
+  const params = new URLSearchParams(window.location.search);
+  const returnTo = params.get('returnTo');
+  if (!returnTo) return null;
+  // Security: only allow infradesk.pl subdomains
+  try {
+    const url = new URL(returnTo.startsWith('http') ? returnTo : `https://${returnTo}`);
+    if (url.hostname.endsWith('infradesk.pl') || url.hostname === 'infradesk.pl') return url.href;
+  } catch {}
+  return null;
+}
+
 export function LoginPage() {
   const navigate = useNavigate();
   const { setTokens, setUser } = useAuth();
@@ -236,7 +248,7 @@ export function LoginPage() {
   const onSubmit = async (data: FormData) => {
     setLoading(true);
     try {
-      const response = await authApi.login(data.email, data.password);
+      const response = await authApi.login(data.email, data.password) as any;
       setTokens(response.accessToken, response.refreshToken);
       setUser(response.user);
       subscribeToPush().catch(() => {});
@@ -245,6 +257,22 @@ export function LoginPage() {
         const ws = await workspacesApi.getMyWorkspaces();
         if (ws && ws.length > 0) setWorkspaces(ws);
       } catch { /* workspace will be resolved by WorkspaceSwitcher */ }
+
+      // Determine redirect destination
+      const returnTo = getReturnTo();
+      if (returnTo) {
+        window.location.href = returnTo;
+        return;
+      }
+
+      // Check for company workspace → redirect to subdomain
+      const workspaces = response.workspaces as { id: string; slug: string; type: string; isDefault: boolean }[] | undefined;
+      const defaultWs = workspaces?.find(w => w.isDefault) || workspaces?.[0];
+      if (defaultWs?.type === 'COMPANY' && defaultWs.slug && window.location.hostname === 'infradesk.pl') {
+        window.location.href = `https://${defaultWs.slug}.infradesk.pl/dashboard`;
+        return;
+      }
+
       if (isMobile) setShowVersionPicker(true);
       else navigate('/dashboard');
     } catch (err: unknown) {

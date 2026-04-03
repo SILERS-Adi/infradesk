@@ -62,17 +62,30 @@ import prisma from './lib/prisma';
 // Public device QR lookup (no auth)
 import { getDeviceByQr } from './modules/devices/devices.controller';
 
+import cookieParser from 'cookie-parser';
+
 const app = express();
 
-// CORS
+// CORS — allow subdomains
+const baseDomain = process.env.BASE_DOMAIN || 'infradesk.pl';
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || '*',
+    origin: (origin, callback) => {
+      // Allow: no origin (server-to-server), main domain, any subdomain, localhost
+      if (!origin || origin.endsWith(baseDomain) || origin.includes('localhost') || origin.includes('127.0.0.1')) {
+        callback(null, true);
+      } else {
+        callback(null, process.env.CORS_ORIGIN === '*');
+      }
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Workspace-Id'],
     credentials: true,
   })
 );
+
+// Cookie parser
+app.use(cookieParser());
 
 // Body parsers
 app.use(express.json({ limit: '10mb' }));

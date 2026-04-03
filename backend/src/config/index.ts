@@ -9,4 +9,7 @@ export const config = {
   jwtRefreshExpiresIn: '7d',
   encryptionKey: process.env.ENCRYPTION_KEY || 'changeme-32-char-encryption-key!',
   nodeEnv: process.env.NODE_ENV || 'development',
+  baseDomain: process.env.BASE_DOMAIN || 'infradesk.pl',
+  cookieDomain: process.env.COOKIE_DOMAIN || '.infradesk.pl',
+  isProduction: (process.env.NODE_ENV || 'production') === 'production',
 };

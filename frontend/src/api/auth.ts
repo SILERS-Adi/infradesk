@@ -33,6 +33,16 @@ export const authApi = {
     return data;
   },
 
+  logout: async (): Promise<void> => {
+    await apiClient.post('/auth/logout');
+  },
+
+  /** Refresh using cookie (no body needed — server reads from cookie) */
+  refreshFromCookie: async (): Promise<{ accessToken: string; refreshToken: string }> => {
+    const { data } = await apiClient.post('/auth/refresh', {});
+    return data;
+  },
+
   register: async (payload: {
     accountType: 'company' | 'personal';
     firstName: string; lastName: string; email: string; password: string;

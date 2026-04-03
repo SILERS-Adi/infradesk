@@ -2,11 +2,30 @@ import { Request, Response, NextFunction } from 'express';
 import { loginService, refreshTokenService, getMeService, forgotPasswordService, resetPasswordService, registerService, checkSlugAvailability } from './auth.service';
 import prisma from '../../lib/prisma';
 import { signAccessToken, signRefreshToken, JwtPayload } from '../../utils/jwt';
+import { verifyRefreshToken } from '../../utils/jwt';
+import { setAuthCookies, clearAuthCookies } from '../../utils/authCookies';
 
 export async function login(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const result = await loginService(req.body);
-    res.status(200).json(result);
+    setAuthCookies(res, result.accessToken, result.refreshToken);
+
+    // Include workspace info for subdomain redirect
+    const memberships = await prisma.workspaceMembership.findMany({
+      where: { userId: result.user.id, status: 'ACTIVE' },
+      select: { workspace: { select: { id: true, slug: true, type: true } }, isDefault: true },
+      orderBy: [{ isDefault: 'desc' }],
+    });
+
+    res.status(200).json({
+      ...result,
+      workspaces: memberships.map(m => ({
+        id: m.workspace.id,
+        slug: m.workspace.slug,
+        type: m.workspace.type,
+        isDefault: m.isDefault,
+      })),
+    });
   } catch (err) {
     next(err);
   }
@@ -14,8 +33,12 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
 
 export async function refresh(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { refreshToken } = req.body;
+    // Read refresh token from body OR cookie
+    const refreshToken = req.body.refreshToken || req.cookies?.infradesk_refresh;
+    if (!refreshToken) { res.status(401).json({ error: 'Refresh token required' }); return; }
+
     const result = await refreshTokenService(refreshToken);
+    setAuthCookies(res, result.accessToken, result.refreshToken);
     res.status(200).json(result);
   } catch (err) {
     next(err);
@@ -27,7 +50,6 @@ export async function autoLogin(req: Request, res: Response, next: NextFunction)
     const agentToken = req.query.token as string;
     if (!agentToken) { res.status(400).json({ error: 'token required' }); return; }
 
-    // Find agent registration by token
     const reg = await prisma.agentRegistration.findUnique({
       where: { agentToken },
       select: { workspaceId: true, status: true, contactEmail: true },
@@ -36,13 +58,11 @@ export async function autoLogin(req: Request, res: Response, next: NextFunction)
       res.status(401).json({ error: 'Invalid agent token' }); return;
     }
 
-    // Find a user linked to this workspace
     let user = reg.contactEmail
       ? await prisma.user.findUnique({ where: { email: reg.contactEmail } })
       : null;
 
     if (!user) {
-      // Find any active user for this workspace
       const membership = await prisma.workspaceMembership.findFirst({
         where: { workspaceId: reg.workspaceId },
         include: { user: true },
@@ -52,13 +72,11 @@ export async function autoLogin(req: Request, res: Response, next: NextFunction)
 
     if (!user) { res.status(401).json({ error: 'No user found for this workspace' }); return; }
 
-    const payload: JwtPayload = {
-      userId: user.id, email: user.email,
-    };
+    const payload: JwtPayload = { userId: user.id, email: user.email };
     const accessToken = signAccessToken(payload);
     const refreshToken = signRefreshToken(payload);
+    setAuthCookies(res, accessToken, refreshToken);
 
-    // Redirect to portal with tokens in URL hash (not query — safer)
     res.redirect(`/portal#autologin=${encodeURIComponent(JSON.stringify({
       accessToken, refreshToken,
       user: { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email },
@@ -98,6 +116,7 @@ export async function resetPassword(req: Request, res: Response, next: NextFunct
 export async function register(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const result = await registerService(req.body);
+    setAuthCookies(res, result.accessToken, result.refreshToken);
     res.status(201).json(result);
   } catch (err) { next(err); }
 }
@@ -109,4 +128,9 @@ export async function checkSlug(req: Request, res: Response, next: NextFunction)
     const available = await checkSlugAvailability(slug);
     res.json({ slug: slug.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''), available });
   } catch (err) { next(err); }
+}
+
+export async function logout(req: Request, res: Response): Promise<void> {
+  clearAuthCookies(res);
+  res.json({ success: true });
 }

@@ -66,7 +66,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setState(s => ({ ...s, isLoading: false }));
       }
     } else {
-      setState(s => ({ ...s, isLoading: false }));
+      // No localStorage tokens — try cookie-based session (cross-subdomain)
+      const hasCookie = document.cookie.includes('infradesk_logged_in=1');
+      if (hasCookie) {
+        // Cookie exists but no localStorage — we're on a different subdomain
+        fetch('/api/auth/refresh', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+          .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+          .then(data => {
+            localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, data.accessToken);
+            localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, data.refreshToken);
+            // Fetch user profile
+            return fetch('/api/auth/me', { headers: { Authorization: `Bearer ${data.accessToken}` } });
+          })
+          .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+          .then(user => {
+            localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+            setState({ user, accessToken: localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN), refreshToken: localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN), isAuthenticated: true, isLoading: false });
+          })
+          .catch(() => setState(s => ({ ...s, isLoading: false })));
+      } else {
+        setState(s => ({ ...s, isLoading: false }));
+      }
     }
   }, []);
 
@@ -83,6 +103,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     unsubscribeFromPush().catch(() => {});
+    // Clear server cookies (cross-subdomain)
+    fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
     useWorkspace.getState().clear();
     localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
     localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);

@@ -10,18 +10,30 @@ declare global {
 }
 
 export function authenticate(req: Request, res: Response, next: NextFunction): void {
+  // Source 1: Authorization header (existing flow)
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Authentication required' });
-    return;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    try {
+      req.user = verifyAccessToken(token);
+      next();
+      return;
+    } catch {
+      // Fall through to cookie check
+    }
   }
 
-  const token = authHeader.substring(7);
-  try {
-    const payload = verifyAccessToken(token);
-    req.user = payload;
-    next();
-  } catch {
-    res.status(401).json({ error: 'Invalid or expired token' });
+  // Source 2: Cookie (cross-subdomain flow)
+  const cookieToken = req.cookies?.infradesk_access;
+  if (cookieToken) {
+    try {
+      req.user = verifyAccessToken(cookieToken);
+      next();
+      return;
+    } catch {
+      // Token expired — client should use refresh
+    }
   }
+
+  res.status(401).json({ error: 'Authentication required' });
 }
