@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Asystent Business</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="light.css">
+  <link rel="stylesheet" href="aicore.css">
+  <style>
+    /* Splash — fullscreen video */
+    .splash{position:fixed;inset:0;background:#040810;display:flex;align-items:center;justify-content:center;z-index:9999;transition:opacity .6s ease}
+    .splash.fade-out{opacity:0;pointer-events:none}
+    .splash video{width:100%;height:100%;object-fit:cover}
+
+    /* Ticket modal — matches premium theme */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity .25s}
+    .modal-overlay.active{opacity:1;pointer-events:all}
+    .modal-card{background:linear-gradient(180deg,rgba(12,20,42,.97),rgba(8,14,30,.98));border:1px solid rgba(120,160,255,.1);border-radius:18px;width:90%;max-width:480px;max-height:90vh;overflow-y:auto;padding:24px;backdrop-filter:blur(20px);box-shadow:0 24px 60px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.04)}
+    .modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+    .modal-header h2{font-size:15px;font-weight:700;color:var(--t,#EEF2FA)}
+    .close-btn{background:none;border:none;color:var(--tm,#576380);font-size:22px;cursor:pointer;padding:4px 8px;border-radius:8px;transition:all .2s}
+    .close-btn:hover{background:rgba(255,255,255,.04);color:var(--t,#EEF2FA)}
+    .cat-pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+    .pill{padding:6px 14px;border-radius:20px;border:1px solid var(--border,rgba(255,255,255,.05));background:rgba(255,255,255,.02);color:var(--tm,#576380);font-size:11px;font-weight:500;cursor:pointer;transition:all .2s;font-family:inherit}
+    .pill:hover{border-color:var(--accent,#4F8CFF);color:var(--ts,#8B95AD)}
+    .pill.active{background:var(--cta,linear-gradient(135deg,#4F8CFF,#6366F1,#8B5CF6));border-color:transparent;color:#fff}
+    .pill.urgent.active{background:linear-gradient(135deg,#EF4444,#DC2626);border-color:transparent}
+    .form-input{width:100%;padding:10px 14px;background:rgba(255,255,255,.03);border:1px solid var(--border-l,rgba(255,255,255,.08));border-radius:var(--rs,12px);color:var(--t,#EEF2FA);font-size:12px;font-family:inherit;outline:none;transition:border-color .2s;margin-bottom:12px}
+    .form-input:focus{border-color:var(--accent,#4F8CFF);box-shadow:0 0 0 3px rgba(79,140,255,.08)}
+    textarea.form-input{resize:vertical;min-height:80px}
+    .form-input::placeholder{color:var(--td,#3D4660)}
+    .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;margin-bottom:12px}
+    .toggle-row span{font-size:12px;font-weight:500;color:var(--ts,#8B95AD)}
+    .toggle-switch{position:relative;width:44px;height:24px;cursor:pointer}
+    .toggle-switch input{display:none}
+    .toggle-slider{position:absolute;inset:0;background:rgba(255,255,255,.06);border:1px solid var(--border-l,rgba(255,255,255,.08));border-radius:12px;transition:all .3s}
+    .toggle-slider::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--tm,#576380);transition:all .3s}
+    .toggle-switch input:checked+.toggle-slider{background:#EF4444;border-color:#EF4444}
+    .toggle-switch input:checked+.toggle-slider::after{left:23px;background:#fff}
+    .ss-label{font-size:10px;color:var(--tm,#576380);margin-bottom:6px}
+    .screenshot-row{display:flex;gap:8px;margin-bottom:16px}
+    .ss-slot{width:100px;height:65px;border:2px dashed var(--border-l,rgba(255,255,255,.08));border-radius:var(--rs,12px);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;overflow:hidden;position:relative;flex-shrink:0}
+    .ss-slot:hover{border-color:var(--accent,#4F8CFF);background:rgba(79,140,255,.03)}
+    .ss-slot .ss-plus{font-size:22px;color:var(--td,#3D4660)}
+    .ss-slot img{width:100%;height:100%;object-fit:cover}
+    .ss-slot .ss-remove{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:#EF4444;color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity .2s}
+    .ss-slot:hover .ss-remove{opacity:1}
+    .submit-btn{width:100%;padding:12px;background:var(--cta,linear-gradient(135deg,#4F8CFF 0%,#6366F1 40%,#8B5CF6 100%));color:#fff;border:none;border-radius:11px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit;position:relative;box-shadow:0 2px 8px rgba(79,140,255,.25),0 8px 24px rgba(79,140,255,.15),inset 0 1px 0 rgba(255,255,255,.1)}
+    .submit-btn::before{content:'';position:absolute;inset:0;border-radius:11px;background:linear-gradient(180deg,rgba(255,255,255,.08),transparent 50%);pointer-events:none}
+    .submit-btn:hover{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 4px 12px rgba(79,140,255,.3),0 12px 32px rgba(79,140,255,.2)}
+    .submit-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;filter:none}
+    .success-msg{text-align:center;padding:40px 20px}
+    .success-msg .check{font-size:48px;margin-bottom:12px}
+    .success-msg h3{font-size:15px;margin-bottom:6px;color:var(--t,#EEF2FA)}
+    .success-msg p{font-size:11px;color:var(--tm,#576380)}
+    .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;margin-right:6px;vertical-align:middle}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+
+<!-- Splash — fullscreen video -->
+<div class="splash" id="splash">
+  <video autoplay muted playsinline id="splashVideo">
+    <source src="logo.mp4" type="video/mp4">
+  </video>
+</div>
+
+<div class="app">
+  <div class="app-ambient">
+    <div class="app-ambient-orb"></div>
+    <div class="app-ambient-orb"></div>
+    <div class="app-ambient-orb"></div>
+  </div>
+
+  <!-- Sidebar — identical structure to index.html -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <img src="logo_dark.png" alt="InfraDesk" class="sidebar-logo-img sidebar-logo-dark">
+      <img src="logo_light.png" alt="InfraDesk" class="sidebar-logo-img sidebar-logo-light">
+    </div>
+    <nav class="sidebar-nav">
+      <a class="nav-item active" data-page="overview"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Stan systemu</a>
+      <a class="nav-item" data-page="ticket"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>Zglos problem</a>
+      <a class="nav-item" data-page="history"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Historia zgloszen</a>
+      <a class="nav-item" data-page="remote"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Pomoc zdalna</a>
+      <a class="nav-item" data-page="contact"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>Kontakt</a>
+      <a class="nav-item" data-page="about"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>O programie</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user" id="sidebarUser" style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:6px;border-radius:8px;background:rgba(255,255,255,.02);border:1px solid var(--border,rgba(255,255,255,.05))">
+        <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--accent,#4F8CFF),#8B5CF6);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0" id="userAvatar">?</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:10px;font-weight:600;color:var(--t,#EEF2FA);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="userName">--</div>
+          <div style="font-size:8px;color:var(--td,#3D4660)" id="userHost">--</div>
+        </div>
+      </div>
+      <button onclick="doLogout()" style="width:100%;padding:7px;border-radius:8px;border:1px solid rgba(239,68,68,.15);background:rgba(239,68,68,.04);color:#EF4444;font-size:10px;font-weight:500;cursor:pointer;font-family:inherit;transition:all .2s;margin-bottom:8px" onmouseover="this.style.background='rgba(239,68,68,.1)'" onmouseout="this.style.background='rgba(239,68,68,.04)'">Wyloguj</button>
+      <div class="theme-switcher" id="themeSwitcher">
+        <button class="theme-opt" data-theme="auto" title="Automatyczny">&#x2600;/&#x1F319;</button>
+        <button class="theme-opt" data-theme="light" title="Jasny">&#x2600;</button>
+        <button class="theme-opt" data-theme="dark" title="Ciemny">&#x1F319;</button>
+      </div>
+      <div class="sidebar-version" id="sidebarVersion">v1.0.0 · Asystent Business</div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="topbar">
+      <div class="topbar-tab active">Stan systemu</div>
+      <div class="topbar-spacer"></div>
+      <div class="topbar-info">Asystent Business · v1.0.0</div>
+    </div>
+    <div class="content">
+      <div class="content-header">
+        <div class="content-title" id="contentTitle">Witaj</div>
+        <div class="content-subtitle">Monitoring Twojego komputera</div>
+      </div>
+
+      <!-- HERO — identical to index.html -->
+      <section class="hero fade-up">
+        <canvas class="hero-canvas" id="heroCanvas"></canvas>
+        <div class="hero-overlay"></div>
+        <div class="hero-highlight"></div>
+
+        <div class="hero-left">
+          <div class="hero-greeting" id="heroGreeting">Witaj</div>
+          <div class="hero-title" id="heroTitle">System dziala prawidlowo</div>
+          <div class="hero-status">
+            <div class="hero-status-dot" id="statusDot"></div>
+            <div class="hero-status-text" id="statusText">Pobieram dane...</div>
+          </div>
+          <button class="hero-cta" id="ctaButton">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            Zglos problem
+          </button>
+        </div>
+
+        <div class="hero-right">
+          <div class="ring-wrapper">
+            <div class="ring-outer-glow"></div>
+            <div class="ring-container">
+              <canvas class="ring-canvas" id="ringCanvas" width="180" height="180"></canvas>
+              <div class="ring-center">
+                <div class="ring-value" id="ringValue">--</div>
+                <div class="ring-label">Stan systemu</div>
+              </div>
+            </div>
+            <div class="ring-status-area">
+              <div class="ring-status-label">Stan systemu</div>
+              <div class="ring-status-value good" id="ringStatus">--</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Cards — identical to index.html -->
+      <section class="cards">
+        <div class="card fade-up fade-up-1">
+          <div class="card-header">
+            <div class="card-icon memory"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M9 2v2M15 20v2M9 20v2M2 15h2M2 9h2M20 15h2M20 9h2"/></svg></div>
+            <div class="card-badge blue" id="ramBadge">--</div>
+          </div>
+          <div class="card-value blue" id="ramValue">--</div>
+          <div class="card-title">Pamiec RAM</div>
+          <div class="card-desc" id="ramDesc">Ladowanie...</div>
+          <div class="card-bar"><div class="card-bar-fill" id="ramBar" style="width:0%"></div></div>
+        </div>
+        <div class="card fade-up fade-up-2">
+          <div class="card-header">
+            <div class="card-icon browser"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+            <div class="card-badge purple" id="cpuBadge">--</div>
+          </div>
+          <div class="card-value purple" id="cpuValue">--</div>
+          <div class="card-title">Procesor</div>
+          <div class="card-desc" id="cpuDesc">Ladowanie...</div>
+          <div class="card-bar"><div class="card-bar-fill" id="cpuBar" style="width:0%"></div></div>
+        </div>
+        <div class="card fade-up fade-up-3">
+          <div class="card-header">
+            <div class="card-icon perf"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></div>
+            <div class="card-badge green" id="dskBadge">--</div>
+          </div>
+          <div class="card-value green" id="dskValue">--</div>
+          <div class="card-title">Dysk C:</div>
+          <div class="card-desc" id="dskDesc">Ladowanie...</div>
+          <div class="card-bar"><div class="card-bar-fill" id="dskBar" style="width:0%"></div></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- Ticket Modal -->
+<div class="modal-overlay" id="ticketModal">
+  <div class="modal-card">
+    <div id="ticketFormView">
+      <div class="modal-header">
+        <h2>Zglos problem</h2>
+        <button class="close-btn" onclick="closeTicketForm()">&times;</button>
+      </div>
+      <div class="cat-pills" id="catPills">
+        <button class="pill active" data-cat="Komputer">Komputer</button>
+        <button class="pill" data-cat="Internet / siec">Internet / siec</button>
+        <button class="pill" data-cat="Drukarka">Drukarka</button>
+        <button class="pill" data-cat="Program">Program</button>
+        <button class="pill urgent" data-cat="Awaria pilna">Awaria pilna</button>
+        <button class="pill" data-cat="Inne">Inne</button>
+      </div>
+      <input type="text" class="form-input" id="ticketTitle" placeholder="Tytul zgloszenia..." maxlength="200">
+      <textarea class="form-input" id="ticketDesc" placeholder="Opisz problem..." rows="4"></textarea>
+      <div class="toggle-row">
+        <span>Pilne</span>
+        <label class="toggle-switch"><input type="checkbox" id="ticketUrgent"><span class="toggle-slider"></span></label>
+      </div>
+      <div class="ss-label">Zrzuty ekranu (opcjonalne)</div>
+      <div class="screenshot-row">
+        <div class="ss-slot" id="ss0" onclick="captureScreenshot(0)"><span class="ss-plus">+</span></div>
+        <div class="ss-slot" id="ss1" onclick="captureScreenshot(1)"><span class="ss-plus">+</span></div>
+        <div class="ss-slot" id="ss2" onclick="captureScreenshot(2)"><span class="ss-plus">+</span></div>
+      </div>
+      <button class="submit-btn" id="submitBtn" onclick="submitTicket()">Wyslij zgloszenie</button>
+    </div>
+    <div id="ticketSuccessView" style="display:none">
+      <div class="success-msg">
+        <div class="check">&#x2705;</div>
+        <h3>Zgloszenie wyslane!</h3>
+        <p>Nasz zespol zajmie sie Twoim problemem.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Load the REAL script.js + aicore.js from Asystent HOME -->
+<script src="aicore.js"></script>
+<script>
+/* === Business overrides — loaded BEFORE script.js === */
+/* Override navigateTo to only allow overview page */
+const _origPages = {};
+
+/* Override CTA to open ticket form */
+window._businessCtaOverride = true;
+
+/* Ticket form logic */
+let selectedCategory = 'Komputer';
+let screenshots = {};
+
+function openTicketForm() {
+  document.getElementById('ticketModal').classList.add('active');
+  document.getElementById('ticketFormView').style.display = '';
+  document.getElementById('ticketSuccessView').style.display = 'none';
+  document.getElementById('ticketTitle').value = '';
+  document.getElementById('ticketDesc').value = '';
+  document.getElementById('ticketUrgent').checked = false;
+  resetScreenshots();
+  selectCategory('Komputer');
+  setTimeout(() => document.getElementById('ticketTitle').focus(), 100);
+}
+
+function closeTicketForm() {
+  document.getElementById('ticketModal').classList.remove('active');
+}
+
+document.getElementById('catPills').addEventListener('click', e => {
+  const pill = e.target.closest('.pill');
+  if (!pill) return;
+  selectCategory(pill.dataset.cat);
+});
+
+function selectCategory(cat) {
+  selectedCategory = cat;
+  document.querySelectorAll('#catPills .pill').forEach(p => p.classList.toggle('active', p.dataset.cat === cat));
+  if (cat === 'Awaria pilna') document.getElementById('ticketUrgent').checked = true;
+}
+
+async function captureScreenshot(slot) {
+  if (screenshots[slot]) {
+    await py('remove_screenshot', slot);
+    delete screenshots[slot];
+    document.getElementById('ss' + slot).innerHTML = '<span class="ss-plus">+</span>';
+    return;
+  }
+  const el = document.getElementById('ss' + slot);
+  el.innerHTML = '<div class="spinner"></div>';
+  const r = await py('capture_screenshot', slot);
+  if (r && r.ok) {
+    screenshots[slot] = true;
+    el.innerHTML = '<img src="data:image/png;base64,' + r.preview + '" alt="screenshot"><span class="ss-remove" onclick="event.stopPropagation();captureScreenshot(' + slot + ')">x</span>';
+  } else {
+    el.innerHTML = '<span class="ss-plus" style="color:#EF4444">!</span>';
+    setTimeout(() => { el.innerHTML = '<span class="ss-plus">+</span>' }, 2000);
+  }
+}
+
+function resetScreenshots() {
+  screenshots = {};
+  [0, 1, 2].forEach(i => { document.getElementById('ss' + i).innerHTML = '<span class="ss-plus">+</span>' });
+}
+
+async function submitTicket() {
+  const title = document.getElementById('ticketTitle').value.trim();
+  const desc = document.getElementById('ticketDesc').value.trim();
+  const urgent = document.getElementById('ticketUrgent').checked;
+  if (!title) {
+    document.getElementById('ticketTitle').style.borderColor = '#EF4444';
+    document.getElementById('ticketTitle').focus();
+    setTimeout(() => { document.getElementById('ticketTitle').style.borderColor = '' }, 2000);
+    return;
+  }
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Wysylanie...';
+  const r = await py('submit_ticket', selectedCategory, title, desc, urgent);
+  if (r && r.ok) {
+    document.getElementById('ticketFormView').style.display = 'none';
+    document.getElementById('ticketSuccessView').style.display = '';
+    setTimeout(closeTicketForm, 2500);
+  } else {
+    btn.textContent = r?.error || 'Blad — sprobuj ponownie';
+    btn.style.background = '#EF4444';
+    setTimeout(() => { btn.textContent = 'Wyslij zgloszenie'; btn.style.background = ''; btn.disabled = false }, 3000);
+    return;
+  }
+  btn.disabled = false;
+  btn.innerHTML = 'Wyslij zgloszenie';
+}
+
+/* Splash */
+function dismissSplash() {
+  const s = document.getElementById('splash');
+  if (s && !s.classList.contains('fade-out')) { s.classList.add('fade-out'); setTimeout(() => s.remove(), 700) }
+}
+const splashVideo = document.getElementById('splashVideo');
+if (splashVideo) { splashVideo.addEventListener('ended', dismissSplash); splashVideo.addEventListener('error', dismissSplash) }
+setTimeout(dismissSplash, 3500);
+</script>
+<script src="script.js"></script>
+<script>
+/* === Post-script.js — Business navigation + pages === */
+
+const _businessPages = {
+  overview: null, // handled by script.js renderOverview
+  ticket: renderTicketPage,
+  history: renderHistoryPage,
+  remote: renderRemotePage,
+  contact: renderContactPage,
+  about: renderAboutPage,
+};
+
+/* Override navigateTo from script.js */
+const _origNavigateTo = window.navigateTo;
+window.navigateTo = function(p) {
+  /* Update sidebar active state */
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.toggle('active', i.getAttribute('data-page') === p));
+
+  if (p === 'overview') {
+    /* Use original script.js renderOverview */
+    _origNavigateTo('overview');
+    /* Re-hook CTA button and user info after render */
+    setTimeout(() => { _hookCta(); py('get_system_info').then(_setUserInfo); }, 150);
+  } else if (_businessPages[p]) {
+    /* Clear metrics interval from overview */
+    if (window.metricsInterval) { clearInterval(window.metricsInterval); window.metricsInterval = null; }
+    const content = document.querySelector('.content');
+    if (content) { content.innerHTML = ''; _businessPages[p](content); }
+  } else {
+    _origNavigateTo('overview');
+    setTimeout(_hookCta, 150);
+  }
+};
+
+/* Re-attach sidebar click handlers for new pages */
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', (e) => {
+    e.preventDefault();
+    const page = item.getAttribute('data-page');
+    if (page) window.navigateTo(page);
+  });
+});
+
+function _hookCta() {
+  const cta = document.getElementById('ctaButton');
+  if (!cta) return;
+  const n = cta.cloneNode(true);
+  n.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> Zglos problem';
+  cta.parentNode.replaceChild(n, cta);
+  n.addEventListener('click', openTicketForm);
+}
+
+/* Initial hook + load user info */
+setTimeout(() => { _hookCta(); py('get_system_info').then(_setUserInfo); }, 500);
+
+/* Set user info when system info loads */
+function _setUserInfo(info) {
+  if (!info) return;
+  const user = info.currentUser || 'Uzytkownik';
+  const host = info.hostname || '';
+  const initials = user.substring(0, 2).toUpperCase();
+  const el = document.getElementById('userName');
+  const av = document.getElementById('userAvatar');
+  const hst = document.getElementById('userHost');
+  const title = document.getElementById('contentTitle');
+  if (el) el.textContent = user;
+  if (av) av.textContent = initials;
+  if (hst) hst.textContent = host;
+  if (title) title.textContent = 'Witaj, ' + user;
+}
+
+/* Logout */
+window.doLogout = async function() {
+  if (confirm('Na pewno chcesz sie wylogowac?')) {
+    await py('logout');
+  }
+};
+
+/* ── PAGE: Ticket (inline form, not modal) ── */
+function renderTicketPage(root) {
+  root.innerHTML = `
+    <div class="content-header"><div class="content-title"><span class="title-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></span>Zglos problem</div><div class="content-subtitle">Wyslij zgloszenie do dzialu IT</div></div>
+    <div class="page-card fade-up" style="max-width:520px">
+      <div class="page-card-body" style="padding:20px">
+        <div class="cat-pills" id="catPillsInline">
+          <button class="pill active" data-cat="Komputer">Komputer</button>
+          <button class="pill" data-cat="Internet / siec">Internet / siec</button>
+          <button class="pill" data-cat="Drukarka">Drukarka</button>
+          <button class="pill" data-cat="Program">Program</button>
+          <button class="pill urgent" data-cat="Awaria pilna">Awaria pilna</button>
+          <button class="pill" data-cat="Inne">Inne</button>
+        </div>
+        <input type="text" class="form-input" id="inlineTitle" placeholder="Tytul zgloszenia..." maxlength="200">
+        <textarea class="form-input" id="inlineDesc" placeholder="Opisz problem szczegolowo..." rows="5"></textarea>
+        <div class="toggle-row"><span>Pilne</span><label class="toggle-switch"><input type="checkbox" id="inlineUrgent"><span class="toggle-slider"></span></label></div>
+        <div class="ss-label">Zrzuty ekranu (opcjonalne)</div>
+        <div class="screenshot-row">
+          <div class="ss-slot" id="iss0" onclick="captureInlineScreenshot(0)"><span class="ss-plus">+</span></div>
+          <div class="ss-slot" id="iss1" onclick="captureInlineScreenshot(1)"><span class="ss-plus">+</span></div>
+          <div class="ss-slot" id="iss2" onclick="captureInlineScreenshot(2)"><span class="ss-plus">+</span></div>
+        </div>
+        <button class="submit-btn" id="inlineSubmitBtn" onclick="submitInlineTicket()">Wyslij zgloszenie</button>
+        <div id="inlineResult" style="margin-top:12px"></div>
+      </div>
+    </div>`;
+
+  let inlineCat = 'Komputer';
+  let inlineShots = {};
+
+  document.getElementById('catPillsInline').addEventListener('click', e => {
+    const pill = e.target.closest('.pill');
+    if (!pill) return;
+    inlineCat = pill.dataset.cat;
+    document.querySelectorAll('#catPillsInline .pill').forEach(p => p.classList.toggle('active', p.dataset.cat === inlineCat));
+    if (inlineCat === 'Awaria pilna') document.getElementById('inlineUrgent').checked = true;
+  });
+
+  window.captureInlineScreenshot = async function(slot) {
+    if (inlineShots[slot]) {
+      await py('remove_screenshot', slot); delete inlineShots[slot];
+      document.getElementById('iss'+slot).innerHTML = '<span class="ss-plus">+</span>'; return;
+    }
+    const el = document.getElementById('iss'+slot);
+    el.innerHTML = '<div class="spinner"></div>';
+    const r = await py('capture_screenshot', slot);
+    if (r && r.ok) {
+      inlineShots[slot] = true;
+      el.innerHTML = '<img src="data:image/png;base64,'+r.preview+'"><span class="ss-remove" onclick="event.stopPropagation();captureInlineScreenshot('+slot+')">x</span>';
+    } else {
+      el.innerHTML = '<span class="ss-plus" style="color:#EF4444">!</span>';
+      setTimeout(() => el.innerHTML = '<span class="ss-plus">+</span>', 2000);
+    }
+  };
+
+  window.submitInlineTicket = async function() {
+    const title = document.getElementById('inlineTitle').value.trim();
+    const desc = document.getElementById('inlineDesc').value.trim();
+    const urgent = document.getElementById('inlineUrgent').checked;
+    if (!title) { document.getElementById('inlineTitle').style.borderColor='#EF4444'; document.getElementById('inlineTitle').focus(); setTimeout(()=>document.getElementById('inlineTitle').style.borderColor='',2000); return; }
+    const btn = document.getElementById('inlineSubmitBtn');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Wysylanie...';
+    const r = await py('submit_ticket', inlineCat, title, desc, urgent);
+    if (r && r.ok) {
+      document.getElementById('inlineResult').innerHTML = '<div class="success-msg" style="padding:16px"><div class="check" style="font-size:32px">&#x2705;</div><h3>Zgloszenie wyslane!</h3><p>Numer: #'+(r.ticketId||'')+'</p></div>';
+      btn.style.display = 'none';
+    } else {
+      btn.textContent = r?.error || 'Blad — sprobuj ponownie'; btn.style.background = '#EF4444';
+      setTimeout(() => { btn.textContent='Wyslij zgloszenie'; btn.style.background=''; btn.disabled=false }, 3000);
+    }
+  };
+}
+
+/* ── PAGE: History ── */
+async function renderHistoryPage(root) {
+  root.innerHTML = `
+    <div class="content-header"><div class="content-title"><span class="title-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>Historia zgloszen</div><div class="content-subtitle">Twoje zgloszenia serwisowe</div></div>
+    <div id="historyList" class="fade-up"><div class="live-status"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg><span>Ladowanie...</span></div></div>`;
+
+  const tickets = await py('get_tickets');
+  const list = document.getElementById('historyList');
+  if (!list) return;
+
+  if (!tickets || tickets.length === 0) {
+    list.innerHTML = '<div class="page-card"><div class="page-card-body" style="text-align:center;padding:40px;color:var(--tm)"><div style="font-size:32px;margin-bottom:8px">&#x1F4ED;</div>Brak zgloszen</div></div>';
+    return;
+  }
+
+  let html = '';
+  (Array.isArray(tickets) ? tickets : []).forEach((t, i) => {
+    const status = t.status || 'OPEN';
+    const colors = {OPEN:'#4F8CFF',IN_PROGRESS:'#FB923C',RESOLVED:'#4ADE80',CLOSED:'#6B7280'};
+    const labels = {OPEN:'Otwarte',IN_PROGRESS:'W trakcie',RESOLVED:'Rozwiazane',CLOSED:'Zamkniete'};
+    const col = colors[status] || '#4F8CFF';
+    const lab = labels[status] || status;
+    const date = t.createdAt ? new Date(t.createdAt).toLocaleDateString('pl') : '';
+    html += '<div class="card fade-up" style="animation-delay:'+(i*0.06)+'s;cursor:default;margin-bottom:6px"><div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:12px;font-weight:600;color:var(--t)">'+(t.title||'Bez tytulu')+'</div><div style="font-size:10px;color:var(--tm);margin-top:2px">#'+(t.number||t.id||'')+' · '+date+'</div></div><span style="font-size:9px;font-weight:600;padding:3px 10px;border-radius:10px;background:'+col+'18;color:'+col+';border:1px solid '+col+'30">'+lab+'</span></div></div>';
+  });
+  list.innerHTML = html;
+}
+
+/* ── PAGE: Remote Help ── */
+async function renderRemotePage(root) {
+  root.innerHTML = `
+    <div class="content-header"><div class="content-title"><span class="title-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span>Pomoc zdalna</div><div class="content-subtitle">Polacz sie z informatykiem</div></div>
+    <div class="page-card fade-up"><div class="page-card-body" style="text-align:center;padding:32px" id="remoteContent"><div class="live-status"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg><span>Sprawdzam...</span></div></div></div>`;
+
+  const rd = await py('get_rustdesk_id');
+  const el = document.getElementById('remoteContent');
+  if (!el) return;
+
+  if (rd && rd.installed) {
+    el.innerHTML = '<div style="font-size:40px;margin-bottom:12px">&#x1F6E1;</div><div style="font-size:14px;font-weight:700;color:var(--t);margin-bottom:4px">Pomoc zdalna gotowa</div><div style="font-size:11px;color:var(--tm);margin-bottom:16px">Twoj identyfikator: <strong style="color:var(--accent,#4F8CFF);font-size:14px">'+(rd.id||'Nieznany')+'</strong></div><div style="font-size:10px;color:var(--td);margin-bottom:16px">Podaj ten numer informatykowi aby sie polaczyl z Twoim komputerem</div><button class="submit-btn" style="max-width:280px;margin:0 auto;display:block" onclick="launchRustdesk()">Uruchom pomoc zdalna</button>';
+  } else {
+    el.innerHTML = '<div style="font-size:40px;margin-bottom:12px">&#x1F4E5;</div><div style="font-size:14px;font-weight:700;color:var(--t);margin-bottom:4px">Pomoc zdalna nie zainstalowana</div><div style="font-size:11px;color:var(--tm);margin-bottom:16px">Oprogramowanie do pomocy zdalnej zostanie zainstalowane automatycznie</div><button class="submit-btn" style="max-width:280px;margin:0 auto;display:block" onclick="installRd()">Zainstaluj teraz</button>';
+  }
+}
+
+window.launchRustdesk = async function() { await py('launch_rustdesk'); };
+window.installRd = async function() {
+  const el = document.getElementById('remoteContent');
+  if (el) el.innerHTML = '<div class="live-status"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg><span>Instalowanie... moze to chwile potrwac</span></div>';
+  await py('install_rustdesk');
+  renderRemotePage(document.querySelector('.content'));
+};
+
+/* ── PAGE: Contact ── */
+async function renderContactPage(root) {
+  root.innerHTML = `
+    <div class="content-header"><div class="content-title"><span class="title-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg></span>Kontakt</div><div class="content-subtitle">Dane Twojego opiekuna IT</div></div>
+    <div id="contactContent" class="fade-up"><div class="live-status"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg><span>Ladowanie...</span></div></div>`;
+
+  const c = await py('get_contact');
+  const el = document.getElementById('contactContent');
+  if (!el) return;
+
+  const row = (icon, label, value, href) => '<div class="card fade-up" style="cursor:default;margin-bottom:6px"><div style="display:flex;align-items:center;gap:12px"><span style="font-size:18px">'+icon+'</span><div><div style="font-size:10px;color:var(--tm)">'+label+'</div><'+(href?'a href="'+href+'" style="color:var(--accent,#4F8CFF);text-decoration:none"':'span style="color:var(--t)"')+'><strong>'+(value||'--')+'</strong></'+(href?'a':'span')+'></div></div></div>';
+
+  el.innerHTML =
+    row('&#x1F464;', 'Opiekun', c.opiekun) +
+    row('&#x1F4DE;', 'Telefon opiekuna', c.opiekunTel, 'tel:'+c.opiekunTel) +
+    row('&#x2709;', 'Email opiekuna', c.opiekunEmail, 'mailto:'+c.opiekunEmail) +
+    row('&#x1F4DE;', 'Infolinia', c.infolinia, 'tel:'+c.infolinia) +
+    row('&#x2709;', 'Email zgloszenia', c.email, 'mailto:'+c.email);
+}
+
+/* ── PAGE: About ── */
+async function renderAboutPage(root) {
+  root.innerHTML = '<div class="content-header"><div class="content-title"><span class="title-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>O programie</div><div class="content-subtitle">Informacje o Asystent Business</div></div><div id="aboutContent" class="fade-up"></div>';
+
+  const info = await py('get_system_info');
+  const ver = (info && info.version) || '1.0.0';
+  const el = document.getElementById('aboutContent');
+  if (!el) return;
+
+  el.innerHTML = '<div style="max-width:480px"><div class="page-card"><div style="text-align:center;padding:32px 24px 20px"><div style="width:64px;height:64px;border-radius:16px;background:linear-gradient(135deg,var(--accent,#4F8CFF),#8B5CF6);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:28px;font-weight:800;color:#fff">ID</div><div style="font-size:18px;font-weight:700;color:var(--t,#EEF2FA)">Asystent Business</div><div style="font-size:12px;color:var(--tm,#576380);margin-top:4px">v'+ver+'</div></div><div style="padding:0 24px 24px"><div style="border-top:1px solid rgba(255,255,255,.05);padding-top:16px"><div style="display:flex;justify-content:space-between;padding:8px 0;font-size:12px"><span style="color:var(--tm)">Wersja</span><span style="color:var(--t);font-weight:600">v'+ver+'</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;font-size:12px"><span style="color:var(--tm)">Producent</span><span style="color:var(--t);font-weight:600">Firma SILERS</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;font-size:12px"><span style="color:var(--tm)">Strona</span><a href="#" onclick="py(\'open_url\',\'https://www.silers.pl\');return false" style="color:var(--accent,#4F8CFF);font-weight:600;text-decoration:none">www.silers.pl</a></div><div style="display:flex;justify-content:space-between;padding:8px 0;font-size:12px"><span style="color:var(--tm)">Platforma</span><span style="color:var(--t);font-weight:600">Windows</span></div></div><div style="margin-top:16px"><button onclick="checkForUpdateBiz()" id="updateBtnBiz" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border,rgba(255,255,255,.05));background:rgba(255,255,255,.02);color:var(--ts,#8B95AD);font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;transition:all .2s">Sprawdz aktualizacje</button></div></div></div><div style="text-align:center;margin-top:16px;font-size:10px;color:var(--td,#3D4660)">&copy; '+new Date().getFullYear()+' Firma SILERS &middot; www.silers.pl &middot; Wszelkie prawa zastrzezone</div></div>';
+}
+
+window.checkForUpdateBiz = async function() {
+  const btn = document.getElementById('updateBtnBiz');
+  if (!btn) return;
+  btn.textContent = 'Sprawdzam...'; btn.disabled = true;
+  try {
+    const r = await py('check_update');
+    if (r && r.available) {
+      btn.textContent = 'Aktualizacja do v' + r.version;
+      btn.style.background = 'linear-gradient(135deg,#4F8CFF,#6366F1,#8B5CF6)';
+      btn.style.color = '#fff'; btn.style.border = 'none'; btn.disabled = false;
+      btn.onclick = async function() { btn.textContent = 'Aktualizowanie...'; btn.disabled = true; await py('do_update'); };
+    } else {
+      btn.textContent = 'Masz najnowsza wersje'; btn.style.color = '#4ADE80';
+      setTimeout(() => { btn.textContent = 'Sprawdz aktualizacje'; btn.style.color = ''; btn.disabled = false; btn.onclick = checkForUpdateBiz; }, 3000);
+    }
+  } catch(e) {
+    btn.textContent = 'Blad sprawdzania'; btn.style.color = '#EF4444';
+    setTimeout(() => { btn.textContent = 'Sprawdz aktualizacje'; btn.style.color = ''; btn.disabled = false; }, 3000);
+  }
+};
+
+/* page-card styles used by business pages */
+document.head.insertAdjacentHTML('beforeend', '<style>.page-card{border-radius:14px;background:rgba(10,16,38,.5);border:1px solid rgba(255,255,255,.07);backdrop-filter:blur(20px);overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.15),inset 0 1px 0 rgba(255,255,255,.03)}.page-card-header{padding:12px 16px;font-size:11px;font-weight:600;color:var(--ts,#8B95AD);border-bottom:1px solid rgba(255,255,255,.04)}.page-card-body{padding:16px}.live-status{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--tm,#576380);padding:12px}.spin-icon{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}</style>');
+</script>
+</body>
+</html>

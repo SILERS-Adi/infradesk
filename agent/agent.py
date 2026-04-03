@@ -5560,6 +5560,31 @@ def _run_home_webview():
                 except Exception as e:
                     return {"error": str(e)}
 
+            def check_update(self):
+                try:
+                    result = check_for_update()
+                    if result:
+                        ver, url = result
+                        return {"available": True, "version": ver, "url": url}
+                    return {"available": False}
+                except Exception as e:
+                    return {"available": False, "error": str(e)}
+
+            def do_update(self):
+                try:
+                    result = check_for_update()
+                    if result:
+                        ver, url = result
+                        do_self_update(url)
+                        return {"ok": True}
+                    return {"ok": False, "error": "Brak aktualizacji"}
+                except Exception as e:
+                    return {"ok": False, "error": str(e)}
+
+            def open_url(self, url):
+                import webbrowser
+                webbrowser.open(url)
+
             def get_metrics(self):
                 try:
                     disk = psutil.disk_usage("C:\\")
@@ -6278,8 +6303,8 @@ def _run_home_webview():
         window = webview.create_window(
             APP_NAME_HOME,
             url=url,
-            width=1020, height=680,
-            min_size=(800, 550),
+            width=1300, height=750,
+            min_size=(900, 550),
             js_api=api,
             background_color='#040810',
         )
