@@ -20,7 +20,6 @@ export interface WorkspaceMembership {
   managedBy: string | null;
 }
 
-export type ClientStatus = 'ACTIVE' | 'INACTIVE';
 export type LocationType = string;
 export type DeviceStatus = 'ACTIVE' | 'INACTIVE' | 'BROKEN' | 'RETIRED' | 'IN_SERVICE';
 export type DeviceCriticality = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -55,53 +54,9 @@ export interface User {
   updatedAt: string;
 }
 
-export interface Client {
-  id: string;
-  clientType: 'COMPANY' | 'INDIVIDUAL';
-  name: string;
-  firstName?: string;
-  lastName?: string;
-  legalName?: string;
-  taxId?: string;
-  email?: string;
-  phone?: string;
-  website?: string;
-  addressLine1?: string;
-  addressLine2?: string;
-  postalCode?: string;
-  city?: string;
-  country?: string;
-  notes?: string;
-  logoUrl?: string;
-  status: ClientStatus;
-  // Rozliczenie
-  billingIntervalMinutes?: number;
-  contractStartDate?: string;
-  // Umowa serwisowa
-  hasContract?: boolean;
-  contractHours?: number;
-  contractMonthlyValue?: number;
-  contractHourlyRateOverLimit?: number;
-  contractScope?: string;
-  contractAttachmentUrl?: string;
-  hourlyRate?: number;
-  enableSecurityAudit?: boolean;
-  enableNetworkScan?: boolean;
-  enableManagedBackup?: boolean;
-  enableMonthlyReport?: boolean;
-  createdAt: string;
-  updatedAt: string;
-  _count?: {
-    locations: number;
-    devices: number;
-    tickets: number;
-  };
-}
-
 export interface Location {
   id: string;
-  clientId: string;
-  client?: { id: string; name: string };
+  workspaceId: string;
   name: string;
   type: LocationType;
   addressLine1?: string;
@@ -140,8 +95,7 @@ export interface AccessType {
 
 export interface Device {
   id: string;
-  clientId: string;
-  client?: { id: string; name: string };
+  workspaceId: string;
   locationId: string;
   location?: { id: string; name: string; addressLine1?: string; postalCode?: string; city?: string; country?: string };
   deviceTypeId?: string;
@@ -193,8 +147,7 @@ export interface Device {
 
 export interface Credential {
   id: string;
-  clientId: string;
-  client?: { id: string; name: string };
+  workspaceId: string;
   locationId?: string;
   location?: { id: string; name: string };
   deviceId?: string;
@@ -220,8 +173,7 @@ export interface Credential {
 export interface Ticket {
   id: string;
   ticketNumber: string;
-  clientId: string;
-  client?: { id: string; name: string };
+  workspaceId: string;
   locationId: string;
   location?: { id: string; name: string };
   deviceId?: string;
@@ -325,6 +277,14 @@ export interface DashboardStats {
   recentDevices: Device[];
 }
 
+/** Stub — Client model removed in workspace migration. Used by legacy wizard. */
+export interface Client {
+  id: string;
+  name: string;
+  hasContract?: boolean;
+  [key: string]: any;
+}
+
 export interface ClientDashboardStats {
   client?: { id: string; name: string; status: string };
   stats: {
@@ -342,8 +302,7 @@ export interface ClientDashboardStats {
 
 export interface CrmActivity {
   id: string;
-  clientId: string;
-  client?: { id: string; name: string; logoUrl?: string };
+  workspaceId: string;
   locationId?: string;
   location?: { id: string; name: string; city?: string };
   deviceId?: string;
@@ -392,14 +351,13 @@ export interface OrderItem {
 export interface Order {
   id: string;
   orderNumber: string;
-  clientId: string;
+  workspaceId: string;
   ticketId?: string;
   assignedToUserId?: string;
   status: OrderStatus;
   notes?: string;
   createdAt: string;
   updatedAt: string;
-  client?: { id: string; name: string };
   ticket?: { id: string; ticketNumber: string; title: string };
   createdBy?: { id: string; firstName: string; lastName: string };
   assignedTo?: { id: string; firstName: string; lastName: string };
@@ -409,14 +367,13 @@ export interface Order {
 export interface Delegation {
   id: string;
   delegationNumber: string;
-  clientId: string;
+  workspaceId: string;
   assignedToUserId?: string;
   title: string;
   description?: string;
   scheduledAt?: string;
   createdAt: string;
   updatedAt: string;
-  client?: { id: string; name: string };
   createdBy?: { id: string; firstName: string; lastName: string };
   assignedTo?: { id: string; firstName: string; lastName: string };
 }
