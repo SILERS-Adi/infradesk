@@ -395,11 +395,11 @@ export function DeviceDetailPage() {
     onError: () => toast.error('Błąd zapisu opiekuna'),
   });
 
-  if (isLoading) return <LoadingSpinner />;
-  if (!device) return <div className="text-sm" style={{ color: 'var(--tm)' }}>Nie znaleziono urządzenia</div>;
-
   const { isAdmin, isTechnician: isTech } = useWorkspaceContext();
   const canSeeInternal = isAdmin || isTech;
+
+  if (isLoading) return <LoadingSpinner />;
+  if (!device) return <div className="text-sm" style={{ color: 'var(--tm)' }}>Nie znaleziono urządzenia</div>;
 
   // Aktywne narzędzia zdalne (tylko te z ID)
   const activeRemoteTools = REMOTE_TOOLS.filter(t => !!(device as any)[t.key]);
