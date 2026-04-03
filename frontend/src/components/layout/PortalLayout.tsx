@@ -1,6 +1,7 @@
 import { type ReactNode, useState } from 'react';
 import { Navigate, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../store/authStore';
+import { useWorkspaceContext } from '../../hooks/useWorkspaceContext';
 import {
   LayoutDashboard, MapPin, Monitor, Ticket, Plus, LogOut, ShoppingCart, Menu, X, Receipt, KeyRound,
 } from 'lucide-react';
@@ -19,6 +20,7 @@ const navItems = [
 
 export function PortalLayout({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading, user, logout } = useAuth();
+  const { workspace } = useWorkspaceContext();
   const navigate = useNavigate();
   const [mobileNav, setMobileNav] = useState(false);
 
@@ -28,7 +30,6 @@ export function PortalLayout({ children }: { children: ReactNode }) {
     </div>
   );
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if ((user as any)?.role !== 'CLIENT') return <Navigate to="/dashboard" replace />;
 
   const initials = user ? getInitials(user.firstName, user.lastName) : '?';
 
@@ -95,7 +96,7 @@ export function PortalLayout({ children }: { children: ReactNode }) {
             <div className="hidden md:flex items-center gap-2.5 ml-2">
               <div className="text-right">
                 <div className="text-[12px] font-medium text-white/70 leading-tight">{user?.firstName} {user?.lastName}</div>
-                <div className="text-[10px] leading-tight" style={{ color: 'rgba(255,255,255,0.3)' }}>{(user as any)?.client?.name}</div>
+                <div className="text-[10px] leading-tight" style={{ color: 'rgba(255,255,255,0.3)' }}>{workspace?.name}</div>
               </div>
               <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
                 style={{ background: 'linear-gradient(145deg, #EA580C, #F97316)' }}>
@@ -143,7 +144,7 @@ export function PortalLayout({ children }: { children: ReactNode }) {
                 </div>
                 <div>
                   <div className="text-[13px] font-medium text-white/80">{user?.firstName} {user?.lastName}</div>
-                  <div className="text-[11px] text-white/30">{(user as any)?.client?.name}</div>
+                  <div className="text-[11px] text-white/30">{workspace?.name}</div>
                 </div>
               </div>
               <button onClick={logout} className="p-2 rounded-lg text-white/30 hover:text-red-400/70 transition-colors">
