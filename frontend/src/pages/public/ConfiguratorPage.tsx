@@ -575,6 +575,7 @@ export default function ConfiguratorPage() {
   // Integration modal state (sales/packing)
   // Auto-include infra state
   const [infraAutoIncluded, setInfraAutoIncluded] = useState(false);
+  const [infraManuallyDisabled, setInfraManuallyDisabled] = useState(false);
   // Confirm dialog for disabling IT
   const [showInfraConfirm, setShowInfraConfirm] = useState(false);
   // Billing cycle
@@ -605,6 +606,7 @@ export default function ConfiguratorPage() {
       } else {
         // Open modal to configure
         setInfraModal(true);
+        setInfraManuallyDisabled(false);
       }
       triggerPricePulse();
       return;
@@ -625,7 +627,8 @@ export default function ConfiguratorPage() {
   // After every activeModules change, check auto-include / auto-remove
   useEffect(() => {
     const hasNonInfra = Array.from(activeModules).some(id => id !== 'infra');
-    if (hasNonInfra && !activeModules.has('infra')) {
+    // Auto-include only if user hasn't manually disabled it
+    if (hasNonInfra && !activeModules.has('infra') && !infraManuallyDisabled) {
       checkAutoIncludeInfra(activeModules);
     }
     // Auto-remove infra if it was auto-included and no other modules left
@@ -633,8 +636,11 @@ export default function ConfiguratorPage() {
       setActiveModules(prev => { const n = new Set(prev); n.delete('infra'); return n; });
       setInfraConfig(defaultInfraConfig);
       setInfraAutoIncluded(false);
+      setInfraManuallyDisabled(false);
     }
-  }, [activeModules, checkAutoIncludeInfra, infraAutoIncluded]);
+    // Reset manually disabled flag when all non-infra modules removed
+    if (!hasNonInfra) setInfraManuallyDisabled(false);
+  }, [activeModules, checkAutoIncludeInfra, infraAutoIncluded, infraManuallyDisabled]);
 
   const toggleAddon = (id: string) => {
     setActiveAddons(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -904,6 +910,7 @@ export default function ConfiguratorPage() {
                 setActiveModules(prev => { const n = new Set(prev); n.delete('infra'); return n; });
                 setInfraConfig(defaultInfraConfig);
                 setInfraAutoIncluded(false);
+                setInfraManuallyDisabled(true);
                 setShowInfraConfirm(false);
                 triggerPricePulse();
               }} style={{
