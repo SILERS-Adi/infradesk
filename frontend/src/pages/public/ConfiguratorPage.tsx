@@ -987,7 +987,7 @@ export default function ConfiguratorPage() {
             </button>
 
             <p style={{ textAlign: 'center', fontSize: 12, color: '#94A3B8', marginTop: 12, fontWeight: 450, lineHeight: 1.5 }}>
-              Możesz zacząć za darmo i skonfigurować wszystko później.
+              Możesz zacząć za darmo i skonfigurować wszystko z nami bezpłatnie.
             </p>
 
             <button style={{
