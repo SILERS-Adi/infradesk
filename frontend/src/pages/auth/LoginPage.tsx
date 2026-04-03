@@ -11,6 +11,8 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { authApi } from '../../api/auth';
 import { useAuth } from '../../store/authStore';
+import { useWorkspace } from '../../store/workspaceStore';
+import { workspacesApi } from '../../api/workspaces';
 import { subscribeToPush } from '../../utils/pushNotifications';
 import { downloadsApi } from '../../api/downloads';
 
@@ -217,6 +219,7 @@ function DownloadsWithPin({ agentVersion, compact }: { agentVersion?: string | n
 export function LoginPage() {
   const navigate = useNavigate();
   const { setTokens, setUser } = useAuth();
+  const { setWorkspaces } = useWorkspace();
   const [loading, setLoading] = useState(false);
   const [showVersionPicker, setShowVersionPicker] = useState(false);
   const [focused, setFocused] = useState('');
@@ -232,7 +235,11 @@ export function LoginPage() {
       setTokens(response.accessToken, response.refreshToken);
       setUser(response.user);
       subscribeToPush().catch(() => {});
-      // After login, workspace context will determine portal vs admin
+      // Fetch and set workspace BEFORE navigating (prevents data leaks)
+      try {
+        const ws = await workspacesApi.getMyWorkspaces();
+        if (ws && ws.length > 0) setWorkspaces(ws);
+      } catch { /* workspace will be resolved by WorkspaceSwitcher */ }
       if (isMobile) setShowVersionPicker(true);
       else navigate('/dashboard');
     } catch (err: unknown) {
