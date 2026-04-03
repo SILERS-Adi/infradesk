@@ -51,7 +51,14 @@ export default function SATenantsPage() {
 
   const startEdit = (ws: any) => {
     setEditId(ws.id);
-    setEditData({ name: ws.name, slug: ws.slug, plan: ws.plan, email: ws.email || '', phone: ws.phone || '', taxId: ws.taxId || '', city: ws.city || '', isActive: ws.isActive });
+    setEditData({
+      name: ws.name || '', slug: ws.slug || '', plan: ws.plan || 'FREE',
+      legalName: ws.legalName || '', taxId: ws.taxId || '',
+      email: ws.email || '', phone: ws.phone || '', website: ws.website || '',
+      addressLine1: ws.addressLine1 || '', postalCode: ws.postalCode || '', city: ws.city || '', country: ws.country || 'PL',
+      maxAgents: ws.maxAgents ?? 10, maxUsers: ws.maxUsers ?? 5,
+      isActive: ws.isActive,
+    });
   };
 
   const inputStyle: React.CSSProperties = {
@@ -105,47 +112,6 @@ export default function SATenantsPage() {
               {filtered.map((ws: any) => {
                 const tc = TYPE_COLORS[ws.type] ?? TYPE_COLORS.COMPANY;
                 const isEditing = editId === ws.id;
-
-                if (isEditing) {
-                  return (
-                    <tr key={ws.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--accent-g)' }}>
-                      <td style={{ padding: '8px 14px' }}>
-                        <input value={editData.name} onChange={e => setEditData({ ...editData, name: e.target.value })} style={inputStyle} />
-                      </td>
-                      <td style={{ padding: '8px 14px', fontSize: 11, color: tc.color }}>{tc.label}</td>
-                      <td style={{ padding: '8px 14px' }}>
-                        <select value={editData.plan} onChange={e => setEditData({ ...editData, plan: e.target.value })}
-                          style={{ ...inputStyle, width: 'auto' }}>
-                          {PLANS.map(p => <option key={p} value={p}>{p}</option>)}
-                        </select>
-                      </td>
-                      <td style={{ padding: '8px 14px' }}>
-                        <input value={editData.taxId} onChange={e => setEditData({ ...editData, taxId: e.target.value })} style={inputStyle} placeholder="NIP" />
-                      </td>
-                      <td style={{ padding: '8px 14px' }}>
-                        <input value={editData.city} onChange={e => setEditData({ ...editData, city: e.target.value })} style={inputStyle} placeholder="Miasto" />
-                      </td>
-                      <td style={{ padding: '8px 14px' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--ts)', cursor: 'pointer' }}>
-                          <input type="checkbox" checked={editData.isActive} onChange={e => setEditData({ ...editData, isActive: e.target.checked })} />
-                          {editData.isActive ? 'Aktywny' : 'Nieaktywny'}
-                        </label>
-                      </td>
-                      <td style={{ padding: '8px 14px' }}>
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          <button onClick={() => updateMutation.mutate({ id: ws.id, data: editData })} title="Zapisz"
-                            style={{ padding: 4, background: 'none', border: 'none', cursor: 'pointer', color: '#4ADE80' }}>
-                            <Save style={{ width: 14, height: 14 }} />
-                          </button>
-                          <button onClick={() => setEditId(null)} title="Anuluj"
-                            style={{ padding: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--td)' }}>
-                            <X style={{ width: 14, height: 14 }} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                }
 
                 return (
                   <tr key={ws.id} className="group" style={{ borderBottom: '1px solid var(--border)' }}
@@ -257,6 +223,70 @@ export default function SATenantsPage() {
                 background: 'var(--accent)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600,
                 opacity: newWs.name.trim() ? 1 : 0.4,
               }}>{createMutation.isPending ? 'Tworzę...' : 'Utwórz'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit modal — full fields */}
+      {editId && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div style={{ background: 'var(--bg2)', borderRadius: 16, padding: 24, maxWidth: 540, width: '90%', border: '1px solid var(--border)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--t)', marginBottom: 16 }}>Edytuj workspace</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--td)', marginTop: 4 }}>DANE PODSTAWOWE</div>
+              <input value={editData.name} onChange={e => setEditData({ ...editData, name: e.target.value })} placeholder="Nazwa firmy *" style={inputStyle} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input value={editData.slug} onChange={e => setEditData({ ...editData, slug: e.target.value })} placeholder="Slug" style={{ ...inputStyle, flex: 1 }} />
+                <input value={editData.legalName} onChange={e => setEditData({ ...editData, legalName: e.target.value })} placeholder="Nazwa prawna" style={{ ...inputStyle, flex: 1 }} />
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <select value={editData.plan} onChange={e => setEditData({ ...editData, plan: e.target.value })} style={{ ...inputStyle, flex: 1 }}>
+                  {PLANS.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--ts)', cursor: 'pointer', flex: 1 }}>
+                  <input type="checkbox" checked={editData.isActive} onChange={e => setEditData({ ...editData, isActive: e.target.checked })} />
+                  {editData.isActive ? 'Aktywny' : 'Nieaktywny'}
+                </label>
+              </div>
+
+              <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--td)', marginTop: 8 }}>KONTAKT</div>
+              <input value={editData.taxId} onChange={e => setEditData({ ...editData, taxId: e.target.value })} placeholder="NIP" style={inputStyle} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input value={editData.email} onChange={e => setEditData({ ...editData, email: e.target.value })} placeholder="Email" style={{ ...inputStyle, flex: 1 }} />
+                <input value={editData.phone} onChange={e => setEditData({ ...editData, phone: e.target.value })} placeholder="Telefon" style={{ ...inputStyle, flex: 1 }} />
+              </div>
+              <input value={editData.website} onChange={e => setEditData({ ...editData, website: e.target.value })} placeholder="Strona www" style={inputStyle} />
+
+              <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--td)', marginTop: 8 }}>ADRES</div>
+              <input value={editData.addressLine1} onChange={e => setEditData({ ...editData, addressLine1: e.target.value })} placeholder="Adres (ulica)" style={inputStyle} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input value={editData.postalCode} onChange={e => setEditData({ ...editData, postalCode: e.target.value })} placeholder="Kod pocztowy" style={{ ...inputStyle, flex: 1 }} />
+                <input value={editData.city} onChange={e => setEditData({ ...editData, city: e.target.value })} placeholder="Miasto" style={{ ...inputStyle, flex: 1 }} />
+                <input value={editData.country} onChange={e => setEditData({ ...editData, country: e.target.value })} placeholder="Kraj" style={{ ...inputStyle, width: 60 }} />
+              </div>
+
+              <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--td)', marginTop: 8 }}>LIMITY</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, color: 'var(--td)', marginBottom: 4 }}>Max agentów</div>
+                  <input type="number" value={editData.maxAgents} onChange={e => setEditData({ ...editData, maxAgents: parseInt(e.target.value) || 0 })} style={inputStyle} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, color: 'var(--td)', marginBottom: 4 }}>Max użytkowników</div>
+                  <input type="number" value={editData.maxUsers} onChange={e => setEditData({ ...editData, maxUsers: parseInt(e.target.value) || 0 })} style={inputStyle} />
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              <button onClick={() => setEditId(null)} style={{
+                flex: 1, padding: '10px 16px', borderRadius: 10, border: '1px solid var(--border)',
+                background: 'transparent', color: 'var(--ts)', cursor: 'pointer', fontSize: 12,
+              }}>Anuluj</button>
+              <button onClick={() => updateMutation.mutate({ id: editId, data: editData })} style={{
+                flex: 1, padding: '10px 16px', borderRadius: 10, border: 'none',
+                background: 'var(--accent)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+              }}>{updateMutation.isPending ? 'Zapisuję...' : 'Zapisz zmiany'}</button>
             </div>
           </div>
         </div>
