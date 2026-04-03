@@ -97,6 +97,7 @@ export interface AccessType {
 export interface Device {
   id: string;
   workspaceId: string;
+  clientId?: string; // legacy stub
   locationId: string;
   location?: { id: string; name: string; addressLine1?: string; postalCode?: string; city?: string; country?: string };
   deviceTypeId?: string;
@@ -149,6 +150,7 @@ export interface Device {
 export interface Credential {
   id: string;
   workspaceId: string;
+  clientId?: string; // legacy stub
   locationId?: string;
   location?: { id: string; name: string };
   deviceId?: string;
