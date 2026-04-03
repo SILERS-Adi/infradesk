@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, Building2, User, Server, Shield } from 'lucide-react';
 import { useWorkspace } from '../../store/workspaceStore';
@@ -102,8 +103,8 @@ export function WorkspaceSwitcher() {
         )}
       </button>
 
-      {/* Dropdown */}
-      {open && (
+      {/* Dropdown — rendered via Portal to escape .main overflow:hidden */}
+      {open && createPortal(
         <div style={{
           position: 'fixed', top: dropPos.top, left: dropPos.left,
           minWidth: 280, maxHeight: 400, overflowY: 'auto',
@@ -111,7 +112,7 @@ export function WorkspaceSwitcher() {
           borderRadius: 12, padding: 4,
           boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
           backdropFilter: 'blur(12px)',
-          zIndex: 9999,
+          zIndex: 99999,
         }}>
           {workspaces.map(ws => {
             const Icon = TYPE_ICONS[ws.type] ?? Building2;
@@ -150,7 +151,8 @@ export function WorkspaceSwitcher() {
               </button>
             );
           })}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
