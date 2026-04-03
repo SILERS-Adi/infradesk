@@ -23,6 +23,9 @@ export default function RegisterPage() {
   const [accountType, setAccountType] = useState<AccountType>('company');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  // Anti-bot
+  const [honeypot, setHoneypot] = useState('');
+  const [loadedAt] = useState(() => Date.now());
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -61,6 +64,14 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
+
+    // Anti-bot: honeypot
+    if (honeypot) return;
+    // Anti-bot: time trap (form submitted too fast = bot)
+    if (Date.now() - loadedAt < 3000) {
+      toast.error('Proszę poczekać chwilę przed wysłaniem formularza');
+      return;
+    }
 
     if (isCompany && companyShortName.length < 3) {
       toast.error('Krótka nazwa firmy musi mieć min. 3 znaki');
@@ -254,6 +265,11 @@ export default function RegisterPage() {
                 </div>
               );
             })()}
+          </div>
+
+          {/* Honeypot — invisible to users, bots fill it */}
+          <div style={{ position: 'absolute', left: -9999, top: -9999, opacity: 0, height: 0, overflow: 'hidden' }} aria-hidden="true">
+            <input type="text" name="website_url" tabIndex={-1} autoComplete="off" value={honeypot} onChange={e => setHoneypot(e.target.value)} />
           </div>
 
           {/* Submit */}

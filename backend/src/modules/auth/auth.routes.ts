@@ -3,12 +3,12 @@ import { login, refresh, me, autoLogin, forgotPassword, resetPassword, register,
 import { authenticate } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { loginSchema, refreshSchema, registerSchema } from './auth.validation';
-import { authLimiter } from '../../middleware/rateLimit';
+import { authLimiter, registerLimiter } from '../../middleware/rateLimit';
 
 const router = Router();
 
 router.post('/login', authLimiter, validate(loginSchema), login);
-router.post('/register', authLimiter, validate(registerSchema), register);
+router.post('/register', registerLimiter, validate(registerSchema), register);
 router.get('/check-slug', checkSlug);
 router.get('/auto-login', autoLogin);
 router.post('/refresh', validate(refreshSchema), refresh);

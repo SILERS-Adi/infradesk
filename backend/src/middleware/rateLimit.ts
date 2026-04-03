@@ -19,6 +19,15 @@ export const authLimiter = rateLimit({
   ...rateLimitResponse('Zbyt wiele prób logowania. Spróbuj ponownie za minutę.'),
 });
 
+/** User registration: stricter limit */
+export const registerLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  ...rateLimitResponse('Zbyt wiele prób rejestracji. Spróbuj ponownie za 15 minut.'),
+});
+
 /** Agent registration: public endpoint */
 export const agentRegisterLimiter = rateLimit({
   windowMs: 60 * 1000,
