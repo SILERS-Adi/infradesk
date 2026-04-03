@@ -4,7 +4,6 @@ import { Timer, Clock, User, Building2, Edit2, Trash2, ChevronDown, ChevronUp, S
 import toast from 'react-hot-toast';
 import { sessionsApi, WorkSession } from '../../../api/sessions';
 import { usersApi } from '../../../api/users';
-import { clientsApi } from '../../../api/clients';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { formatDateTime, getErrorMessage } from '../../../utils/helpers';
 
@@ -20,16 +19,10 @@ function formatMoney(val: number): string {
 }
 
 function calcEarnings(s: WorkSession): { amount: number; isContract: boolean; label: string } {
-  const client = s.client;
-  if (!client) return { amount: 0, isContract: false, label: '—' };
-  const isContract = client.hasContract ?? false;
-  const rate = client.hourlyRate ?? 0;
-  const interval = client.billingIntervalMinutes ?? 30;
+  // Client billing data was on old Client model — now workspace-level
+  // TODO: implement workspace-level billing settings
   const min = s.durationMin ?? 0;
-  const billableHours = Math.ceil(min / interval) * (interval / 60);
-
-  if (isContract) return { amount: 0, isContract: true, label: 'abonament' };
-  if (rate > 0) return { amount: billableHours * rate, isContract: false, label: formatMoney(billableHours * rate) };
+  if (min <= 0) return { amount: 0, isContract: false, label: '—' };
   return { amount: 0, isContract: false, label: '—' };
 }
 
@@ -65,7 +58,7 @@ const ALL_COLUMNS: ColDef[] = [
   },
   {
     key: 'client', label: 'Klient', group: 'Podstawowe', defaultVisible: true,
-    render: s => <span className="text-[13px]" style={{ color: 'var(--ts)' }}>{s.client?.name ?? '—'}</span>,
+    render: s => <span className="text-[13px]" style={{ color: 'var(--ts)' }}>{s.location?.name ?? '—'}</span>,
   },
   {
     key: 'ticket', label: 'Ticket', group: 'Podstawowe', defaultVisible: true,
@@ -357,7 +350,6 @@ function ColumnEditorPanel({ visibleKeys, setVisibleKeys, groups, onClose }: {
    ════════════════════════════════════════════════════════════ */
 export function SessionsPage() {
   const [techFilter, setTechFilter] = useState('');
-  const [clientFilter, setClientFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [showColumnEditor, setShowColumnEditor] = useState(false);
@@ -366,19 +358,17 @@ export function SessionsPage() {
   useEffect(() => { saveColumns(visibleKeys); }, [visibleKeys]);
 
   const { data: sessions = [], isLoading } = useQuery({
-    queryKey: ['sessions-all', techFilter, clientFilter, dateFrom, dateTo],
+    queryKey: ['sessions-all', techFilter, dateFrom, dateTo],
     queryFn: () => sessionsApi.getAll({
       techId: techFilter || undefined,
-      clientId: clientFilter || undefined,
       from: dateFrom || undefined,
       to: dateTo || undefined,
     }),
   });
 
   const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => usersApi.getAll() });
-  const { data: clients = [] } = useQuery({ queryKey: ['clients'], queryFn: () => clientsApi.getAll() });
 
-  const techs = users.filter(u => (u as any).role === 'ADMIN' || (u as any).role === 'TECHNICIAN');
+  const techs = users.filter(u => u.isActive);
 
   const stats = useMemo(() => {
     const total = sessions.length;
@@ -457,15 +447,6 @@ export function SessionsPage() {
           </select>
         </div>
         <div>
-          <label className="block text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--tm)' }}>Klient</label>
-          <select value={clientFilter} onChange={e => setClientFilter(e.target.value)}
-            className="text-sm rounded-xl px-3 py-2 focus:outline-none"
-            style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}>
-            <option value="">Wszyscy</option>
-            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </div>
-        <div>
           <label className="block text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--tm)' }}>Od</label>
           <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
             className="text-sm rounded-xl px-3 py-2 focus:outline-none"
@@ -477,8 +458,8 @@ export function SessionsPage() {
             className="text-sm rounded-xl px-3 py-2 focus:outline-none"
             style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }} />
         </div>
-        {(techFilter || clientFilter || dateFrom || dateTo) && (
-          <button onClick={() => { setTechFilter(''); setClientFilter(''); setDateFrom(''); setDateTo(''); }}
+        {(techFilter || dateFrom || dateTo) && (
+          <button onClick={() => { setTechFilter(''); setDateFrom(''); setDateTo(''); }}
             className="text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-colors hover:bg-white/[0.06]"
             style={{ color: 'var(--tm)' }}>
             Wyczysc filtry

@@ -59,7 +59,7 @@ function sortTickets(tickets: Ticket[], key: SortKey, dir: SortDir): Ticket[] {
     let cmp = 0;
     switch (key) {
       case 'number':      cmp = a.ticketNumber.localeCompare(b.ticketNumber, undefined, { numeric: true }); break;
-      case 'client':      cmp = (a.client?.name ?? '').localeCompare(b.client?.name ?? ''); break;
+      case 'client':      cmp = (a.location?.name ?? '').localeCompare(b.location?.name ?? ''); break;
       case 'priority':    cmp = (PRIORITY_ORDER[a.priority] ?? 0) - (PRIORITY_ORDER[b.priority] ?? 0); break;
       case 'assigned':    cmp = (a.assignedTo ? `${a.assignedTo.firstName} ${a.assignedTo.lastName}` : '').localeCompare(b.assignedTo ? `${b.assignedTo.firstName} ${b.assignedTo.lastName}` : ''); break;
       case 'status':      cmp = (STATUS_ORDER[a.status] ?? 0) - (STATUS_ORDER[b.status] ?? 0); break;
@@ -340,10 +340,10 @@ export function TicketsListPage() {
       ),
     },
     {
-      key: 'client', label: 'Klient', group: 'Podstawowe', defaultVisible: true,
+      key: 'client', label: 'Lokalizacja', group: 'Podstawowe', defaultVisible: true,
       render: (t: Ticket) => (
         <span className="text-[13px]" style={{ color: 'var(--ts)' }}>
-          {t.client?.name ?? <span className="text-[11px]" style={{ color: 'var(--td)' }}>--</span>}
+          {t.location?.name ?? <span className="text-[11px]" style={{ color: 'var(--td)' }}>--</span>}
         </span>
       ),
     },
@@ -435,7 +435,7 @@ export function TicketsListPage() {
     !q ||
     t.title.toLowerCase().includes(q) ||
     t.ticketNumber.toLowerCase().includes(q) ||
-    (t.client?.name ?? '').toLowerCase().includes(q) ||
+    (t.location?.name ?? '').toLowerCase().includes(q) ||
     (t.assignedTo ? `${t.assignedTo.firstName} ${t.assignedTo.lastName}`.toLowerCase().includes(q) : false)
   );
 
