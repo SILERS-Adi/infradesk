@@ -64,8 +64,8 @@ export default function SATenantsPage() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
-          <h1 style={{ fontSize: 18, fontWeight: 700, color: 'var(--t)' }}>Workspace'y</h1>
-          <p style={{ fontSize: 12, color: 'var(--td)' }}>{workspaces.length} workspace'ów</p>
+          <h1 style={{ fontSize: 18, fontWeight: 700, color: 'var(--t)' }}>Firmy</h1>
+          <p style={{ fontSize: 12, color: 'var(--td)' }}>{workspaces.length} firm</p>
         </div>
         <button onClick={() => setShowCreate(true)} style={{
           display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10,

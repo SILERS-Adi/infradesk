@@ -69,7 +69,37 @@ router.patch('/tenants/:id', async (req: Request, res: Response, next: NextFunct
 
 router.delete('/tenants/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await prisma.workspace.delete({ where: { id: req.params.id } });
+    const wsId = req.params.id;
+    // Delete all workspace-related data in order (foreign key dependencies)
+    await prisma.$transaction([
+      prisma.invoicingPayment.deleteMany({ where: { workspaceId: wsId } }),
+      prisma.invoiceDocumentItem.deleteMany({ where: { document: { workspaceId: wsId } } }),
+      prisma.invoiceDocument.deleteMany({ where: { workspaceId: wsId } }),
+      prisma.invoicingContractor.deleteMany({ where: { workspaceId: wsId } }),
+      prisma.invoicingProduct.deleteMany({ where: { workspaceId: wsId } }),
+      prisma.shipmentItem.deleteMany({ where: { shipment: { workspaceId: wsId } } }),
+      prisma.shipment.deleteMany({ where: { workspaceId: wsId } }),
+      prisma.packingOrderItem.deleteMany({ where: { order: { workspaceId: wsId } } }),
+      prisma.packingOrder.deleteMany({ where: { workspaceId: wsId } }),
+      prisma.serviceInspection.deleteMany({ where: { workspaceId: wsId } }),
+      prisma.serviceVehicle.deleteMany({ where: { workspaceId: wsId } }),
+      prisma.notification.deleteMany({ where: { workspaceId: wsId } }),
+      prisma.activityLog.deleteMany({ where: { workspaceId: wsId } }),
+      prisma.backupConfig.deleteMany({ where: { workspaceId: wsId } }),
+      prisma.crmActivity.deleteMany({ where: { workspaceId: wsId } }),
+      prisma.workSession.deleteMany({ where: { workspaceId: wsId } }),
+      prisma.credential.deleteMany({ where: { workspaceId: wsId } }),
+      prisma.ticket.deleteMany({ where: { workspaceId: wsId } }),
+      prisma.agentRegistration.deleteMany({ where: { workspaceId: wsId } }),
+      prisma.task.deleteMany({ where: { workspaceId: wsId } }),
+      prisma.order.deleteMany({ where: { workspaceId: wsId } }),
+      prisma.delegation.deleteMany({ where: { workspaceId: wsId } }),
+      prisma.device.deleteMany({ where: { workspaceId: wsId } }),
+      prisma.location.deleteMany({ where: { workspaceId: wsId } }),
+      prisma.workspaceSetting.deleteMany({ where: { workspaceId: wsId } }),
+      prisma.workspaceMembership.deleteMany({ where: { workspaceId: wsId } }),
+      prisma.workspace.delete({ where: { id: wsId } }),
+    ]);
     res.status(204).send();
   } catch (err) { next(err); }
 });
