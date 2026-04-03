@@ -7,6 +7,7 @@ import { AttachmentGallery } from '../../../components/ui/AttachmentGallery';
 import toast from 'react-hot-toast';
 import { ticketsApi } from '../../../api/tickets';
 import { usersApi } from '../../../api/users';
+import { activityLogsApi } from '../../../api/activityLogs';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import { TicketStatusBadge } from '../../../components/ui/StatusBadge';
@@ -127,6 +128,11 @@ export function TicketDetailPage() {
   const [assignUserId, setAssignUserId] = useState('');
 
   const { data: ticket, isLoading } = useQuery({ queryKey: ['tickets', id], queryFn: () => ticketsApi.getOne(id!), enabled: !!id });
+  const { data: activityLogs = [] } = useQuery({
+    queryKey: ['activity-logs', id],
+    queryFn: () => activityLogsApi.getAll({ entityId: id, entityType: 'Ticket', limit: 30 }),
+    enabled: !!id,
+  });
   const { data: technicians = [] } = useQuery({
     queryKey: ['users-staff-all'],
     queryFn: async () => {
@@ -305,6 +311,25 @@ export function TicketDetailPage() {
               ) : null)}
             </div>
           </Section>
+
+          {/* Timeline */}
+          {activityLogs.length > 0 && (
+            <Section title={`Historia (${activityLogs.length})`}>
+              <div className="space-y-2">
+                {activityLogs.slice(0, 15).map((log: any) => (
+                  <div key={log.id} className="flex gap-2 py-1.5" style={{ borderBottom: '1px solid var(--border)' }}>
+                    <div className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: 'var(--accent)' }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[12px]" style={{ color: 'var(--ts)' }}>{log.description}</div>
+                      <div className="text-[10px] mt-0.5" style={{ color: 'var(--td)' }}>
+                        {log.performedBy ? `${log.performedBy.firstName} ${log.performedBy.lastName}` : '—'} · {formatDateTime(log.createdAt)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )}
 
           {/* Anuluj */}
           {isAdminOrTech && canEdit && (
