@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Shield, Monitor, Zap, Users, Download, ChevronRight, Check, Server, User, Building2, ArrowRight, Phone } from 'lucide-react';
+import { Shield, Monitor, Zap, Users, Download, ChevronRight, Server, User, Building2, ArrowRight, Phone } from 'lucide-react';
 import { useTheme } from '../../store/themeStore';
 
 const FEATURES = [
@@ -9,21 +9,6 @@ const FEATURES = [
   { icon: Users, title: 'Portal klienta', desc: 'Każdy klient ma swój panel do zgłoszeń i podglądu infrastruktury' },
   { icon: Server, title: 'Backup zarządzany', desc: 'Automatyczne kopie SQL i folderów z monitoringiem statusu' },
   { icon: Download, title: 'Agent na każdy komputer', desc: 'Jeden agent — pełna widoczność. Windows, serwery, stacje robocze' },
-];
-
-const PLANS = [
-  {
-    name: 'Personal', type: 'PERSONAL', price: 'Za darmo', desc: 'Dla użytkowników domowych',
-    color: '#10B981', features: ['Do 3 urządzeń', 'Monitoring systemu', 'Czyszczenie i optymalizacja', 'Audyt bezpieczeństwa', 'Pomoc zdalna (płatna)'],
-  },
-  {
-    name: 'Business', type: 'BUSINESS', price: 'od 49 zł/mies', desc: 'Dla firm zarządzających własną infra',
-    color: '#3B82F6', popular: true, features: ['Nieograniczone urządzenia', 'Zgłoszenia serwisowe', 'Backup zarządzany', 'CRM i rozliczenia', 'Zapraszanie partnerów IT'],
-  },
-  {
-    name: 'MSP', type: 'MSP', price: 'od 149 zł/mies', desc: 'Dla firm IT zarządzających klientami',
-    color: '#8B5CF6', features: ['Wszystko z Business', 'Tworzenie kont klientów', 'Kontrola modułów per klient', 'Wielopoziomowe zarządzanie', 'AI diagnostyka'],
-  },
 ];
 
 export default function LandingPage() {
@@ -40,6 +25,7 @@ export default function LandingPage() {
           <a href="tel:+48575662664" className="hidden md:flex items-center gap-1.5 text-sm transition-colors" style={{ color: 'var(--tm)' }}>
             <Phone className="h-3.5 w-3.5" /> +48 575 662 664
           </a>
+          <Link to="/konfigurator" className="px-3 py-2 text-sm font-medium transition-colors" style={{ color: 'var(--tm)' }}>Konfigurator</Link>
           <Link to="/kontakt" className="px-3 py-2 text-sm font-medium transition-colors" style={{ color: 'var(--tm)' }}>Kontakt</Link>
           <Link to="/login" className="px-4 py-2 text-sm font-medium transition-colors" style={{ color: 'var(--ts)' }}>Zaloguj się</Link>
           <Link to="/register" className="px-4 py-2 text-sm font-semibold text-white rounded-xl transition-all hover:opacity-90"
@@ -65,10 +51,14 @@ export default function LandingPage() {
           Monitoring, zgłoszenia, zdalne zarządzanie, backup i audyt bezpieczeństwa.
           Dla firm IT, przedsiębiorstw i użytkowników domowych.
         </p>
-        <div className="flex items-center justify-center gap-4 mb-10">
-          <Link to="/register" className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-10">
+          <Link to="/register" className="flex items-center gap-2 px-7 py-3.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 hover:scale-[1.02] active:scale-[0.98]"
             style={{ background: 'linear-gradient(135deg, #4f8cff 0%, #6366F1 40%, #8B5CF6 100%)', boxShadow: '0 4px 20px rgba(79,140,255,0.3)' }}>
             Rozpocznij za darmo <ArrowRight className="h-4 w-4" />
+          </Link>
+          <Link to="/konfigurator" className="flex items-center gap-2 px-7 py-3.5 rounded-xl text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"
+            style={{ background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)', color: 'var(--ts)', border: '1px solid var(--border)' }}>
+            Skonfiguruj i sprawdź cenę
           </Link>
         </div>
 
@@ -128,44 +118,27 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Pricing */}
+      {/* Pricing → Configurator CTA */}
       <section className="px-6 md:px-12 py-16 max-w-7xl mx-auto">
-        <h2 className="text-2xl md:text-3xl font-bold text-center mb-4">Cennik</h2>
-        <p className="text-center mb-12" style={{ color: 'var(--tm)' }}>Wybierz plan dopasowany do Twoich potrzeb</p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-4xl mx-auto">
-          {PLANS.map(p => (
-            <div key={p.name} className="rounded-2xl p-6 relative"
-              style={{
-                background: p.popular ? 'rgba(139,92,246,0.06)' : 'var(--bg-card)',
-                border: p.popular ? '2px solid rgba(139,92,246,0.25)' : '1px solid var(--border)',
-              }}>
-              {p.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-bold"
-                  style={{ background: 'linear-gradient(135deg, #4f8cff 0%, #6366F1 40%, #8B5CF6 100%)', color: '#fff' }}>
-                  Najpopularniejszy
-                </div>
-              )}
-              <h3 className="text-lg font-bold" style={{ color: p.color }}>{p.name}</h3>
-              <p className="text-xs mt-1" style={{ color: 'var(--tm)' }}>{p.desc}</p>
-              <div className="text-2xl font-bold mt-4 mb-6" style={{ color: 'var(--t)' }}>{p.price}</div>
-              <ul className="space-y-2 mb-6">
-                {p.features.map(f => (
-                  <li key={f} className="flex items-center gap-2 text-sm" style={{ color: 'var(--ts)' }}>
-                    <Check className="h-3.5 w-3.5 flex-shrink-0" style={{ color: p.color }} /> {f}
-                  </li>
-                ))}
-              </ul>
-              <Link to={`/register`}
-                className="block text-center py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-90"
-                style={{
-                  background: p.popular ? 'linear-gradient(135deg, #4f8cff 0%, #6366F1 40%, #8B5CF6 100%)' : isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
-                  color: p.popular ? '#fff' : 'var(--ts)',
-                  border: p.popular ? 'none' : '1px solid var(--border)',
-                }}>
-                Rozpocznij
-              </Link>
-            </div>
-          ))}
+        <div className="rounded-3xl p-8 md:p-12 text-center"
+          style={{ background: 'linear-gradient(145deg, rgba(79,70,229,0.06), rgba(139,92,246,0.04))', border: '1px solid rgba(99,102,241,0.15)' }}>
+          <h2 className="text-2xl md:text-3xl font-bold mb-4" style={{ color: 'var(--t)' }}>Skonfiguruj system pod siebie</h2>
+          <p className="max-w-xl mx-auto mb-3" style={{ color: 'var(--ts)' }}>
+            Wybierz moduły, ustaw liczbę stanowisk, sprawdź cenę — i zacznij 14-dniowy trial za darmo.
+          </p>
+          <p className="max-w-xl mx-auto mb-8 text-sm" style={{ color: 'var(--tm)' }}>
+            Zarządzanie IT · Sprzedaż · Pakowanie · Stacje diagnostyczne · Integracje API
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Link to="/konfigurator" className="flex items-center gap-2 px-8 py-4 rounded-xl text-base font-bold text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
+              style={{ background: 'linear-gradient(135deg, #4F46E5 0%, #6D28D9 100%)', boxShadow: '0 6px 24px rgba(79,70,229,0.35)' }}>
+              Otwórz konfigurator <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link to="/register" className="flex items-center gap-2 px-7 py-3.5 rounded-xl text-sm font-semibold transition-all hover:scale-[1.02]"
+              style={{ background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)', color: 'var(--ts)', border: '1px solid var(--border)' }}>
+              Rozpocznij od razu
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -200,6 +173,22 @@ export default function LandingPage() {
             style={{ background: 'linear-gradient(145deg, #059669, #0EA5E9)', boxShadow: '0 4px 20px rgba(5,150,105,0.3)' }}>
             <Download className="h-4 w-4" /> Pobierz Asystent InfraDesk — za darmo
           </a>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="px-6 md:px-12 py-16 max-w-7xl mx-auto text-center">
+        <h2 className="text-2xl md:text-3xl font-bold mb-4" style={{ color: 'var(--t)' }}>Gotowy na start?</h2>
+        <p className="mb-8" style={{ color: 'var(--ts)' }}>14 dni za darmo. Bez karty kredytowej. Bez zobowiązań.</p>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <Link to="/konfigurator" className="flex items-center gap-2 px-8 py-4 rounded-xl text-base font-bold text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
+            style={{ background: 'linear-gradient(135deg, #4F46E5 0%, #6D28D9 100%)', boxShadow: '0 6px 24px rgba(79,70,229,0.35)' }}>
+            Skonfiguruj i rozpocznij <ArrowRight className="h-4 w-4" />
+          </Link>
+          <Link to="/kontakt" className="flex items-center gap-2 px-7 py-3.5 rounded-xl text-sm font-semibold transition-all"
+            style={{ color: 'var(--ts)' }}>
+            Porozmawiaj z nami
+          </Link>
         </div>
       </section>
 
