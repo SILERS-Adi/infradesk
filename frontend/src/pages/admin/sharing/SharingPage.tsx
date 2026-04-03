@@ -4,8 +4,10 @@ import { apiClient } from '../../../api/client';
 import { useWorkspaceContext } from '../../../hooks/useWorkspaceContext';
 import toast from 'react-hot-toast';
 import {
-  Share2, Send, UserPlus, Shield, Monitor, MapPin, ChevronRight, X, Check, Loader2, Link2Off,
+  Share2, Send, UserPlus, Shield, Monitor, MapPin, ChevronRight, X, Check, Loader2, Link2Off, Building2,
 } from 'lucide-react';
+import { devicesApi } from '../../../api/devices';
+import { locationsApi } from '../../../api/locations';
 
 export default function SharingPage() {
   const { workspace, isAdmin } = useWorkspaceContext();
@@ -22,6 +24,23 @@ export default function SharingPage() {
   const [accessLevel, setAccessLevel] = useState('FULL_MANAGEMENT');
   const [scope, setScope] = useState('ALL');
   const [message, setMessage] = useState('');
+  const [selectedDeviceIds, setSelectedDeviceIds] = useState<Set<string>>(new Set());
+  const [selectedLocationIds, setSelectedLocationIds] = useState<Set<string>>(new Set());
+
+  // Fetch devices and locations for picker (only when SELECTED scope)
+  const { data: devices } = useQuery({
+    queryKey: ['devices-sharing'],
+    queryFn: () => devicesApi.getAll(),
+    enabled: scope === 'SELECTED' && tab === 'invite',
+  });
+  const { data: locations } = useQuery({
+    queryKey: ['locations-sharing'],
+    queryFn: () => locationsApi.getAll(),
+    enabled: scope === 'SELECTED' && tab === 'invite',
+  });
+
+  const toggleDevice = (id: string) => setSelectedDeviceIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleLocation = (id: string) => setSelectedLocationIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const inviteMutation = useMutation({
     mutationFn: (payload: any) => apiClient.post('/sharing/invite', payload),
@@ -188,7 +207,10 @@ export default function SharingPage() {
       {tab === 'invite' && (
         <div style={cardStyle}>
           <h3 style={{ fontSize: 16, fontWeight: 750, color: 'var(--t)', marginBottom: 4 }}>Udziel dostępu do swoich urządzeń</h3>
-          <p style={{ fontSize: 13, color: 'var(--ts)', marginBottom: 20 }}>Wyślij zaproszenie do firmy IT, która będzie zarządzać Twoją infrastrukturą.</p>
+          <p style={{ fontSize: 13, color: 'var(--ts)', marginBottom: 8 }}>Wyślij zaproszenie do firmy IT, która będzie zarządzać Twoją infrastrukturą.</p>
+          <p style={{ fontSize: 12, color: 'var(--tm)', marginBottom: 20, padding: '8px 12px', borderRadius: 8, background: isAdmin ? 'transparent' : 'rgba(245,158,11,0.08)', border: isAdmin ? 'none' : '1px solid rgba(245,158,11,0.15)' }}>
+            {isAdmin ? '' : '⚠️ Jako pracownik możesz udostępnić tylko urządzenia przypisane do Ciebie.'}
+          </p>
 
           <div style={{ marginBottom: 16 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ts)', display: 'block', marginBottom: 6 }}>Email firmy IT</label>
@@ -234,14 +256,86 @@ export default function SharingPage() {
             </div>
           </div>
 
+          {/* Device/Location picker when SELECTED */}
+          {scope === 'SELECTED' && (
+            <div style={{ marginBottom: 16 }}>
+              {/* Locations */}
+              {(locations as any[])?.length > 0 && (
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--tm)', display: 'block', marginBottom: 8 }}>
+                    <MapPin size={12} style={{ display: 'inline', verticalAlign: '-2px', marginRight: 4 }} /> Lokalizacje
+                  </label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {(locations as any[]).map((loc: any) => {
+                      const sel = selectedLocationIds.has(loc.id);
+                      return (
+                        <button key={loc.id} onClick={() => toggleLocation(loc.id)} style={{
+                          display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, width: '100%', textAlign: 'left',
+                          border: `1px solid ${sel ? 'var(--accent)' : 'var(--border)'}`,
+                          background: sel ? 'var(--accent-g, rgba(79,140,255,0.08))' : 'var(--bg)',
+                          cursor: 'pointer', transition: 'all 0.15s ease',
+                        }}>
+                          <div style={{ width: 20, height: 20, borderRadius: 6, border: `2px solid ${sel ? 'var(--accent)' : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: sel ? 'var(--accent)' : 'transparent', transition: 'all 0.15s ease', flexShrink: 0 }}>
+                            {sel && <Check size={12} color="#fff" />}
+                          </div>
+                          <Building2 size={14} color="var(--tm)" />
+                          <span style={{ fontSize: 13, fontWeight: sel ? 600 : 500, color: 'var(--t)' }}>{loc.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Devices */}
+              {(devices as any[])?.length > 0 && (
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--tm)', display: 'block', marginBottom: 8 }}>
+                    <Monitor size={12} style={{ display: 'inline', verticalAlign: '-2px', marginRight: 4 }} /> Urządzenia ({selectedDeviceIds.size} wybranych)
+                  </label>
+                  <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4, borderRadius: 10, border: '1px solid var(--border)', padding: 6 }}>
+                    {(devices as any[]).map((dev: any) => {
+                      const sel = selectedDeviceIds.has(dev.id);
+                      return (
+                        <button key={dev.id} onClick={() => toggleDevice(dev.id)} style={{
+                          display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, width: '100%', textAlign: 'left', border: 'none',
+                          background: sel ? 'var(--accent-g, rgba(79,140,255,0.08))' : 'transparent',
+                          cursor: 'pointer', transition: 'all 0.15s ease',
+                        }}>
+                          <div style={{ width: 18, height: 18, borderRadius: 5, border: `2px solid ${sel ? 'var(--accent)' : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: sel ? 'var(--accent)' : 'transparent', transition: 'all 0.15s ease', flexShrink: 0 }}>
+                            {sel && <Check size={10} color="#fff" />}
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: sel ? 600 : 500, color: 'var(--t)' }}>{dev.hostname || dev.name || 'Urządzenie'}</div>
+                            <div style={{ fontSize: 11, color: 'var(--tm)' }}>{dev.ipAddress || ''} {dev.location?.name ? `· ${dev.location.name}` : ''}</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {selectedDeviceIds.size === 0 && selectedLocationIds.size === 0 && (
+                <div style={{ fontSize: 12, color: 'var(--tm)', marginTop: 8, fontStyle: 'italic' }}>
+                  Wybierz lokalizacje lub urządzenia do udostępnienia
+                </div>
+              )}
+            </div>
+          )}
+
           <div style={{ marginBottom: 20 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ts)', display: 'block', marginBottom: 6 }}>Wiadomość (opcjonalnie)</label>
             <textarea value={message} onChange={e => setMessage(e.target.value)} placeholder="Np. Prosimy o obsługę naszych 14 stanowisk..."
               rows={3} style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--t)', fontSize: 13, outline: 'none', resize: 'vertical' }} />
           </div>
 
-          <button onClick={() => inviteMutation.mutate({ email, accessLevel, scope, message: message || undefined })}
-            disabled={!email || inviteMutation.isPending}
+          <button onClick={() => inviteMutation.mutate({
+              email, accessLevel, scope, message: message || undefined,
+              deviceIds: scope === 'SELECTED' ? Array.from(selectedDeviceIds) : undefined,
+              locationIds: scope === 'SELECTED' ? Array.from(selectedLocationIds) : undefined,
+            })}
+            disabled={!email || inviteMutation.isPending || (scope === 'SELECTED' && selectedDeviceIds.size === 0 && selectedLocationIds.size === 0)}
             style={{
               width: '100%', padding: '14px 20px', borderRadius: 12, border: 'none',
               background: 'linear-gradient(135deg, #4F46E5, #6D28D9)', color: '#fff',
