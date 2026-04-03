@@ -79,7 +79,7 @@ export function MobileLayout({ children }: Props) {
       <header className="relative z-10 px-5 pb-2 flex items-center justify-between safe-area-pt" style={{ paddingTop: 'max(16px, env(safe-area-inset-top, 16px))' }}>
         {/* Logo: [icon] InfraDesk — icon 20-25% larger */}
         <div className="flex items-center gap-[7px]">
-          <img src="/logo.png" alt="InfraDesk" className="h-[44px] w-auto" />
+          <img src="/logo.png" alt="InfraDesk" className="h-[70px] w-auto" />
         </div>
         {/* Right: search, GPS, avatar — compact */}
         <div className="flex items-center gap-2">

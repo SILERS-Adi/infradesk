@@ -256,7 +256,7 @@ export function LoginPage() {
         <div className="absolute inset-0" style={{ backgroundImage: 'url(/tlo.png)', backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.15 }} />
         <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(8,13,25,0.3), rgba(8,13,25,0.9))' }} />
         <div className="relative z-10 flex flex-col items-center w-full max-w-sm">
-          <img src="/logo.png" alt="InfraDesk" className="w-64 max-w-[75%] mb-6 drop-shadow-xl" />
+          <img src="/logo.png" alt="InfraDesk" className="w-80 max-w-[85%] mb-6 drop-shadow-xl" />
           <p className="text-[13px] text-white/40 mb-10">Wybierz wersję interfejsu</p>
           <div className="w-full space-y-3">
             <button onClick={() => navigate('/m')}
@@ -312,7 +312,7 @@ export function LoginPage() {
         </div>
 
         <div className="relative z-10 text-center max-w-md flex flex-col items-center justify-center">
-          <img src="/logo.png" alt="InfraDesk" className="w-96 max-w-[85%] mx-auto mb-10" style={{ filter: 'drop-shadow(0 0 50px rgba(139,92,246,0.2))' }} />
+          <img src="/logo.png" alt="InfraDesk" style={{ width: 480, maxWidth: '90%', marginBottom: 40, filter: 'drop-shadow(0 0 50px rgba(139,92,246,0.2))' }} />
           <p className="text-[13px] font-medium uppercase tracking-[0.2em] mb-10"
             style={{ color: 'rgba(139,92,246,0.5)' }}>
             Zarządzanie infrastrukturą IT
@@ -337,7 +337,7 @@ export function LoginPage() {
 
         {/* Mobile logo */}
         <div className="lg:hidden text-center mb-8 relative z-10">
-          <img src="/logo.png" alt="InfraDesk" className="w-64 max-w-[80%] mx-auto mb-3 drop-shadow-xl" />
+          <img src="/logo.png" alt="InfraDesk" className="w-80 max-w-[85%] mx-auto mb-3 drop-shadow-xl" />
           <p className="text-[10px] font-medium uppercase tracking-[0.15em] mt-1" style={{ color: 'rgba(139,92,246,0.5)' }}>
             Zarządzanie infrastrukturą IT
           </p>

@@ -207,7 +207,7 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
         )}
         <div className="sidebar-logo">
           <img src={collapsed ? "/logo-icon.png" : "/logo.png"} alt="InfraDesk"
-            style={collapsed ? { height: 36, width: 36, objectFit: 'contain' } : { height: 54, objectFit: 'contain' }} />
+            style={collapsed ? { height: 40, width: 40, objectFit: 'contain' } : { height: 90, objectFit: 'contain' }} />
         </div>
       </div>
 
