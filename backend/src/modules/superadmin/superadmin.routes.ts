@@ -97,13 +97,12 @@ router.delete('/tenants/:id', async (req: Request, res: Response, next: NextFunc
     ['order', () => prisma.order.deleteMany({ where: { workspaceId: wsId } })],
     ['delegation', () => prisma.delegation.deleteMany({ where: { workspaceId: wsId } })],
     ['device', () => prisma.device.deleteMany({ where: { workspaceId: wsId } })],
-    ['deviceType', () => prisma.deviceType.deleteMany({ where: { workspaceId: wsId } })],
-    ['accessType', () => prisma.accessType.deleteMany({ where: { workspaceId: wsId } })],
+    // deviceType and accessType are global (no workspaceId) — skip
     ['location', () => prisma.location.deleteMany({ where: { workspaceId: wsId } })],
     ['workspaceSetting', () => prisma.workspaceSetting.deleteMany({ where: { workspaceId: wsId } })],
     ['workspaceManagement', () => prisma.workspaceManagement.deleteMany({ where: { OR: [{ companyWorkspaceId: wsId }, { mspWorkspaceId: wsId }] } })],
     ['accessGrant', () => prisma.accessGrant.deleteMany({ where: { membership: { workspaceId: wsId } } })],
-    ['pushSubscription', () => prisma.pushSubscription.deleteMany({ where: { workspaceId: wsId } })],
+    // pushSubscription has no workspaceId — skip
     ['workspaceMembership', () => prisma.workspaceMembership.deleteMany({ where: { workspaceId: wsId } })],
     ['workspace', () => prisma.workspace.delete({ where: { id: wsId } })],
   ] as [string, () => Promise<any>][];
