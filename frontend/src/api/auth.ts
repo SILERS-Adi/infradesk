@@ -32,4 +32,18 @@ export const authApi = {
     const { data } = await apiClient.post('/auth/reset-password', { token, password });
     return data;
   },
+
+  register: async (payload: {
+    accountType: 'company' | 'personal';
+    firstName: string; lastName: string; email: string; password: string;
+    phone?: string; companyName?: string; companyShortName?: string; taxId?: string;
+  }): Promise<LoginResponse & { workspace: { id: string; name: string; slug: string; type: string } }> => {
+    const { data } = await apiClient.post('/auth/register', payload);
+    return data;
+  },
+
+  checkSlug: async (slug: string): Promise<{ slug: string; available: boolean }> => {
+    const { data } = await apiClient.get('/auth/check-slug', { params: { slug } });
+    return data;
+  },
 };

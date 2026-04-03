@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { loginService, refreshTokenService, getMeService, forgotPasswordService, resetPasswordService } from './auth.service';
+import { loginService, refreshTokenService, getMeService, forgotPasswordService, resetPasswordService, registerService, checkSlugAvailability } from './auth.service';
 import prisma from '../../lib/prisma';
 import { signAccessToken, signRefreshToken, JwtPayload } from '../../utils/jwt';
 
@@ -92,5 +92,21 @@ export async function resetPassword(req: Request, res: Response, next: NextFunct
     if (password.length < 6) { res.status(400).json({ error: 'Hasło musi mieć min. 6 znaków' }); return; }
     const result = await resetPasswordService(token, password);
     res.json(result);
+  } catch (err) { next(err); }
+}
+
+export async function register(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const result = await registerService(req.body);
+    res.status(201).json(result);
+  } catch (err) { next(err); }
+}
+
+export async function checkSlug(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const slug = req.query.slug as string;
+    if (!slug) { res.status(400).json({ error: 'slug is required' }); return; }
+    const available = await checkSlugAvailability(slug);
+    res.json({ slug: slug.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''), available });
   } catch (err) { next(err); }
 }
