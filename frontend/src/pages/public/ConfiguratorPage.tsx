@@ -12,7 +12,6 @@ import {
 
 // ── Types ──
 interface ModuleDef { id: string; name: string; description: string; icon: React.ElementType; features: string[]; priceFrom: number; hasModal?: boolean; showIntegrations?: boolean; }
-interface IntegrationDef { id: string; name: string; icon: string; category: string; }
 interface AddonDef { id: string; name: string; description: string; price: number | null; badge?: string; icon: React.ElementType; }
 
 // ── Infra pricing helpers ──
@@ -85,20 +84,16 @@ function infraSummary(cfg: InfraConfig): string {
   return `MULTI • ${MULTI_COMPANIES[cfg.multiCompanies].label} firm • ${MULTI_SEATS[cfg.multiSeats].label} stan.`;
 }
 
+function isDefaultInfraConfig(cfg: InfraConfig): boolean {
+  return cfg.mode === 'solo' && cfg.soloSeats === 0 && cfg.soloRemote === 0;
+}
+
 // ── Data ──
 const MODULES: ModuleDef[] = [
   { id: 'infra', name: 'Zarządzanie IT', description: 'Pełna kontrola nad środowiskiem IT firmy.', icon: Monitor, features: ['Zarządzanie komputerami', 'Użytkownicy i uprawnienia', 'Monitoring sieci', 'Obsługa środowiska IT'], priceFrom: 0, hasModal: true },
+  { id: 'diagnostic', name: 'Stacje diagnostyczne', description: 'Moduł branżowy dla SKP i motoryzacji.', icon: Car, features: ['Zarządzanie terminami', 'Przypomnienia klientów', 'Procesy stacji', 'Dokumentacja przeglądów'], priceFrom: 99 },
   { id: 'sales', name: 'Sprzedaż', description: 'Faktury, paragony i dokumenty handlowe.', icon: FileText, features: ['Faktury sprzedaży i zakupu', 'Paragony', 'Kartoteka towarów', 'Kontrahenci i dokumenty'], priceFrom: 59, showIntegrations: true },
   { id: 'packing', name: 'Pakowanie', description: 'Sprawny fulfillment zamówień.', icon: Package, features: ['Kompletacja zamówień', 'Skanowanie produktów', 'Statusy pakowania', 'Obsługa wysyłek'], priceFrom: 79, showIntegrations: true },
-  { id: 'diagnostic', name: 'Stacje diagnostyczne', description: 'Moduł branżowy dla SKP i motoryzacji.', icon: Car, features: ['Zarządzanie terminami', 'Przypomnienia klientów', 'Procesy stacji', 'Dokumentacja przeglądów'], priceFrom: 99 },
-];
-const INTEGRATIONS: IntegrationDef[] = [
-  { id: 'allegro', name: 'Allegro', icon: '🛒', category: 'Marketplace' },
-  { id: 'woocommerce', name: 'WooCommerce', icon: '🟣', category: 'E-commerce' },
-  { id: 'shopify', name: 'Shopify', icon: '🟢', category: 'E-commerce' },
-  { id: 'baselinker', name: 'Baselinker', icon: '🔗', category: 'Multi-channel' },
-  { id: 'custom-api', name: 'Własne API', icon: '⚡', category: 'Custom' },
-  { id: 'more', name: 'I wiele więcej...', icon: '🌐', category: 'Other' },
 ];
 const ADDONS: AddonDef[] = [
   { id: 'it-support', name: 'Obsługa informatyczna', description: 'Nie masz IT? Zajmiemy się wszystkim za Ciebie.', price: 99, icon: Headphones },
@@ -337,10 +332,125 @@ function InfraModal({ open, initial, onApply, onCancel }: { open: boolean; initi
   );
 }
 
+// ── Integration Config Modal (for Sales & Packing) ──
+function IntegrationModal({ open, moduleName, moduleIcon: ModIcon, initial, onApply, onCancel }: {
+  open: boolean; moduleName: string; moduleIcon: React.ElementType; initial: number;
+  onApply: (count: number) => void; onCancel: () => void;
+}) {
+  const [count, setCount] = useState(initial);
+  const ease = 'cubic-bezier(0.16,1,0.3,1)';
+
+  useEffect(() => { if (open) setCount(initial); }, [open, initial]);
+
+  useEffect(() => {
+    if (!open) return;
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel(); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [open, onCancel]);
+
+  if (!open) return null;
+
+  const total = count * 10;
+
+  return (
+    <div onClick={onCancel} style={{
+      position: 'fixed', inset: 0, zIndex: 200,
+      background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+      animation: 'cfgFadeIn 0.2s ease',
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto',
+        background: '#fff', borderRadius: 24, padding: '36px 40px',
+        boxShadow: '0 25px 80px rgba(0,0,0,0.2), 0 8px 24px rgba(0,0,0,0.1)',
+        animation: 'cfgModalIn 0.35s cubic-bezier(0.16,1,0.3,1)',
+      }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 14, background: 'linear-gradient(135deg, #4F46E5, #7C3AED)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(79,70,229,0.3)' }}>
+              <ModIcon size={22} color="#fff" />
+            </div>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em' }}>{moduleName}</div>
+              <div style={{ fontSize: 13, color: '#64748B' }}>Konfiguracja integracji API</div>
+            </div>
+          </div>
+          <button onClick={onCancel} style={{ width: 36, height: 36, borderRadius: 10, border: '1px solid #E2E8F0', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: `all 0.2s ease` }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#F1F5F9'; }} onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}>
+            <X size={16} color="#64748B" />
+          </button>
+        </div>
+
+        {/* Helper texts */}
+        <div style={{ marginBottom: 28, padding: '18px 22px', borderRadius: 14, background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+          <div style={{ fontSize: 14, color: '#334155', fontWeight: 600, marginBottom: 8 }}>Integracje działają z platformami posiadającymi API.</div>
+          <div style={{ fontSize: 13, color: '#64748B', lineHeight: 1.6 }}>Podłącz Allegro, sklep internetowy, ERP lub własny system — jeśli posiada API.</div>
+        </div>
+
+        {/* Slider */}
+        <div style={{ marginBottom: 32 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#94A3B8', marginBottom: 20 }}>Liczba integracji</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#334155' }}>Integracje API</span>
+            <span style={{ fontSize: 14, fontWeight: 750, color: '#4F46E5', fontVariantNumeric: 'tabular-nums' }}>
+              {count}
+            </span>
+          </div>
+          <div style={{ position: 'relative', height: 40, display: 'flex', alignItems: 'center' }}>
+            <div style={{ position: 'absolute', left: 0, right: 0, height: 6, borderRadius: 3, background: '#E2E8F0' }} />
+            <div style={{ position: 'absolute', left: 0, height: 6, borderRadius: 3, background: 'linear-gradient(90deg, #4F46E5, #7C3AED)', width: `${(count / 10) * 100}%`, transition: `width 0.25s ${ease}` }} />
+            <input type="range" min={0} max={10} value={count} onChange={e => setCount(Number(e.target.value))}
+              style={{ position: 'absolute', left: 0, right: 0, width: '100%', height: 40, opacity: 0, cursor: 'pointer', zIndex: 3 }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+            {Array.from({ length: 11 }, (_, i) => (
+              <span key={i} style={{ fontSize: 10, color: i === count ? '#4F46E5' : '#94A3B8', fontWeight: i === count ? 700 : 400, transition: 'all 0.2s ease', minWidth: 0, textAlign: 'center' }}>{i}</span>
+            ))}
+          </div>
+        </div>
+
+        {/* Live price */}
+        <div style={{ borderRadius: 16, padding: '20px 24px', marginBottom: 28, background: 'linear-gradient(145deg, #F0FDF4, #ECFDF5, #D1FAE5)', border: '1px solid rgba(16,185,129,0.12)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <span style={{ fontSize: 15, fontWeight: 650, color: '#064E3B' }}>Integracje:</span>
+            <span style={{ fontSize: 22, fontWeight: 900, color: '#059669', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
+              {count} &times; 10 zł = {total} zł<span style={{ fontSize: 14, fontWeight: 400, color: '#64748B' }}> / msc</span>
+            </span>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button onClick={onCancel} style={{
+            flex: 1, padding: '16px 20px', borderRadius: 14, border: '1px solid #E2E8F0', background: '#fff',
+            color: '#64748B', fontSize: 15, fontWeight: 650, cursor: 'pointer', transition: `all 0.2s ${ease}`,
+          }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#F8FAFC'; e.currentTarget.style.borderColor = '#CBD5E1'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#E2E8F0'; }}
+          >Anuluj</button>
+          <button onClick={() => onApply(count)} style={{
+            flex: 2, padding: '16px 20px', borderRadius: 14, border: 'none',
+            background: 'linear-gradient(135deg, #4F46E5, #6D28D9)', color: '#fff',
+            fontSize: 15, fontWeight: 750, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            boxShadow: '0 4px 16px rgba(79,70,229,0.35)', transition: `all 0.25s ${ease}`,
+          }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px) scale(1.01)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(79,70,229,0.4)'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0) scale(1)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(79,70,229,0.35)'; }}
+            onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.98)'; }}
+            onMouseUp={e => { e.currentTarget.style.transform = 'translateY(-1px) scale(1.01)'; }}
+          ><Check size={18} /> Zastosuj</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Scenario generation ──
 interface ScenarioStep { icon: React.ElementType; title: string; desc: string; }
 
-function generateScenario(modules: Set<string>, infraCfg: InfraConfig): ScenarioStep[] {
+function generateScenario(modules: Set<string>, infraCfg: InfraConfig, salesInt: number, packingInt: number): ScenarioStep[] {
   const steps: ScenarioStep[] = [];
   const hasInfra = modules.has('infra');
   const hasSales = modules.has('sales');
@@ -371,17 +481,30 @@ function generateScenario(modules: Set<string>, infraCfg: InfraConfig): Scenario
   }
 
   if (hasSales && hasPacking) {
-    steps.push({ icon: ShoppingCart, title: 'Nowe zamówienie z platformy', desc: 'Allegro, WooCommerce, Shopify — zamówienie wpada automatycznie.' });
+    const hasAnyInt = salesInt > 0 || packingInt > 0;
+    if (hasAnyInt) {
+      steps.push({ icon: ShoppingCart, title: 'Nowe zamówienie z platformy', desc: 'Nowe zamówienie wpada z platformy przez API.' });
+    } else {
+      steps.push({ icon: ShoppingCart, title: 'Nowe zamówienie w systemie', desc: 'Ręczne wprowadzanie danych do systemu.' });
+    }
     steps.push({ icon: Package, title: 'Kompletacja rozpoczęta', desc: 'Pracownik skanuje produkty wg listy zamówienia.' });
     steps.push({ icon: Scan, title: 'Weryfikacja przez skan', desc: 'System sprawdza czy wszystko się zgadza. Bez błędów.' });
     steps.push({ icon: FileText, title: 'Faktura lub paragon', desc: 'Dokument generuje się automatycznie.' });
     steps.push({ icon: Car, title: 'List przewozowy gotowy', desc: 'Zamówienie spakowane, etykieta wydrukowana, gotowe do wysyłki.' });
   } else if (hasSales) {
-    steps.push({ icon: FileText, title: 'Dane trafiają do systemu', desc: 'Kontrahenci, towary, ceny — baza danych gotowa.' });
+    if (salesInt > 0) {
+      steps.push({ icon: ShoppingCart, title: 'Nowe zamówienie z platformy', desc: 'Nowe zamówienie wpada z platformy przez API.' });
+    } else {
+      steps.push({ icon: FileText, title: 'Dane trafiają do systemu', desc: 'Ręczne wprowadzanie danych do systemu.' });
+    }
     steps.push({ icon: FileText, title: 'Tworzysz dokument', desc: 'Faktura, paragon lub inny dokument sprzedaży w kilka kliknięć.' });
     steps.push({ icon: Users, title: 'Zarządzasz kontrahentami', desc: 'Historia współpracy, płatności, dokumenty — przejrzyście.' });
   } else if (hasPacking) {
-    steps.push({ icon: ShoppingCart, title: 'Zamówienie w systemie', desc: 'Nowe zamówienie trafia na listę do realizacji.' });
+    if (packingInt > 0) {
+      steps.push({ icon: ShoppingCart, title: 'Nowe zamówienie z platformy', desc: 'Nowe zamówienie wpada z platformy przez API.' });
+    } else {
+      steps.push({ icon: ShoppingCart, title: 'Zamówienie w systemie', desc: 'Ręczne wprowadzanie danych do systemu.' });
+    }
     steps.push({ icon: Package, title: 'Kompletacja i pakowanie', desc: 'Skanowanie produktów, weryfikacja, pakowanie.' });
     steps.push({ icon: Car, title: 'Wysyłka', desc: 'Etykieta, list przewozowy, status — automatycznie.' });
   }
@@ -575,13 +698,33 @@ export default function ConfiguratorPage() {
   // Infra modal state
   const [infraModal, setInfraModal] = useState(false);
   const [infraConfig, setInfraConfig] = useState<InfraConfig>(defaultInfraConfig);
+  // Integration modal state (sales/packing)
+  const [integrationModal, setIntegrationModal] = useState<null | 'sales' | 'packing'>(null);
+  const [salesIntegrations, setSalesIntegrations] = useState(0);
+  const [packingIntegrations, setPackingIntegrations] = useState(0);
+  // Auto-include infra state
+  const [infraAutoIncluded, setInfraAutoIncluded] = useState(false);
   // Scenario modal
   const [scenarioOpen, setScenarioOpen] = useState(false);
-  const scenarioSteps = useMemo(() => generateScenario(activeModules, infraConfig), [activeModules, infraConfig]);
+  const scenarioSteps = useMemo(() => generateScenario(activeModules, infraConfig, salesIntegrations, packingIntegrations), [activeModules, infraConfig, salesIntegrations, packingIntegrations]);
+
+  // Check if any non-infra module is active and auto-include infra
+  const checkAutoIncludeInfra = useCallback((modules: Set<string>) => {
+    const hasNonInfra = Array.from(modules).some(id => id !== 'infra');
+    if (hasNonInfra && !modules.has('infra')) {
+      const next = new Set(modules);
+      next.add('infra');
+      setActiveModules(next);
+      setInfraConfig(defaultInfraConfig);
+      setInfraAutoIncluded(true);
+    }
+  }, []);
 
   const toggleModule = (id: string) => {
     if (id === 'infra') {
       if (activeModules.has('infra')) {
+        // If auto-included, don't allow deactivation
+        if (infraAutoIncluded) return;
         // Deactivate
         setActiveModules(prev => { const n = new Set(prev); n.delete('infra'); return n; });
         setInfraConfig(defaultInfraConfig);
@@ -592,9 +735,47 @@ export default function ConfiguratorPage() {
       triggerPricePulse();
       return;
     }
-    setActiveModules(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    if (id === 'sales' || id === 'packing') {
+      if (activeModules.has(id)) {
+        // Deactivating: remove + reset integrations
+        const next = new Set(activeModules);
+        next.delete(id);
+        if (id === 'sales') setSalesIntegrations(0);
+        if (id === 'packing') setPackingIntegrations(0);
+        setActiveModules(next);
+      } else {
+        // Activating: add + open integration modal
+        const next = new Set(activeModules);
+        next.add(id);
+        setActiveModules(next);
+        setIntegrationModal(id);
+        // Auto-include infra check
+        setTimeout(() => checkAutoIncludeInfra(next), 0);
+      }
+      triggerPricePulse();
+      return;
+    }
+    // Other modules (diagnostic, etc.)
+    const next = new Set(activeModules);
+    next.has(id) ? next.delete(id) : next.add(id);
+    setActiveModules(next);
+    // Auto-include infra check
+    if (!next.has(id)) {
+      // just removed — no need to auto-include
+    } else {
+      setTimeout(() => checkAutoIncludeInfra(next), 0);
+    }
     triggerPricePulse();
   };
+
+  // After every activeModules change, check auto-include
+  useEffect(() => {
+    const hasNonInfra = Array.from(activeModules).some(id => id !== 'infra');
+    if (hasNonInfra && !activeModules.has('infra')) {
+      checkAutoIncludeInfra(activeModules);
+    }
+  }, [activeModules, checkAutoIncludeInfra]);
+
   const toggleAddon = (id: string) => {
     setActiveAddons(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
     triggerPricePulse();
@@ -609,25 +790,56 @@ export default function ConfiguratorPage() {
     setInfraConfig(cfg);
     setActiveModules(prev => { const n = new Set(prev); n.add('infra'); return n; });
     setInfraModal(false);
+    setInfraAutoIncluded(false); // User manually configured
     triggerPricePulse();
   }, [triggerPricePulse]);
+
+  const handleIntegrationApply = useCallback((count: number) => {
+    if (integrationModal === 'sales') setSalesIntegrations(count);
+    if (integrationModal === 'packing') setPackingIntegrations(count);
+    setIntegrationModal(null);
+    triggerPricePulse();
+  }, [integrationModal, triggerPricePulse]);
 
   const infraPrice = useMemo(() => calcInfraPrice(infraConfig), [infraConfig]);
 
   const pricing = useMemo(() => {
-    let monthly = 0; const items: { name: string; price: number }[] = [];
+    let monthly = 0;
+    const items: { name: string; price: number; sub?: string }[] = [];
     activeModules.forEach(modId => {
       const mod = MODULES.find(m => m.id === modId); if (!mod) return;
       if (modId === 'infra') {
-        items.push({ name: `Zarządzanie IT (${infraConfig.mode.toUpperCase()})`, price: infraPrice.total });
-        monthly += infraPrice.total;
+        if (infraAutoIncluded && isDefaultInfraConfig(infraConfig)) {
+          items.push({ name: 'Zarządzanie IT (gratis)', price: 0, sub: '1 stanowisko' });
+        } else {
+          items.push({ name: `Zarządzanie IT (${infraConfig.mode.toUpperCase()})`, price: infraPrice.total, sub: infraSummary(infraConfig) });
+          monthly += infraPrice.total;
+        }
+      } else if (modId === 'sales') {
+        const intPrice = salesIntegrations * 10;
+        const totalPrice = mod.priceFrom + intPrice;
+        items.push({
+          name: mod.name,
+          price: totalPrice,
+          sub: salesIntegrations > 0 ? `${salesIntegrations} integracji API` : undefined,
+        });
+        monthly += totalPrice;
+      } else if (modId === 'packing') {
+        const intPrice = packingIntegrations * 10;
+        const totalPrice = mod.priceFrom + intPrice;
+        items.push({
+          name: mod.name,
+          price: totalPrice,
+          sub: packingIntegrations > 0 ? `${packingIntegrations} integracji API` : undefined,
+        });
+        monthly += totalPrice;
       } else {
         items.push({ name: mod.name, price: mod.priceFrom }); monthly += mod.priceFrom;
       }
     });
     activeAddons.forEach(id => { const a = ADDONS.find(a => a.id === id); if (a?.price) { items.push({ name: a.name, price: a.price }); monthly += a.price; } });
     return { items, monthly };
-  }, [activeModules, activeAddons, infraConfig, infraPrice]);
+  }, [activeModules, activeAddons, infraConfig, infraPrice, infraAutoIncluded, salesIntegrations, packingIntegrations]);
 
   // Flash new items in pricing list
   const prevItemCount = useRef(pricing.items.length);
@@ -641,7 +853,6 @@ export default function ConfiguratorPage() {
     prevItemCount.current = pricing.items.length;
   }, [pricing.items.length]);
 
-  const showIntegrations = activeModules.has('sales') || activeModules.has('packing');
   const ease = 'cubic-bezier(0.16,1,0.3,1)';
   const easeOut = 'cubic-bezier(0.4,0,0.2,1)';
 
@@ -658,12 +869,64 @@ export default function ConfiguratorPage() {
     const clicked = clickedModule === mod.id;
     const Icon = mod.icon;
     const isInfra = mod.id === 'infra';
-    const displayPrice = isInfra && active ? infraPrice.total : mod.priceFrom;
-    const priceLabel = isInfra && !active ? 'od 0 zł' : `${displayPrice} zł`;
+    const isSales = mod.id === 'sales';
+    const isPacking = mod.id === 'packing';
+    const hasIntegrationModal = isSales || isPacking;
+    const intCount = isSales ? salesIntegrations : isPacking ? packingIntegrations : 0;
+    const intPrice = intCount * 10;
+
+    // Compute display price
+    let displayPrice: number;
+    let priceLabel: string;
+    if (isInfra && active && infraAutoIncluded && isDefaultInfraConfig(infraConfig)) {
+      displayPrice = 0;
+      priceLabel = '0 zł';
+    } else if (isInfra && active) {
+      displayPrice = infraPrice.total;
+      priceLabel = `${displayPrice} zł`;
+    } else if (hasIntegrationModal && active) {
+      displayPrice = mod.priceFrom + intPrice;
+      priceLabel = `${displayPrice} zł`;
+    } else if (isInfra && !active) {
+      displayPrice = mod.priceFrom;
+      priceLabel = 'od 0 zł';
+    } else {
+      displayPrice = mod.priceFrom;
+      priceLabel = `${displayPrice} zł`;
+    }
+
+    // Card click handler
+    const onCardClick = () => {
+      if (isInfra) {
+        if (active) {
+          setInfraModal(true);
+          setInfraAutoIncluded(false); // User manually opens modal
+        } else {
+          handleModuleClick(mod.id);
+        }
+      } else if (hasIntegrationModal) {
+        if (active) {
+          setIntegrationModal(mod.id as 'sales' | 'packing');
+        } else {
+          handleModuleClick(mod.id);
+        }
+      } else {
+        handleModuleClick(mod.id);
+      }
+    };
+
+    // Toggle click handler
+    const onToggleClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      handleModuleClick(mod.id);
+    };
+
+    // Determine if infra toggle should be disabled (auto-included)
+    const infraToggleDisabled = isInfra && active && infraAutoIncluded;
 
     return (
       <FadeInSection key={mod.id} delay={modIdx * 80}>
-        <div onClick={() => { if (!active || !isInfra) handleModuleClick(mod.id); else setInfraModal(true); }} style={{
+        <div onClick={onCardClick} style={{
           padding: 32, borderRadius: 22, cursor: 'pointer', minHeight: 320,
           display: 'flex', flexDirection: 'column' as const,
           background: active ? 'linear-gradient(160deg, #EEF2FF 0%, #F5F3FF 50%, #fff 100%)' : '#fff',
@@ -678,22 +941,35 @@ export default function ConfiguratorPage() {
           onMouseLeave={e => { if (!active) { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.02)'; e.currentTarget.style.transform = 'scale(1)'; } }}
         >
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
-            <div style={{
-              width: 52, height: 52, borderRadius: 16,
-              background: active ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : 'linear-gradient(135deg, #F1F5F9, #E2E8F0)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: `all 0.35s ${ease}`,
-              boxShadow: active ? '0 6px 16px rgba(79,70,229,0.35)' : '0 1px 3px rgba(0,0,0,0.06)',
-              transform: clicked ? 'rotate(-8deg) scale(1.1)' : 'rotate(0deg) scale(1)',
-            }}>
-              <Icon size={26} color={active ? '#fff' : '#64748B'} strokeWidth={1.7} />
+            <div style={{ position: 'relative' }}>
+              <div style={{
+                width: 52, height: 52, borderRadius: 16,
+                background: active ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : 'linear-gradient(135deg, #F1F5F9, #E2E8F0)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: `all 0.35s ${ease}`,
+                boxShadow: active ? '0 6px 16px rgba(79,70,229,0.35)' : '0 1px 3px rgba(0,0,0,0.06)',
+                transform: clicked ? 'rotate(-8deg) scale(1.1)' : 'rotate(0deg) scale(1)',
+              }}>
+                <Icon size={26} color={active ? '#fff' : '#64748B'} strokeWidth={1.7} />
+              </div>
+              {/* GRATIS badge for auto-included infra */}
+              {isInfra && active && infraAutoIncluded && isDefaultInfraConfig(infraConfig) && (
+                <div style={{
+                  position: 'absolute', top: -8, right: -32,
+                  padding: '2px 10px', borderRadius: 8,
+                  background: 'linear-gradient(135deg, #ECFDF5, #D1FAE5)', color: '#059669',
+                  fontSize: 10, fontWeight: 800, letterSpacing: '0.05em',
+                  boxShadow: '0 1px 4px rgba(16,185,129,0.2)',
+                }}>GRATIS</div>
+              )}
             </div>
             {/* Toggle */}
-            <div onClick={e => { e.stopPropagation(); handleModuleClick(mod.id); }} style={{
-              width: 44, height: 26, borderRadius: 13, padding: 2, cursor: 'pointer',
+            <div onClick={infraToggleDisabled ? undefined : onToggleClick} style={{
+              width: 44, height: 26, borderRadius: 13, padding: 2, cursor: infraToggleDisabled ? 'default' : 'pointer',
               background: active ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : '#E2E8F0',
               transition: `all 0.35s ${ease}`,
               boxShadow: active ? '0 2px 8px rgba(79,70,229,0.35)' : 'inset 0 1px 3px rgba(0,0,0,0.1)',
+              opacity: infraToggleDisabled ? 0.6 : 1,
             }}>
               <div style={{
                 width: 22, height: 22, borderRadius: 11, background: '#fff',
@@ -704,10 +980,27 @@ export default function ConfiguratorPage() {
             </div>
           </div>
 
-          <div style={{ fontSize: 18, fontWeight: 750, color: '#0F172A', marginBottom: isInfra && active ? 8 : 14, letterSpacing: '-0.02em' }}>{mod.name}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: isInfra && active ? 8 : hasIntegrationModal && active && intCount > 0 ? 8 : 14 }}>
+            <span style={{ fontSize: 18, fontWeight: 750, color: '#0F172A', letterSpacing: '-0.02em' }}>{mod.name}</span>
+          </div>
 
-          {/* Infra active: show summary + change button instead of features */}
-          {isInfra && active ? (
+          {/* Infra active + auto-included: show gratis info */}
+          {isInfra && active && infraAutoIncluded && isDefaultInfraConfig(infraConfig) ? (
+            <div>
+              <div style={{ fontSize: 14, color: '#059669', fontWeight: 600, marginBottom: 16 }}>1 stanowisko gratis</div>
+              <button onClick={e => { e.stopPropagation(); setInfraModal(true); setInfraAutoIncluded(false); }} style={{
+                padding: '10px 20px', borderRadius: 12, border: '1px solid #C7D2FE', background: 'rgba(79,70,229,0.04)',
+                color: '#4F46E5', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                transition: `all 0.2s ${ease}`,
+              }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(79,70,229,0.08)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(79,70,229,0.04)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+              >
+                <Settings2 size={14} /> Zmień konfigurację
+              </button>
+            </div>
+          ) : isInfra && active ? (
+            /* Infra active: show summary + change button instead of features */
             <div>
               <div style={{ fontSize: 14, color: '#64748B', marginBottom: 16 }}>{infraSummary(infraConfig)}</div>
               <button onClick={e => { e.stopPropagation(); setInfraModal(true); }} style={{
@@ -719,6 +1012,21 @@ export default function ConfiguratorPage() {
                 onMouseLeave={e => { e.currentTarget.style.background = 'rgba(79,70,229,0.04)'; e.currentTarget.style.transform = 'translateY(0)'; }}
               >
                 <Settings2 size={14} /> Zmień konfigurację
+              </button>
+            </div>
+          ) : hasIntegrationModal && active && intCount > 0 ? (
+            /* Sales/Packing active with integrations: show summary + change button */
+            <div>
+              <div style={{ fontSize: 14, color: '#64748B', marginBottom: 16 }}>{intCount} integracje API</div>
+              <button onClick={e => { e.stopPropagation(); setIntegrationModal(mod.id as 'sales' | 'packing'); }} style={{
+                padding: '10px 20px', borderRadius: 12, border: '1px solid #C7D2FE', background: 'rgba(79,70,229,0.04)',
+                color: '#4F46E5', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                transition: `all 0.2s ${ease}`,
+              }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(79,70,229,0.08)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(79,70,229,0.04)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+              >
+                <Settings2 size={14} /> Zmień
               </button>
             </div>
           ) : (
@@ -747,11 +1055,24 @@ export default function ConfiguratorPage() {
     );
   };
 
+  // Integration modal: determine which module
+  const intModalMod = integrationModal ? MODULES.find(m => m.id === integrationModal) : null;
+
   return (
     <div style={{ minHeight: '100vh', background: '#F8FAFC', color: '#0F172A', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", scrollBehavior: 'smooth' }}>
 
       {/* Modals */}
       <InfraModal open={infraModal} initial={infraConfig} onApply={handleInfraApply} onCancel={() => setInfraModal(false)} />
+      {intModalMod && (
+        <IntegrationModal
+          open={integrationModal !== null}
+          moduleName={intModalMod.name}
+          moduleIcon={intModalMod.icon}
+          initial={integrationModal === 'sales' ? salesIntegrations : packingIntegrations}
+          onApply={handleIntegrationApply}
+          onCancel={() => setIntegrationModal(null)}
+        />
+      )}
       <ScenarioModal open={scenarioOpen} steps={scenarioSteps} onClose={() => setScenarioOpen(false)} />
 
       {/* ── AMBIENT GLOW ── */}
@@ -811,39 +1132,6 @@ export default function ConfiguratorPage() {
               </div>
             </section>
           </FadeInSection>
-
-          {/* ── INTEGRATIONS ── */}
-          <ExpandSection open={showIntegrations}>
-            <FadeInSection>
-              <section style={{ marginTop: 64 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                  <Plug size={16} color="#4F46E5" />
-                  <h2 style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#94A3B8', margin: 0 }}>Integracje</h2>
-                </div>
-                <h3 style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.03em', marginBottom: 6 }}>Działa z Twoimi systemami</h3>
-                <p style={{ fontSize: 16, color: '#64748B', marginBottom: 28 }}>Podłącz sklepy, marketplace i systemy przez API.</p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
-                  {INTEGRATIONS.map((int, ii) => (
-                    <div key={int.id} className="cfg-integration" style={{
-                      display: 'flex', alignItems: 'center', gap: 14, padding: '18px 22px', borderRadius: 16,
-                      background: '#fff', border: '1px solid #E2E8F0', position: 'relative', overflow: 'hidden',
-                      transition: `all 0.25s ${ease}`, cursor: 'pointer',
-                      animation: `cfgSlideUp 0.4s ${ease} ${ii * 60}ms both`,
-                    }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#A5B4FC'; e.currentTarget.style.background = 'linear-gradient(135deg, #F5F3FF, #EEF2FF)'; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(79,70,229,0.1)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.background = '#fff'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
-                      onMouseDown={e => { e.currentTarget.style.transform = 'translateY(0) scale(0.97)'; }}
-                      onMouseUp={e => { e.currentTarget.style.transform = 'translateY(-2px) scale(1)'; }}
-                    >
-                      <span style={{ fontSize: 28, lineHeight: 1 }}>{int.icon}</span>
-                      <span style={{ fontSize: 15, fontWeight: 650, color: '#334155' }}>{int.name}</span>
-                      <ChevronRight size={14} color="#CBD5E1" style={{ marginLeft: 'auto', transition: `transform 0.2s ${easeOut}` }} className="cfg-int-arrow" />
-                    </div>
-                  ))}
-                </div>
-              </section>
-            </FadeInSection>
-          </ExpandSection>
 
           {/* ── ADDONS ── */}
           <FadeInSection delay={200}>
@@ -939,7 +1227,10 @@ export default function ConfiguratorPage() {
                     background: flashItems.has(i) ? 'rgba(79,70,229,0.04)' : 'transparent',
                     transition: 'background 0.4s ease', borderRadius: 8, marginLeft: -8, marginRight: -8,
                   }}>
-                    <span style={{ fontSize: 14, color: '#334155', fontWeight: 500 }}>{item.name}</span>
+                    <div>
+                      <span style={{ fontSize: 14, color: '#334155', fontWeight: 500, display: 'block' }}>{item.name}</span>
+                      {item.sub && <span style={{ fontSize: 12, color: '#94A3B8', fontWeight: 450, display: 'block', marginTop: 2 }}>{item.sub}</span>}
+                    </div>
                     <span style={{ fontSize: 14, fontWeight: 750, color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}>{item.price} zł</span>
                   </div>
                 ))}
@@ -1062,7 +1353,6 @@ export default function ConfiguratorPage() {
         @keyframes cfgPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.95); } }
         @keyframes cfgModalIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         @keyframes cfgStepIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
-        .cfg-integration:hover .cfg-int-arrow { transform: translateX(3px) !important; }
         .cfg-cta-btn::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 50%); opacity: 0; transition: opacity 0.3s ease; pointer-events: none; border-radius: inherit; }
         .cfg-cta-btn:hover::after { opacity: 1; }
         html { scroll-behavior: smooth; }
