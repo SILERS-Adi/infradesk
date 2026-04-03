@@ -57,6 +57,7 @@ export interface User {
 export interface Location {
   id: string;
   workspaceId: string;
+  clientId?: string; // legacy stub
   name: string;
   type: LocationType;
   addressLine1?: string;
@@ -174,6 +175,7 @@ export interface Ticket {
   id: string;
   ticketNumber: string;
   workspaceId: string;
+  clientId?: string; // legacy stub
   locationId: string;
   location?: { id: string; name: string };
   deviceId?: string;
@@ -284,6 +286,9 @@ export interface Client {
   hasContract?: boolean;
   [key: string]: any;
 }
+
+/** Stub — ClientStatus removed in workspace migration */
+export type ClientStatus = 'ACTIVE' | 'INACTIVE';
 
 export interface ClientDashboardStats {
   client?: { id: string; name: string; status: string };
