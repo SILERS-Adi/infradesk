@@ -6,12 +6,12 @@
 import apiClient from './client';
 
 export const clientsApi = {
-  getAll: async (_params?: any) => [],
-  getOne: async (id: string) => ({ id, name: 'Workspace', hasContract: false }),
-  search: async (_q: string) => [],
-  getPaged: async (_params?: any) => ({ items: [] as any[], total: 0, pages: 1, pagination: { page: 1, pages: 1, total: 0, totalPages: 1 } }),
-  create: async (_data: any) => ({}),
-  update: async (_id: string, _data: any) => ({}),
-  delete: async (_id: string) => ({}),
-  deactivate: async (_id: string) => ({}),
+  getAll: async (_params?: any): Promise<any[]> => [],
+  getOne: async (id: string): Promise<any> => ({ id, name: 'Workspace', hasContract: false }),
+  search: async (_q: string): Promise<any[]> => [],
+  getPaged: async (_params?: any): Promise<any> => ({ items: [], total: 0, pages: 1, data: [], pagination: { page: 1, pages: 1, total: 0, totalPages: 1 } }),
+  create: async (_data: any): Promise<any> => ({}),
+  update: async (_id: string, _data: any): Promise<any> => ({}),
+  delete: async (_id: string): Promise<any> => ({}),
+  deactivate: async (_id: string): Promise<any> => ({}),
 };
