@@ -912,8 +912,9 @@ export default function ConfiguratorPage() {
 
         {/* ── RIGHT: PRICING BOX ── */}
         <aside style={{ width: 380, flexShrink: 0 }}>
+         <div style={{ position: 'sticky', top: 88 }}>
           <div style={{
-            position: 'sticky', top: 88, padding: 36, borderRadius: 24,
+            padding: 36, borderRadius: 24,
             background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(24px) saturate(1.8)',
             border: '1px solid rgba(0,0,0,0.06)',
             boxShadow: '0 4px 40px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04), 0 20px 60px rgba(0,0,0,0.03)',
@@ -1051,6 +1052,7 @@ export default function ConfiguratorPage() {
               </button>
             </div>
           )}
+         </div>
         </aside>
       </div>
 
