@@ -191,6 +191,14 @@ export async function createTicket(
 
   const assignedToUserId = data.assignedToUserId || undefined;
 
+  // Auto-calculate SLA deadline based on priority if not provided
+  let dueAt = data.dueAt ? new Date(data.dueAt) : undefined;
+  if (!dueAt) {
+    const slaHours: Record<string, number> = { LOW: 48, MEDIUM: 24, HIGH: 8, CRITICAL: 4 };
+    const hours = slaHours[data.priority] ?? 24;
+    dueAt = new Date(Date.now() + hours * 3600000);
+  }
+
   const ticket = await prisma.ticket.create({
     data: {
       ticketNumber,
@@ -207,7 +215,7 @@ export async function createTicket(
       description: data.description,
       reporterName: data.reporterName,
       reporterPhone: data.reporterPhone,
-      dueAt: data.dueAt ? new Date(data.dueAt) : undefined,
+      dueAt,
       billedInContract: data.billedInContract ?? false,
       serviceMode: data.serviceMode ?? null,
     },
