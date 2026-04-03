@@ -65,6 +65,7 @@ import LandingPage from './pages/public/LandingPage';
 import LegalPage from './pages/public/LegalPage';
 import ContactPage from './pages/public/ContactPage';
 import AiPanelPage from './pages/public/AiPanelPage';
+import ConfiguratorPage from './pages/public/ConfiguratorPage';
 import MonitoringPage from './pages/admin/MonitoringPage';
 import AiCommandsPage from './pages/admin/AiCommandsPage';
 import ModuleTemplatePreviewPage from './pages/admin/ModuleTemplatePreviewPage';
@@ -322,6 +323,7 @@ export default function App() {
             <Route path="/kontakt" element={<ContactPage />} />
             <Route path="/pobieranie" element={<PublicDownloadsPage />} />
             <Route path="/ai-panel" element={<AiPanelPage />} />
+            <Route path="/konfigurator" element={<ConfiguratorPage />} />
             <Route path="/tv" element={<TvDashboardPage />} />
             <Route path="/qr/:qrCodeValue" element={<QrPage />} />
 
