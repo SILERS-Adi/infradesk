@@ -133,10 +133,11 @@ export default function RegisterPage() {
             return (
               <button key={t.id} onClick={() => setAccountType(t.id)} style={{
                 flex: 1, padding: '12px 16px', borderRadius: 12, border: 'none',
-                background: sel ? 'rgba(79,70,229,0.2)' : 'transparent',
-                color: sel ? '#A5B4FC' : 'var(--tm)',
+                background: sel ? (isLight ? '#fff' : 'rgba(79,70,229,0.2)') : 'transparent',
+                color: sel ? (isLight ? '#4F46E5' : '#A5B4FC') : 'var(--ts)',
                 fontSize: 14, fontWeight: sel ? 700 : 500, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                boxShadow: sel && isLight ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
                 transition: `all 0.25s ${ease}`,
               }}>
                 <TI size={16} /> {t.label}
