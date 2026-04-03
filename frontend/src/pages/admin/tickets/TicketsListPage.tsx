@@ -259,7 +259,7 @@ function loadColumns(): string[] {
     const s = localStorage.getItem(STORAGE_KEY);
     if (s) return JSON.parse(s);
   } catch {}
-  return ['number', 'title', 'client', 'priority', 'assigned', 'status', 'serviceMode', 'date'];
+  return ['number', 'title', 'client', 'priority', 'assigned', 'status', 'serviceMode', 'date', 'sla'];
 }
 
 function saveColumns(keys: string[]) {
@@ -408,6 +408,20 @@ export function TicketsListPage() {
           {formatDate(t.reportedAt)}
         </span>
       ),
+    },
+    {
+      key: 'sla', label: 'SLA', group: 'Czas', defaultVisible: true,
+      render: (t: Ticket) => {
+        if (!t.dueAt) return <span style={{ color: 'var(--td)' }}>—</span>;
+        if (t.status === 'COMPLETED' || t.status === 'CANCELLED' || t.status === 'RESOLVED') return <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(34,197,94,0.1)', color: '#4ADE80' }}>OK</span>;
+        const due = new Date(t.dueAt);
+        const now = new Date();
+        const hoursLeft = (due.getTime() - now.getTime()) / 3600000;
+        if (hoursLeft < 0) return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.12)', color: '#F87171' }}>PRZETERMINOWANE</span>;
+        if (hoursLeft < 4) return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(251,191,36,0.12)', color: '#FBBF24' }}>{Math.ceil(hoursLeft)}h</span>;
+        const d = due.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' });
+        return <span className="text-[10px] font-semibold" style={{ color: 'var(--tm)' }}>{d}</span>;
+      },
     },
   ], [activeTab, technicians]);
 

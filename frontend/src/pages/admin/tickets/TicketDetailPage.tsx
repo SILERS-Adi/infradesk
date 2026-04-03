@@ -278,14 +278,23 @@ export function TicketDetailPage() {
           <Section title="Szczegóły">
             <div className="space-y-0">
               {[
-                { label: 'Klient', value: ticket.location?.name || '—' },
-                { label: 'Lokalizacja', value: ticket.location?.name },
+                { label: 'Lokalizacja', value: ticket.location?.name || '—' },
                 { label: 'Urządzenie', value: ticket.device ? <Link to={`/devices/${ticket.device.id}`} className="text-violet-400 hover:underline">{ticket.device.name}</Link> : null },
                 { label: 'Typ', value: TYPE_LABELS[ticket.type] ?? ticket.type },
                 { label: 'Priorytet', value: <PriorityBadge priority={ticket.priority} /> },
                 { label: 'Źródło', value: SOURCE_LABELS[ticket.source] ?? ticket.source },
                 { label: 'Zgłoszono', value: formatDateTime(ticket.reportedAt) },
-                { label: 'Termin', value: ticket.dueAt ? formatDateTime(ticket.dueAt) : null },
+                { label: 'Termin SLA', value: ticket.dueAt ? (() => {
+                  const due = new Date(ticket.dueAt);
+                  const now = new Date();
+                  const done = ticket.status === 'COMPLETED' || ticket.status === 'RESOLVED' || ticket.status === 'CANCELLED';
+                  const hoursLeft = (due.getTime() - now.getTime()) / 3600000;
+                  const dateStr = formatDateTime(ticket.dueAt);
+                  if (done) return <span style={{ color: '#4ADE80' }}>{dateStr} ✓</span>;
+                  if (hoursLeft < 0) return <span style={{ color: '#F87171', fontWeight: 700 }}>{dateStr} — PRZETERMINOWANE ({Math.abs(Math.round(hoursLeft))}h temu)</span>;
+                  if (hoursLeft < 4) return <span style={{ color: '#FBBF24', fontWeight: 600 }}>{dateStr} — {Math.ceil(hoursLeft)}h pozostało</span>;
+                  return <span>{dateStr}</span>;
+                })() : null },
                 { label: 'Przypisany', value: ticket.assignedTo ? `${ticket.assignedTo.firstName} ${ticket.assignedTo.lastName}` : null },
                 { label: 'Autor', value: ticket.createdBy ? `${ticket.createdBy.firstName} ${ticket.createdBy.lastName}` : null },
               ].map(({ label, value }) => value ? (
