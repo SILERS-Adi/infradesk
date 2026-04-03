@@ -74,7 +74,7 @@ export default function LandingPage() {
 
         {/* Download cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
-          <a href="/downloads/Asystent%20Home.exe"
+          <a href="/downloads/Asystent%20InfraDesk.exe"
             className="group rounded-2xl p-5 text-left transition-all hover:scale-[1.02] active:scale-[0.98]"
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
             <div className="flex items-center gap-3 mb-3">

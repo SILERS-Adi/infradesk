@@ -236,7 +236,7 @@ export function DownloadsPage() {
       description: 'Dla użytkowników domowych. Monitoring, czyszczenie, audyt bezpieczeństwa, pomoc zdalna. Bezpłatny.',
       color: 'emerald',
       files: [
-        { label: 'Asystent Home — Windows (zalecany)', url: '/downloads/Asystent%20Home.exe', badge: 'v6.0.0', primary: true, size: '~40 MB' },
+        { label: 'Asystent Home — Windows (zalecany)', url: '/downloads/Asystent%20InfraDesk.exe', badge: 'v6.0.0', primary: true, size: '~40 MB' },
       ],
       notes: [
         'Wymaga Windows 10 lub nowszego',
