@@ -907,42 +907,7 @@ export default function ConfiguratorPage() {
             </section>
           </FadeInSection>
 
-          {/* ── SCENARIO CTA ── */}
-          {activeModules.size > 0 && (
-            <FadeInSection delay={300}>
-              <section style={{ marginTop: 64, textAlign: 'center' }}>
-                <div style={{
-                  padding: '48px 40px', borderRadius: 24,
-                  background: 'linear-gradient(160deg, #EEF2FF 0%, #F5F3FF 40%, #FFF 100%)',
-                  border: '1px solid rgba(99,102,241,0.1)',
-                  boxShadow: '0 4px 24px rgba(79,70,229,0.06)',
-                }}>
-                  <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#818CF8', marginBottom: 12 }}>Podgląd działania</div>
-                  <div style={{ fontSize: 24, fontWeight: 850, color: '#0F172A', letterSpacing: '-0.03em', marginBottom: 8 }}>
-                    Jak to będzie działać w praktyce?
-                  </div>
-                  <div style={{ fontSize: 15, color: '#64748B', marginBottom: 28, maxWidth: 440, margin: '0 auto 28px' }}>
-                    Interaktywny scenariusz pracy systemu — na podstawie Twojej konfiguracji.
-                  </div>
-                  <button onClick={() => setScenarioOpen(true)} style={{
-                    padding: '18px 40px', borderRadius: 16, border: 'none',
-                    background: 'linear-gradient(135deg, #4F46E5 0%, #6D28D9 100%)',
-                    color: '#fff', fontSize: 16, fontWeight: 750, cursor: 'pointer',
-                    display: 'inline-flex', alignItems: 'center', gap: 10,
-                    boxShadow: '0 6px 24px rgba(79,70,229,0.35), 0 2px 4px rgba(79,70,229,0.15)',
-                    transition: `all 0.25s ${ease}`,
-                  }}
-                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)'; e.currentTarget.style.boxShadow = '0 10px 32px rgba(79,70,229,0.4), 0 0 40px rgba(99,102,241,0.12)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 6px 24px rgba(79,70,229,0.35), 0 2px 4px rgba(79,70,229,0.15)'; }}
-                    onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.97)'; }}
-                    onMouseUp={e => { e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)'; }}
-                  >
-                    <Sparkles size={18} /> Zobacz scenariusz działania
-                  </button>
-                </div>
-              </section>
-            </FadeInSection>
-          )}
+          {/* scenario CTA moved to right column */}
         </main>
 
         {/* ── RIGHT: PRICING BOX ── */}
@@ -1052,6 +1017,40 @@ export default function ConfiguratorPage() {
               ))}
             </div>
           </div>
+
+          {/* ── SCENARIO CTA (below pricing box) ── */}
+          {activeModules.size > 0 && (
+            <div style={{
+              marginTop: 20, padding: '28px 28px', borderRadius: 20, textAlign: 'center',
+              background: 'linear-gradient(160deg, #EEF2FF 0%, #F5F3FF 40%, #fff 100%)',
+              border: '1px solid rgba(99,102,241,0.1)',
+              boxShadow: '0 2px 16px rgba(79,70,229,0.06)',
+              animation: `cfgSlideUp 0.4s ${ease}`,
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#818CF8', marginBottom: 8 }}>Podgląd działania</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em', marginBottom: 6 }}>
+                Jak to będzie działać?
+              </div>
+              <div style={{ fontSize: 13, color: '#64748B', marginBottom: 18, lineHeight: 1.5 }}>
+                Interaktywny scenariusz na podstawie Twojej konfiguracji.
+              </div>
+              <button onClick={() => setScenarioOpen(true)} style={{
+                width: '100%', padding: '14px 20px', borderRadius: 14, border: 'none',
+                background: 'linear-gradient(135deg, #4F46E5 0%, #6D28D9 100%)',
+                color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                boxShadow: '0 4px 16px rgba(79,70,229,0.3)',
+                transition: `all 0.25s ${ease}`,
+              }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px) scale(1.01)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(79,70,229,0.35)'; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(79,70,229,0.3)'; }}
+                onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.97)'; }}
+                onMouseUp={e => { e.currentTarget.style.transform = 'translateY(-1px) scale(1.01)'; }}
+              >
+                <Sparkles size={15} /> Zobacz scenariusz
+              </button>
+            </div>
+          )}
         </aside>
       </div>
 
