@@ -235,7 +235,7 @@ export function PublicDownloadsPage() {
             <h1 className="text-[32px] font-semibold text-white/90 mb-3">InfraDesk</h1>
             <p className="text-[13px] font-medium uppercase tracking-[0.15em] mb-10" style={{ color: 'rgba(139,92,246,0.6)' }}>Pliki do pobrania</p>
             <p className="text-[14px] leading-relaxed max-w-[320px] mx-auto" style={{ color: 'rgba(255,255,255,0.3)' }}>
-              Pobierz aplikacje InfraDesk Agent, Android TV i narzędzia do zdalnej pomocy.
+              Pobierz Asystent Home, Asystent Business, Android TV i narzędzia do zdalnej pomocy.
             </p>
           </div>
           <p className="absolute bottom-6 text-[11px]" style={{ color: 'rgba(255,255,255,0.15)' }}>by SILERS · infradesk.pl</p>

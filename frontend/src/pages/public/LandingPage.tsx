@@ -8,7 +8,7 @@ const FEATURES = [
   { icon: Zap, title: 'Zdalne zarządzanie', desc: 'RustDesk, Wake-on-LAN, restart usług, aktualizacje Windows' },
   { icon: Users, title: 'Portal klienta', desc: 'Każdy klient ma swój panel do zgłoszeń i podglądu infrastruktury' },
   { icon: Server, title: 'Backup zarządzany', desc: 'Automatyczne kopie SQL i folderów z monitoringiem statusu' },
-  { icon: Download, title: 'Agent na każdy komputer', desc: 'Jeden agent — pełna widoczność. Windows, serwery, stacje robocze' },
+  { icon: Download, title: 'Asystent na każdy komputer', desc: 'Jeden asystent — pełna widoczność. Windows, serwery, stacje robocze' },
 ];
 
 export default function LandingPage() {
@@ -142,11 +142,11 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Asystent InfraDesk */}
+      {/* Asystent Home */}
       <section className="px-6 md:px-12 py-16 max-w-7xl mx-auto">
         <div className="rounded-3xl p-8 md:p-12 text-center"
           style={{ background: 'linear-gradient(145deg, rgba(16,185,129,0.08), rgba(59,130,246,0.06))', border: '1px solid rgba(16,185,129,0.15)' }}>
-          <h2 className="text-2xl md:text-3xl font-bold mb-4">Asystent InfraDesk</h2>
+          <h2 className="text-2xl md:text-3xl font-bold mb-4">Asystent Home</h2>
           <p className="max-w-xl mx-auto mb-8" style={{ color: 'var(--ts)' }}>
             Darmowe narzędzie do monitorowania i optymalizacji komputera.
             Potrzebujesz pomocy? AI zdiagnozuje problem i naprawi go automatycznie.
@@ -171,7 +171,7 @@ export default function LandingPage() {
           <a href="/downloads/Asystent%20Home.exe"
             className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white"
             style={{ background: 'linear-gradient(145deg, #059669, #0EA5E9)', boxShadow: '0 4px 20px rgba(5,150,105,0.3)' }}>
-            <Download className="h-4 w-4" /> Pobierz Asystent InfraDesk — za darmo
+            <Download className="h-4 w-4" /> Pobierz Asystent Home — za darmo
           </a>
         </div>
       </section>
@@ -206,7 +206,7 @@ export default function LandingPage() {
             <h4 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--tm)' }}>Produkt</h4>
             <div className="space-y-2 text-sm" style={{ color: 'var(--tm)' }}>
               <Link to="/register" className="block hover:text-white/50">Załóż konto</Link>
-              <a href="/downloads/InfraDesk.exe" className="block hover:text-white/50">Pobierz InfraDesk</a>
+              <a href="/downloads/Asystent%20Home.exe" className="block hover:text-white/50">Pobierz Asystent Home</a>
               <a href="/downloads/InfraDesk%20Server%20Agent.exe" className="block hover:text-white/50">Pobierz InfraDesk Server</a>
               <Link to="/login" className="block hover:text-white/50">Zaloguj się</Link>
             </div>

@@ -177,7 +177,7 @@ function CompareModal({ open, onClose }: { open: boolean; onClose: () => void })
         <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4" style={{ background: '#0E1527', borderBottom: '1px solid var(--border)' }}>
           <div className="flex items-center gap-3">
             <GitCompareArrows className="h-5 w-5" style={{ color: '#818CF8' }} />
-            <h3 className="text-[16px] font-semibold text-white/90">Agent Client vs Agent Server</h3>
+            <h3 className="text-[16px] font-semibold text-white/90">Asystent Home vs Asystent Business</h3>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg transition-colors hover:bg-white/10">
             <X className="h-5 w-5 text-white/40" />
