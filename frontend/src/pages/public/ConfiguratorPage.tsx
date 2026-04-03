@@ -575,6 +575,8 @@ export default function ConfiguratorPage() {
   // Integration modal state (sales/packing)
   // Auto-include infra state
   const [infraAutoIncluded, setInfraAutoIncluded] = useState(false);
+  // Confirm dialog for disabling IT
+  const [showInfraConfirm, setShowInfraConfirm] = useState(false);
   // Billing cycle
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
   const isYearly = billingCycle === 'yearly';
@@ -597,10 +599,9 @@ export default function ConfiguratorPage() {
   const toggleModule = (id: string) => {
     if (id === 'infra') {
       if (activeModules.has('infra')) {
-        // Deactivate (allowed even if auto-included)
-        setActiveModules(prev => { const n = new Set(prev); n.delete('infra'); return n; });
-        setInfraConfig(defaultInfraConfig);
-        setInfraAutoIncluded(false);
+        // Show confirmation before deactivating
+        setShowInfraConfirm(true);
+        return;
       } else {
         // Open modal to configure
         setInfraModal(true);
@@ -866,6 +867,56 @@ export default function ConfiguratorPage() {
       {/* Modals */}
       <InfraModal open={infraModal} initial={infraConfig} onApply={handleInfraApply} onCancel={() => setInfraModal(false)} />
       <ScenarioModal open={scenarioOpen} steps={scenarioSteps} onClose={() => setScenarioOpen(false)} />
+
+      {/* Confirm disable IT */}
+      {showInfraConfirm && (
+        <div onClick={() => setShowInfraConfirm(false)} style={{
+          position: 'fixed', inset: 0, zIndex: 250,
+          background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+          animation: 'cfgFadeIn 0.2s ease',
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: '100%', maxWidth: 440, background: '#fff', borderRadius: 22, padding: '32px 36px',
+            boxShadow: '0 25px 80px rgba(0,0,0,0.2)', animation: 'cfgModalIn 0.3s cubic-bezier(0.16,1,0.3,1)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 14, background: 'linear-gradient(135deg, #F59E0B, #EAB308)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Monitor size={22} color="#fff" />
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#0F172A' }}>Wyłączyć Zarządzanie IT?</div>
+            </div>
+            <p style={{ fontSize: 14, color: '#64748B', lineHeight: 1.7, marginBottom: 24 }}>
+              Dzięki temu modułowi możemy połączyć się zdalnie z Twoim środowiskiem i udzielać wsparcia technicznego w ramach współpracy.<br /><br />
+              <span style={{ fontWeight: 600, color: '#334155' }}>Czy na pewno chcesz wyłączyć ten moduł?</span>
+            </p>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button onClick={() => setShowInfraConfirm(false)} style={{
+                flex: 1, padding: '14px 20px', borderRadius: 12, border: 'none',
+                background: 'linear-gradient(135deg, #4F46E5, #6D28D9)', color: '#fff',
+                fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(79,70,229,0.3)', transition: 'all 0.2s ease',
+              }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}
+              >Zostaw włączony</button>
+              <button onClick={() => {
+                setActiveModules(prev => { const n = new Set(prev); n.delete('infra'); return n; });
+                setInfraConfig(defaultInfraConfig);
+                setInfraAutoIncluded(false);
+                setShowInfraConfirm(false);
+                triggerPricePulse();
+              }} style={{
+                padding: '14px 20px', borderRadius: 12, border: '1px solid #E2E8F0', background: '#fff',
+                color: '#64748B', fontSize: 14, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s ease',
+              }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#F8FAFC'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}
+              >Tak, wyłącz</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── AMBIENT GLOW ── */}
       <div style={{ position: 'fixed', top: -200, left: '30%', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle, rgba(79,70,229,0.04) 0%, transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
