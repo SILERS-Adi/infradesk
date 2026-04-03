@@ -146,6 +146,22 @@ router.patch('/users/:id', async (req: Request, res: Response, next: NextFunctio
   } catch (err) { next(err); }
 });
 
+// ── Change user password (SuperAdmin) ───────────────────────────────
+
+router.post('/users/:id/reset-password', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { password } = req.body;
+    if (!password || password.length < 6) {
+      res.status(400).json({ error: 'Hasło musi mieć minimum 6 znaków' });
+      return;
+    }
+    const bcrypt = require('bcrypt');
+    const passwordHash = await bcrypt.hash(password, 12);
+    await prisma.user.update({ where: { id: req.params.id }, data: { passwordHash } });
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
 // ── Platform Stats ──────────────────────────────────────────────────
 
 router.get('/stats', async (_req: Request, res: Response, next: NextFunction) => {
