@@ -14,5 +14,5 @@ export const clientsApi = {
   update: async (_id: string, _data: any): Promise<any> => ({}),
   delete: async (_id: string): Promise<any> => ({}),
   deactivate: async (_id: string): Promise<any> => ({}),
-  checkTaxId: async (_nip: string): Promise<any> => ({ valid: false }),
+  checkTaxId: async (_nip: string, _extra?: any): Promise<any> => ({ valid: false }),
 };
