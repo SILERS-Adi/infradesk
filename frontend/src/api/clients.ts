@@ -9,4 +9,8 @@ export const clientsApi = {
   getAll: async (_params?: any) => [],
   getOne: async (id: string) => ({ id, name: 'Workspace', hasContract: false }),
   search: async (_q: string) => [],
+  create: async (_data: any) => ({}),
+  update: async (_id: string, _data: any) => ({}),
+  delete: async (_id: string) => ({}),
+  deactivate: async (_id: string) => ({}),
 };
