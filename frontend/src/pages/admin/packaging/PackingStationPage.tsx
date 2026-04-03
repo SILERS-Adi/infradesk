@@ -19,7 +19,8 @@ interface OrderToPack {
   id: string; externalOrderId?: string; addressName?: string; addressCity?: string;
   addressStreet?: string; addressZip?: string; addressPhone?: string;
   totalAmount: number | string; courierName?: string; deliveryMethod?: string;
-  status: string; items: { id: string; name: string; sku?: string; quantity: number; unitPrice: number | string }[];
+  status: string; _count?: { items: number };
+  items: { id: string; name: string; sku?: string; quantity: number; unitPrice: number | string }[];
 }
 
 const STATUS_COLORS: Record<string, BadgeColor> = {
