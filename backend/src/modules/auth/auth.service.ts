@@ -6,7 +6,7 @@ import { AppError } from '../../middleware/errorHandler';
 import { logActivity } from '../../utils/activityLogger';
 import { validatePassword } from '../../utils/passwordPolicy';
 import { LoginInput, RegisterInput } from './auth.validation';
-import { sendMail } from '../../lib/mailer';
+import { sendMail, emailTemplate, emailButton, emailHeading, emailText, emailMuted } from '../../lib/mailer';
 
 export async function loginService(data: LoginInput) {
   const user = await prisma.user.findUnique({
@@ -128,22 +128,14 @@ export async function forgotPasswordService(email: string) {
 
   const resetUrl = `${process.env.FRONTEND_URL || 'https://infradesk.pl'}/reset-password?token=${token}`;
 
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
-      <h2 style="color: #1e40af;">Resetowanie hasła — InfraDesk</h2>
-      <p>Otrzymaliśmy prośbę o zresetowanie hasła dla konta <strong>${email}</strong>.</p>
-      <p>Kliknij poniższy przycisk, aby ustawić nowe hasło:</p>
-      <div style="text-align: center; margin: 30px 0;">
-        <a href="${resetUrl}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(145deg, #6D28D9, #2563EB); color: #fff; text-decoration: none; border-radius: 12px; font-weight: bold; font-size: 16px;">
-          Ustaw nowe hasło
-        </a>
-      </div>
-      <p style="color: #6b7280; font-size: 14px;">Link jest ważny przez <strong>24 godziny</strong>.</p>
-      <p style="color: #6b7280; font-size: 14px;">Jeśli nie prosiłeś/-aś o reset hasła, zignoruj tę wiadomość — Twoje hasło pozostanie niezmienione.</p>
-      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
-      <p style="color: #9ca3af; font-size: 11px;">InfraDesk by SILERS · infradesk.pl</p>
-    </div>
-  `;
+  const html = emailTemplate(
+    emailHeading('Resetowanie hasła') +
+    emailText(`Otrzymaliśmy prośbę o zresetowanie hasła dla konta <strong>${email}</strong>.`) +
+    emailText('Kliknij poniższy przycisk, aby ustawić nowe hasło:') +
+    emailButton('Ustaw nowe hasło', resetUrl) +
+    emailMuted('Link jest ważny przez <strong>24 godziny</strong>.') +
+    emailMuted('Jeśli nie prosiłeś/-aś o reset hasła, zignoruj tę wiadomość.')
+  );
 
   await sendMail(email, 'Resetowanie hasła — InfraDesk', html);
 
@@ -317,21 +309,13 @@ export async function sendVerificationEmail(userId: string, email: string) {
 
   const verifyUrl = `${process.env.FRONTEND_URL || 'https://infradesk.pl'}/verify-email?token=${token}`;
 
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
-      <h2 style="color: #1e40af;">Potwierdź adres e-mail — InfraDesk</h2>
-      <p>Dziękujemy za rejestrację! Kliknij poniższy przycisk, aby potwierdzić swój adres e-mail:</p>
-      <div style="text-align: center; margin: 30px 0;">
-        <a href="${verifyUrl}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(145deg, #6D28D9, #2563EB); color: #fff; text-decoration: none; border-radius: 12px; font-weight: bold; font-size: 16px;">
-          Potwierdź e-mail
-        </a>
-      </div>
-      <p style="color: #6b7280; font-size: 14px;">Link jest ważny przez <strong>48 godzin</strong>.</p>
-      <p style="color: #6b7280; font-size: 14px;">Jeśli nie rejestrowałeś/-aś się w InfraDesk, zignoruj tę wiadomość.</p>
-      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
-      <p style="color: #9ca3af; font-size: 11px;">InfraDesk by SILERS · infradesk.pl</p>
-    </div>
-  `;
+  const html = emailTemplate(
+    emailHeading('Potwierdź adres e-mail') +
+    emailText('Dziękujemy za rejestrację! Kliknij poniższy przycisk, aby potwierdzić swój adres e-mail:') +
+    emailButton('Potwierdź e-mail', verifyUrl) +
+    emailMuted('Link jest ważny przez <strong>48 godzin</strong>.') +
+    emailMuted('Jeśli nie rejestrowałeś/-aś się w InfraDesk, zignoruj tę wiadomość.')
+  );
 
   await sendMail(email, 'Potwierdź adres e-mail — InfraDesk', html);
 }

@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../../middleware/auth';
 import prisma from '../../lib/prisma';
-import { sendMail } from '../../lib/mailer';
+import { sendMail, emailTemplate, emailHeading, emailText, emailMuted } from '../../lib/mailer';
 import PDFDocument from 'pdfkit';
 
 const router = Router();
@@ -142,16 +142,12 @@ router.post('/send-proforma', async (req: Request, res: Response, next: NextFunc
       to: workspace.email,
       cc: user?.email !== workspace.email ? user?.email : undefined,
       subject: `Proforma ${proformaNumber} — InfraDesk`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
-          <h2 style="color: #1e40af;">Proforma — InfraDesk</h2>
-          <p>W załączeniu przesyłamy proformę <strong>${proformaNumber}</strong> na kwotę <strong>${amount},00 PLN netto</strong>.</p>
-          <p>Termin płatności: <strong>7 dni</strong>.</p>
-          <p style="color: #6b7280; font-size: 14px;">Po zaksięgowaniu wpłaty usługa zostanie aktywowana automatycznie.</p>
-          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
-          <p style="color: #9ca3af; font-size: 11px;">InfraDesk by SILERS · infradesk.pl</p>
-        </div>
-      `,
+      html: emailTemplate(
+        emailHeading('Proforma') +
+        emailText(`W załączeniu przesyłamy proformę <strong>${proformaNumber}</strong> na kwotę <strong>${amount},00 PLN netto</strong>.`) +
+        emailText('Termin płatności: <strong>7 dni</strong>.') +
+        emailMuted('Po zaksięgowaniu wpłaty usługa zostanie aktywowana automatycznie.')
+      ),
       attachments: [{
         filename: `proforma-${proformaNumber.replace(/\//g, '-')}.pdf`,
         content: pdfBuffer,

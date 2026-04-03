@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../../middleware/auth';
 import prisma from '../../lib/prisma';
-import { sendMail } from '../../lib/mailer';
+import { sendMail, emailTemplate, emailButton, emailHeading, emailText, emailMuted, emailInfoBox } from '../../lib/mailer';
 import { AppError } from '../../middleware/errorHandler';
 import crypto from 'crypto';
 
@@ -77,23 +77,16 @@ router.post('/invite', async (req: Request, res: Response, next: NextFunction) =
 
     // Send email
     const acceptUrl = `${process.env.FRONTEND_URL || 'https://infradesk.pl'}/sharing/accept?token=${token}`;
-    await sendMail(email, `Zaproszenie do współpracy — ${workspace?.name || 'InfraDesk'}`, `
-      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
-        <h2 style="color: #1e40af;">Zaproszenie do współpracy</h2>
-        <p>Firma <strong>${workspace?.name}</strong> zaprasza Cię do współpracy w ramach platformy InfraDesk.</p>
-        ${message ? `<p style="background: #f3f4f6; padding: 12px 16px; border-radius: 8px; color: #374151;">${message}</p>` : ''}
-        <p>Zakres dostępu: <strong>${accessLevel === 'FULL_MANAGEMENT' ? 'Pełne zarządzanie' : accessLevel === 'REMOTE_SUPPORT' ? 'Wsparcie zdalne' : 'Monitoring'}</strong></p>
-        <p>Urządzenia: <strong>${scope === 'ALL' ? 'Wszystkie' : `Wybrane (${(deviceIds?.length || 0) + (locationIds?.length || 0)})`}</strong></p>
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${acceptUrl}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(145deg, #6D28D9, #2563EB); color: #fff; text-decoration: none; border-radius: 12px; font-weight: bold; font-size: 16px;">
-            Akceptuj zaproszenie
-          </a>
-        </div>
-        <p style="color: #6b7280; font-size: 14px;">Link jest ważny przez <strong>7 dni</strong>.</p>
-        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
-        <p style="color: #9ca3af; font-size: 11px;">InfraDesk by SILERS · infradesk.pl</p>
-      </div>
-    `).catch(err => console.error('Failed to send sharing invite:', err.message));
+    const accessLabel = accessLevel === 'FULL_MANAGEMENT' ? 'Pełne zarządzanie' : accessLevel === 'REMOTE_SUPPORT' ? 'Wsparcie zdalne' : 'Monitoring';
+    const scopeLabel = scope === 'ALL' ? 'Wszystkie urządzenia' : `Wybrane (${(deviceIds?.length || 0) + (locationIds?.length || 0)})`;
+    await sendMail(email, `Zaproszenie do współpracy — ${workspace?.name || 'InfraDesk'}`, emailTemplate(
+      emailHeading('Zaproszenie do współpracy') +
+      emailText(`Firma <strong>${workspace?.name}</strong> zaprasza Cię do współpracy w ramach platformy InfraDesk.`) +
+      (message ? emailInfoBox(message) : '') +
+      emailText(`Zakres dostępu: <strong>${accessLabel}</strong><br/>Urządzenia: <strong>${scopeLabel}</strong>`) +
+      emailButton('Akceptuj zaproszenie', acceptUrl) +
+      emailMuted('Link jest ważny przez <strong>7 dni</strong>.')
+    )).catch(err => console.error('Failed to send sharing invite:', err.message));
 
     res.status(201).json(invite);
   } catch (err) { next(err); }
@@ -134,22 +127,14 @@ router.post('/request', async (req: Request, res: Response, next: NextFunction) 
     });
 
     const acceptUrl = `${process.env.FRONTEND_URL || 'https://infradesk.pl'}/sharing/accept?token=${token}`;
-    await sendMail(email, `Prośba o obsługę IT — ${workspace?.name || 'InfraDesk'}`, `
-      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
-        <h2 style="color: #1e40af;">Prośba o obsługę IT</h2>
-        <p>Firma <strong>${workspace?.name}</strong> prosi o objęcie jej obsługą informatyczną w ramach InfraDesk.</p>
-        ${message ? `<p style="background: #f3f4f6; padding: 12px 16px; border-radius: 8px; color: #374151;">${message}</p>` : ''}
-        <p>Zakres: <strong>${scope === 'ALL' ? 'Wszystkie urządzenia' : 'Wybrane urządzenia'}</strong></p>
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${acceptUrl}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(145deg, #6D28D9, #2563EB); color: #fff; text-decoration: none; border-radius: 12px; font-weight: bold; font-size: 16px;">
-            Zaakceptuj i zarządzaj
-          </a>
-        </div>
-        <p style="color: #6b7280; font-size: 14px;">Link ważny 7 dni.</p>
-        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
-        <p style="color: #9ca3af; font-size: 11px;">InfraDesk by SILERS · infradesk.pl</p>
-      </div>
-    `).catch(err => console.error('Failed to send sharing request:', err.message));
+    await sendMail(email, `Prośba o obsługę IT — ${workspace?.name || 'InfraDesk'}`, emailTemplate(
+      emailHeading('Prośba o obsługę IT') +
+      emailText(`Firma <strong>${workspace?.name}</strong> prosi o objęcie jej obsługą informatyczną w ramach InfraDesk.`) +
+      (message ? emailInfoBox(message) : '') +
+      emailText(`Zakres: <strong>${scope === 'ALL' ? 'Wszystkie urządzenia' : 'Wybrane urządzenia'}</strong>`) +
+      emailButton('Zaakceptuj i zarządzaj', acceptUrl) +
+      emailMuted('Link ważny 7 dni.')
+    )).catch(err => console.error('Failed to send sharing request:', err.message));
 
     res.status(201).json(invite);
   } catch (err) { next(err); }
