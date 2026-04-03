@@ -433,7 +433,8 @@ export default function ConfiguratorPage() {
     return (
       <FadeInSection key={mod.id} delay={modIdx * 80}>
         <div onClick={() => { if (!active || !isInfra) handleModuleClick(mod.id); else setInfraModal(true); }} style={{
-          padding: 32, borderRadius: 22, cursor: 'pointer',
+          padding: 32, borderRadius: 22, cursor: 'pointer', minHeight: 320,
+          display: 'flex', flexDirection: 'column' as const,
           background: active ? 'linear-gradient(160deg, #EEF2FF 0%, #F5F3FF 50%, #fff 100%)' : '#fff',
           border: `2px solid ${active ? '#818CF8' : '#E2E8F0'}`,
           boxShadow: active
@@ -506,7 +507,7 @@ export default function ConfiguratorPage() {
             </div>
           )}
 
-          <div style={{ paddingTop: 16, borderTop: `1px solid ${active ? 'rgba(99,102,241,0.12)' : '#F1F5F9'}`, transition: `border-color 0.3s ${easeOut}` }}>
+          <div style={{ paddingTop: 16, marginTop: 'auto', borderTop: `1px solid ${active ? 'rgba(99,102,241,0.12)' : '#F1F5F9'}`, transition: `border-color 0.3s ${easeOut}` }}>
             <span style={{ fontSize: 26, fontWeight: 850, color: active ? '#4F46E5' : '#0F172A', letterSpacing: '-0.03em', transition: `color 0.25s ${easeOut}` }}>{priceLabel}</span>
             <span style={{ fontSize: 15, fontWeight: 400, color: '#94A3B8', marginLeft: 4 }}>/ miesiąc</span>
           </div>
