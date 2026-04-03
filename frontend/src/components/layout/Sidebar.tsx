@@ -41,6 +41,7 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) {
   const { user } = useAuth();
   const { isAdmin, hasModule } = useWorkspaceContext();
+  const { resolved: themeResolved } = useTheme();
   const isSuperAdmin = !!user?.isSuperAdmin;
 
   const { data: queueTickets = [] } = useQuery({
@@ -206,7 +207,7 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
           </button>
         )}
         <div className="sidebar-logo">
-          <img src={collapsed ? "/logo-icon.png" : "/logo.png"} alt="InfraDesk"
+          <img src={collapsed ? "/logo-icon.png" : themeResolved === 'light' ? "/logo-dark.png" : "/logo.png"} alt="InfraDesk"
             style={collapsed ? { height: 40, width: 40, objectFit: 'contain' } : { height: 90, objectFit: 'contain' }} />
         </div>
       </div>
