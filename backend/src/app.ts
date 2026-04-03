@@ -88,6 +88,19 @@ app.use(requestLogger);
 // Workspace resolution
 app.use(resolveWorkspace);
 
+// Require workspace for data endpoints (prevent cross-workspace data leaks)
+app.use('/api', (req, res, next) => {
+  // Skip workspace requirement for these paths
+  const skip = ['/api/auth', '/api/superadmin', '/api/workspaces', '/api/push', '/api/agent', '/api/qr'];
+  if (skip.some(p => req.path.startsWith(p.replace('/api', '')))) return next();
+  if (req.method === 'OPTIONS') return next();
+  // If authenticated but no workspace resolved — block
+  if (req.headers.authorization && !req.workspaceId) {
+    return res.status(400).json({ error: 'No workspace selected. Please select a workspace.' });
+  }
+  next();
+});
+
 // Health check
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });

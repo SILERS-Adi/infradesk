@@ -15,8 +15,8 @@ apiClient.interceptors.request.use(config => {
     config.headers.Authorization = `Bearer ${token}`;
   }
 
-  // Inject workspace context header (Etap 2)
-  const wsId = getCurrentWorkspaceId();
+  // Inject workspace context header
+  const wsId = getCurrentWorkspaceId() || localStorage.getItem('infradesk_workspace');
   if (wsId) {
     config.headers['X-Workspace-Id'] = wsId;
   }
