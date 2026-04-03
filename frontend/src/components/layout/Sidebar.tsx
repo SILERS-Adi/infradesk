@@ -4,7 +4,7 @@ import {
   Ticket, ChevronLeft, ChevronRight, X, MessageSquare, Bot, ClipboardList,
   ShoppingCart, Download, Settings, HardDrive, KeyRound, Timer,
   Receipt, Plane, Users, CalendarDays, Sun, Moon, SunMoon, LinkIcon, ExternalLink,
-  Shield, Activity, Sparkles,
+  Shield, Activity, Sparkles, Share2,
   FileText, Package, Warehouse, CreditCard, BarChart3, Upload, Car, ClipboardCheck,
 } from 'lucide-react';
 import { useTheme } from '../../store/themeStore';
@@ -87,6 +87,7 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
         { to: '/calendar', label: 'Kalendarz', icon: <CalendarDays className="nav-icon" /> },
         { to: '/orders', label: 'Zamówienia', icon: <ShoppingCart className="nav-icon" />, feature: 'orders' },
         { to: '/delegations', label: 'Delegacje', icon: <Plane className="nav-icon" />, feature: 'delegations' },
+        { to: '/sharing', label: 'Udostępnianie', icon: <Share2 className="nav-icon" /> },
       ],
     },
 

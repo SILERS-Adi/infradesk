@@ -224,6 +224,7 @@ model Workspace {
   crmActivities       CrmActivity[]           @relation("CrmWorkspace")
   backupConfigs       BackupConfig[]          @relation("BackupWorkspace")
   activityLogs        ActivityLog[]           @relation("ActivityLogWorkspace")
+  sharingInvitations  SharingInvitation[]
 
   @@index([type])
   @@index([isActive])
@@ -822,6 +823,31 @@ model PasswordResetToken {
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime  @default(now())
+}
+
+model SharingInvitation {
+  id                String    @id @default(uuid())
+  fromWorkspaceId   String
+  toEmail           String
+  accessLevel       String    @default("FULL_MANAGEMENT") // FULL_MANAGEMENT | REMOTE_SUPPORT | MONITORING_ONLY
+  scope             String    @default("ALL")             // ALL | SELECTED
+  deviceIds         Json      @default("[]")
+  locationIds       Json      @default("[]")
+  direction         String    @default("INVITE")          // INVITE | REQUEST
+  message           String?
+  token             String    @unique
+  status            String    @default("PENDING")         // PENDING | ACCEPTED | DECLINED | EXPIRED
+  expiresAt         DateTime
+  createdByUserId   String
+  acceptedByUserId  String?
+  acceptedAt        DateTime?
+  createdAt         DateTime  @default(now())
+
+  fromWorkspace     Workspace @relation(fields: [fromWorkspaceId], references: [id])
+
+  @@index([toEmail])
+  @@index([fromWorkspaceId])
+  @@index([token])
 }
 
 model EmailVerificationToken {

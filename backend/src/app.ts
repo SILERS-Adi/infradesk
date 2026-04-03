@@ -52,6 +52,7 @@ import packagingRouter from './modules/packaging/packaging.routes';
 import packagingReportsRouter from './modules/packaging/reports.routes';
 import packagingOrdersRouter from './modules/packaging/orders.routes';
 import billingRouter from './modules/billing/billing.routes';
+import sharingRouter from './modules/sharing/sharing.routes';
 
 // Middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -188,6 +189,7 @@ app.use('/api/packaging/shipments', packagingRouter);
 app.use('/api/packaging/reports', packagingReportsRouter);
 app.use('/api/packaging/orders', packagingOrdersRouter);
 app.use('/api/billing', billingRouter);
+app.use('/api/sharing', sharingRouter);
 app.use('/api/service/vehicles', serviceVehiclesRouter);
 app.use('/api/service/inspections', serviceInspectionsRouter);
 // Public agent endpoints (no auth)

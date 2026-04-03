@@ -40,6 +40,7 @@ import { DelegationsPage } from './pages/admin/delegations/DelegationsPage';
 import { SessionsPage } from './pages/admin/sessions/SessionsPage';
 import { BillingPage } from './pages/admin/billing/BillingPage';
 import { CalendarPage } from './pages/admin/tasks/CalendarPage';
+import SharingPage from './pages/admin/sharing/SharingPage';
 
 // Portal pages
 import { PortalDashboardPage } from './pages/portal/PortalDashboardPage';
@@ -69,6 +70,7 @@ import ContactPage from './pages/public/ContactPage';
 import AiPanelPage from './pages/public/AiPanelPage';
 import ConfiguratorPage from './pages/public/ConfiguratorPage';
 import RenewalPage from './pages/public/RenewalPage';
+import SharingAcceptPage from './pages/public/SharingAcceptPage';
 import MonitoringPage from './pages/admin/MonitoringPage';
 import AiCommandsPage from './pages/admin/AiCommandsPage';
 import ModuleTemplatePreviewPage from './pages/admin/ModuleTemplatePreviewPage';
@@ -155,6 +157,7 @@ function AdminRoutes() {
         <Route path="sessions" element={<SessionsPage />} />
         <Route path="calendar" element={<CalendarPage />} />
         <Route path="billing" element={<BillingPage />} />
+        <Route path="sharing" element={<SharingPage />} />
         <Route path="agents" element={<WaitingRoomPage />} />
         <Route path="monitoring" element={<MonitoringPage />} />
         <Route path="settings" element={<SettingsPage />} />
@@ -330,6 +333,7 @@ export default function App() {
             <Route path="/ai-panel" element={<AiPanelPage />} />
             <Route path="/konfigurator" element={<ConfiguratorPage />} />
             <Route path="/wznowienie" element={<RenewalPage />} />
+            <Route path="/sharing/accept" element={<SharingAcceptPage />} />
             <Route path="/tv" element={<TvDashboardPage />} />
             <Route path="/qr/:qrCodeValue" element={<QrPage />} />
 
