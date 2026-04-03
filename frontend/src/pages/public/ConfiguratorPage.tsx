@@ -575,6 +575,9 @@ export default function ConfiguratorPage() {
   // Integration modal state (sales/packing)
   // Auto-include infra state
   const [infraAutoIncluded, setInfraAutoIncluded] = useState(false);
+  // Billing cycle
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const isYearly = billingCycle === 'yearly';
   // Scenario modal
   const [scenarioOpen, setScenarioOpen] = useState(false);
   const scenarioSteps = useMemo(() => generateScenario(activeModules, infraConfig), [activeModules, infraConfig]);
@@ -992,7 +995,28 @@ export default function ConfiguratorPage() {
             boxShadow: '0 4px 40px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04), 0 20px 60px rgba(0,0,0,0.03)',
             transition: `box-shadow 0.4s ${easeOut}`,
           }}>
-            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0F172A', marginBottom: 28, letterSpacing: '-0.02em' }}>Twoja konfiguracja</h3>
+            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0F172A', marginBottom: 20, letterSpacing: '-0.02em' }}>Twoja konfiguracja</h3>
+
+            {/* Billing cycle toggle */}
+            <div style={{ display: 'flex', gap: 0, marginBottom: 24, background: '#F1F5F9', borderRadius: 12, padding: 3 }}>
+              {(['monthly', 'yearly'] as const).map(cycle => {
+                const sel = billingCycle === cycle;
+                return (
+                  <button key={cycle} onClick={() => setBillingCycle(cycle)} style={{
+                    flex: 1, padding: '10px 12px', borderRadius: 10, border: 'none',
+                    background: sel ? '#fff' : 'transparent',
+                    color: sel ? '#0F172A' : '#64748B',
+                    fontSize: 13, fontWeight: sel ? 700 : 500, cursor: 'pointer',
+                    boxShadow: sel ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
+                    transition: `all 0.25s ${ease}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}>
+                    {cycle === 'monthly' ? 'Miesięcznie' : <>Rocznie <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 8, background: sel ? 'linear-gradient(135deg, #ECFDF5, #D1FAE5)' : 'rgba(16,185,129,0.1)', color: '#059669' }}>-10%</span></>}
+                  </button>
+                );
+              })}
+            </div>
+            {isYearly && <div style={{ fontSize: 12, color: '#64748B', marginBottom: 20, marginTop: -12, textAlign: 'center' }}>Większość firm wybiera rozliczenie roczne</div>}
 
             {pricing.items.length === 0 ? (
               <div style={{ padding: '36px 0', textAlign: 'center', animation: `cfgFadeIn 0.4s ${ease}` }}>
@@ -1022,26 +1046,69 @@ export default function ConfiguratorPage() {
             )}
 
             {/* Price */}
-            <div style={{
-              borderRadius: 18, padding: 28, marginBottom: 28, position: 'relative', overflow: 'hidden',
-              background: 'linear-gradient(145deg, #F0FDF4 0%, #ECFDF5 50%, #D1FAE5 100%)',
-              border: '1px solid rgba(16,185,129,0.12)',
-              boxShadow: pricePulse ? '0 0 0 3px rgba(16,185,129,0.15), inset 0 1px 0 rgba(255,255,255,0.6)' : 'inset 0 1px 0 rgba(255,255,255,0.6)',
-              transition: 'box-shadow 0.4s ease',
-            }}>
-              <div style={{ position: 'absolute', top: -20, right: -20, width: 80, height: 80, borderRadius: '50%', background: 'rgba(16,185,129,0.1)', filter: 'blur(20px)', pointerEvents: 'none' }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12, position: 'relative' }}>
-                <span style={{ fontSize: 15, fontWeight: 650, color: '#064E3B' }}>Dziś płacisz:</span>
-                <span style={{ fontSize: 42, fontWeight: 900, color: '#059669', letterSpacing: '-0.05em', lineHeight: 1, textShadow: '0 2px 8px rgba(16,185,129,0.15)', transform: pricePulse ? 'scale(1.05)' : 'scale(1)', transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)', display: 'inline-block' }}>0 zł</span>
-              </div>
-              <div style={{ height: 1, background: 'rgba(16,185,129,0.12)', margin: '0 0 12px' }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', position: 'relative' }}>
-                <span style={{ fontSize: 14, fontWeight: 500, color: '#064E3B' }}>Po 14 dniach:</span>
-                <span style={{ fontSize: 22, fontWeight: 850, color: '#0F172A', fontVariantNumeric: 'tabular-nums', transform: pricePulse ? 'scale(1.08)' : 'scale(1)', transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)', display: 'inline-block' }}>
-                  <AnimatedPrice value={pricing.monthly} /> zł <span style={{ fontSize: 14, fontWeight: 400, color: '#94A3B8' }}>/ msc</span>
-                </span>
-              </div>
-            </div>
+            {(() => {
+              const m = pricing.monthly;
+              const yearlyBase = m * 12;
+              const yearlyDisc = Math.round(yearlyBase * 0.9);
+              const yearlySave = yearlyBase - yearlyDisc;
+              const yearlyMonthEq = Math.round(yearlyDisc / 12);
+              return (
+                <div style={{
+                  borderRadius: 18, padding: 28, marginBottom: 12, position: 'relative', overflow: 'hidden',
+                  background: 'linear-gradient(145deg, #F0FDF4 0%, #ECFDF5 50%, #D1FAE5 100%)',
+                  border: '1px solid rgba(16,185,129,0.12)',
+                  boxShadow: pricePulse ? '0 0 0 3px rgba(16,185,129,0.15), inset 0 1px 0 rgba(255,255,255,0.6)' : 'inset 0 1px 0 rgba(255,255,255,0.6)',
+                  transition: 'box-shadow 0.4s ease',
+                }}>
+                  <div style={{ position: 'absolute', top: -20, right: -20, width: 80, height: 80, borderRadius: '50%', background: 'rgba(16,185,129,0.1)', filter: 'blur(20px)', pointerEvents: 'none' }} />
+                  {/* Today = 0 */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12, position: 'relative' }}>
+                    <span style={{ fontSize: 15, fontWeight: 650, color: '#064E3B' }}>Dziś płacisz:</span>
+                    <span style={{ fontSize: 42, fontWeight: 900, color: '#059669', letterSpacing: '-0.05em', lineHeight: 1, textShadow: '0 2px 8px rgba(16,185,129,0.15)', transform: pricePulse ? 'scale(1.05)' : 'scale(1)', transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)', display: 'inline-block' }}>0 zł</span>
+                  </div>
+                  <div style={{ height: 1, background: 'rgba(16,185,129,0.12)', margin: '0 0 12px' }} />
+                  {/* After trial */}
+                  {isYearly ? (
+                    <div style={{ position: 'relative' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                        <span style={{ fontSize: 14, fontWeight: 500, color: '#064E3B' }}>Po 14 dniach:</span>
+                        <span style={{ fontSize: 24, fontWeight: 900, color: '#0F172A', fontVariantNumeric: 'tabular-nums', transform: pricePulse ? 'scale(1.06)' : 'scale(1)', transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)', display: 'inline-block' }}>
+                          <AnimatedPrice value={yearlyMonthEq} /> zł<span style={{ fontSize: 13, fontWeight: 400, color: '#94A3B8' }}> / msc</span>
+                        </span>
+                      </div>
+                      <div style={{ textAlign: 'right', fontSize: 12, color: '#64748B', marginBottom: 8 }}>
+                        przy płatności rocznej
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <span style={{ fontSize: 13, color: '#064E3B', fontWeight: 500 }}>Razem za rok:</span>
+                        <div style={{ textAlign: 'right' }}>
+                          <span style={{ fontSize: 18, fontWeight: 850, color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}><AnimatedPrice value={yearlyDisc} /> zł</span>
+                        </div>
+                      </div>
+                      {m > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: 12, color: '#94A3B8' }}>Bez rabatu:</span>
+                          <span style={{ fontSize: 13, color: '#94A3B8', textDecoration: 'line-through', fontVariantNumeric: 'tabular-nums' }}>{yearlyBase} zł</span>
+                        </div>
+                      )}
+                      {yearlySave > 0 && (
+                        <div style={{ marginTop: 10, padding: '8px 14px', borderRadius: 10, background: 'rgba(16,185,129,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, animation: 'cfgFadeIn 0.3s ease' }}>
+                          <Check size={13} color="#059669" strokeWidth={3} />
+                          <span style={{ fontSize: 13, fontWeight: 700, color: '#059669' }}>Oszczędzasz {yearlySave} zł rocznie</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', position: 'relative' }}>
+                      <span style={{ fontSize: 14, fontWeight: 500, color: '#064E3B' }}>Po 14 dniach:</span>
+                      <span style={{ fontSize: 22, fontWeight: 850, color: '#0F172A', fontVariantNumeric: 'tabular-nums', transform: pricePulse ? 'scale(1.08)' : 'scale(1)', transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)', display: 'inline-block' }}>
+                        <AnimatedPrice value={m} /> zł <span style={{ fontSize: 14, fontWeight: 400, color: '#94A3B8' }}>/ msc</span>
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             <div style={{ textAlign: 'right', marginBottom: 20 }}>
               <span style={{ fontSize: 11, color: '#94A3B8', fontWeight: 500 }}>Wszystkie ceny netto</span>
             </div>
@@ -1062,7 +1129,7 @@ export default function ConfiguratorPage() {
               onMouseDown={e => { e.currentTarget.style.transform = 'translateY(1px) scale(0.97)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(79,70,229,0.3)'; }}
               onMouseUp={e => { e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)'; e.currentTarget.style.boxShadow = '0 10px 28px rgba(79,70,229,0.4), 0 4px 8px rgba(79,70,229,0.15), 0 0 40px rgba(99,102,241,0.15)'; }}
             >
-              Rozpocznij za darmo <span style={{ opacity: 0.65, fontWeight: 500 }}>(14 dni)</span> <ArrowRight size={18} />
+              {isYearly ? 'Rozpocznij za darmo i oszczędź 10%' : 'Rozpocznij za darmo'} {!isYearly && <span style={{ opacity: 0.65, fontWeight: 500 }}>(14 dni)</span>} <ArrowRight size={18} />
             </button>
 
             <p style={{ textAlign: 'center', fontSize: 12, color: '#94A3B8', marginTop: 12, fontWeight: 450, lineHeight: 1.5 }}>
