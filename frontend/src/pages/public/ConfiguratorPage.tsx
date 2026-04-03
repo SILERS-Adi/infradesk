@@ -161,7 +161,7 @@ export default function ConfiguratorPage() {
       <header style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(248,250,252,0.72)', backdropFilter: 'blur(20px) saturate(1.8)', borderBottom: '1px solid rgba(0,0,0,0.05)', transition: 'box-shadow 0.3s ease' }}>
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 40px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <img src="/logo-dark.png" alt="InfraDesk" style={{ height: 36, objectFit: 'contain' }} />
+            <img src="/logo-dark.png" alt="InfraDesk" style={{ height: 52, objectFit: 'contain' }} />
           </div>
           <Link to="/login" style={{ fontSize: 14, fontWeight: 500, color: '#64748B', textDecoration: 'none', transition: `all 0.2s ${easeOut}` }}
             onMouseEnter={e => { e.currentTarget.style.color = '#4F46E5'; e.currentTarget.style.transform = 'translateX(2px)'; }}

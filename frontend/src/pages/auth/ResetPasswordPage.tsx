@@ -44,7 +44,7 @@ export function ResetPasswordPage() {
 
       <div className="w-full max-w-[420px] relative z-10">
         <div className="text-center mb-8">
-          <img src="/logo.png" alt="InfraDesk" className="h-16 mx-auto mb-3" />
+          <img src="/logo.png" alt="InfraDesk" className="h-24 mx-auto mb-3" />
         </div>
 
         <div className="rounded-[22px] overflow-hidden" style={{

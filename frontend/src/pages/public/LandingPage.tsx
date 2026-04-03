@@ -31,7 +31,7 @@ export default function LandingPage() {
       {/* Nav */}
       <nav className="flex items-center justify-between px-6 md:px-12 py-4 max-w-7xl mx-auto">
         <div className="flex items-center gap-2">
-          <img src="/logo.png" alt="InfraDesk" className="h-9 object-contain" />
+          <img src="/logo.png" alt="InfraDesk" className="h-14 object-contain" />
         </div>
         <div className="flex items-center gap-3">
           <a href="tel:+48575662664" className="hidden md:flex items-center gap-1.5 text-sm text-white/40 hover:text-white/70 transition-colors">

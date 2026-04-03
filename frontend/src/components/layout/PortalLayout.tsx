@@ -60,7 +60,7 @@ export function PortalLayout({ children }: { children: ReactNode }) {
           {/* Left: Logo + Nav */}
           <div className="flex items-center gap-6 md:gap-8">
             <div className="flex items-center gap-2.5">
-              <img src="/logo.png" alt="InfraDesk" className="h-8" />
+              <img src="/logo.png" alt="InfraDesk" className="h-12" />
             </div>
 
             <nav className="hidden md:flex items-center gap-1">
