@@ -68,51 +68,56 @@ router.patch('/tenants/:id', async (req: Request, res: Response, next: NextFunct
 });
 
 router.delete('/tenants/:id', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const wsId = req.params.id;
-    // Delete all workspace-related data in order (foreign key dependencies)
-    await prisma.$transaction([
-      prisma.invoicingPayment.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.invoiceDocumentItem.deleteMany({ where: { document: { workspaceId: wsId } } }),
-      prisma.invoiceDocument.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.invoicingContractor.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.invoicingProduct.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.shipmentItem.deleteMany({ where: { shipment: { workspaceId: wsId } } }),
-      prisma.shipment.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.packingOrderItem.deleteMany({ where: { order: { workspaceId: wsId } } }),
-      prisma.packingOrder.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.serviceInspection.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.serviceVehicle.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.notification.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.activityLog.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.backupConfig.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.crmActivity.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.sessionTimeEntry.deleteMany({ where: { workSession: { workspaceId: wsId } } }),
-      prisma.workSession.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.credential.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.ticketComment.deleteMany({ where: { ticket: { workspaceId: wsId } } }),
-      prisma.ticket.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.backupHistory.deleteMany({ where: { config: { workspaceId: wsId } } }),
-      prisma.agentRegistration.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.task.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.orderItem.deleteMany({ where: { order: { workspaceId: wsId } } }),
-      prisma.order.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.delegation.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.device.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.deviceType.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.accessType.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.location.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.workspaceSetting.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.workspaceManagement.deleteMany({ where: { OR: [{ companyWorkspaceId: wsId }, { mspWorkspaceId: wsId }] } }),
-      prisma.accessGrant.deleteMany({ where: { membership: { workspaceId: wsId } } }),
-      prisma.workspaceMembership.deleteMany({ where: { workspaceId: wsId } }),
-      prisma.workspace.delete({ where: { id: wsId } }),
-    ]);
-    res.status(204).send();
-  } catch (err: any) {
-    console.error('DELETE workspace error:', err?.message || err);
-    res.status(400).json({ error: err?.message || 'Delete failed', code: err?.code });
+  const wsId = req.params.id;
+  const steps = [
+    ['invoicingPayment', () => prisma.invoicingPayment.deleteMany({ where: { workspaceId: wsId } })],
+    ['invoiceDocumentItem', () => prisma.invoiceDocumentItem.deleteMany({ where: { document: { workspaceId: wsId } } })],
+    ['invoiceDocument', () => prisma.invoiceDocument.deleteMany({ where: { workspaceId: wsId } })],
+    ['invoicingContractor', () => prisma.invoicingContractor.deleteMany({ where: { workspaceId: wsId } })],
+    ['invoicingProduct', () => prisma.invoicingProduct.deleteMany({ where: { workspaceId: wsId } })],
+    ['shipmentItem', () => prisma.shipmentItem.deleteMany({ where: { shipment: { workspaceId: wsId } } })],
+    ['shipment', () => prisma.shipment.deleteMany({ where: { workspaceId: wsId } })],
+    ['packingOrderItem', () => prisma.packingOrderItem.deleteMany({ where: { order: { workspaceId: wsId } } })],
+    ['packingOrder', () => prisma.packingOrder.deleteMany({ where: { workspaceId: wsId } })],
+    ['serviceInspection', () => prisma.serviceInspection.deleteMany({ where: { workspaceId: wsId } })],
+    ['serviceVehicle', () => prisma.serviceVehicle.deleteMany({ where: { workspaceId: wsId } })],
+    ['notification', () => prisma.notification.deleteMany({ where: { workspaceId: wsId } })],
+    ['activityLog', () => prisma.activityLog.deleteMany({ where: { workspaceId: wsId } })],
+    ['sessionTimeEntry', () => prisma.sessionTimeEntry.deleteMany({ where: { workSession: { workspaceId: wsId } } })],
+    ['workSession', () => prisma.workSession.deleteMany({ where: { workspaceId: wsId } })],
+    ['crmActivity', () => prisma.crmActivity.deleteMany({ where: { workspaceId: wsId } })],
+    ['credential', () => prisma.credential.deleteMany({ where: { workspaceId: wsId } })],
+    ['ticketComment', () => prisma.ticketComment.deleteMany({ where: { ticket: { workspaceId: wsId } } })],
+    ['ticket', () => prisma.ticket.deleteMany({ where: { workspaceId: wsId } })],
+    ['backupHistory', () => prisma.backupHistory.deleteMany({ where: { config: { workspaceId: wsId } } })],
+    ['backupConfig', () => prisma.backupConfig.deleteMany({ where: { workspaceId: wsId } })],
+    ['agentRegistration', () => prisma.agentRegistration.deleteMany({ where: { workspaceId: wsId } })],
+    ['task', () => prisma.task.deleteMany({ where: { workspaceId: wsId } })],
+    ['orderItem', () => prisma.orderItem.deleteMany({ where: { order: { workspaceId: wsId } } })],
+    ['order', () => prisma.order.deleteMany({ where: { workspaceId: wsId } })],
+    ['delegation', () => prisma.delegation.deleteMany({ where: { workspaceId: wsId } })],
+    ['device', () => prisma.device.deleteMany({ where: { workspaceId: wsId } })],
+    ['deviceType', () => prisma.deviceType.deleteMany({ where: { workspaceId: wsId } })],
+    ['accessType', () => prisma.accessType.deleteMany({ where: { workspaceId: wsId } })],
+    ['location', () => prisma.location.deleteMany({ where: { workspaceId: wsId } })],
+    ['workspaceSetting', () => prisma.workspaceSetting.deleteMany({ where: { workspaceId: wsId } })],
+    ['workspaceManagement', () => prisma.workspaceManagement.deleteMany({ where: { OR: [{ companyWorkspaceId: wsId }, { mspWorkspaceId: wsId }] } })],
+    ['accessGrant', () => prisma.accessGrant.deleteMany({ where: { membership: { workspaceId: wsId } } })],
+    ['pushSubscription', () => prisma.pushSubscription.deleteMany({ where: { workspaceId: wsId } })],
+    ['workspaceMembership', () => prisma.workspaceMembership.deleteMany({ where: { workspaceId: wsId } })],
+    ['workspace', () => prisma.workspace.delete({ where: { id: wsId } })],
+  ] as [string, () => Promise<any>][];
+
+  for (const [name, fn] of steps) {
+    try {
+      await fn();
+    } catch (err: any) {
+      console.error(`DELETE workspace FAILED at step [${name}]:`, err?.message);
+      res.status(400).json({ error: `Nie udało się usunąć: błąd na etapie ${name}`, detail: err?.message });
+      return;
+    }
   }
+  res.status(204).send();
 });
 
 // ── All Users (global) ──────────────────────────────────────────────
