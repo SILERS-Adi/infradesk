@@ -3,5 +3,5 @@
  * Returns empty results. Client concept is now handled by Workspace.
  */
 export function useClientSearch(_query: string, _enabled: boolean = true) {
-  return { clients: [], isLoading: false };
+  return { clients: [] as any[], isLoading: false };
 }
