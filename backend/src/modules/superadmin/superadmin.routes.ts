@@ -81,7 +81,7 @@ router.delete('/tenants/:id', async (req: Request, res: Response, next: NextFunc
     ['packingOrder', () => prisma.packingOrder.deleteMany({ where: { workspaceId: wsId } })],
     ['serviceInspection', () => prisma.serviceInspection.deleteMany({ where: { workspaceId: wsId } })],
     ['serviceVehicle', () => prisma.serviceVehicle.deleteMany({ where: { workspaceId: wsId } })],
-    ['notification', () => prisma.notification.deleteMany({ where: { workspaceId: wsId } })],
+    // notification has no workspaceId — skip (no FK to workspace)
     ['activityLog', () => prisma.activityLog.deleteMany({ where: { workspaceId: wsId } })],
     ['sessionTimeEntry', () => prisma.sessionTimeEntry.deleteMany({ where: { workSession: { workspaceId: wsId } } })],
     ['workSession', () => prisma.workSession.deleteMany({ where: { workspaceId: wsId } })],
