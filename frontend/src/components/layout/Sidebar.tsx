@@ -81,6 +81,7 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
       label: 'SERWIS',
       items: [
         { to: '/tickets', label: 'Zgłoszenia', icon: <Ticket className="nav-icon" />, badge: queueCount > 0 ? queueCount : undefined },
+        { to: '/tickets/reports', label: 'Raporty', icon: <BarChart3 className="nav-icon" /> },
         { to: '/tasks', label: 'Zadania', icon: <ClipboardList className="nav-icon" />, badge: myActiveTasksCount > 0 ? myActiveTasksCount : undefined },
         { to: '/calendar', label: 'Kalendarz', icon: <CalendarDays className="nav-icon" /> },
         { to: '/orders', label: 'Zamówienia', icon: <ShoppingCart className="nav-icon" />, feature: 'orders' },

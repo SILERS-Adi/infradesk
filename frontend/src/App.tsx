@@ -23,6 +23,7 @@ import { DeviceDetailPage } from './pages/admin/devices/DeviceDetailPage';
 import { TicketsListPage } from './pages/admin/tickets/TicketsListPage';
 import { TicketDetailPage } from './pages/admin/tickets/TicketDetailPage';
 import { TicketsQueuePage } from './pages/admin/tickets/TicketsQueuePage';
+import { TicketReportsPage } from './pages/admin/tickets/TicketReportsPage';
 import { CredentialsPage } from './pages/admin/credentials/CredentialsPage';
 import { UsersPage } from './pages/admin/users/UsersPage';
 import { WorkspaceMembersPage } from './pages/admin/WorkspaceMembersPage';
@@ -137,6 +138,7 @@ function AdminRoutes() {
         <Route path="devices/:id" element={<DeviceDetailPage />} />
         <Route path="tickets" element={<TicketsListPage />} />
         <Route path="tickets/queue" element={<TicketsQueuePage />} />
+        <Route path="tickets/reports" element={<TicketReportsPage />} />
         <Route path="tickets/:id" element={<TicketDetailPage />} />
         <Route path="credentials" element={<CredentialsPage />} />
         <Route path="users" element={<UsersPage />} />
