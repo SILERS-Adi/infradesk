@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, Building2, User, Server, Shield } from 'lucide-react';
 import { useWorkspace } from '../../store/workspaceStore';
 import { workspacesApi } from '../../api/workspaces';
@@ -29,6 +29,7 @@ const ROLE_LABELS: Record<MemberRole, string> = {
 export function WorkspaceSwitcher() {
   const { isAuthenticated } = useAuth();
   const { workspaces, current, switchWorkspace, setWorkspaces, isLoading } = useWorkspace();
+  const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -107,7 +108,7 @@ export function WorkspaceSwitcher() {
             return (
               <button
                 key={ws.workspaceId}
-                onClick={() => { switchWorkspace(ws.workspaceId); setOpen(false); }}
+                onClick={() => { switchWorkspace(ws.workspaceId); setOpen(false); window.location.reload(); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8,
                   width: '100%', padding: '8px 10px', borderRadius: 8,
