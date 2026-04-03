@@ -3,7 +3,7 @@
  * Premium SaaS — Stripe/Linear/Notion motion polish
  */
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Monitor, FileText, Package, Car, Headphones, Check, X,
   ChevronRight, Plug, Zap, ArrowRight, MessageCircle,
@@ -573,6 +573,9 @@ function ScenarioModal({ open, steps, onClose }: { open: boolean; steps: Scenari
 export default function ConfiguratorPage() {
   const { resolved } = useTheme();
   const isLight = resolved === 'light';
+  const [searchParams] = useSearchParams();
+  const isRenewalMode = searchParams.get('mode') === 'renewal';
+
   const [activeModules, setActiveModules] = useState<Set<string>>(new Set());
   const [activeAddons, setActiveAddons] = useState<Set<string>>(new Set(['onboarding']));
   const [pricePulse, setPricePulse] = useState(false);
@@ -581,10 +584,22 @@ export default function ConfiguratorPage() {
   // Infra modal state
   const [infraModal, setInfraModal] = useState(false);
   const [infraConfig, setInfraConfig] = useState<InfraConfig>(defaultInfraConfig);
-  // Integration modal state (sales/packing)
   // Auto-include infra state
   const [infraAutoIncluded, setInfraAutoIncluded] = useState(false);
   const [infraManuallyDisabled, setInfraManuallyDisabled] = useState(false);
+
+  // Preload config from URL (renewal mode)
+  useEffect(() => {
+    const configParam = searchParams.get('config');
+    if (!configParam) return;
+    try {
+      const cfg = JSON.parse(decodeURIComponent(configParam));
+      if (cfg.modules) setActiveModules(new Set(cfg.modules));
+      if (cfg.addons) setActiveAddons(new Set(cfg.addons));
+      if (cfg.infraConfig) setInfraConfig(cfg.infraConfig);
+      if (cfg.billingCycle) setBillingCycle(cfg.billingCycle);
+    } catch { /* invalid config param */ }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Confirm dialog for disabling IT
   const [showInfraConfirm, setShowInfraConfirm] = useState(false);
   // Billing cycle
@@ -968,13 +983,15 @@ export default function ConfiguratorPage() {
                 boxShadow: '0 1px 6px rgba(16,185,129,0.15), inset 0 1px 0 rgba(255,255,255,0.5)',
               }}>
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10B981', boxShadow: '0 0 8px rgba(16,185,129,0.6)', animation: 'cfgPulse 2s ease-in-out infinite' }} />
-                14 dni za darmo — bez karty
+                {isRenewalMode ? 'Wznowienie usługi' : '14 dni za darmo — bez karty'}
               </div>
               <h1 style={{ fontSize: 48, fontWeight: 850, color: 'var(--t)', letterSpacing: '-0.04em', lineHeight: 1.08, margin: '0 0 20px' }}>
-                Zbuduj system dla swojej<br />firmy w 5 minut
+                {isRenewalMode ? <>Dostosuj konfigurację<br />do obecnych potrzeb</> : <>Zbuduj system dla swojej<br />firmy w 5 minut</>}
               </h1>
               <p style={{ fontSize: 20, color: 'var(--ts)', lineHeight: 1.6, maxWidth: 540, margin: 0, fontWeight: 400 }}>
-                Wybierz moduły, połącz z używanymi systemami<br />i zacznij bez ryzyka.
+                {isRenewalMode
+                  ? 'Zmień moduły, plan rozliczenia lub zakres usług przed wznowieniem.'
+                  : <>Wybierz moduły, połącz z używanymi systemami<br />i zacznij bez ryzyka.</>}
               </p>
             </section>
           </FadeInSection>
@@ -1201,7 +1218,10 @@ export default function ConfiguratorPage() {
               onMouseDown={e => { e.currentTarget.style.transform = 'translateY(1px) scale(0.97)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(79,70,229,0.3)'; }}
               onMouseUp={e => { e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)'; e.currentTarget.style.boxShadow = '0 10px 28px rgba(79,70,229,0.4), 0 4px 8px rgba(79,70,229,0.15), 0 0 40px rgba(99,102,241,0.15)'; }}
             >
-              {isYearly ? 'Rozpocznij za darmo i oszczędź 10%' : 'Rozpocznij za darmo'} {!isYearly && <span style={{ opacity: 0.65, fontWeight: 500 }}>(14 dni)</span>} <ArrowRight size={18} />
+              {isRenewalMode
+                ? 'Wznów z tą konfiguracją'
+                : isYearly ? 'Rozpocznij za darmo i oszczędź 10%' : 'Rozpocznij za darmo'
+              } {!isRenewalMode && !isYearly && <span style={{ opacity: 0.65, fontWeight: 500 }}>(14 dni)</span>} <ArrowRight size={18} />
             </Link>
 
             <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--tm)', marginTop: 12, fontWeight: 450, lineHeight: 1.5 }}>

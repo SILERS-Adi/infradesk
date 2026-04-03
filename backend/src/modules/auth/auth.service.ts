@@ -234,6 +234,9 @@ export async function registerService(data: RegisterInput) {
       },
     });
 
+    const trialEnd = new Date();
+    trialEnd.setDate(trialEnd.getDate() + 14);
+
     const workspace = await tx.workspace.create({
       data: {
         name: isCompany ? (data.companyName || data.companyShortName!) : `${data.firstName} ${data.lastName}`,
@@ -243,6 +246,8 @@ export async function registerService(data: RegisterInput) {
         taxId: isCompany ? data.taxId : null,
         email: data.email,
         phone: data.phone || null,
+        subscriptionStatus: 'TRIAL',
+        trialEndDate: trialEnd,
       },
     });
 

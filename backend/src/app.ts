@@ -195,6 +195,7 @@ app.get('/api/workspaces/my', authenticate, async (req, res, next) => {
           select: {
             id: true, name: true, slug: true, type: true, plan: true,
             logoUrl: true, primaryColor: true, isActive: true, enabledModules: true,
+            subscriptionStatus: true, trialEndDate: true, billingCycle: true, monthlyPrice: true, lastConfig: true, paidUntil: true,
             managedBy: {
               where: { status: 'ACTIVE' },
               select: { mspWorkspace: { select: { id: true, name: true, slug: true } } },
@@ -221,9 +222,58 @@ app.get('/api/workspaces/my', authenticate, async (req, res, next) => {
       allowedModules: m.allowedModules,
       enabledModules: m.workspace.enabledModules ?? ['helpdesk'],
       managedBy: (m.workspace.managedBy as any)?.[0]?.mspWorkspace?.name ?? null,
+      subscriptionStatus: m.workspace.subscriptionStatus,
+      trialEndDate: m.workspace.trialEndDate,
+      billingCycle: m.workspace.billingCycle,
+      monthlyPrice: m.workspace.monthlyPrice,
+      lastConfig: m.workspace.lastConfig,
+      paidUntil: m.workspace.paidUntil,
     }));
 
     res.json(result);
+  } catch (err) { next(err); }
+});
+
+// Save workspace configuration (from configurator)
+app.post('/api/workspaces/save-config', authenticate, async (req, res, next) => {
+  try {
+    const userId = req.user!.userId;
+    const { workspaceId, config, billingCycle, monthlyPrice } = req.body;
+    if (!workspaceId || !config) { res.status(400).json({ error: 'workspaceId and config required' }); return; }
+
+    // Verify ownership
+    const membership = await prisma.workspaceMembership.findFirst({
+      where: { userId, workspaceId, role: { in: ['OWNER', 'ADMIN'] }, status: 'ACTIVE' },
+    });
+    if (!membership) { res.status(403).json({ error: 'No access to this workspace' }); return; }
+
+    const updated = await prisma.workspace.update({
+      where: { id: workspaceId },
+      data: {
+        lastConfig: config,
+        billingCycle: billingCycle || 'MONTHLY',
+        monthlyPrice: monthlyPrice || 0,
+      },
+    });
+    res.json({ success: true, lastConfig: updated.lastConfig });
+  } catch (err) { next(err); }
+});
+
+// Get workspace subscription info (public for renewal flow)
+app.get('/api/workspaces/:id/subscription', authenticate, async (req, res, next) => {
+  try {
+    const userId = req.user!.userId;
+    const wsId = req.params.id;
+    const membership = await prisma.workspaceMembership.findFirst({
+      where: { userId, workspaceId: wsId, status: 'ACTIVE' },
+    });
+    if (!membership) { res.status(403).json({ error: 'No access' }); return; }
+
+    const ws = await prisma.workspace.findUnique({
+      where: { id: wsId },
+      select: { subscriptionStatus: true, trialEndDate: true, billingCycle: true, monthlyPrice: true, lastConfig: true, paidUntil: true, type: true, name: true },
+    });
+    res.json(ws);
   } catch (err) { next(err); }
 });
 

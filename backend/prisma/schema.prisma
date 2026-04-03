@@ -195,6 +195,14 @@ model Workspace {
   maxUsers        Int            @default(5)
   enabledModules  String[]       @default(["helpdesk"])
 
+  // Subscription
+  subscriptionStatus  String     @default("TRIAL")   // TRIAL | ACTIVE | EXPIRED | PAUSED
+  trialEndDate        DateTime?
+  billingCycle        String     @default("MONTHLY")  // MONTHLY | YEARLY
+  monthlyPrice        Float      @default(0)
+  lastConfig          Json?                           // saved configurator state for renewal
+  paidUntil           DateTime?
+
   workspaceKey    String         @unique @default(uuid())
   isActive        Boolean        @default(true)
   createdAt       DateTime       @default(now())
