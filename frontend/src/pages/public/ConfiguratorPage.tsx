@@ -337,6 +337,234 @@ function InfraModal({ open, initial, onApply, onCancel }: { open: boolean; initi
   );
 }
 
+// ── Scenario generation ──
+interface ScenarioStep { icon: React.ElementType; title: string; desc: string; }
+
+function generateScenario(modules: Set<string>, infraCfg: InfraConfig): ScenarioStep[] {
+  const steps: ScenarioStep[] = [];
+  const hasInfra = modules.has('infra');
+  const hasSales = modules.has('sales');
+  const hasPacking = modules.has('packing');
+  const hasDiag = modules.has('diagnostic');
+
+  if (hasInfra && infraCfg.mode === 'multi' && infraCfg.multiRemote > 0) {
+    // MULTI + RustDesk
+    steps.push({ icon: Headphones, title: 'Klient zgłasza problem', desc: 'Zgłoszenie trafia do systemu i jest przypisane do technika.' });
+    steps.push({ icon: Monitor, title: 'Technik łączy się zdalnie', desc: 'Sesja RustDesk uruchamia się jednym kliknięciem.' });
+    steps.push({ icon: Zap, title: 'Sesja zostaje uruchomiona', desc: 'Czas pracy nalicza się automatycznie w tle.' });
+    steps.push({ icon: Settings2, title: 'Technik rozwiązuje problem', desc: 'Pełny dostęp do urządzenia klienta — bezpiecznie i szybko.' });
+    steps.push({ icon: Check, title: 'Sesja zakończona', desc: 'Czas trafia do rozliczenia. Klient dostaje potwierdzenie.' });
+    steps.push({ icon: FileText, title: 'Faktura na koniec miesiąca', desc: 'Automatyczne zestawienie godzin → gotowa faktura dla klienta.' });
+  } else if (hasInfra && infraCfg.mode === 'multi') {
+    // MULTI bez RustDesk
+    steps.push({ icon: Users, title: 'Wybierasz klienta', desc: 'Panel z listą Twoich firm i ich środowiskiem IT.' });
+    steps.push({ icon: Monitor, title: 'Widzisz wszystkie urządzenia', desc: 'Komputery, serwery, drukarki — wszystko w jednym miejscu.' });
+    steps.push({ icon: Globe, title: 'Łączysz się zdalnie', desc: 'Uruchamiasz połączenie przez TeamViewer, AnyDesk lub inny klient.' });
+    steps.push({ icon: Settings2, title: 'Pracujesz nad problemem', desc: 'Dane klienta, historia zgłoszeń, notatki — masz je pod ręką.' });
+    steps.push({ icon: Sparkles, title: 'Wszystko w jednym miejscu', desc: 'Automatyczne rozliczanie czasu dostępne z integracją RustDesk.' });
+  } else if (hasInfra) {
+    // SOLO
+    steps.push({ icon: Monitor, title: 'Wszystkie stanowiska w panelu', desc: 'Jedno miejsce do zarządzania całą infrastrukturą IT firmy.' });
+    steps.push({ icon: Settings2, title: 'Wybierasz urządzenie', desc: 'Klikasz w komputer, serwer lub drukarkę.' });
+    steps.push({ icon: Globe, title: 'Łączysz się zdalnie', desc: 'Szybkie połączenie z dowolnym stanowiskiem.' });
+    steps.push({ icon: Check, title: 'Zarządzasz z jednego miejsca', desc: 'Monitoring, inwentaryzacja, zgłoszenia — wszystko pod kontrolą.' });
+  }
+
+  if (hasSales && hasPacking) {
+    steps.push({ icon: ShoppingCart, title: 'Nowe zamówienie z platformy', desc: 'Allegro, WooCommerce, Shopify — zamówienie wpada automatycznie.' });
+    steps.push({ icon: Package, title: 'Kompletacja rozpoczęta', desc: 'Pracownik skanuje produkty wg listy zamówienia.' });
+    steps.push({ icon: Scan, title: 'Weryfikacja przez skan', desc: 'System sprawdza czy wszystko się zgadza. Bez błędów.' });
+    steps.push({ icon: FileText, title: 'Faktura lub paragon', desc: 'Dokument generuje się automatycznie.' });
+    steps.push({ icon: Car, title: 'List przewozowy gotowy', desc: 'Zamówienie spakowane, etykieta wydrukowana, gotowe do wysyłki.' });
+  } else if (hasSales) {
+    steps.push({ icon: FileText, title: 'Dane trafiają do systemu', desc: 'Kontrahenci, towary, ceny — baza danych gotowa.' });
+    steps.push({ icon: FileText, title: 'Tworzysz dokument', desc: 'Faktura, paragon lub inny dokument sprzedaży w kilka kliknięć.' });
+    steps.push({ icon: Users, title: 'Zarządzasz kontrahentami', desc: 'Historia współpracy, płatności, dokumenty — przejrzyście.' });
+  } else if (hasPacking) {
+    steps.push({ icon: ShoppingCart, title: 'Zamówienie w systemie', desc: 'Nowe zamówienie trafia na listę do realizacji.' });
+    steps.push({ icon: Package, title: 'Kompletacja i pakowanie', desc: 'Skanowanie produktów, weryfikacja, pakowanie.' });
+    steps.push({ icon: Car, title: 'Wysyłka', desc: 'Etykieta, list przewozowy, status — automatycznie.' });
+  }
+
+  if (hasDiag) {
+    steps.push({ icon: Calendar, title: 'Nowy termin przeglądu', desc: 'Klient rezerwuje termin online lub przez telefon.' });
+    steps.push({ icon: Car, title: 'Przegląd pojazdu', desc: 'Technik przeprowadza inspekcję wg procedury SKP.' });
+    steps.push({ icon: FileText, title: 'Dokumentacja gotowa', desc: 'Wynik przeglądu, zdjęcia, uwagi — wszystko w systemie.' });
+    steps.push({ icon: Check, title: 'Przypomnienie o następnym', desc: 'System wysyła automatyczne przypomnienie przed terminem.' });
+  }
+
+  return steps;
+}
+
+// ── Scenario Modal ──
+function ScenarioModal({ open, steps, onClose }: { open: boolean; steps: ScenarioStep[]; onClose: () => void }) {
+  const [current, setCurrent] = useState(0);
+  const [autoplay, setAutoplay] = useState(true);
+  const [stepKey, setStepKey] = useState(0); // force re-animate
+  const ease = 'cubic-bezier(0.16,1,0.3,1)';
+
+  useEffect(() => { if (open) { setCurrent(0); setStepKey(0); setAutoplay(true); } }, [open]);
+
+  // Autoplay
+  useEffect(() => {
+    if (!open || !autoplay || current >= steps.length) return;
+    const t = setTimeout(() => {
+      if (current < steps.length - 1) { setCurrent(c => c + 1); setStepKey(k => k + 1); }
+      else setAutoplay(false);
+    }, 3000);
+    return () => clearTimeout(t);
+  }, [open, autoplay, current, steps.length]);
+
+  // Escape
+  useEffect(() => {
+    if (!open) return;
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [open, onClose]);
+
+  if (!open || steps.length === 0) return null;
+
+  const isLast = current >= steps.length - 1;
+  const finished = isLast && !autoplay;
+  const step = steps[current];
+  const StepIcon = step?.icon;
+  const progress = ((current + 1) / steps.length) * 100;
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, zIndex: 300,
+      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(12px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+      animation: 'cfgFadeIn 0.2s ease',
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: '100%', maxWidth: 700, background: '#fff', borderRadius: 28, overflow: 'hidden',
+        boxShadow: '0 30px 100px rgba(0,0,0,0.25), 0 10px 30px rgba(0,0,0,0.12)',
+        animation: 'cfgModalIn 0.35s cubic-bezier(0.16,1,0.3,1)',
+      }}>
+        {/* Progress bar */}
+        <div style={{ height: 4, background: '#E2E8F0' }}>
+          <div style={{ height: '100%', background: 'linear-gradient(90deg, #4F46E5, #7C3AED)', width: `${progress}%`, transition: `width 0.5s ${ease}`, borderRadius: 2 }} />
+        </div>
+
+        <div style={{ padding: '40px 44px' }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 36 }}>
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 850, color: '#0F172A', letterSpacing: '-0.02em', marginBottom: 4 }}>
+                {finished ? 'Twój system jest gotowy' : 'Zobacz, jak działa Twój system'}
+              </div>
+              <div style={{ fontSize: 14, color: '#64748B' }}>
+                {finished ? 'Wszystkie procesy zautomatyzowane i gotowe do pracy.' : `Krok ${current + 1} z ${steps.length} — na podstawie Twojej konfiguracji`}
+              </div>
+            </div>
+            <button onClick={onClose} style={{ width: 36, height: 36, borderRadius: 10, border: '1px solid #E2E8F0', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#F1F5F9'; }} onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}>
+              <X size={16} color="#64748B" />
+            </button>
+          </div>
+
+          {finished ? (
+            /* ── Final screen ── */
+            <div style={{ textAlign: 'center', padding: '40px 0 20px' }}>
+              <div style={{ width: 80, height: 80, borderRadius: 24, background: 'linear-gradient(135deg, #4F46E5, #7C3AED)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', boxShadow: '0 10px 30px rgba(79,70,229,0.35)' }}>
+                <Check size={40} color="#fff" strokeWidth={2.5} />
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>
+                {steps.length} kroków — w pełni automatycznie
+              </div>
+              <div style={{ fontSize: 15, color: '#64748B', marginBottom: 36 }}>
+                System robi to za Ciebie. Codziennie, bezbłędnie, bez wysiłku.
+              </div>
+              <button onClick={onClose} style={{
+                padding: '18px 48px', borderRadius: 16, border: 'none',
+                background: 'linear-gradient(135deg, #4F46E5, #6D28D9)', color: '#fff',
+                fontSize: 16, fontWeight: 750, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 10,
+                boxShadow: '0 6px 20px rgba(79,70,229,0.35)',
+                transition: `all 0.25s ${ease}`,
+              }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)'; e.currentTarget.style.boxShadow = '0 10px 28px rgba(79,70,229,0.4)'; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(79,70,229,0.35)'; }}
+                onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.97)'; }}
+                onMouseUp={e => { e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)'; }}
+              >
+                Rozpocznij za darmo <span style={{ opacity: 0.6 }}>(14 dni)</span> <ArrowRight size={18} />
+              </button>
+            </div>
+          ) : (
+            /* ── Step display ── */
+            <>
+              {/* Timeline dots */}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 32, flexWrap: 'wrap' }}>
+                {steps.map((_, i) => (
+                  <div key={i} onClick={() => { setCurrent(i); setStepKey(k => k + 1); setAutoplay(false); }} style={{
+                    width: i === current ? 32 : 10, height: 10, borderRadius: 5, cursor: 'pointer',
+                    background: i < current ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : i === current ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : '#E2E8F0',
+                    transition: `all 0.3s ${ease}`,
+                    opacity: i <= current ? 1 : 0.5,
+                  }} />
+                ))}
+              </div>
+
+              {/* Current step card */}
+              <div key={stepKey} style={{
+                padding: 36, borderRadius: 20, minHeight: 180,
+                background: 'linear-gradient(160deg, #F8FAFC, #EEF2FF, #F5F3FF)',
+                border: '1px solid rgba(99,102,241,0.1)',
+                animation: 'cfgStepIn 0.5s cubic-bezier(0.16,1,0.3,1)',
+                display: 'flex', alignItems: 'center', gap: 28,
+              }}>
+                <div style={{
+                  width: 72, height: 72, borderRadius: 20, flexShrink: 0,
+                  background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 8px 24px rgba(79,70,229,0.3)',
+                }}>
+                  {StepIcon && <StepIcon size={32} color="#fff" strokeWidth={1.7} />}
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#818CF8', marginBottom: 8 }}>Krok {current + 1}</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', marginBottom: 8, letterSpacing: '-0.02em' }}>{step.title}</div>
+                  <div style={{ fontSize: 15, color: '#64748B', lineHeight: 1.6 }}>{step.desc}</div>
+                </div>
+              </div>
+
+              {/* Navigation */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 28 }}>
+                <button onClick={() => { if (current > 0) { setCurrent(c => c - 1); setStepKey(k => k + 1); setAutoplay(false); } }} disabled={current === 0} style={{
+                  padding: '12px 24px', borderRadius: 12, border: '1px solid #E2E8F0', background: '#fff',
+                  color: current === 0 ? '#CBD5E1' : '#64748B', fontSize: 14, fontWeight: 650, cursor: current === 0 ? 'default' : 'pointer',
+                  transition: `all 0.2s ease`, opacity: current === 0 ? 0.5 : 1,
+                }}>Wstecz</button>
+
+                <button onClick={() => { setAutoplay(!autoplay); }} style={{
+                  padding: '8px 16px', borderRadius: 10, border: '1px solid #E2E8F0', background: autoplay ? 'rgba(79,70,229,0.06)' : '#fff',
+                  color: '#64748B', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s ease',
+                }}>
+                  {autoplay ? 'Pauza' : 'Autoplay'}
+                </button>
+
+                <button onClick={() => { if (current < steps.length - 1) { setCurrent(c => c + 1); setStepKey(k => k + 1); setAutoplay(false); } else { setAutoplay(false); } }} style={{
+                  padding: '12px 24px', borderRadius: 12, border: 'none',
+                  background: isLast ? 'linear-gradient(135deg, #059669, #10B981)' : 'linear-gradient(135deg, #4F46E5, #7C3AED)',
+                  color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(79,70,229,0.3)', transition: `all 0.25s ${ease}`,
+                }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}
+                >
+                  {isLast ? 'Zakończ' : 'Dalej'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Component ──
 export default function ConfiguratorPage() {
   const [activeModules, setActiveModules] = useState<Set<string>>(new Set());
@@ -347,6 +575,9 @@ export default function ConfiguratorPage() {
   // Infra modal state
   const [infraModal, setInfraModal] = useState(false);
   const [infraConfig, setInfraConfig] = useState<InfraConfig>(defaultInfraConfig);
+  // Scenario modal
+  const [scenarioOpen, setScenarioOpen] = useState(false);
+  const scenarioSteps = useMemo(() => generateScenario(activeModules, infraConfig), [activeModules, infraConfig]);
 
   const toggleModule = (id: string) => {
     if (id === 'infra') {
@@ -519,8 +750,9 @@ export default function ConfiguratorPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#F8FAFC', color: '#0F172A', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", scrollBehavior: 'smooth' }}>
 
-      {/* Infra configuration modal */}
+      {/* Modals */}
       <InfraModal open={infraModal} initial={infraConfig} onApply={handleInfraApply} onCancel={() => setInfraModal(false)} />
+      <ScenarioModal open={scenarioOpen} steps={scenarioSteps} onClose={() => setScenarioOpen(false)} />
 
       {/* ── AMBIENT GLOW ── */}
       <div style={{ position: 'fixed', top: -200, left: '30%', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle, rgba(79,70,229,0.04) 0%, transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
@@ -674,6 +906,43 @@ export default function ConfiguratorPage() {
               </div>
             </section>
           </FadeInSection>
+
+          {/* ── SCENARIO CTA ── */}
+          {activeModules.size > 0 && (
+            <FadeInSection delay={300}>
+              <section style={{ marginTop: 64, textAlign: 'center' }}>
+                <div style={{
+                  padding: '48px 40px', borderRadius: 24,
+                  background: 'linear-gradient(160deg, #EEF2FF 0%, #F5F3FF 40%, #FFF 100%)',
+                  border: '1px solid rgba(99,102,241,0.1)',
+                  boxShadow: '0 4px 24px rgba(79,70,229,0.06)',
+                }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#818CF8', marginBottom: 12 }}>Podgląd działania</div>
+                  <div style={{ fontSize: 24, fontWeight: 850, color: '#0F172A', letterSpacing: '-0.03em', marginBottom: 8 }}>
+                    Jak to będzie działać w praktyce?
+                  </div>
+                  <div style={{ fontSize: 15, color: '#64748B', marginBottom: 28, maxWidth: 440, margin: '0 auto 28px' }}>
+                    Interaktywny scenariusz pracy systemu — na podstawie Twojej konfiguracji.
+                  </div>
+                  <button onClick={() => setScenarioOpen(true)} style={{
+                    padding: '18px 40px', borderRadius: 16, border: 'none',
+                    background: 'linear-gradient(135deg, #4F46E5 0%, #6D28D9 100%)',
+                    color: '#fff', fontSize: 16, fontWeight: 750, cursor: 'pointer',
+                    display: 'inline-flex', alignItems: 'center', gap: 10,
+                    boxShadow: '0 6px 24px rgba(79,70,229,0.35), 0 2px 4px rgba(79,70,229,0.15)',
+                    transition: `all 0.25s ${ease}`,
+                  }}
+                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)'; e.currentTarget.style.boxShadow = '0 10px 32px rgba(79,70,229,0.4), 0 0 40px rgba(99,102,241,0.12)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 6px 24px rgba(79,70,229,0.35), 0 2px 4px rgba(79,70,229,0.15)'; }}
+                    onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.97)'; }}
+                    onMouseUp={e => { e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)'; }}
+                  >
+                    <Sparkles size={18} /> Zobacz scenariusz działania
+                  </button>
+                </div>
+              </section>
+            </FadeInSection>
+          )}
         </main>
 
         {/* ── RIGHT: PRICING BOX ── */}
@@ -791,6 +1060,7 @@ export default function ConfiguratorPage() {
         @keyframes cfgFadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes cfgPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.95); } }
         @keyframes cfgModalIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        @keyframes cfgStepIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
         .cfg-integration:hover .cfg-int-arrow { transform: translateX(3px) !important; }
         .cfg-cta-btn::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 50%); opacity: 0; transition: opacity 0.3s ease; pointer-events: none; border-radius: inherit; }
         .cfg-cta-btn:hover::after { opacity: 1; }
