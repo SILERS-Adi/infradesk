@@ -9,6 +9,7 @@ export const clientsApi = {
   getAll: async (_params?: any) => [],
   getOne: async (id: string) => ({ id, name: 'Workspace', hasContract: false }),
   search: async (_q: string) => [],
+  getPaged: async (_params?: any) => ({ items: [], total: 0, pages: 1 }),
   create: async (_data: any) => ({}),
   update: async (_id: string, _data: any) => ({}),
   delete: async (_id: string) => ({}),
