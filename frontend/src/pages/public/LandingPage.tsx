@@ -74,37 +74,37 @@ export default function LandingPage() {
 
         {/* Download cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
-          <a href="/downloads/InfraDesk.exe"
+          <a href="/downloads/Asystent%20Home.exe"
+            className="group rounded-2xl p-5 text-left transition-all hover:scale-[1.02] active:scale-[0.98]"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(5,150,105,0.12)' }}>
+                <Monitor className="h-5 w-5 text-emerald-400" />
+              </div>
+              <div>
+                <div className="text-sm font-semibold" style={{ color: 'var(--t)', opacity: 0.85 }}>Asystent Home</div>
+                <div className="text-[11px]" style={{ color: 'var(--tm)' }}>v6.0.0 · Windows · Za darmo</div>
+              </div>
+            </div>
+            <p className="text-xs mb-3" style={{ color: 'var(--tm)' }}>Dla uzykownikow domowych. Diagnostyka, czyszczenie, bezpieczenstwo, naprawa AI, pomoc zdalna.</p>
+            <div className="flex items-center gap-2 text-xs font-medium text-emerald-400 group-hover:text-emerald-300 transition-colors">
+              <Download className="h-3.5 w-3.5" /> Pobierz · ~40 MB
+            </div>
+          </a>
+          <a href="/downloads/Asystent%20Business.exe"
             className="group rounded-2xl p-5 text-left transition-all hover:scale-[1.02] active:scale-[0.98]"
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.12)' }}>
-                <Monitor className="h-5 w-5 text-violet-400" />
+                <Server className="h-5 w-5 text-violet-400" />
               </div>
               <div>
-                <div className="text-sm font-semibold" style={{ color: 'var(--t)', opacity: 0.85 }}>InfraDesk</div>
-                <div className="text-[11px]" style={{ color: 'var(--tm)' }}>v5.0.0 · Windows</div>
+                <div className="text-sm font-semibold" style={{ color: 'var(--t)', opacity: 0.85 }}>Asystent Business</div>
+                <div className="text-[11px]" style={{ color: 'var(--tm)' }}>v1.0.0 · Windows</div>
               </div>
             </div>
-            <p className="text-xs mb-3" style={{ color: 'var(--tm)' }}>Dla stacji roboczych i komputerów pracowników. Monitoring, zgłoszenia, audyt, pomoc zdalna.</p>
+            <p className="text-xs mb-3" style={{ color: 'var(--tm)' }}>Dla firm. Monitoring, zgloszenia, backup, S.M.A.R.T., RAID, pomoc zdalna, diagnostyka.</p>
             <div className="flex items-center gap-2 text-xs font-medium text-violet-400 group-hover:text-violet-300 transition-colors">
-              <Download className="h-3.5 w-3.5" /> Pobierz · ~40 MB
-            </div>
-          </a>
-          <a href="/downloads/InfraDesk%20Server%20Agent.exe"
-            className="group rounded-2xl p-5 text-left transition-all hover:scale-[1.02] active:scale-[0.98]"
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(34,211,238,0.12)' }}>
-                <Server className="h-5 w-5 text-cyan-400" />
-              </div>
-              <div>
-                <div className="text-sm font-semibold" style={{ color: 'var(--t)', opacity: 0.85 }}>InfraDesk Server</div>
-                <div className="text-[11px]" style={{ color: 'var(--tm)' }}>v4.3.1 · Windows Server</div>
-              </div>
-            </div>
-            <p className="text-xs mb-3" style={{ color: 'var(--tm)' }}>Dla serwerów Windows. S.M.A.R.T., RAID, Event Log, Hyper-V, SSL, usługa w tle.</p>
-            <div className="flex items-center gap-2 text-xs font-medium text-cyan-400 group-hover:text-cyan-300 transition-colors">
               <Download className="h-3.5 w-3.5" /> Pobierz · ~40 MB
             </div>
           </a>

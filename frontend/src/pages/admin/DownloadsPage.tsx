@@ -232,12 +232,11 @@ export function DownloadsPage() {
   const APPS: AppCard[] = [
     {
       icon: <Monitor className="h-7 w-7" />,
-      name: 'InfraDesk',
-      description: 'Monitoring, zgłoszenia, audyt bezpieczeństwa, pomoc zdalna. Tryb firmowy lub Asystent InfraDesk.',
-      color: 'indigo',
+      name: 'Asystent Home',
+      description: 'Dla użytkowników domowych. Monitoring, czyszczenie, audyt bezpieczeństwa, pomoc zdalna. Bezpłatny.',
+      color: 'emerald',
       files: [
-        { label: 'InfraDesk (zalecany)', url: '/downloads/InfraDesk.exe', badge: versionBadge, primary: true, size: '~40 MB' },
-        { label: 'Wersja Beta (v4.1.0 — auto-diagnostyka, backup)', url: '/downloads/InfraDesk-Agent-beta.exe', badge: 'Beta 4.1', size: '~39 MB' },
+        { label: 'Asystent Home — Windows (zalecany)', url: '/downloads/Asystent%20Home.exe', badge: 'v6.0.0', primary: true, size: '~40 MB' },
       ],
       notes: [
         'Wymaga Windows 10 lub nowszego',
@@ -248,17 +247,17 @@ export function DownloadsPage() {
     },
     {
       icon: <Server className="h-7 w-7" />,
-      name: 'InfraDesk Agent Server',
-      description: 'Agent dla serwerów Windows. Usługa Windows, S.M.A.R.T., RAID, Event Log, Hyper-V, SSL.',
+      name: 'Asystent Business',
+      description: 'Dla firm. Monitoring sprzętu, S.M.A.R.T., RAID, Event Log, zgłoszenia serwisowe, pomoc zdalna.',
       color: 'indigo',
       files: [
-        { label: 'InfraDesk Agent Server — Windows', url: '/downloads/InfraDesk%20Server%20Agent.exe', badge: versionBadge, primary: true, size: '~40 MB' },
+        { label: 'Asystent Business — Windows', url: '/downloads/Asystent%20Business.exe', badge: 'v1.0.0', primary: true, size: '~40 MB' },
       ],
       notes: [
-        'Działa jako usługa Windows (bez logowania)',
+        'Wymaga Windows 10 lub nowszego',
+        'Działa też jako usługa Windows (serwery)',
         'S.M.A.R.T., RAID, Event Log, certyfikaty SSL',
-        'Security Audit 0-100, Hyper-V monitoring',
-        'Instalacja: agent.exe --install-service',
+        'Formularz zgłoszeń ze screenshotami',
       ],
     },
     {

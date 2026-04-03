@@ -23,6 +23,7 @@ interface AppCard {
 }
 
 const COLORS: Record<string, { accent: string; bg: string }> = {
+  emerald: { accent: '#10B981', bg: 'rgba(16,185,129,0.08)' },
   violet: { accent: '#8B5CF6', bg: 'rgba(139,92,246,0.08)' },
   cyan:   { accent: '#22D3EE', bg: 'rgba(34,211,238,0.06)' },
   orange: { accent: '#FB923C', bg: 'rgba(251,146,60,0.06)' },
@@ -87,13 +88,13 @@ function AppCardView({ app }: { app: AppCard }) {
 interface CompareRow { feature: string; client: string | boolean; server: string | boolean }
 
 const COMPARE_DATA: CompareRow[] = [
-  { feature: 'Tryb pracy',              client: 'Aplikacja w zasobniku (tray)', server: 'Usługa Windows (background)' },
+  { feature: 'Tryb pracy',              client: 'Aplikacja w zasobniku (tray)', server: 'Aplikacja + usługa Windows' },
   { feature: 'Wymaga logowania',         client: true,                          server: false },
   { feature: 'Auto-start z Windows',     client: true,                          server: true },
-  { feature: 'Zgłoszenia serwisowe',     client: true,                          server: false },
-  { feature: 'Okno klienta (kontakt)',   client: true,                          server: false },
+  { feature: 'Zgłoszenia serwisowe',     client: true,                          server: true },
+  { feature: 'Formularz ze screenshotami', client: false,                       server: true },
   { feature: 'Wake-on-LAN',             client: true,                          server: true },
-  { feature: 'RustDesk (zdalny pulpit)', client: true,                          server: false },
+  { feature: 'RustDesk (zdalny pulpit)', client: true,                          server: true },
   { feature: 'Security Audit (0-100)',   client: true,                          server: true },
   { feature: 'Skanowanie sieci',         client: true,                          server: true },
   { feature: 'Monitoring S.M.A.R.T.',    client: false,                         server: true },
@@ -103,7 +104,7 @@ const COMPARE_DATA: CompareRow[] = [
   { feature: 'Hyper-V monitoring',       client: false,                         server: true },
   { feature: 'Backup (konfigurowalny)',  client: true,                          server: true },
   { feature: 'Auto-diagnostyka',         client: true,                          server: true },
-  { feature: 'Przeznaczenie',           client: 'Komputery pracowników',       server: 'Serwery Windows' },
+  { feature: 'Przeznaczenie',           client: 'Użytkownicy domowi',          server: 'Firmy i serwery' },
 ];
 
 function CompareModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -117,7 +118,7 @@ function CompareModal({ open, onClose }: { open: boolean; onClose: () => void })
         <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4" style={{ background: '#0E1527', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="flex items-center gap-3">
             <GitCompareArrows className="h-5 w-5" style={{ color: '#8B5CF6' }} />
-            <h3 className="text-[16px] font-semibold text-white/90">Agent Client vs Agent Server</h3>
+            <h3 className="text-[16px] font-semibold text-white/90">Asystent Home vs Asystent Business</h3>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg transition-colors hover:bg-white/10">
             <X className="h-5 w-5 text-white/40" />
@@ -128,11 +129,11 @@ function CompareModal({ open, onClose }: { open: boolean; onClose: () => void })
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                 <th className="text-left py-3 pr-4 font-medium" style={{ color: 'rgba(255,255,255,0.4)' }}>Funkcja</th>
-                <th className="text-center py-3 px-3 font-semibold" style={{ color: '#8B5CF6' }}>
-                  <div className="flex items-center justify-center gap-1.5"><Monitor className="h-3.5 w-3.5" /> Client</div>
+                <th className="text-center py-3 px-3 font-semibold" style={{ color: '#10B981' }}>
+                  <div className="flex items-center justify-center gap-1.5"><Monitor className="h-3.5 w-3.5" /> Home</div>
                 </th>
-                <th className="text-center py-3 pl-3 font-semibold" style={{ color: '#22D3EE' }}>
-                  <div className="flex items-center justify-center gap-1.5"><Server className="h-3.5 w-3.5" /> Server</div>
+                <th className="text-center py-3 pl-3 font-semibold" style={{ color: '#8B5CF6' }}>
+                  <div className="flex items-center justify-center gap-1.5"><Server className="h-3.5 w-3.5" /> Business</div>
                 </th>
               </tr>
             </thead>
@@ -194,17 +195,17 @@ export function PublicDownloadsPage() {
   };
 
   const APPS: AppCard[] = [
-    { icon: <Monitor className="h-6 w-6" />, name: 'InfraDesk', description: 'Dla firm i użytkowników domowych. Monitoring, zgłoszenia, audyt bezpieczeństwa, pomoc zdalna.', color: 'violet',
+    { icon: <Monitor className="h-6 w-6" />, name: 'Asystent Home', description: 'Dla użytkowników domowych. Monitoring, czyszczenie systemu, audyt bezpieczeństwa, pomoc zdalna. Bezpłatny.', color: 'emerald',
       files: [
-        { label: 'InfraDesk — Windows', url: '/downloads/InfraDesk.exe', badge: versionBadge, primary: true, size: '~40 MB' },
+        { label: 'Asystent Home — Windows', url: '/downloads/Asystent%20Home.exe', badge: 'v6.0.0', primary: true, size: '~40 MB' },
       ],
-      notes: ['Wymaga Windows 10 lub nowszego', 'Tryb firmowy lub Asystent InfraDesk (domowy)', 'Monitoring, audyt, czyszczenie, pomoc zdalna'],
+      notes: ['Wymaga Windows 10 lub nowszego', 'Monitoring, audyt, czyszczenie, pomoc zdalna', 'Bezpłatny dla użytkowników domowych'],
     },
-    { icon: <Server className="h-6 w-6" />, name: 'InfraDesk Server', description: 'Dla serwerów Windows. S.M.A.R.T., RAID, Event Log, Hyper-V, SSL.', color: 'violet',
+    { icon: <Server className="h-6 w-6" />, name: 'Asystent Business', description: 'Dla firm. Monitoring sprzętu, S.M.A.R.T., RAID, Event Log, zgłoszenia serwisowe, pomoc zdalna.', color: 'violet',
       files: [
-        { label: 'InfraDesk Agent Server — Windows', url: '/downloads/InfraDesk%20Server%20Agent.exe', badge: versionBadge, primary: true, size: '~40 MB' },
+        { label: 'Asystent Business — Windows', url: '/downloads/Asystent%20Business.exe', badge: 'v1.0.0', primary: true, size: '~40 MB' },
       ],
-      notes: ['Działa jako usługa Windows (bez logowania)', 'S.M.A.R.T., RAID, Event Log, certyfikaty SSL', 'Security Audit 0-100, Hyper-V monitoring', 'Instalacja: agent.exe --install-service'],
+      notes: ['Wymaga Windows 10 lub nowszego', 'S.M.A.R.T., RAID, Event Log, certyfikaty SSL', 'Formularz zgłoszeń ze screenshotami', 'Działa też jako usługa Windows (serwery)'],
     },
     { icon: <Smartphone className="h-6 w-6" />, name: 'InfraDesk TV — Android', description: 'Dashboard dla Android TV. Statystyki i zgłoszenia na dużym ekranie.', color: 'cyan',
       files: [{ label: 'APK — Android TV', url: '/downloads/InfraDesk-TV.apk', badge: 'v1.0.0', primary: true, size: '~5 MB' }],
