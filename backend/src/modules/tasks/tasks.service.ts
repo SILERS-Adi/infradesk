@@ -26,7 +26,7 @@ const taskSelect = {
       title: true,
       priority: true,
       serviceMode: true,
-      client: { select: { id: true, name: true, hasContract: true, contractHours: true, contractMonthlyValue: true, hourlyRate: true, contractHourlyRateOverLimit: true, billingIntervalMinutes: true } },
+      // client field removed (migrated to workspace model)
       location: { select: { id: true, name: true, contactPersonName: true, contactPersonPhone: true } },
       device: { select: { id: true, name: true, rustdeskId: true, assignedUser: { select: { id: true, firstName: true, lastName: true, email: true, phone: true, avatarUrl: true } } } },
       createdBy: { select: { id: true, firstName: true, lastName: true, email: true, phone: true, avatarUrl: true } },
