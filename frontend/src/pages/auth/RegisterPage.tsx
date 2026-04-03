@@ -94,6 +94,25 @@ export default function RegisterPage() {
       localStorage.setItem('infradesk_user', JSON.stringify(result.user));
       localStorage.setItem('infradesk_workspace', result.workspace.id);
 
+      // Save configurator config to workspace if available
+      const savedConfig = sessionStorage.getItem('infradesk_configurator_config');
+      const savedPrice = sessionStorage.getItem('infradesk_configurator_price');
+      if (savedConfig) {
+        try {
+          await fetch('/api/workspaces/save-config', {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${result.accessToken}` },
+            body: JSON.stringify({
+              workspaceId: result.workspace.id,
+              config: JSON.parse(savedConfig),
+              monthlyPrice: savedPrice ? Number(savedPrice) : 0,
+            }),
+          });
+        } catch {}
+        sessionStorage.removeItem('infradesk_configurator_config');
+        sessionStorage.removeItem('infradesk_configurator_price');
+      }
+
       toast.success('Konto utworzone! Witamy w InfraDesk.');
       // Redirect: companies → subdomain, personal → main domain
       if (result.workspace.type === 'COMPANY' && result.workspace.slug) {

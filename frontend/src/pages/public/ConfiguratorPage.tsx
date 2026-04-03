@@ -3,7 +3,7 @@
  * Premium SaaS — Stripe/Linear/Notion motion polish
  */
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Monitor, FileText, Package, Car, Headphones, Check, X,
   ChevronRight, Plug, Zap, ArrowRight, MessageCircle,
@@ -575,6 +575,7 @@ export default function ConfiguratorPage() {
   const isLight = resolved === 'light';
   const [searchParams] = useSearchParams();
   const isRenewalMode = searchParams.get('mode') === 'renewal';
+  const navigate = useNavigate();
 
   const [activeModules, setActiveModules] = useState<Set<string>>(new Set());
   const [activeAddons, setActiveAddons] = useState<Set<string>>(new Set(['onboarding']));
@@ -605,6 +606,7 @@ export default function ConfiguratorPage() {
   // Billing cycle
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
   const isYearly = billingCycle === 'yearly';
+
   // Scenario modal
   const [scenarioOpen, setScenarioOpen] = useState(false);
   const scenarioSteps = useMemo(() => generateScenario(activeModules, infraConfig), [activeModules, infraConfig]);
@@ -705,6 +707,37 @@ export default function ConfiguratorPage() {
     activeAddons.forEach(id => { const a = ADDONS.find(a => a.id === id); if (a?.price) { items.push({ name: a.name, price: a.price }); monthly += a.price; } });
     return { items, monthly };
   }, [activeModules, activeAddons, infraConfig, infraPrice, infraAutoIncluded]);
+
+  // Build config JSON for saving
+  const buildConfig = useCallback(() => ({
+    modules: Array.from(activeModules),
+    addons: Array.from(activeAddons),
+    infraConfig,
+    billingCycle,
+  }), [activeModules, activeAddons, infraConfig, billingCycle]);
+
+  // CTA action — save config + navigate
+  const handleCTA = useCallback(async () => {
+    const config = buildConfig();
+    if (isRenewalMode) {
+      const wsId = localStorage.getItem('infradesk_workspace');
+      const token = localStorage.getItem('infradesk_access_token');
+      if (wsId && token) {
+        try {
+          await fetch('/api/workspaces/save-config', {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ workspaceId: wsId, config, billingCycle, monthlyPrice: pricing.monthly }),
+          });
+        } catch {}
+      }
+      navigate('/wznowienie');
+    } else {
+      sessionStorage.setItem('infradesk_configurator_config', JSON.stringify(config));
+      sessionStorage.setItem('infradesk_configurator_price', String(pricing.monthly));
+      navigate('/register');
+    }
+  }, [buildConfig, isRenewalMode, billingCycle, pricing.monthly, navigate]);
 
   // Flash new items in pricing list
   const prevItemCount = useRef(pricing.items.length);
@@ -1203,8 +1236,8 @@ export default function ConfiguratorPage() {
             </div>
 
             {/* CTA */}
-            <Link to="/register" className="cfg-cta-btn" style={{
-              width: '100%', padding: '18px 20px', borderRadius: 16, border: 'none', textDecoration: 'none',
+            <button onClick={handleCTA} className="cfg-cta-btn" style={{
+              width: '100%', padding: '18px 20px', borderRadius: 16, border: 'none',
               background: 'linear-gradient(135deg, #4F46E5 0%, #6D28D9 100%)',
               color: '#fff', fontSize: 16, fontWeight: 750, cursor: 'pointer', letterSpacing: '-0.01em',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
@@ -1222,7 +1255,7 @@ export default function ConfiguratorPage() {
                 ? 'Wznów z tą konfiguracją'
                 : isYearly ? 'Rozpocznij za darmo i oszczędź 10%' : 'Rozpocznij za darmo'
               } {!isRenewalMode && !isYearly && <span style={{ opacity: 0.65, fontWeight: 500 }}>(14 dni)</span>} <ArrowRight size={18} />
-            </Link>
+            </button>
 
             <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--tm)', marginTop: 12, fontWeight: 450, lineHeight: 1.5 }}>
               Możesz zacząć za darmo i skonfigurować wszystko z nami bezpłatnie.
