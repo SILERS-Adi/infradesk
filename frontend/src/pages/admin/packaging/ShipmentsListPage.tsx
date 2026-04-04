@@ -129,7 +129,7 @@ export function ShipmentsListPage() {
   };
 
   return (
-    <>
+    <div className="pakops">
       <PageHeader title="Zamówienia" subtitle={`${total} zamówień w systemie`}
         actions={
           <div style={{ display: 'flex', gap: 8 }}>
@@ -263,7 +263,7 @@ export function ShipmentsListPage() {
             onClick={() => syncMut.mutate()}>Synchronizuj</Button>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 

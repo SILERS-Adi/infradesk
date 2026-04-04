@@ -179,7 +179,7 @@ export function CarriersPage() {
   });
 
   return (
-    <>
+    <div className="pakops">
       <PageHeader title="Kurierzy i przewoźnicy" subtitle="Konfiguracja kurierów, przewoźników i adresu nadawczego" />
 
       <div style={{ padding: '0 24px 24px' }}>
@@ -353,7 +353,7 @@ export function CarriersPage() {
           </div>
         </div>
       </Modal>
-    </>
+    </div>
   );
 }
 

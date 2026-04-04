@@ -49,7 +49,7 @@ export function WavesPage() {
   const totalShipped = waveList.reduce((s, w) => s + w.shippedCount, 0);
 
   return (
-    <>
+    <div className="pakops">
       <PageHeader title="Fale wysyłkowe" subtitle="Dzisiejsze fale pogrupowane wg kuriera i godziny odbioru"
         actions={
           <Button variant="ghost" size="sm" icon={<RefreshCw size={14} />}
@@ -169,7 +169,7 @@ export function WavesPage() {
           </div>
         )}
       </div>
-    </>
+    </div>
   );
 }
 

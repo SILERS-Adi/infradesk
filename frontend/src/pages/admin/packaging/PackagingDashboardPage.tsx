@@ -114,7 +114,7 @@ export function PackagingDashboardPage() {
   ];
 
   return (
-    <>
+    <div className="pakops">
       <PageHeader title="PakOps Dashboard" />
       <div style={{ padding: '0 24px 24px' }}>
 
@@ -202,7 +202,7 @@ export function PackagingDashboardPage() {
           ))}
         </div>
       </div>
-    </>
+    </div>
   );
 }
 

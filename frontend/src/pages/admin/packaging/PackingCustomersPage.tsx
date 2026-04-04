@@ -66,7 +66,7 @@ export function PackingCustomersPage() {
   // Detail view
   if (selectedId) {
     return (
-      <>
+      <div className="pakops">
         <PageHeader title="Klient" back="/packaging/customers"
           actions={<Button variant="ghost" size="sm" icon={<ChevronLeft size={14} />} onClick={() => setSelectedId(null)}>Lista</Button>} />
         <div style={{ padding: '0 24px 24px', maxWidth: 900 }}>
@@ -184,12 +184,12 @@ export function PackingCustomersPage() {
             <div style={{ textAlign: 'center', color: 'var(--tm)' }}>Klient nie znaleziony</div>
           )}
         </div>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
+    <div className="pakops">
       <PageHeader title="Klienci" subtitle="Lista klientów pakowania" />
       <div style={{ padding: '0 24px 24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
@@ -244,7 +244,7 @@ export function PackingCustomersPage() {
 
         <Pagination page={page} total={total} perPage={30} onPageChange={setPage} />
       </div>
-    </>
+    </div>
   );
 }
 

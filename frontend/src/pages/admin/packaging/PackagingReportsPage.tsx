@@ -65,7 +65,7 @@ export function PackagingReportsPage() {
   const rangeLabel = (r: Range) => ({ '7': '7 dni', '14': '14 dni', '30': '30 dni', '90': '90 dni' }[r]);
 
   return (
-    <>
+    <div className="pakops">
       <PageHeader title="Raporty pakowania" subtitle="Statystyki i analiza operacji" />
       <div style={{ padding: '0 24px 24px' }}>
         {/* Date range selector */}
@@ -193,7 +193,7 @@ export function PackagingReportsPage() {
           </Card>
         )}
       </div>
-    </>
+    </div>
   );
 }
 

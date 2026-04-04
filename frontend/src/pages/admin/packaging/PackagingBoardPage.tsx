@@ -86,10 +86,10 @@ export function PackagingBoardPage() {
     color: active ? '#fff' : 'var(--tm)',
   });
 
-  if (isLoading) return <><PageHeader title="Pakowanie" /><LoadingSpinner /></>;
+  if (isLoading) return <div className="pakops"><PageHeader title="Pakowanie" /><LoadingSpinner /></div>;
 
   return (
-    <>
+    <div className="pakops">
       <PageHeader title="Pakowanie" subtitle="Batche do realizacji" actions={
         <div style={{ display: 'flex', gap: 8 }}>
           <Button variant="ghost" size="sm" icon={<RefreshCw size={14} />}
@@ -236,7 +236,7 @@ export function PackagingBoardPage() {
           ))}
         </div>
       </Modal>
-    </>
+    </div>
   );
 }
 

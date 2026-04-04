@@ -9,8 +9,11 @@ import {
   ChevronRight, Loader2, Scan, User, FileText, AlertTriangle, Truck, Download, ExternalLink,
 } from 'lucide-react';
 import api from '../../../api/client';
+import toast from 'react-hot-toast';
 import { soundCollect, soundSuccess } from './useSound';
 import type { PakOpsBatch, PakOpsOrderToPack, PakOpsSessionData } from './types';
+
+const SHIPPING_UNAVAILABLE = 'Generowanie przesyłek nie jest jeszcze skonfigurowane. Nadaj ręcznie przez panel kuriera.';
 
 export default function PackingStationPage() {
   /* ═══ State ═══ */
@@ -189,7 +192,12 @@ export default function PackingStationPage() {
         } catch { /* silent */ }
       }
     } catch (err: any) {
-      alert(err?.response?.data?.detail || 'Blad tworzenia przesylki');
+      const status = err?.response?.status;
+      if (status === 404) {
+        toast.error(SHIPPING_UNAVAILABLE, { duration: 5000 });
+      } else {
+        toast.error(err?.response?.data?.detail || 'Błąd tworzenia przesyłki');
+      }
     } finally { setShipmentLoading(false); }
   };
 
@@ -677,16 +685,18 @@ export default function PackingStationPage() {
                 <p style={{ fontSize: 11, fontWeight: 500, marginTop: 2, color: 'var(--tx)' }}>{session.order.buyer_note}</p>
               </div>
             )}
-            <a
-              href={`https://allegro.pl/moje-allegro/sprzedaz/zamowienia/${session.order?.allegro_order_id}`}
-              target="_blank" rel="noopener noreferrer"
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, width: '100%', padding: '8px 0',
-                background: 'var(--sf2)', color: 'var(--pri)', border: '1px solid var(--bd)', borderRadius: 'var(--pk-rs)',
-                fontSize: 11, fontWeight: 700, textDecoration: 'none', cursor: 'pointer',
-              }}>
-              <ExternalLink style={{ width: 11, height: 11 }} /> Zobacz zamowienie na Allegro
-            </a>
+            {session.order?.allegro_order_id && (
+              <a
+                href={`https://allegro.pl/moje-allegro/sprzedaz/zamowienia/${session.order.allegro_order_id}`}
+                target="_blank" rel="noopener noreferrer"
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, width: '100%', padding: '8px 0',
+                  background: 'var(--sf2)', color: 'var(--pri)', border: '1px solid var(--bd)', borderRadius: 'var(--pk-rs)',
+                  fontSize: 11, fontWeight: 700, textDecoration: 'none', cursor: 'pointer',
+                }}>
+                <ExternalLink style={{ width: 11, height: 11 }} /> Zobacz zamówienie na Allegro
+              </a>
+            )}
           </div>
 
           {/* BOX 2: Camera */}
@@ -866,15 +876,17 @@ export default function PackingStationPage() {
                   {shipmentLoading ? <Loader2 style={{ width: 14, height: 14, animation: 'pakSpin .6s linear infinite' }} /> : <Printer style={{ width: 18, height: 18 }} />}
                   {shipmentLoading ? 'Generowanie listu...' : 'Generuj list przewozowy'}
                 </button>
-                <a href={`https://salescenter.allegro.com/ship-with-allegro/swa/create-shipment/${session.order?.allegro_order_id}`}
-                  target="_blank" rel="noopener noreferrer"
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', marginTop: 8, padding: '8px 0',
-                    background: 'transparent', color: 'var(--tx3)', border: '1px solid var(--bd-l)', borderRadius: 'var(--pk-rs)',
-                    fontSize: 11, fontWeight: 600, textDecoration: 'none',
-                  }}>
-                  <ExternalLink style={{ width: 12, height: 12 }} /> Nadaj recznie na Allegro
-                </a>
+                {session.order?.allegro_order_id && (
+                  <a href={`https://salescenter.allegro.com/ship-with-allegro/swa/create-shipment/${session.order.allegro_order_id}`}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', marginTop: 8, padding: '8px 0',
+                      background: 'transparent', color: 'var(--tx3)', border: '1px solid var(--bd-l)', borderRadius: 'var(--pk-rs)',
+                      fontSize: 11, fontWeight: 600, textDecoration: 'none',
+                    }}>
+                    <ExternalLink style={{ width: 12, height: 12 }} /> Nadaj ręcznie na Allegro
+                  </a>
+                )}
               </>
             ) : (
               <>
@@ -886,9 +898,9 @@ export default function PackingStationPage() {
                       const url = window.URL.createObjectURL(new Blob([resp.data], { type: 'application/pdf' }));
                       window.open(url, '_blank');
                     } else {
-                      alert('Etykieta jeszcze nie gotowa — sprobuj za chwile');
+                      toast('Etykieta jeszcze nie gotowa — spróbuj za chwilę', { icon: '⏳' });
                     }
-                  } catch (err: any) { alert(err?.response?.data?.detail || 'Blad pobierania etykiety'); }
+                  } catch (err: any) { toast.error(err?.response?.data?.detail || 'Błąd pobierania etykiety'); }
                 }}
                   style={{
                     width: '100%', padding: '16px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,

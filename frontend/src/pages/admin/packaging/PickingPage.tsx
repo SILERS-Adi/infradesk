@@ -112,7 +112,7 @@ export function PickingPage() {
 
 
   return (
-    <>
+    <div className="pakops">
       <PageHeader title="Zbieranie" subtitle={`${products.length} produktów do zebrania`}
         actions={
           <div style={{ display: 'flex', gap: 8 }}>
@@ -363,7 +363,7 @@ export function PickingPage() {
           )}
         </div>
       </Modal>
-    </>
+    </div>
   );
 }
 
