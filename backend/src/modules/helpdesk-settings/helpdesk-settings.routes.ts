@@ -65,4 +65,47 @@ router.put('/', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), a
   } catch (err) { next(err); }
 });
 
+// ── SLA Configuration ─────────────────────────────────────────
+
+const SLA_KEY = 'sla_config';
+
+// GET /api/helpdesk-settings/sla
+router.get('/sla', withWorkspaceMembership, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const wsId = req.workspaceId;
+    if (!wsId) { res.status(400).json({ error: 'Workspace context required' }); return; }
+
+    const setting = await prisma.workspaceSetting.findUnique({
+      where: { workspaceId_key: { workspaceId: wsId, key: SLA_KEY } },
+    });
+
+    if (!setting) {
+      res.json(null);
+      return;
+    }
+
+    res.json(JSON.parse(setting.value));
+  } catch (err) { next(err); }
+});
+
+// PUT /api/helpdesk-settings/sla
+router.put('/sla', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const wsId = req.workspaceId;
+    if (!wsId) { res.status(400).json({ error: 'Workspace context required' }); return; }
+
+    const { priorities, businessHours } = req.body;
+
+    const config = { priorities: priorities ?? {}, businessHours: businessHours ?? {} };
+
+    await prisma.workspaceSetting.upsert({
+      where: { workspaceId_key: { workspaceId: wsId, key: SLA_KEY } },
+      create: { workspaceId: wsId, key: SLA_KEY, value: JSON.stringify(config) },
+      update: { value: JSON.stringify(config) },
+    });
+
+    res.json(config);
+  } catch (err) { next(err); }
+});
+
 export default router;

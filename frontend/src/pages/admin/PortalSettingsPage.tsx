@@ -6,6 +6,7 @@ import type { WorkspaceType } from '../../config/menuRegistry';
 
 // Lazy imports for existing sub-pages
 import HelpdeskSettingsContent from './HelpdeskSettingsContent';
+import SlaContent from './SlaContent';
 import SharingContent from './SharingContent';
 
 interface Tab {
@@ -76,7 +77,7 @@ export default function PortalSettingsPage() {
         {activeTab === 'forms' && <PlaceholderTab title="Formularze zgłoszeń" desc="Konfiguracja pól formularzy, szablonów i publicznych formularzy zgłoszeń" />}
         {activeTab === 'categories' && <PlaceholderTab title="Kategorie i priorytety" desc="Zarządzanie kategoriami zgłoszeń, typami, priorytetami i ich kolorami" />}
         {activeTab === 'rules' && <PlaceholderTab title="Reguły obsługi" desc="Automatyczne przypisywanie, eskalacje i reguły routingu zgłoszeń" />}
-        {activeTab === 'sla' && <PlaceholderTab title="SLA" desc="Umowy poziomu usług — czas reakcji, czas rozwiązania, priorytety SLA" />}
+        {activeTab === 'sla' && <SlaContent />}
         {activeTab === 'sharing' && <SharingContent />}
         {activeTab === 'visibility' && <PlaceholderTab title="Widoczność dla klienta" desc="Konfiguracja tego, co klient widzi w swoim panelu — urządzenia, historia, komentarze" />}
         {activeTab === 'notifications' && <PlaceholderTab title="Powiadomienia" desc="Konfiguracja powiadomień email, push i wewnętrznych dla zgłoszeń" />}
