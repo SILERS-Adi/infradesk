@@ -50,25 +50,23 @@ export function useEffectiveMenu(): EffectiveGroup[] {
   return useMemo(() => {
     const effective = layout ?? buildDefaultLayout();
 
-    // Permission checkers (same logic as original Sidebar.tsx)
+    // Permission checkers — modular architecture
     const canSeeGroup = (groupId: string): boolean => {
       const sg = GROUPS_BY_ID.get(groupId);
       if (!sg) return true; // custom group — always visible
+      if (sg.superadminOnly) return isSuperAdmin;
+      if (sg.permanent) return true; // permanent sections always visible
       if (sg.module && !hasModule(sg.module)) return false;
-      if (!sg.role) return true;
-      if (sg.role === 'ADMIN') return isAdmin;
-      if (sg.role === 'SUPERADMIN') return isSuperAdmin;
-      return false;
+      if (sg.adminOnly) return isAdmin;
+      return true;
     };
 
     const canSeeItem = (itemId: string): boolean => {
       const si = ITEMS_BY_ID.get(itemId);
       if (!si) return false; // unknown item — skip
       if (si.module && !hasModule(si.module)) return false;
-      if (!si.role) return true;
-      if (si.role === 'ADMIN') return isAdmin;
-      if (si.role === 'SUPERADMIN') return isSuperAdmin;
-      return false;
+      if (si.adminOnly) return isAdmin;
+      return true;
     };
 
     // Collect all item IDs present in layout (groups + hidden)
@@ -159,7 +157,7 @@ export function useEffectiveMenu(): EffectiveGroup[] {
         color: gc.color ?? null,
         isCustom: !!gc.isCustom,
         isSeparator: false,
-        isPlatform: sysGroup?.role === 'SUPERADMIN',
+        isPlatform: sysGroup?.superadminOnly === true,
         isFavorites: isFavoritesGroup,
         isCollapsed: collapsedSet.has(gc.id),
         systemGroup: sysGroup,

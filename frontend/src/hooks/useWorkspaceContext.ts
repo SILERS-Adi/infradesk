@@ -33,9 +33,16 @@ export function useWorkspaceContext() {
   const canManageUsers = !isPreview && (isOwner || role === 'ADMIN');
   const canManageSettings = !isPreview && (isOwner || role === 'ADMIN');
 
-  // Module access — workspace-level enabledModules
-  const enabledModules = current?.enabledModules ?? ['helpdesk'];
-  const hasModule = (mod: string) => enabledModules.includes(mod);
+  // Module access — workspace-level enabledModules (with migration support)
+  const enabledModules = current?.enabledModules ?? ['infrastructure', 'service-desk'];
+  const hasModule = (mod: string) => {
+    if (enabledModules.includes(mod)) return true;
+    // Migration: old 'helpdesk' key → infrastructure + service-desk
+    if ((mod === 'infrastructure' || mod === 'service-desk') && enabledModules.includes('helpdesk')) return true;
+    // Migration: old 'service' key → skp
+    if (mod === 'skp' && enabledModules.includes('service')) return true;
+    return false;
+  };
 
   return {
     workspace: current,

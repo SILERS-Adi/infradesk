@@ -152,9 +152,12 @@ function AdminRoutes() {
         <Route path="tickets/queue" element={<TicketsQueuePage />} />
         <Route path="tickets/reports" element={<TicketReportsPage />} />
         <Route path="tickets/:id" element={<TicketDetailPage />} />
-        <Route path="credentials" element={<CredentialsPage />} />
-        <Route path="users" element={<UsersPage />} />
-        <Route path="workspace-members" element={<WorkspaceMembersPage />} />
+        <Route path="vault" element={<CredentialsPage />} />
+        <Route path="vault/mine" element={<CredentialsPage />} />
+        <Route path="vault/shared" element={<CredentialsPage />} />
+        <Route path="credentials" element={<Navigate to="/vault" replace />} />
+        <Route path="users" element={<WorkspaceMembersPage />} />
+        <Route path="workspace-members" element={<Navigate to="/users" replace />} />
         <Route path="activity-logs" element={<ActivityLogsPage />} />
         <Route path="tasks" element={<TasksPage />} />
         <Route path="orders" element={<OrdersPage />} />
@@ -203,15 +206,19 @@ function AdminRoutes() {
         <Route path="packaging/customers" element={<PackingCustomersPage />} />
         <Route path="packaging/waves" element={<WavesPage />} />
         <Route path="packaging/reports" element={<PackagingReportsPage />} />
-        {/* Service module */}
-        <Route path="service" element={<ServiceDashboardPage />} />
-        <Route path="service/inspections" element={<InspectionsListPage />} />
-        <Route path="service/inspections/new" element={<InspectionFormPage />} />
-        <Route path="service/inspections/:id/edit" element={<InspectionFormPage />} />
-        <Route path="service/inspections/:id" element={<InspectionFormPage />} />
-        <Route path="service/vehicles" element={<VehiclesListPage />} />
-        <Route path="service/vehicles/new" element={<VehicleFormPage />} />
-        <Route path="service/vehicles/:id/edit" element={<VehicleFormPage />} />
+        {/* SKP module (new paths) */}
+        <Route path="skp" element={<ServiceDashboardPage />} />
+        <Route path="skp/inspections" element={<InspectionsListPage />} />
+        <Route path="skp/inspections/new" element={<InspectionFormPage />} />
+        <Route path="skp/inspections/:id/edit" element={<InspectionFormPage />} />
+        <Route path="skp/inspections/:id" element={<InspectionFormPage />} />
+        <Route path="skp/vehicles" element={<VehiclesListPage />} />
+        <Route path="skp/vehicles/new" element={<VehicleFormPage />} />
+        <Route path="skp/vehicles/:id/edit" element={<VehicleFormPage />} />
+        {/* SKP legacy redirects */}
+        <Route path="service" element={<Navigate to="/skp" replace />} />
+        <Route path="service/inspections" element={<Navigate to="/skp/inspections" replace />} />
+        <Route path="service/vehicles" element={<Navigate to="/skp/vehicles" replace />} />
         <Route path="superadmin" element={<RequireSuperAdmin><SADashboardPage /></RequireSuperAdmin>} />
         <Route path="superadmin/tenants" element={<RequireSuperAdmin><SATenantsPage /></RequireSuperAdmin>} />
         <Route path="superadmin/users" element={<RequireSuperAdmin><SAUsersPage /></RequireSuperAdmin>} />
@@ -376,6 +383,10 @@ export default function App() {
             <Route path="/downloads" element={<Navigate to="/pobieranie" replace />} />
             <Route path="/o-nas" element={<Navigate to="/kontakt" replace />} />
             <Route path="/platnosci" element={<Navigate to="/regulamin" replace />} />
+
+            {/* Redirects — architecture migration */}
+            <Route path="/credentials" element={<Navigate to="/vault" replace />} />
+            <Route path="/workspace-members" element={<Navigate to="/users" replace />} />
 
             {/* Portal (CLIENT) */}
             <Route path="/portal/*" element={<PortalRoutes />} />
