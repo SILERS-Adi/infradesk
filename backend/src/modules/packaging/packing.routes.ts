@@ -44,37 +44,33 @@ router.get('/queue', async (req: Request, res: Response, next: NextFunction) => 
     const userMap: Record<string, string> = {};
     for (const u of users) userMap[u.id] = `${u.firstName} ${u.lastName}`.trim();
 
-    const items = shipments.map(o => {
-      const session = sessionByShipment[o.id];
-      let customerName: string | null = null;
-      let customerLogin: string | null = null;
-      if (o.customer) {
-        const parts = [o.customer.firstName || '', o.customer.lastName || ''].filter(Boolean);
-        customerName = parts.join(' ') || o.customer.login || null;
-        customerLogin = o.customer.login;
-      }
-
+    // Frontend expects PackingQueueItem[] (plain array)
+    const result = shipments.map(o => {
       return {
         id: o.id,
-        allegro_order_id: o.externalId || o.orderNumber,
-        status: o.status.toLowerCase(),
-        customer_name: customerName,
-        customer_login: customerLogin,
-        total_amount: o.totalAmount || 0,
-        items_count: o.items.length,
-        delivery_method: o.deliveryMethod || null,
-        delivery_point_id: o.deliveryPointId || null,
-        dispatch_deadline: o.dispatchDeadline ? o.dispatchDeadline.toISOString() : null,
-        allegro_created_at: o.createdAt.toISOString(),
-        taken_by: session ? {
-          id: session.userId,
-          name: userMap[session.userId] || null,
-        } : null,
-        session_id: session ? session.id : null,
+        externalOrderId: o.externalId || o.orderNumber || null,
+        status: o.status,
+        addressName: o.addressName || null,
+        addressCity: o.addressCity || null,
+        addressStreet: o.addressStreet || null,
+        addressZip: o.addressZip || null,
+        addressPhone: o.addressPhone || null,
+        totalAmount: o.totalAmount || 0,
+        courierName: o.deliveryMethod || null,
+        deliveryMethod: o.deliveryMethod || null,
+        _count: { items: o.items.length },
+        items: o.items.map(i => ({
+          id: i.id,
+          name: i.name,
+          sku: i.sku || null,
+          quantity: i.quantity,
+          unitPrice: i.unitPrice,
+          image: i.imageUrl || null,
+        })),
       };
     });
 
-    res.json({ items, total: items.length });
+    res.json(result);
   } catch (err) { next(err); }
 });
 
@@ -86,10 +82,10 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
   try {
     const workspaceId = req.workspaceId!;
     const userId = req.user!.userId;
-    const { order_id } = req.body;
+    const order_id = req.body.orderId || req.body.order_id;
 
     if (!order_id) {
-      res.status(400).json({ detail: 'order_id is required' });
+      res.status(400).json({ detail: 'orderId is required' });
       return;
     }
 
@@ -111,10 +107,15 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
       where: { shipmentId: order_id, status: 'IN_PROGRESS' },
     });
     if (existing) {
+      // Return format matching frontend expectations
+      const checkedItemIds = Object.entries((existing.itemsChecked as Record<string, any>) || {})
+        .filter(([_, v]) => v.scanned)
+        .map(([k]) => k);
       res.json({
-        session_id: existing.id,
-        order_id: order_id,
-        items: existing.itemsChecked,
+        id: existing.id,
+        orderId: order_id,
+        checkedItems: checkedItemIds,
+        photos: [],
         resumed: true,
       });
       return;
@@ -160,9 +161,10 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
     }
 
     res.json({
-      session_id: session.id,
-      order_id: order.id,
-      items: itemsChecked,
+      id: session.id,
+      orderId: order.id,
+      checkedItems: [],
+      photos: [],
     });
   } catch (err) { next(err); }
 });
@@ -255,8 +257,73 @@ router.get('/sessions/:session_id', async (req: Request, res: Response, next: Ne
 });
 
 /**
- * POST /sessions/:session_id/scan — Scan barcode
- * Matches PakOps: POST /packing/sessions/{session_id}/scan
+ * POST /scan — Scan barcode (frontend sends { barcode, orderId })
+ * Finds active session for the given order and delegates to session scan
+ */
+router.post('/scan', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { barcode, orderId } = req.body;
+    if (!barcode) {
+      res.status(400).json({ detail: 'barcode is required' });
+      return;
+    }
+
+    // Find active session for this order
+    const session = await prisma.packingSession.findFirst({
+      where: orderId
+        ? { shipmentId: orderId, status: 'IN_PROGRESS' }
+        : { userId: req.user!.userId, status: 'IN_PROGRESS' },
+    });
+    if (!session) {
+      res.status(404).json({ detail: 'No active packing session found' });
+      return;
+    }
+
+    const items = (session.itemsChecked as Record<string, any>) || {};
+    const barcodeClean = barcode.trim();
+
+    let matchedItemId: string | null = null;
+    for (const [itemId, itemData] of Object.entries(items)) {
+      if (
+        itemData.allegro_offer_id === barcodeClean ||
+        (itemData.sku && itemData.sku === barcodeClean) ||
+        (itemData.name && barcodeClean.toLowerCase().includes(itemData.name.toLowerCase().substring(0, 10)))
+      ) {
+        if ((itemData.qty_scanned || 0) < itemData.quantity) {
+          matchedItemId = itemId;
+          break;
+        }
+      }
+    }
+
+    if (!matchedItemId) {
+      res.json({ matched: false, message: `Nie znaleziono produktu dla kodu: ${barcodeClean}` });
+      return;
+    }
+
+    items[matchedItemId].qty_scanned = (items[matchedItemId].qty_scanned || 0) + 1;
+    if (items[matchedItemId].qty_scanned >= items[matchedItemId].quantity) {
+      items[matchedItemId].scanned = true;
+    }
+
+    await prisma.packingSession.update({
+      where: { id: session.id },
+      data: { itemsChecked: items },
+    });
+
+    res.json({
+      matched: true,
+      itemId: matchedItemId,
+      itemName: items[matchedItemId].name,
+      qtyScanned: items[matchedItemId].qty_scanned,
+      qtyNeeded: items[matchedItemId].quantity,
+      allScanned: Object.values(items).every((i: any) => i.scanned),
+    });
+  } catch (err) { next(err); }
+});
+
+/**
+ * POST /sessions/:session_id/scan — Scan barcode (legacy route)
  */
 router.post('/sessions/:session_id/scan', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -311,11 +378,11 @@ router.post('/sessions/:session_id/scan', async (req: Request, res: Response, ne
 
     res.json({
       matched: true,
-      item_id: matchedItemId,
-      item_name: items[matchedItemId].name,
-      qty_scanned: items[matchedItemId].qty_scanned,
-      qty_needed: items[matchedItemId].quantity,
-      all_scanned: allScanned,
+      itemId: matchedItemId,
+      itemName: items[matchedItemId].name,
+      qtyScanned: items[matchedItemId].qty_scanned,
+      qtyNeeded: items[matchedItemId].quantity,
+      allScanned: allScanned,
     });
   } catch (err) { next(err); }
 });
@@ -365,7 +432,8 @@ router.post('/sessions/:session_id/check-item', async (req: Request, res: Respon
  */
 router.post('/sessions/:session_id/photo', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { photo_base64, filename } = req.body;
+    const photo_base64 = req.body.photo || req.body.photo_base64;
+    const filename = req.body.filename;
     if (!photo_base64) {
       res.status(400).json({ detail: 'Invalid base64 data' });
       return;
@@ -523,14 +591,22 @@ router.get('/active', async (req: Request, res: Response, next: NextFunction) =>
     });
 
     if (!session) {
-      res.json({ active: false });
+      res.status(404).json({ detail: 'No active session' });
       return;
     }
 
+    const checkedItemIds = Object.entries((session.itemsChecked as Record<string, any>) || {})
+      .filter(([_, v]) => v.scanned)
+      .map(([k]) => k);
+
     res.json({
-      active: true,
-      session_id: session.id,
-      order_id: session.shipmentId,
+      id: session.id,
+      orderId: session.shipmentId,
+      status: session.status,
+      checkedItems: checkedItemIds,
+      photos: [],
+      startedAt: session.startedAt.toISOString(),
+      completedAt: session.completedAt ? session.completedAt.toISOString() : null,
     });
   } catch (err) { next(err); }
 });
@@ -566,6 +642,47 @@ router.get('/next-ready', async (req: Request, res: Response, next: NextFunction
     }
 
     res.json({ order_id: null, status: 'empty' });
+  } catch (err) { next(err); }
+});
+
+/**
+ * DELETE /sessions/:session_id — Cancel/delete packing session (frontend uses DELETE)
+ */
+router.delete('/sessions/:session_id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+
+    const session = await prisma.packingSession.findFirst({
+      where: { id: req.params.session_id, status: 'IN_PROGRESS' },
+      include: { shipment: true },
+    });
+    if (!session) {
+      res.status(404).json({ detail: 'Session not found' });
+      return;
+    }
+
+    await prisma.packingSession.update({
+      where: { id: session.id },
+      data: { status: 'CANCELLED', completedAt: new Date() },
+    });
+
+    if (session.shipment.status === 'PACKING') {
+      await prisma.shipment.update({
+        where: { id: session.shipmentId },
+        data: { status: 'PAID' },
+      });
+      await prisma.shipmentStatusHistory.create({
+        data: {
+          shipmentId: session.shipmentId,
+          oldStatus: 'packing',
+          newStatus: 'paid',
+          changedById: userId,
+          note: 'Pakowanie anulowane',
+        },
+      });
+    }
+
+    res.json({ status: 'cancelled' });
   } catch (err) { next(err); }
 });
 

@@ -5,6 +5,12 @@ import prisma from '../../lib/prisma';
 const router = Router();
 router.use(authenticate);
 
+// Map DB batch status to frontend-expected status
+function mapBatchStatus(dbStatus: string): string {
+  if (dbStatus === 'PICKING') return 'IN_PROGRESS';
+  return dbStatus; // OPEN, COMPLETED, CANCELLED pass through
+}
+
 /**
  * GET / — List all batches with order counts
  * Matches PakOps: GET /batches/
@@ -12,9 +18,17 @@ router.use(authenticate);
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const workspaceId = req.workspaceId!;
+    const { status } = req.query as Record<string, string>;
+
+    const where: any = { workspaceId };
+    if (status) {
+      // Frontend sends IN_PROGRESS but DB stores PICKING
+      const dbStatus = status.toUpperCase() === 'IN_PROGRESS' ? 'PICKING' : status.toUpperCase();
+      where.status = dbStatus;
+    }
 
     const batches = await prisma.packingBatch.findMany({
-      where: { workspaceId },
+      where,
       include: {
         orders: {
           include: {
@@ -34,28 +48,24 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     for (const u of users) userMap[u.id] = `${u.firstName} ${u.lastName}`.trim();
 
     const result = batches.map(b => {
-      const totalOrders = b.orders.length;
-      const collectedOrders = b.orders.filter(o =>
-        ['PICKED', 'PACKING', 'PACKED', 'SHIPPED'].includes(o.shipment.status)
-      ).length;
-      const packedOrders = b.orders.filter(o =>
+      const orderCount = b.orders.length;
+      const packedCount = b.orders.filter(o =>
         ['PACKED', 'SHIPPED'].includes(o.shipment.status)
+      ).length;
+      const shippedCount = b.orders.filter(o =>
+        o.shipment.status === 'SHIPPED'
       ).length;
 
       return {
         id: b.id,
         name: b.name,
         mode: b.mode.toLowerCase(),
-        courier_name: b.courierName,
-        status: b.status.toLowerCase(),
-        created_at: b.createdAt.toISOString(),
-        taken_by_id: b.takenById || null,
-        taken_by_name: b.takenById ? userMap[b.takenById] || null : null,
-        total_orders: totalOrders,
-        collected_orders: collectedOrders,
-        packed_orders: packedOrders,
-        percent_collected: totalOrders > 0 ? Math.round((collectedOrders / totalOrders) * 100) : 0,
-        percent_packed: totalOrders > 0 ? Math.round((packedOrders / totalOrders) * 100) : 0,
+        courierName: b.courierName || null,
+        status: mapBatchStatus(b.status),
+        createdAt: b.createdAt.toISOString(),
+        orderCount,
+        packedCount,
+        shippedCount,
       };
     });
 
@@ -70,7 +80,30 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const workspaceId = req.workspaceId!;
-    const { mode, courier_id, limit: batchLimit } = req.body;
+    const { mode, courier_id, courierId, limit: batchLimit, orderIds } = req.body;
+    const courierIdVal = courierId || courier_id;
+
+    // If orderIds provided directly (from ShipmentsListPage bulk action)
+    if (orderIds && Array.isArray(orderIds) && orderIds.length > 0) {
+      const now = new Date();
+      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const dateStr = `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const batchName = `Paczka ${dateStr} ${timeStr}`;
+
+      const batch = await prisma.packingBatch.create({
+        data: {
+          name: batchName,
+          mode: 'DATE',
+          workspaceId,
+          orders: {
+            create: orderIds.map((id: string) => ({ shipmentId: id })),
+          },
+        },
+      });
+
+      res.json({ id: batch.id, name: batchName, orders: orderIds.length });
+      return;
+    }
 
     if (!mode || !['date', 'courier'].includes(mode)) {
       res.status(400).json({ detail: 'Nieznany tryb' });
@@ -109,12 +142,12 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       batchName = `Paczka ${dateStr} ${timeStr}`;
     } else {
       // mode === 'courier'
-      if (!courier_id) {
+      if (!courierIdVal) {
         res.status(400).json({ detail: 'Wybierz kuriera' });
         return;
       }
 
-      const courier = await prisma.courier.findUnique({ where: { id: courier_id } });
+      const courier = await prisma.courier.findUnique({ where: { id: courierIdVal } });
       if (!courier) {
         res.status(404).json({ detail: 'Kurier nie znaleziony' });
         return;
@@ -123,7 +156,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 
       // Get carrier names linked to this courier
       const courierCarriers = await prisma.carrier.findMany({
-        where: { courierId: courier_id },
+        where: { courierId: courierIdVal },
         select: { name: true },
       });
       const carrierNames = courierCarriers.map(c => c.name);
@@ -154,7 +187,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
         name: batchName,
         mode: mode.toUpperCase() as any,
         courierName: courierName,
-        courierId: mode === 'courier' ? courier_id : null,
+        courierId: mode === 'courier' ? courierIdVal : null,
         workspaceId,
         orders: {
           create: orders.map(o => ({ shipmentId: o.id })),
@@ -308,16 +341,31 @@ router.get('/:batch_id', async (req: Request, res: Response, next: NextFunction)
       }
     }
 
+    const orderCount = batch.orders.length;
+    const packedCount = batch.orders.filter(o =>
+      ['PACKED', 'SHIPPED'].includes(o.shipment.status)
+    ).length;
+    const shippedCount = batch.orders.filter(o =>
+      o.shipment.status === 'SHIPPED'
+    ).length;
+
     res.json({
       id: batch.id,
       name: batch.name,
       mode: batch.mode.toLowerCase(),
-      courier_name: batch.courierName,
-      status: batch.status.toLowerCase(),
-      created_at: batch.createdAt.toISOString(),
-      taken_by_name: takenByName,
-      total_orders: batch.orders.length,
-      products: Object.values(products).sort((a: any, b: any) => a.name.localeCompare(b.name)),
+      courierName: batch.courierName || null,
+      status: mapBatchStatus(batch.status),
+      createdAt: batch.createdAt.toISOString(),
+      orderCount,
+      packedCount,
+      shippedCount,
+      orders: batch.orders.map(bo => ({
+        id: bo.shipment.id,
+        externalOrderId: bo.shipment.externalId || bo.shipment.orderNumber || null,
+        addressName: bo.shipment.addressName || null,
+        status: bo.shipment.status,
+        totalAmount: bo.shipment.totalAmount || 0,
+      })),
     });
   } catch (err) { next(err); }
 });

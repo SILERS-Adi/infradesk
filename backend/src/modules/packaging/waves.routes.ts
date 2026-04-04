@@ -170,57 +170,36 @@ router.get('/today', async (req: Request, res: Response, next: NextFunction) => 
       const percent = total > 0 ? Math.round((packed / total) * 100) : 0;
 
       waveCards.push({
-        carrier,
-        logo_url: wave.logo_url,
-        pickup_time: pickupTime,
-        time_remaining: timeRemaining,
-        minutes_left: minutesLeft,
-        date: today,
-        status: waveStatus,
-        status_label: WAVE_STATUSES[waveStatus] || waveStatus,
-        total,
-        packed,
-        picked,
-        packing: packingCount,
-        picking: pickingCount,
-        waiting,
-        percent,
-        past_pickup: pastPickup,
-        order_ids: orderList.map(o => o.id),
-        orders: orderList.map(o => ({
-          id: o.id,
-          allegro_order_id: o.externalId || o.orderNumber,
-          customer_name: o.addressName || '\u2014',
-          status: o.status.toLowerCase(),
-          total_amount: o.totalAmount || 0,
-          items_count: o.items.length,
-          delivery_point_id: o.deliveryPointId || null,
-        })),
+        id: `wave-${carrier.replace(/\s+/g, '-').toLowerCase()}`,
+        name: `${carrier} ${pickupTime || ''}`.trim(),
+        courierName: carrier,
+        pickupTime: pickupTime || '',
+        orderCount: total,
+        packedCount: packed,
+        shippedCount: statuses.filter(s => s === 'SHIPPED').length,
+        status: (() => {
+          // Map internal wave status to frontend WAVE_STATUS keys
+          switch (waveStatus) {
+            case 'done': return 'COMPLETED';
+            case 'late': return 'LATE';
+            case 'waiting': return 'PENDING';
+            default: return 'ON_TRACK'; // picking, ready, packing -> on track
+          }
+        })(),
       });
     }
 
-    // Sort: late first, then by pickup_time, then by percent
-    waveCards.sort((a, b) => {
-      if (a.status === 'late' && b.status !== 'late') return -1;
-      if (a.status !== 'late' && b.status === 'late') return 1;
-      const timeA = a.pickup_time || '99:99';
-      const timeB = b.pickup_time || '99:99';
-      if (timeA !== timeB) return timeA.localeCompare(timeB);
-      return -a.percent + b.percent;
+    // Sort: late first, then by pickup_time
+    waveCards.sort((a: any, b: any) => {
+      if (a.status === 'LATE' && b.status !== 'LATE') return -1;
+      if (a.status !== 'LATE' && b.status === 'LATE') return 1;
+      const timeA = a.pickupTime || '99:99';
+      const timeB = b.pickupTime || '99:99';
+      return timeA.localeCompare(timeB);
     });
 
-    const totalOrders = waveCards.reduce((sum, w) => sum + w.total, 0);
-    const totalPacked = waveCards.reduce((sum, w) => sum + w.packed, 0);
-
-    res.json({
-      waves: waveCards,
-      summary: {
-        total_waves: waveCards.length,
-        total_orders: totalOrders,
-        total_packed: totalPacked,
-        total_percent: totalOrders > 0 ? Math.round((totalPacked / totalOrders) * 100) : 0,
-      },
-    });
+    // Frontend expects Wave[] (plain array)
+    res.json(waveCards);
   } catch (err) { next(err); }
 });
 

@@ -18,11 +18,10 @@ router.get('/stats', async (req: Request, res: Response, next: NextFunction) => 
       select: { status: true, totalAmount: true, paidAt: true, createdAt: true },
     });
 
-    // Status counts (lowercase)
+    // Status counts
     const counts: Record<string, number> = {};
     for (const s of shipments) {
-      const key = s.status.toLowerCase();
-      counts[key] = (counts[key] || 0) + 1;
+      counts[s.status] = (counts[s.status] || 0) + 1;
     }
 
     const now = new Date();
@@ -41,16 +40,19 @@ router.get('/stats', async (req: Request, res: Response, next: NextFunction) => 
     }
 
     res.json({
-      new: counts['new'] || 0,
-      paid: counts['paid'] || 0,
-      packing: counts['packing'] || 0,
-      packed: counts['packed'] || 0,
-      shipped: counts['shipped'] || 0,
-      delivered: counts['delivered'] || 0,
+      NEW: counts['NEW'] || 0,
+      PAID: counts['PAID'] || 0,
+      PICKING: counts['PICKING'] || 0,
+      PICKED: counts['PICKED'] || 0,
+      PACKING: counts['PACKING'] || 0,
+      PACKED: counts['PACKED'] || 0,
+      SHIPPED: counts['SHIPPED'] || 0,
+      DELIVERED: counts['DELIVERED'] || 0,
+      CANCELLED: counts['CANCELLED'] || 0,
       total: shipments.length,
-      orders_today: ordersToday,
-      revenue_today: revenueToday,
-      revenue_month: revenueMonth,
+      ordersToday,
+      revenueToday,
+      revenueMonth,
     });
   } catch (err) { next(err); }
 });
@@ -100,22 +102,22 @@ router.get('/top-products', async (req: Request, res: Response, next: NextFuncti
 
     const items = await prisma.shipmentItem.findMany({
       where: { shipment: { workspaceId } },
-      select: { name: true, quantity: true, totalPrice: true },
+      select: { name: true, quantity: true, totalPrice: true, sku: true, imageUrl: true },
     });
 
-    const products: Record<string, { name: string; total_qty: number; total_revenue: number; order_count: number }> = {};
+    const products: Record<string, { name: string; sku: string | null; image: string | null; totalQty: number; totalRevenue: number; orderCount: number }> = {};
     for (const item of items) {
       const key = item.name;
       if (!products[key]) {
-        products[key] = { name: item.name, total_qty: 0, total_revenue: 0, order_count: 0 };
+        products[key] = { name: item.name, sku: item.sku || null, image: item.imageUrl || null, totalQty: 0, totalRevenue: 0, orderCount: 0 };
       }
-      products[key].total_qty += item.quantity;
-      products[key].total_revenue += item.totalPrice || 0;
-      products[key].order_count++;
+      products[key].totalQty += item.quantity;
+      products[key].totalRevenue += item.totalPrice || 0;
+      products[key].orderCount++;
     }
 
     const result = Object.values(products)
-      .sort((a, b) => b.total_qty - a.total_qty)
+      .sort((a, b) => b.totalQty - a.totalQty)
       .slice(0, limit);
 
     res.json(result);
@@ -139,12 +141,12 @@ router.get('/recent', async (req: Request, res: Response, next: NextFunction) =>
 
     res.json(shipments.map(o => ({
       id: o.id,
-      allegro_order_id: o.externalId || o.orderNumber,
-      status: o.status.toLowerCase(),
-      total_amount: o.totalAmount || 0,
-      address_name: o.addressName || null,
-      delivery_method: o.deliveryMethod || null,
-      allegro_created_at: o.createdAt.toISOString(),
+      externalOrderId: o.externalId || o.orderNumber || null,
+      addressName: o.addressName || null,
+      status: o.status,
+      totalAmount: o.totalAmount || 0,
+      courierName: o.deliveryMethod || null,
+      createdAt: o.createdAt.toISOString(),
     })));
   } catch (err) { next(err); }
 });

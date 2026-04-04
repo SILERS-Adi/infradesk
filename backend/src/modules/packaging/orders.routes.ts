@@ -18,6 +18,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       page: pageStr,
       per_page: perPageStr,
       sort: sortParam,
+      order: orderParam,
     } = req.query as Record<string, string>;
 
     const page = pageStr ? Math.max(1, parseInt(pageStr)) : 1;
@@ -41,19 +42,17 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     // Count
     const total = await prisma.shipment.count({ where });
 
-    // Sort
-    const sortField = sortParam || '-createdAt';
-    const desc = sortField.startsWith('-');
-    const fieldName = desc ? sortField.slice(1) : sortField;
-    // Map Python field names to Prisma
+    // Sort — frontend sends sort=createdAt&order=desc
+    const fieldName = sortParam || 'createdAt';
     const fieldMap: Record<string, string> = {
       allegro_created_at: 'createdAt',
       created_at: 'createdAt',
       total_amount: 'totalAmount',
-      status: 'status',
+      externalOrderId: 'externalId',
     };
     const prismaField = fieldMap[fieldName] || fieldName;
-    const orderBy: any = { [prismaField]: desc ? 'desc' : 'asc' };
+    const sortDirection = orderParam === 'asc' ? 'asc' : 'desc';
+    const orderBy: any = { [prismaField]: sortDirection };
 
     const shipments = await prisma.shipment.findMany({
       where,
@@ -72,43 +71,20 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     });
 
     const items = shipments.map(o => {
-      let customerName: string | null = null;
-      let customerEmail: string | null = null;
-      let customerPhone: string | null = null;
-
-      if (o.customer) {
-        const parts = [o.customer.firstName || '', o.customer.lastName || ''].filter(Boolean);
-        customerName = parts.join(' ') || o.customer.login || o.customer.companyName || null;
-        customerEmail = o.customer.email;
-        customerPhone = o.customer.phone;
-      }
-
       return {
         id: o.id,
-        allegro_order_id: o.externalId || o.orderNumber,
-        customer_id: o.customerId || null,
-        status: o.status.toLowerCase(),
-        payment_status: o.paymentStatus || 'pending',
-        cod_amount: o.codAmount || null,
-        is_cod: o.paymentStatus === 'cod',
-        total_amount: o.totalAmount || 0,
-        currency: o.currency || 'PLN',
-        buyer_note: o.buyerNote || null,
-        internal_note: o.internalNote || null,
-        address_name: o.addressName || null,
-        address_city: o.addressCity || null,
-        address_phone: o.addressPhone || null,
-        delivery_method: o.deliveryMethod || null,
-        dispatch_deadline: o.dispatchDeadline ? o.dispatchDeadline.toISOString() : null,
-        delivery_point_id: o.deliveryPointId || null,
-        allegro_created_at: o.createdAt.toISOString(),
-        paid_at: o.paidAt ? o.paidAt.toISOString() : null,
-        shipped_at: o.shippedAt ? o.shippedAt.toISOString() : null,
-        created_at: o.createdAt.toISOString(),
-        items_count: o.items.length,
-        customer_name: customerName,
-        customer_email: customerEmail,
-        customer_phone: customerPhone || o.addressPhone || null,
+        externalOrderId: o.externalId || o.orderNumber || null,
+        status: o.status,
+        paymentStatus: o.paymentStatus || 'pending',
+        totalAmount: o.totalAmount || 0,
+        addressName: o.addressName || null,
+        addressCity: o.addressCity || null,
+        addressPhone: o.addressPhone || (o.customer?.phone) || null,
+        courierName: o.deliveryMethod || null,
+        deliveryMethod: o.deliveryMethod || null,
+        dispatchDeadline: o.dispatchDeadline ? o.dispatchDeadline.toISOString() : null,
+        createdAt: o.createdAt.toISOString(),
+        _count: { items: o.items.length },
       };
     });
 
@@ -209,44 +185,39 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 
     res.json({
       id: order.id,
-      allegro_order_id: order.externalId || order.orderNumber,
-      status: order.status.toLowerCase(),
-      payment_status: order.paymentStatus || 'pending',
-      cod_amount: order.codAmount || null,
-      is_cod: order.paymentStatus === 'cod',
-      total_amount: order.totalAmount || 0,
-      currency: order.currency || 'PLN',
-      buyer_note: order.buyerNote || null,
-      internal_note: order.internalNote || null,
-      address_name: order.addressName || null,
-      address_street: order.addressStreet || null,
-      address_city: order.addressCity || null,
-      address_zip: order.addressZip || null,
-      address_phone: order.addressPhone || null,
-      delivery_method: order.deliveryMethod || null,
-      delivery_point_id: order.deliveryPointId || null,
-      allegro_created_at: order.createdAt.toISOString(),
-      paid_at: order.paidAt ? order.paidAt.toISOString() : null,
-      shipped_at: order.shippedAt ? order.shippedAt.toISOString() : null,
-      created_at: order.createdAt.toISOString(),
-      customer_name: customerName,
-      customer: customerData,
+      externalOrderId: order.externalId || order.orderNumber || null,
+      status: order.status,
+      paymentStatus: (order.paymentStatus || 'pending').toUpperCase(),
+      totalAmount: order.totalAmount || 0,
+      addressName: order.addressName || customerName || null,
+      addressStreet: order.addressStreet || null,
+      addressCity: order.addressCity || null,
+      addressZip: order.addressZip || null,
+      addressPhone: order.addressPhone || null,
+      addressEmail: order.customer?.email || null,
+      courierName: order.deliveryMethod || null,
+      deliveryMethod: order.deliveryMethod || null,
+      trackingNumber: (order as any).trackingNumber || null,
+      notes: order.buyerNote || null,
+      internalNotes: order.internalNote || null,
+      createdAt: order.createdAt.toISOString(),
+      paidAt: order.paidAt ? order.paidAt.toISOString() : null,
+      packedAt: (order as any).packedAt ? (order as any).packedAt.toISOString() : null,
+      shippedAt: order.shippedAt ? order.shippedAt.toISOString() : null,
+      deliveredAt: (order as any).deliveredAt ? (order as any).deliveredAt.toISOString() : null,
+      packingSessionId: null,
       items: order.items.map(i => ({
         id: i.id,
         name: i.name,
-        sku: i.sku,
+        sku: i.sku || null,
         quantity: i.quantity,
-        unit_price: i.unitPrice,
-        total_price: i.totalPrice,
-        allegro_offer_id: i.allegroOfferId,
-        image_url: i.imageUrl,
+        unitPrice: i.unitPrice,
+        image: i.imageUrl || null,
       })),
-      status_history: order.statusHistory.map(h => ({
-        id: h.id,
-        old_status: h.oldStatus,
-        new_status: h.newStatus,
-        note: h.note,
-        created_at: h.createdAt.toISOString(),
+      statusHistory: order.statusHistory.map(h => ({
+        status: (h.newStatus || '').toUpperCase(),
+        changedAt: h.createdAt.toISOString(),
+        changedBy: null,
       })),
     });
   } catch (err) { next(err); }
@@ -260,7 +231,7 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => 
   try {
     const workspaceId = req.workspaceId!;
     const userId = req.user!.userId;
-    const { status, internal_note } = req.body;
+    const { status, internal_note, internalNotes } = req.body;
 
     const order = await prisma.shipment.findFirst({
       where: { id: req.params.id, workspaceId },
@@ -292,8 +263,10 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => 
       }
     }
 
-    if (internal_note !== undefined) {
-      updates.internalNote = internal_note;
+    // Accept both camelCase (frontend) and snake_case (legacy)
+    const noteValue = internalNotes !== undefined ? internalNotes : internal_note;
+    if (noteValue !== undefined) {
+      updates.internalNote = noteValue;
     }
 
     if (Object.keys(updates).length > 0) {
@@ -302,6 +275,84 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => 
         data: updates,
       });
     }
+
+    res.json({ status: 'ok' });
+  } catch (err) { next(err); }
+});
+
+/**
+ * PUT /:id — Update order (frontend uses PUT for status changes)
+ * Delegates to the same logic as PATCH
+ */
+router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const workspaceId = req.workspaceId!;
+    const userId = req.user!.userId;
+    const { status, internal_note, internalNotes } = req.body;
+
+    const order = await prisma.shipment.findFirst({
+      where: { id: req.params.id, workspaceId },
+    });
+    if (!order) {
+      res.status(404).json({ detail: 'Order not found' });
+      return;
+    }
+
+    const updates: any = {};
+
+    if (status && status.toUpperCase() !== order.status) {
+      const newStatus = status.toUpperCase();
+      updates.status = newStatus;
+
+      await prisma.shipmentStatusHistory.create({
+        data: {
+          shipmentId: order.id,
+          oldStatus: order.status.toLowerCase(),
+          newStatus: status.toLowerCase(),
+          changedById: userId,
+          note: `Zmiana statusu`,
+        },
+      });
+
+      if (newStatus === 'SHIPPED' && !order.shippedAt) {
+        updates.shippedAt = new Date();
+      }
+    }
+
+    const noteValue = internalNotes !== undefined ? internalNotes : internal_note;
+    if (noteValue !== undefined) {
+      updates.internalNote = noteValue;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await prisma.shipment.update({
+        where: { id: order.id },
+        data: updates,
+      });
+    }
+
+    res.json({ status: 'ok' });
+  } catch (err) { next(err); }
+});
+
+/**
+ * DELETE /:id — Delete order
+ */
+router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const workspaceId = req.workspaceId!;
+    const order = await prisma.shipment.findFirst({
+      where: { id: req.params.id, workspaceId },
+    });
+    if (!order) {
+      res.status(404).json({ detail: 'Order not found' });
+      return;
+    }
+
+    // Delete related records first
+    await prisma.shipmentStatusHistory.deleteMany({ where: { shipmentId: order.id } });
+    await prisma.shipmentItem.deleteMany({ where: { shipmentId: order.id } });
+    await prisma.shipment.delete({ where: { id: order.id } });
 
     res.json({ status: 'ok' });
   } catch (err) { next(err); }

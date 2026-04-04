@@ -75,28 +75,27 @@ router.get('/list', async (req: Request, res: Response, next: NextFunction) => {
       }
     }
 
-    const items = Object.values(products).sort((a: any, b: any) => a.name.localeCompare(b.name));
+    // Frontend expects PickingListItem[] (plain array with camelCase)
+    const result = Object.values(products)
+      .sort((a: any, b: any) => a.name.localeCompare(b.name))
+      .map((p: any) => ({
+        name: p.name,
+        sku: p.sku || null,
+        image: p.image_url || null,
+        totalQty: p.total_qty,
+        orderCount: p.order_ids.length,
+        locations: p.carriers || [],
+      }));
 
-    // Sort carriers by pickup_time (earliest first, null last)
-    const sortedCarriers = Object.values(carriersOrders).sort((a: any, b: any) =>
-      (a.pickup_time || '99:99').localeCompare(b.pickup_time || '99:99')
-    );
-
-    res.json({
-      items,
-      total_products: items.length,
-      total_orders: orders.length,
-      total_pieces: items.reduce((sum: number, p: any) => sum + p.total_qty, 0),
-      by_carrier: sortedCarriers,
-    });
+    res.json(result);
   } catch (err) { next(err); }
 });
 
 /**
- * POST /start — Start picking session, lock all paid orders
- * Matches PakOps: POST /picking/start
+ * POST /start or POST /sessions — Start picking session, lock all paid orders
+ * Frontend calls POST /picking/sessions
  */
-router.post('/start', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/sessions', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const workspaceId = req.workspaceId!;
     const userId = req.user!.userId;
@@ -173,9 +172,16 @@ router.post('/start', async (req: Request, res: Response, next: NextFunction) =>
     }
 
     res.json({
-      session_id: session.id,
-      items: itemsToPick,
-      order_count: orderIds.length,
+      id: session.id,
+      status: 'IN_PROGRESS',
+      items: Object.entries(itemsToPick).map(([key, v]: [string, any]) => ({
+        id: key,
+        name: v.name,
+        sku: v.sku || null,
+        requiredQty: v.total_qty,
+        pickedQty: v.picked_qty || 0,
+      })),
+      startedAt: session.startedAt.toISOString(),
     });
   } catch (err) { next(err); }
 });
@@ -223,31 +229,34 @@ router.get('/sessions/:session_id', async (req: Request, res: Response, next: Ne
       select: { firstName: true, lastName: true },
     });
 
+    // Convert items map to PickingSessionItem[] array for frontend
+    const itemsMap = (session.itemsToPick as Record<string, any>) || {};
+    const itemsArray = Object.entries(itemsMap).map(([key, v]: [string, any]) => ({
+      id: key,
+      name: v.name,
+      sku: v.sku || null,
+      requiredQty: v.total_qty,
+      pickedQty: v.picked_qty || 0,
+    }));
+
     res.json({
       id: session.id,
-      status: session.status.toLowerCase(),
-      picker: user ? `${user.firstName} ${user.lastName}`.trim() : 'Unknown',
-      items: session.itemsToPick,
-      order_count: ((session.orderIds as string[]) || []).length,
-      started_at: session.startedAt.toISOString(),
+      status: session.status,
+      items: itemsArray,
+      startedAt: session.startedAt.toISOString(),
+      completedAt: session.completedAt ? session.completedAt.toISOString() : null,
     });
   } catch (err) { next(err); }
 });
 
 /**
- * POST /sessions/:session_id/pick-item — Mark product as picked
- * Matches PakOps: POST /picking/sessions/{session_id}/pick-item
+ * POST /pick-item — Mark product as picked (frontend sends { sessionId, itemId, quantity })
+ * Also handles POST /sessions/:session_id/pick-item for backward compat
  */
-router.post('/sessions/:session_id/pick-item', async (req: Request, res: Response, next: NextFunction) => {
+async function handlePickItem(req: Request, res: Response, next: NextFunction, sessionId: string, itemId: string, qty: number) {
   try {
-    const { offer_id, qty } = req.body;
-    if (!offer_id) {
-      res.status(400).json({ detail: 'offer_id is required' });
-      return;
-    }
-
     const session = await prisma.pickingSession.findFirst({
-      where: { id: req.params.session_id, status: 'IN_PROGRESS' },
+      where: { id: sessionId, status: 'IN_PROGRESS' },
     });
     if (!session) {
       res.status(404).json({ detail: 'Session not found' });
@@ -255,12 +264,12 @@ router.post('/sessions/:session_id/pick-item', async (req: Request, res: Respons
     }
 
     const items = (session.itemsToPick as Record<string, any>) || {};
-    let key = offer_id;
+    let key = itemId;
 
     if (!items[key]) {
       // Try matching by name substring or offer_id
       for (const [k, v] of Object.entries(items)) {
-        if (offer_id.includes(k) || offer_id.toLowerCase().includes((v.name || '').toLowerCase().substring(0, 10))) {
+        if (itemId.includes(k) || itemId.toLowerCase().includes((v.name || '').toLowerCase().substring(0, 10))) {
           key = k;
           break;
         }
@@ -271,10 +280,8 @@ router.post('/sessions/:session_id/pick-item', async (req: Request, res: Respons
       }
     }
 
-    items[key].picked_qty = Math.min(
-      items[key].total_qty,
-      (items[key].picked_qty || 0) + (qty || 1)
-    );
+    // quantity from frontend is the absolute target value, not a delta
+    items[key].picked_qty = Math.min(items[key].total_qty, Math.max(0, qty));
 
     await prisma.pickingSession.update({
       where: { id: session.id },
@@ -284,11 +291,32 @@ router.post('/sessions/:session_id/pick-item', async (req: Request, res: Respons
     res.json({
       key,
       name: items[key].name,
-      picked_qty: items[key].picked_qty,
-      total_qty: items[key].total_qty,
+      pickedQty: items[key].picked_qty,
+      totalQty: items[key].total_qty,
       done: items[key].picked_qty >= items[key].total_qty,
     });
   } catch (err) { next(err); }
+}
+
+router.post('/pick-item', async (req: Request, res: Response, next: NextFunction) => {
+  const sessionId = req.body.sessionId || req.body.session_id;
+  const itemId = req.body.itemId || req.body.offer_id;
+  const qty = req.body.quantity ?? req.body.qty ?? 1;
+  if (!sessionId || !itemId) {
+    res.status(400).json({ detail: 'sessionId and itemId are required' });
+    return;
+  }
+  await handlePickItem(req, res, next, sessionId, itemId, qty);
+});
+
+router.post('/sessions/:session_id/pick-item', async (req: Request, res: Response, next: NextFunction) => {
+  const itemId = req.body.itemId || req.body.offer_id;
+  const qty = req.body.quantity ?? req.body.qty ?? 1;
+  if (!itemId) {
+    res.status(400).json({ detail: 'itemId is required' });
+    return;
+  }
+  await handlePickItem(req, res, next, req.params.session_id, itemId, qty);
 });
 
 /**
@@ -378,6 +406,50 @@ router.post('/sessions/:session_id/complete', async (req: Request, res: Response
  * Matches PakOps: POST /picking/sessions/{session_id}/cancel
  */
 router.post('/sessions/:session_id/cancel', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+
+    const session = await prisma.pickingSession.findFirst({
+      where: { id: req.params.session_id, status: 'IN_PROGRESS' },
+    });
+    if (!session) {
+      res.status(404).json({ detail: 'Session not found' });
+      return;
+    }
+
+    await prisma.pickingSession.update({
+      where: { id: session.id },
+      data: { status: 'CANCELLED', completedAt: new Date() },
+    });
+
+    const orderIds = (session.orderIds as string[]) || [];
+    for (const oid of orderIds) {
+      const order = await prisma.shipment.findUnique({ where: { id: oid } });
+      if (order && order.status === 'PICKING') {
+        await prisma.shipment.update({
+          where: { id: oid },
+          data: { status: 'PAID' },
+        });
+        await prisma.shipmentStatusHistory.create({
+          data: {
+            shipmentId: oid,
+            oldStatus: 'picking',
+            newStatus: 'paid',
+            changedById: userId,
+            note: 'Zbieranie anulowane',
+          },
+        });
+      }
+    }
+
+    res.json({ status: 'cancelled' });
+  } catch (err) { next(err); }
+});
+
+/**
+ * DELETE /sessions/:session_id — Cancel picking session (frontend uses DELETE)
+ */
+router.delete('/sessions/:session_id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.userId;
 
