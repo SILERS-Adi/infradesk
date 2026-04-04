@@ -41,6 +41,7 @@ const deviceSelect = {
   gpsLon:           true,
   createdAt: true,
   updatedAt: true,
+  workspace:    { select: { id: true, name: true } },
   location:     { select: { id: true, name: true, addressLine1: true, postalCode: true, city: true, country: true } },
   deviceType:   { select: { id: true, name: true, icon: true } },
   assignedUser: { select: { id: true, firstName: true, lastName: true, email: true } },
@@ -59,6 +60,7 @@ const deviceSelectWithInternalNotes = {
 
 export async function listDevices(params: {
   workspaceId?: string | null;
+  workspaceIds?: string[];
   locationId?: string;
   status?: DeviceStatus;
   criticality?: DeviceCriticality;
@@ -68,12 +70,14 @@ export async function listDevices(params: {
   scopeFilter?: Record<string, unknown>;
   requestingUser?: any;
 }) {
-  const { workspaceId, locationId, status, criticality, search, page = 1, limit = 20, scopeFilter } = params;
+  const { workspaceId, workspaceIds, locationId, status, criticality, search, page = 1, limit = 20, scopeFilter } = params;
   const skip = (page - 1) * limit;
 
   const where: Record<string, unknown> = {};
 
-  if (workspaceId) {
+  if (workspaceIds && workspaceIds.length > 0) {
+    where.workspaceId = { in: workspaceIds };
+  } else if (workspaceId) {
     where.workspaceId = workspaceId;
   }
 

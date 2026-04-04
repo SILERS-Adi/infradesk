@@ -17,8 +17,12 @@ export async function getTickets(req: Request, res: Response, next: NextFunction
   try {
     const { locationId, deviceId, status, priority, type, assignedToUserId, unassigned, search, page, limit } =
       req.query as Record<string, string>;
+    // MSP scope: include client workspaces
+    const { getMspWorkspaceIds } = require('../../utils/mspScope');
+    const wsIds: string[] = req.workspaceId ? await getMspWorkspaceIds(req.workspaceId) : [];
     const result = await listTickets({
-      workspaceId: req.workspaceId,
+      workspaceId: wsIds.length > 1 ? undefined : req.workspaceId,
+      workspaceIds: wsIds.length > 1 ? wsIds : undefined,
       locationId,
       deviceId,
       status: status as TicketStatus | undefined,

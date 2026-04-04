@@ -14,8 +14,12 @@ import { deviceScopeFilter, isDeviceAccessible } from '../../middleware/workspac
 export async function getDevices(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { locationId, status, criticality, search, page, limit } = req.query as Record<string, string>;
+    // MSP scope: include client workspaces
+    const { getMspWorkspaceIds } = require('../../utils/mspScope');
+    const wsIds: string[] = req.workspaceId ? await getMspWorkspaceIds(req.workspaceId) : [];
     const result = await listDevices({
-      workspaceId: req.workspaceId,
+      workspaceId: wsIds.length > 1 ? undefined : req.workspaceId,
+      workspaceIds: wsIds.length > 1 ? wsIds : undefined,
       locationId,
       status: status as DeviceStatus | undefined,
       criticality: criticality as DeviceCriticality | undefined,

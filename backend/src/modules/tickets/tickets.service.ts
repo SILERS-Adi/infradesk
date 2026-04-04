@@ -54,6 +54,7 @@ const ticketSelect = {
   ratedByUserId: true,
   createdAt: true,
   updatedAt: true,
+  workspace: { select: { id: true, name: true } },
   location: { select: { id: true, name: true, city: true } },
   device: { select: { id: true, name: true, manufacturer: true, model: true, rustdeskId: true, locationId: true, assignedUser: { select: { id: true, firstName: true, lastName: true } } } },
   createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
@@ -73,6 +74,7 @@ async function generateTicketNumber(): Promise<string> {
 
 export async function listTickets(params: {
   workspaceId?: string | null;
+  workspaceIds?: string[];
   locationId?: string;
   deviceId?: string;
   status?: TicketStatus;
@@ -87,14 +89,16 @@ export async function listTickets(params: {
   requestingUser?: any;
 }) {
   const {
-    workspaceId, locationId, deviceId, status, priority, type,
+    workspaceId, workspaceIds, locationId, deviceId, status, priority, type,
     assignedToUserId, unassigned, search, page = 1, limit = 20, scopeFilter,
   } = params;
   const skip = (page - 1) * limit;
 
   const where: Record<string, unknown> = {};
 
-  if (workspaceId) {
+  if (workspaceIds && workspaceIds.length > 0) {
+    where.workspaceId = { in: workspaceIds };
+  } else if (workspaceId) {
     where.workspaceId = workspaceId;
   }
   if (locationId) where.locationId = locationId;

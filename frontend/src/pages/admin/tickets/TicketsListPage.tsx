@@ -340,6 +340,14 @@ export function TicketsListPage() {
       ),
     },
     {
+      key: 'company', label: 'Firma', group: 'Podstawowe', defaultVisible: true,
+      render: (t: Ticket) => (
+        <span className="text-[12px]" style={{ color: 'var(--tm)' }}>
+          {(t as any).workspace?.name ?? '—'}
+        </span>
+      ),
+    },
+    {
       key: 'client', label: 'Lokalizacja', group: 'Podstawowe', defaultVisible: true,
       render: (t: Ticket) => (
         <span className="text-[13px]" style={{ color: 'var(--ts)' }}>

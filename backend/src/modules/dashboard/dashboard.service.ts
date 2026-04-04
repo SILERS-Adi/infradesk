@@ -1,7 +1,13 @@
 import prisma from '../../lib/prisma';
 
 export async function getAdminDashboard(workspaceId?: string | null) {
-  const wf = workspaceId ? { workspaceId } : {};
+  // MSP scope: include client workspaces
+  let wsIds: string[] | null = null;
+  if (workspaceId) {
+    const { getMspWorkspaceIds } = require('../../utils/mspScope');
+    wsIds = await getMspWorkspaceIds(workspaceId);
+  }
+  const wf = wsIds && wsIds.length > 1 ? { workspaceId: { in: wsIds } } : (workspaceId ? { workspaceId } : {});
   const [
     totalLocations,
     totalDevices,

@@ -233,6 +233,7 @@ export function DevicesListPage() {
                     <SortTh label="Urządzenie" sortKey="name" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <SortTh label="Użytkownik" sortKey="user" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Login</th>
+                    <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Firma</th>
                     <SortTh label="Lokalizacja" sortKey="location" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <th className="text-center px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>RustDesk</th>
                     <SortTh label="Agent" sortKey="agent" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} align="center" />
@@ -287,6 +288,11 @@ export function DevicesListPage() {
                         ) : (
                           <span className="text-[11px]" style={{ color: 'var(--td)' }}>—</span>
                         )}
+                      </td>
+
+                      {/* Firma */}
+                      <td className="px-4 py-3">
+                        <span className="text-[12px]" style={{ color: 'var(--tm)' }}>{(device as any).workspace?.name ?? '—'}</span>
                       </td>
 
                       {/* Lokalizacja */}
