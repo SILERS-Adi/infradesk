@@ -196,21 +196,13 @@ export function ShipmentDetailPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <Badge color={st.color}>{st.label}</Badge>
                       {!isPacked && (
-                        <button
+                        <Button variant="primary" size="sm" icon={<ChevronRight size={14} />}
                           onClick={e => {
                             e.stopPropagation();
                             navigate(`/packaging/packing?order=${o.id}`);
-                          }}
-                          style={{
-                            padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                            background: 'var(--accent)', color: '#fff', fontSize: 12, fontWeight: 700,
-                            display: 'flex', alignItems: 'center', gap: 4, transition: 'all .15s',
-                          }}
-                          onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = 'var(--accent)'; }}
-                        >
-                          Pakuj <ChevronRight size={14} />
-                        </button>
+                          }}>
+                          Pakuj
+                        </Button>
                       )}
                       {isExpanded ? <ChevronDown size={16} style={{ color: 'var(--tm)' }} /> : <ChevronRight size={16} style={{ color: 'var(--tm)' }} />}
                     </div>
@@ -383,7 +375,11 @@ export function ShipmentDetailPage() {
                       width: '100%', minHeight: 80, padding: 10, borderRadius: 8,
                       border: '1px solid var(--border)', background: 'var(--hover-bg)',
                       color: 'var(--t)', fontSize: 13, resize: 'vertical', outline: 'none',
-                    }} />
+                      transition: 'border-color 0.15s',
+                    }}
+                    onFocus={e => { e.currentTarget.style.borderColor = 'var(--accent)'; }}
+                    onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+                    placeholder="Wpisz notatki wewnętrzne..." />
                   <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                     <Button size="sm" variant="primary" loading={notesMut.isPending}
                       onClick={() => notesMut.mutate(notesText)}>Zapisz</Button>

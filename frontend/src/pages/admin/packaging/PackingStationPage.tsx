@@ -223,7 +223,8 @@ export function PackingStationPage() {
             }}>
               <Barcode size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
               <input type="text" value={scanInput} onChange={e => setScanInput(e.target.value)}
-                onKeyDown={handleScan} placeholder="Skanuj kod kreskowy / wpisz SKU..." autoFocus
+                onKeyDown={handleScan} placeholder="Wpisz lub zeskanuj kod kreskowy..." autoFocus
+                aria-label="Skanuj kod"
                 style={{
                   flex: 1, padding: '8px 0', border: 'none', background: 'transparent',
                   color: 'var(--t)', fontSize: 14, fontFamily: 'monospace', outline: 'none',
@@ -273,15 +274,12 @@ export function PackingStationPage() {
                             }}>
                               x{item.quantity}
                             </div>
-                            <button onClick={() => packItem(item.id)}
-                              style={{
-                                padding: '10px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                                background: packed ? '#059669' : 'var(--accent)', color: '#fff',
-                                fontSize: 13, fontWeight: 700, transition: 'all .15s',
-                                display: 'flex', alignItems: 'center', gap: 6,
-                              }}>
-                              {packed ? <><CheckCircle2 size={16} /> Spakowano</> : 'Spakuj'}
-                            </button>
+                            <Button variant={packed ? 'secondary' : 'primary'} size="sm"
+                              icon={packed ? <CheckCircle2 size={14} /> : undefined}
+                              onClick={() => packItem(item.id)}
+                              style={packed ? { background: '#059669', color: '#fff', borderColor: '#059669' } : undefined}>
+                              {packed ? 'Spakowano' : 'Spakuj'}
+                            </Button>
                           </div>
                         </div>
                       </div>
@@ -307,14 +305,15 @@ export function PackingStationPage() {
                       {photos.map((p, i) => (
                         <div key={i} style={{ position: 'relative' }}>
                           <img src={p} alt="" style={{ width: 70, height: 70, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border)' }} />
-                          <button onClick={() => setPhotos(prev => prev.filter((_, j) => j !== i))}
+                          <Button variant="danger" size="sm"
+                            onClick={() => setPhotos(prev => prev.filter((_, j) => j !== i))}
                             style={{
                               position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%',
-                              background: '#F87171', border: 'none', cursor: 'pointer', display: 'flex',
-                              alignItems: 'center', justifyContent: 'center',
+                              padding: 0, minWidth: 'auto', minHeight: 'auto',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
                             }}>
-                            <X size={10} color="#fff" />
-                          </button>
+                            <X size={10} />
+                          </Button>
                         </div>
                       ))}
                     </div>

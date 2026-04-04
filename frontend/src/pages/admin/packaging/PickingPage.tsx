@@ -155,7 +155,9 @@ export function PickingPage() {
             {products.map((p, i) => (
               <div key={i} className="page-card" style={{
                 padding: 0, overflow: 'hidden', transition: 'var(--trf)',
-              }}>
+              }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.transform = ''; }}>
                 {/* Image area */}
                 <div style={{
                   height: 140, background: 'var(--hover-bg)',
@@ -247,30 +249,30 @@ export function PickingPage() {
                           {item.sku && <div style={{ fontSize: 11, color: 'var(--tm)', fontFamily: 'monospace' }}>{item.sku}</div>}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <button onClick={() => pickMut.mutate({ itemId: item.id, qty: Math.max(0, item.pickedQty - 1) })}
+                          <Button variant="secondary" size="sm"
+                            onClick={() => pickMut.mutate({ itemId: item.id, qty: Math.max(0, item.pickedQty - 1) })}
+                            disabled={item.pickedQty <= 0}
                             style={{
-                              width: 28, height: 28, borderRadius: 6, border: '1px solid var(--border)',
-                              background: 'var(--hover-bg)', cursor: 'pointer', display: 'flex',
-                              alignItems: 'center', justifyContent: 'center', color: 'var(--tm)',
-                            }}
-                            disabled={item.pickedQty <= 0}>
+                              width: 28, height: 28, padding: 0, minWidth: 'auto', minHeight: 'auto',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}>
                             <Minus size={14} />
-                          </button>
+                          </Button>
                           <span style={{
                             fontSize: 16, fontWeight: 800, minWidth: 50, textAlign: 'center',
                             color: done ? '#059669' : 'var(--t)',
                           }}>
                             {item.pickedQty}/{item.requiredQty}
                           </span>
-                          <button onClick={() => pickMut.mutate({ itemId: item.id, qty: item.pickedQty + 1 })}
+                          <Button variant="secondary" size="sm"
+                            onClick={() => pickMut.mutate({ itemId: item.id, qty: item.pickedQty + 1 })}
                             style={{
-                              width: 28, height: 28, borderRadius: 6, border: '1px solid var(--border)',
-                              background: done ? 'rgba(34,197,94,0.1)' : 'var(--hover-bg)',
-                              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              color: done ? '#059669' : 'var(--accent)',
+                              width: 28, height: 28, padding: 0, minWidth: 'auto', minHeight: 'auto',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              ...(done ? { background: 'rgba(34,197,94,0.1)', color: '#059669', borderColor: 'rgba(34,197,94,0.2)' } : {}),
                             }}>
                             <Plus size={14} />
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     );

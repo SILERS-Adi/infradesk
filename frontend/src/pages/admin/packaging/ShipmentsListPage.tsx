@@ -125,13 +125,6 @@ export function ShipmentsListPage() {
     return sortDir === 'asc' ? ' ↑' : ' ↓';
   };
 
-  const tabStyle = (active: boolean): React.CSSProperties => ({
-    padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
-    fontSize: 12, fontWeight: 600, transition: 'all .15s',
-    background: active ? 'var(--accent)' : 'transparent',
-    color: active ? '#fff' : 'var(--tm)',
-  });
-
   const thStyle = (align: 'left' | 'right' | 'center' = 'left'): React.CSSProperties => ({
     padding: '10px 14px', fontSize: 10, fontWeight: 700, color: 'var(--td)',
     textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: align,
@@ -172,10 +165,14 @@ export function ShipmentsListPage() {
           padding: 4, borderRadius: 10, background: 'var(--hover-bg)',
         }}>
           {ORDER_STATUS_TABS.map(t => (
-            <button key={t.value} onClick={() => { setStatusFilter(t.value); setPage(1); }}
-              style={tabStyle(statusFilter === t.value)}>
+            <Button key={t.value} variant={statusFilter === t.value ? 'primary' : 'ghost'} size="sm"
+              onClick={() => { setStatusFilter(t.value); setPage(1); }}
+              style={{
+                borderRadius: 8,
+                ...(statusFilter !== t.value ? { color: 'var(--tm)' } : {}),
+              }}>
               {t.label}
-            </button>
+            </Button>
           ))}
         </div>
 
