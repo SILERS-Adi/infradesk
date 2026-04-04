@@ -135,6 +135,91 @@ export interface PackingSession {
   completedAt?: string;
 }
 
+// ── PakOps Packing Station types (1:1 port) ──
+
+export interface PakOpsBatch {
+  id: string;
+  name: string;
+  courier_name: string | null;
+  total_orders: number;
+  packed_orders: number;
+  ready_orders: number;
+  percent_packed: number;
+}
+
+export interface PakOpsOrderToPack {
+  id: string;
+  allegro_order_id: string;
+  customer_name: string | null;
+  customer_login: string | null;
+  total_amount: number;
+  items_count: number;
+  delivery_method: string | null;
+  delivery_point_id: string | null;
+  address_name: string | null;
+  address_street: string | null;
+  address_city: string | null;
+  address_zip: string | null;
+  address_phone: string | null;
+  buyer_note: string | null;
+  status: string;
+  items: {
+    id: string;
+    name: string;
+    quantity: number;
+    allegro_offer_id: string;
+    image_url: string | null;
+    unit_price: number;
+  }[];
+}
+
+export interface PakOpsCheckedItem {
+  name: string;
+  quantity: number;
+  allegro_offer_id: string;
+  image_url?: string;
+  scanned: boolean;
+  qty_scanned: number;
+}
+
+export interface PakOpsSessionData {
+  id: string;
+  items_checked: Record<string, PakOpsCheckedItem>;
+  order: {
+    id: string;
+    allegro_order_id: string;
+    customer_name: string | null;
+    customer_login: string | null;
+    customer_email: string | null;
+    total_amount: number;
+    delivery_method: string | null;
+    delivery_point_id: string | null;
+    address_name: string | null;
+    address_street: string | null;
+    address_city: string | null;
+    address_zip: string | null;
+    address_phone: string | null;
+    buyer_note: string | null;
+    is_cod: boolean;
+    cod_amount: number | null;
+    delivery_cost: number | null;
+    currency: string;
+    wants_invoice: boolean;
+    invoice_company: string | null;
+    invoice_nip: string | null;
+    invoice_address: string | null;
+    allegro_created_at: string | null;
+    items: {
+      id: string;
+      name: string;
+      quantity: number;
+      allegro_offer_id: string;
+      image_url?: string;
+      unit_price: number;
+    }[];
+  };
+}
+
 // ── Picking ──
 export interface PickingListItem {
   name: string;

@@ -96,3 +96,46 @@
   /* Hover */
   --hover-bg: rgba(79,70,229,0.04);
 }
+
+/* ══════════════════════════════════════════════
+   PAKOPS — Packing Module Tokens (scoped)
+   Pixel-perfect reproduction of pakops.silers.pl
+   ══════════════════════════════════════════════ */
+.pakops {
+  --pri: #818cf8; --pri-h: #6366f1; --pri-l: rgba(99,102,241,.14); --pri-50: rgba(99,102,241,.1);
+  --pri-glow: rgba(129,140,248,.22); --pri-glow2: rgba(129,140,248,.4);
+  --pk-bg: #0b101b; --sf: #151c2c; --sf2: #111827; --sf-h: #1c2536; --sf-el: #1c2536;
+  --bd: #1f2937; --bd-l: #1c2536; --bd-f: #818cf8;
+  --tx: #f3f4f6; --tx2: #9ca3af; --tx3: #6b7280;
+  --ok: #34d399; --ok-l: rgba(16,185,129,.14); --ok-b: rgba(52,211,153,.25);
+  --wn: #fbbf24; --wn-l: rgba(251,191,36,.14); --wn-b: rgba(251,191,36,.25);
+  --er: #f87171; --er-l: rgba(248,113,113,.14); --er-b: rgba(248,113,113,.25);
+  --in: #60a5fa; --in-l: rgba(96,165,250,.14); --in-b: rgba(96,165,250,.25);
+  --sh1: 0 1px 3px rgba(0,0,0,.4);
+  --sh2: 0 2px 6px rgba(0,0,0,.4);
+  --sh3: 0 6px 20px rgba(0,0,0,.5);
+  --sh4: 0 16px 48px rgba(0,0,0,.6);
+  --sh-glow: 0 0 30px var(--pri-glow);
+  --pk-r: 14px; --pk-rs: 10px; --pk-rl: 18px; --pk-rxl: 24px;
+}
+
+[data-theme="light"] .pakops {
+  --pri: #6366f1; --pri-h: #4f46e5; --pri-l: #eef2ff; --pri-50: #e0e7ff;
+  --pri-glow: rgba(99,102,241,.18); --pri-glow2: rgba(99,102,241,.3);
+  --pk-bg: #f0f2f5; --sf: #fff; --sf2: #f8f9fb; --sf-h: #f3f4f6; --sf-el: #fff;
+  --bd: #e5e7eb; --bd-l: #f3f4f6; --bd-f: #6366f1;
+  --tx: #111827; --tx2: #4b5563; --tx3: #9ca3af;
+  --ok: #10b981; --ok-l: #ecfdf5; --ok-b: #a7f3d0;
+  --wn: #f59e0b; --wn-l: #fffbeb; --wn-b: #fde68a;
+  --er: #ef4444; --er-l: #fef2f2; --er-b: #fecaca;
+  --in: #3b82f6; --in-l: #eff6ff; --in-b: #bfdbfe;
+  --sh1: 0 1px 2px rgba(0,0,0,.04);
+  --sh2: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --sh3: 0 4px 12px rgba(0,0,0,.07);
+  --sh4: 0 12px 32px rgba(0,0,0,.1);
+  --sh-glow: 0 0 24px var(--pri-glow);
+}
+
+/* PakOps animations */
+@keyframes pakGlow { 0%,100% { box-shadow:0 0 8px var(--pri-glow) } 50% { box-shadow:0 0 24px var(--pri-glow2) } }
+@keyframes pakSpin { to { transform:rotate(360deg) } }

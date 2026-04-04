@@ -105,7 +105,7 @@ import { ShipmentEditPage } from './pages/admin/packaging/ShipmentEditPage';
 import { PackagingReportsPage } from './pages/admin/packaging/PackagingReportsPage';
 import { PackagingBoardPage } from './pages/admin/packaging/PackagingBoardPage';
 import { OrdersListPage } from './pages/admin/packaging/OrdersListPage';
-import { PackingStationPage } from './pages/admin/packaging/PackingStationPage';
+import PackingStationPage from './pages/admin/packaging/PackingStationPage';
 import { PickingPage } from './pages/admin/packaging/PickingPage';
 import { CarriersPage } from './pages/admin/packaging/CarriersPage';
 import { PackingCustomersPage } from './pages/admin/packaging/PackingCustomersPage';
