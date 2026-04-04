@@ -27,6 +27,14 @@
   --accent-s: #818CF8;
   --cta: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
 
+  /* Semantic */
+  --success: #10B981;
+  --success-bg: rgba(16,185,129,0.12);
+  --danger: #F87171;
+  --danger-bg: rgba(248,113,113,0.12);
+  --warning: #FBBF24;
+  --warning-bg: rgba(251,191,36,0.12);
+
   /* Radii */
   --r: 16px;
   --rs: 10px;
@@ -69,6 +77,14 @@
   --accent-g: rgba(79,70,229,0.10);
   --accent-s: #6366F1;
   --cta: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+
+  /* Semantic */
+  --success: #059669;
+  --success-bg: rgba(5,150,105,0.10);
+  --danger: #EF4444;
+  --danger-bg: rgba(239,68,68,0.10);
+  --warning: #F59E0B;
+  --warning-bg: rgba(245,158,11,0.10);
 
   /* Glass */
   --glass-bg: rgba(255,255,255,0.6);

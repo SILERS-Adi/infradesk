@@ -16,6 +16,7 @@ import { Button } from '../../../components/ui/Button';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { Modal } from '../../../components/ui/Modal';
+import { Input } from '../../../components/ui/Input';
 import { Alert } from '../../../components/ui/Alert';
 import type { CourierEntity, CarrierEntity, ClientConfig } from './types';
 
@@ -266,7 +267,7 @@ export function CarriersPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <button
                         onClick={() => toggleCarrierMut.mutate({ id: c.id, active: !c.active })}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: c.active ? '#059669' : 'var(--tm)', display: 'flex' }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: c.active ? 'var(--success)' : 'var(--tm)', display: 'flex' }}
                         title={c.active ? 'Aktywny' : 'Nieaktywny'}>
                         {c.active ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
                       </button>
@@ -289,49 +290,19 @@ export function CarriersPage() {
               loading={configMut.isPending} onClick={() => configMut.mutate()}>Zapisz</Button>
           }>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, maxWidth: 700 }}>
-              <div>
-                <span style={labelStyle}>Nazwa nadawcy</span>
-                <input style={inputStyle} value={configForm.senderName || ''} onChange={e => setConfigForm(p => ({ ...p, senderName: e.target.value }))} />
-              </div>
-              <div>
-                <span style={labelStyle}>Email nadawcy</span>
-                <input style={inputStyle} value={configForm.senderEmail || ''} onChange={e => setConfigForm(p => ({ ...p, senderEmail: e.target.value }))} />
-              </div>
-              <div>
-                <span style={labelStyle}>Ulica</span>
-                <input style={inputStyle} value={configForm.senderStreet || ''} onChange={e => setConfigForm(p => ({ ...p, senderStreet: e.target.value }))} />
-              </div>
-              <div>
-                <span style={labelStyle}>Miasto</span>
-                <input style={inputStyle} value={configForm.senderCity || ''} onChange={e => setConfigForm(p => ({ ...p, senderCity: e.target.value }))} />
-              </div>
-              <div>
-                <span style={labelStyle}>Kod pocztowy</span>
-                <input style={inputStyle} value={configForm.senderZip || ''} onChange={e => setConfigForm(p => ({ ...p, senderZip: e.target.value }))} />
-              </div>
-              <div>
-                <span style={labelStyle}>Telefon</span>
-                <input style={inputStyle} value={configForm.senderPhone || ''} onChange={e => setConfigForm(p => ({ ...p, senderPhone: e.target.value }))} />
-              </div>
+              <Input label="Nazwa nadawcy" value={configForm.senderName || ''} onChange={e => setConfigForm(p => ({ ...p, senderName: e.target.value }))} />
+              <Input label="Email nadawcy" value={configForm.senderEmail || ''} onChange={e => setConfigForm(p => ({ ...p, senderEmail: e.target.value }))} />
+              <Input label="Ulica" value={configForm.senderStreet || ''} onChange={e => setConfigForm(p => ({ ...p, senderStreet: e.target.value }))} />
+              <Input label="Miasto" value={configForm.senderCity || ''} onChange={e => setConfigForm(p => ({ ...p, senderCity: e.target.value }))} />
+              <Input label="Kod pocztowy" value={configForm.senderZip || ''} onChange={e => setConfigForm(p => ({ ...p, senderZip: e.target.value }))} />
+              <Input label="Telefon" value={configForm.senderPhone || ''} onChange={e => setConfigForm(p => ({ ...p, senderPhone: e.target.value }))} />
               <div style={{ gridColumn: '1 / -1', marginTop: 8 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t)', marginBottom: 12 }}>Domyślne wymiary paczki</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
-                  <div>
-                    <span style={labelStyle}>Szerokość (cm)</span>
-                    <input type="number" style={inputStyle} value={configForm.defaultWidth || ''} onChange={e => setConfigForm(p => ({ ...p, defaultWidth: Number(e.target.value) }))} />
-                  </div>
-                  <div>
-                    <span style={labelStyle}>Wysokość (cm)</span>
-                    <input type="number" style={inputStyle} value={configForm.defaultHeight || ''} onChange={e => setConfigForm(p => ({ ...p, defaultHeight: Number(e.target.value) }))} />
-                  </div>
-                  <div>
-                    <span style={labelStyle}>Głębokość (cm)</span>
-                    <input type="number" style={inputStyle} value={configForm.defaultDepth || ''} onChange={e => setConfigForm(p => ({ ...p, defaultDepth: Number(e.target.value) }))} />
-                  </div>
-                  <div>
-                    <span style={labelStyle}>Waga (g)</span>
-                    <input type="number" style={inputStyle} value={configForm.defaultWeight || ''} onChange={e => setConfigForm(p => ({ ...p, defaultWeight: Number(e.target.value) }))} />
-                  </div>
+                  <Input label="Szerokość (cm)" type="number" value={configForm.defaultWidth || ''} onChange={e => setConfigForm(p => ({ ...p, defaultWidth: Number(e.target.value) }))} />
+                  <Input label="Wysokość (cm)" type="number" value={configForm.defaultHeight || ''} onChange={e => setConfigForm(p => ({ ...p, defaultHeight: Number(e.target.value) }))} />
+                  <Input label="Głębokość (cm)" type="number" value={configForm.defaultDepth || ''} onChange={e => setConfigForm(p => ({ ...p, defaultDepth: Number(e.target.value) }))} />
+                  <Input label="Waga (g)" type="number" value={configForm.defaultWeight || ''} onChange={e => setConfigForm(p => ({ ...p, defaultWeight: Number(e.target.value) }))} />
                 </div>
               </div>
             </div>
@@ -350,9 +321,9 @@ export function CarriersPage() {
         }
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div><span style={labelStyle}>Nazwa *</span><input style={inputStyle} value={cName} onChange={e => setCName(e.target.value)} placeholder="np. InPost" /></div>
-          <div><span style={labelStyle}>URL logo</span><input style={inputStyle} value={cLogo} onChange={e => setCLogo(e.target.value)} placeholder="https://..." /></div>
-          <div><span style={labelStyle}>Godzina odbioru</span><input style={inputStyle} type="time" value={cPickupTime} onChange={e => setCPickupTime(e.target.value)} /></div>
+          <Input label="Nazwa *" value={cName} onChange={e => setCName(e.target.value)} placeholder="np. InPost" />
+          <Input label="URL logo" value={cLogo} onChange={e => setCLogo(e.target.value)} placeholder="https://..." />
+          <Input label="Godzina odbioru" type="time" value={cPickupTime} onChange={e => setCPickupTime(e.target.value)} />
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
             <input type="checkbox" checked={cSaturday} onChange={e => setCSaturday(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
             <span style={{ fontSize: 13, color: 'var(--t)' }}>Odbiory w soboty</span>
@@ -371,8 +342,8 @@ export function CarriersPage() {
         }
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div><span style={labelStyle}>Nazwa *</span><input style={inputStyle} value={crName} onChange={e => setCrName(e.target.value)} placeholder="np. InPost Paczkomaty" /></div>
-          <div><span style={labelStyle}>Kod *</span><input style={inputStyle} value={crCode} onChange={e => setCrCode(e.target.value)} placeholder="np. INPOST_LOCKER" /></div>
+          <Input label="Nazwa *" value={crName} onChange={e => setCrName(e.target.value)} placeholder="np. InPost Paczkomaty" />
+          <Input label="Kod *" value={crCode} onChange={e => setCrCode(e.target.value)} placeholder="np. INPOST_LOCKER" />
           <div>
             <span style={labelStyle}>Powiązany kurier</span>
             <select style={{ ...inputStyle, appearance: 'none' }} value={crCourierId} onChange={e => setCrCourierId(e.target.value)}>

@@ -18,7 +18,7 @@ import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { Alert } from '../../../components/ui/Alert';
 import { ORDER_STATUS, ORDER_STATUS_TABS } from './constants';
-import { fmtMoney, fmtDate } from './utils';
+import { fmtMoney, fmtDate, deadlineText } from './utils';
 import type { BadgeColor } from './types';
 
 interface OrderRow {
@@ -38,18 +38,10 @@ interface OrderRow {
 }
 
 function DeadlineBadge({ iso }: { iso?: string }) {
-  if (!iso) return <span style={{ color: 'var(--td)' }}>—</span>;
-  const dl = new Date(iso);
-  const now = new Date();
-  const overdue = dl < now;
-  const hoursLeft = (dl.getTime() - now.getTime()) / 3600000;
-  const isToday = dl.toDateString() === now.toDateString();
-  let text: string, color: string;
-  if (overdue) { text = 'OPÓŹNIONE'; color = '#F87171'; }
-  else if (isToday && hoursLeft < 4) { text = 'DZIŚ!'; color = '#F87171'; }
-  else if (isToday) { text = 'DZIŚ'; color = '#FBBF24'; }
-  else { text = dl.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' }); color = 'var(--tm)'; }
-  return <span style={{ fontSize: 11, fontWeight: 700, color }}>{text}</span>;
+  const dl = deadlineText(iso);
+  if (!dl) return <span style={{ color: 'var(--td)' }}>—</span>;
+  const colorMap: Record<string, string> = { red: 'var(--danger)', orange: 'var(--warning)', yellow: 'var(--warning)', gray: 'var(--tm)' };
+  return <span style={{ fontSize: 11, fontWeight: 700, color: colorMap[dl.color] || 'var(--tm)' }}>{dl.text}</span>;
 }
 
 export function ShipmentsListPage() {
@@ -126,7 +118,7 @@ export function ShipmentsListPage() {
   };
 
   const thStyle = (align: 'left' | 'right' | 'center' = 'left'): React.CSSProperties => ({
-    padding: '10px 14px', fontSize: 10, fontWeight: 700, color: 'var(--td)',
+    padding: '10px 14px', fontSize: 11, fontWeight: 700, color: 'var(--td)',
     textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: align,
     background: 'var(--hover-bg)', whiteSpace: 'nowrap', cursor: 'pointer',
     userSelect: 'none',

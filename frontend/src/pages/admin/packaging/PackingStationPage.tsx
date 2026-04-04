@@ -241,7 +241,7 @@ export function PackingStationPage() {
                     <div key={item.id} className="page-card" style={{
                       padding: 0, overflow: 'hidden',
                       opacity: packed ? 0.6 : 1,
-                      borderLeft: packed ? '4px solid #059669' : '4px solid transparent',
+                      borderLeft: packed ? '4px solid var(--success)' : '4px solid transparent',
                       transition: 'all .2s',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'stretch' }}>
@@ -277,7 +277,7 @@ export function PackingStationPage() {
                             <Button variant={packed ? 'secondary' : 'primary'} size="sm"
                               icon={packed ? <CheckCircle2 size={14} /> : undefined}
                               onClick={() => packItem(item.id)}
-                              style={packed ? { background: '#059669', color: '#fff', borderColor: '#059669' } : undefined}>
+                              style={packed ? { background: 'var(--success)', color: '#fff', borderColor: 'var(--success)' } : undefined}>
                               {packed ? 'Spakowano' : 'Spakuj'}
                             </Button>
                           </div>

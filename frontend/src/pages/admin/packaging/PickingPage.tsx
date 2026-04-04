@@ -209,13 +209,13 @@ export function PickingPage() {
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 background: allPicked ? 'rgba(34,197,94,0.06)' : 'transparent',
               }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: allPicked ? '#059669' : 'var(--ts)' }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: allPicked ? 'var(--success)' : 'var(--ts)' }}>
                   {allPicked ? 'Wszystko zebrane!' : `${totalPicked} / ${totalRequired} sztuk`}
                 </span>
                 <div style={{ width: 160, height: 6, borderRadius: 3, background: 'var(--border)' }}>
                   <div style={{
                     height: '100%', borderRadius: 3,
-                    background: allPicked ? '#059669' : 'var(--accent)',
+                    background: allPicked ? 'var(--success)' : 'var(--accent)',
                     width: `${totalRequired > 0 ? (totalPicked / totalRequired) * 100 : 0}%`,
                     transition: 'width 0.3s',
                   }} />
@@ -235,7 +235,7 @@ export function PickingPage() {
                         <div style={{
                           width: 28, height: 28, borderRadius: 7, flexShrink: 0,
                           border: done ? 'none' : '2px solid var(--border)',
-                          background: done ? '#059669' : 'transparent',
+                          background: done ? 'var(--success)' : 'transparent',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                         }}>
                           {done && <CheckCircle2 size={16} color="#fff" />}
@@ -260,7 +260,7 @@ export function PickingPage() {
                           </Button>
                           <span style={{
                             fontSize: 16, fontWeight: 800, minWidth: 50, textAlign: 'center',
-                            color: done ? '#059669' : 'var(--t)',
+                            color: done ? 'var(--success)' : 'var(--t)',
                           }}>
                             {item.pickedQty}/{item.requiredQty}
                           </span>
@@ -269,7 +269,7 @@ export function PickingPage() {
                             style={{
                               width: 28, height: 28, padding: 0, minWidth: 'auto', minHeight: 'auto',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              ...(done ? { background: 'rgba(34,197,94,0.1)', color: '#059669', borderColor: 'rgba(34,197,94,0.2)' } : {}),
+                              ...(done ? { background: 'rgba(34,197,94,0.1)', color: 'var(--success)', borderColor: 'rgba(34,197,94,0.2)' } : {}),
                             }}>
                             <Plus size={14} />
                           </Button>

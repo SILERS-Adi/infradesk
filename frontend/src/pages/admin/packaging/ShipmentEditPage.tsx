@@ -171,7 +171,7 @@ export function ShipmentEditPage() {
                         {items.length > 1 && (
                           <button onClick={() => removeItem(idx)} type="button"
                             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--tm)', padding: 4, display: 'flex' }}
-                            onMouseEnter={e => { e.currentTarget.style.color = '#F87171'; }}
+                            onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)'; }}
                             onMouseLeave={e => { e.currentTarget.style.color = 'var(--tm)'; }}>
                             <Trash2 size={15} />
                           </button>
@@ -191,7 +191,7 @@ export function ShipmentEditPage() {
               </button>
               <span style={{ fontSize: 13, color: 'var(--tm)' }}>Waga: <strong style={{ color: 'var(--t)' }}>{fmtWeight(totalWeight)}</strong></span>
             </div>
-            {errors.items && <div style={{ padding: '0 16px 12px' }}><p style={{ fontSize: 11, color: '#F87171' }}>{errors.items}</p></div>}
+            {errors.items && <div style={{ padding: '0 16px 12px' }}><p style={{ fontSize: 11, color: 'var(--danger)' }}>{errors.items}</p></div>}
           </Card>
         </div>
 

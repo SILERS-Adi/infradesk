@@ -24,9 +24,9 @@ import { fmtDate } from './utils';
 import type { Batch, BadgeColor } from './types';
 
 function progressColor(pct: number): string {
-  if (pct === 100) return '#059669';
+  if (pct === 100) return 'var(--success)';
   if (pct >= 70) return '#A78BFA';
-  if (pct >= 40) return '#FBBF24';
+  if (pct >= 40) return 'var(--warning)';
   return 'var(--accent)';
 }
 
@@ -179,26 +179,16 @@ export function PackagingBoardPage() {
                         {fmtDate(b.createdAt)}
                       </span>
                       {b.status === 'OPEN' ? (
-                        <button onClick={e => { e.stopPropagation(); takeMut.mutate(b.id); }}
-                          style={{
-                            padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                            background: 'var(--accent)', color: '#fff', fontSize: 12, fontWeight: 700,
-                            display: 'flex', alignItems: 'center', gap: 6, transition: 'all .15s',
-                          }}
-                          onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = 'var(--accent)'; }}
-                        >
-                          Pakuj <ChevronRight size={14} />
-                        </button>
+                        <Button variant="primary" size="sm" iconRight={<ChevronRight size={14} />}
+                          loading={takeMut.isPending}
+                          onClick={e => { e.stopPropagation(); takeMut.mutate(b.id); }}>
+                          Pakuj
+                        </Button>
                       ) : b.status === 'IN_PROGRESS' ? (
-                        <button onClick={e => { e.stopPropagation(); navigate(`/packaging/batches/${b.id}`); }}
-                          style={{
-                            padding: '8px 18px', borderRadius: 8, border: '1px solid var(--accent)',
-                            background: 'transparent', color: 'var(--accent)', fontSize: 12, fontWeight: 700,
-                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-                          }}>
-                          Kontynuuj <ChevronRight size={14} />
-                        </button>
+                        <Button variant="outline" size="sm" iconRight={<ChevronRight size={14} />}
+                          onClick={e => { e.stopPropagation(); navigate(`/packaging/batches/${b.id}`); }}>
+                          Kontynuuj
+                        </Button>
                       ) : null}
                     </div>
                   </div>
