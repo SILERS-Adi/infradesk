@@ -47,7 +47,7 @@ export const SYSTEM_GROUPS: SystemMenuGroup[] = [
 
   // Modules (activated per workspace)
   { id: 'infrastructure',  label: 'INFRASTRUKTURA IT',  defaultOrder: 1,  module: 'infrastructure' },
-  { id: 'service-desk',    label: 'SERWIS I OBSŁUGA',   defaultOrder: 2,  module: 'service-desk' },
+  { id: 'service-desk',    label: 'SERWIS I OBSŁUGA IT', defaultOrder: 2,  module: 'service-desk' },
   { id: 'invoicing',       label: 'FINANSE',            defaultOrder: 3,  module: 'invoicing' },
   { id: 'packaging',       label: 'PAKOWANIE',          defaultOrder: 4,  module: 'packaging' },
   { id: 'skp',             label: 'SKP',                defaultOrder: 5,  module: 'skp' },
@@ -79,7 +79,7 @@ export const SYSTEM_ITEMS: SystemMenuItem[] = [
   { id: 'backups',            to: '/backups',              label: 'Kopie zapasowe',     icon: HardDrive,       groupId: 'infrastructure', defaultOrder: 3, module: 'infrastructure' },
   { id: 'activity-logs',      to: '/activity-logs',        label: 'Logi aktywności',    icon: Activity,        groupId: 'infrastructure', defaultOrder: 4, module: 'infrastructure' },
 
-  // ── SERWIS I OBSŁUGA ──
+  // ── SERWIS I OBSŁUGA IT ──
   { id: 'tickets',            to: '/tickets',              label: 'Zgłoszenia',         icon: Ticket,          groupId: 'service-desk',   defaultOrder: 0, module: 'service-desk', badgeKey: 'ticketQueue', end: true },
   { id: 'tasks',              to: '/tasks',                label: 'Zadania',            icon: ClipboardList,   groupId: 'service-desk',   defaultOrder: 1, module: 'service-desk', badgeKey: 'activeTasks' },
   { id: 'calendar',           to: '/calendar',             label: 'Kalendarz',          icon: CalendarDays,    groupId: 'service-desk',   defaultOrder: 2, module: 'service-desk' },

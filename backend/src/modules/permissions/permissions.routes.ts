@@ -24,7 +24,7 @@ const PERMISSION_TREE = [
   },
   {
     nodeId: 'service-desk',
-    label: 'Serwis i obsługa',
+    label: 'Serwis i obsługa IT',
     children: [
       { nodeId: 'service-desk.tickets', label: 'Zgłoszenia' },
       { nodeId: 'service-desk.tasks', label: 'Zadania' },
