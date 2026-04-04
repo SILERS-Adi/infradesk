@@ -269,18 +269,37 @@ model WorkspaceMembership {
   isDefault      Boolean          @default(false)
   status         MembershipStatus @default(ACTIVE)
   managementId   String?
+
+  // Permission model v2
+  accountType    String           @default("USER")       // "ADMIN" | "USER"
+  accessScope    String           @default("FULL")       // "FULL" | "RESTRICTED"
+
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
-  user         User                 @relation(fields: [userId], references: [id])
-  workspace    Workspace            @relation(fields: [workspaceId], references: [id])
-  management   WorkspaceManagement? @relation(fields: [managementId], references: [id])
-  accessGrants AccessGrant[]
+  user                 User                      @relation(fields: [userId], references: [id])
+  workspace            Workspace                 @relation(fields: [workspaceId], references: [id])
+  management           WorkspaceManagement?      @relation(fields: [managementId], references: [id])
+  accessGrants         AccessGrant[]
+  permissionOverrides  UserPermissionOverride[]
 
   @@unique([userId, workspaceId])
   @@index([workspaceId])
   @@index([userId])
   @@index([status])
+}
+
+model UserPermissionOverride {
+  id           String  @id @default(uuid())
+  membershipId String
+  nodeId       String  // hierarchical: "infrastructure", "infrastructure.devices", "invoicing.documents"
+  level        String  // "FULL" | "VIEW" | "NONE"
+  canDelete    Boolean @default(false)
+
+  membership WorkspaceMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@unique([membershipId, nodeId])
+  @@index([membershipId])
 }
 
 model AccessGrant {

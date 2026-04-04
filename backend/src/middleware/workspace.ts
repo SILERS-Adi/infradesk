@@ -31,6 +31,9 @@ export interface MembershipContext {
   source: string;           // DIRECT | MSP_ASSIGNED | INVITATION
   allowedModules: string[] | null;
   grants: { resourceType: string; resourceId: string }[];
+  accountType: string;      // ADMIN | USER
+  accessScope: string;      // FULL | RESTRICTED
+  permissionOverrides?: { nodeId: string; level: string; canDelete: boolean }[];
 }
 
 // ── Extend Express Request ──────────────────────────────────────────
@@ -185,10 +188,19 @@ export async function resolveMembership(req: Request, _res: Response, next: Next
         source: true,
         allowedModules: true,
         status: true,
+        accountType: true,
+        accessScope: true,
         accessGrants: {
           select: {
             resourceType: true,
             resourceId: true,
+          },
+        },
+        permissionOverrides: {
+          select: {
+            nodeId: true,
+            level: true,
+            canDelete: true,
           },
         },
       },
@@ -215,6 +227,9 @@ export async function resolveMembership(req: Request, _res: Response, next: Next
         resourceType: g.resourceType,
         resourceId: g.resourceId,
       })),
+      accountType: membership.accountType ?? 'USER',
+      accessScope: membership.accessScope ?? 'FULL',
+      permissionOverrides: membership.permissionOverrides ?? [],
     };
 
     logDebug(
@@ -276,6 +291,95 @@ export function authorizeWorkspace(...allowedRoles: MemberRole[]) {
     }
 
     res.status(403).json({ error: 'No workspace membership' });
+  };
+}
+
+
+// ══════════════════════════════════════════════════════════════════════
+//  Permission tree helpers
+//
+//  checkNodePermission(): resolves effective permission level for a node
+//  using inheritance (child inherits from parent if no override).
+//  requirePermission(): middleware that blocks if user lacks access.
+// ══════════════════════════════════════════════════════════════════════
+
+/** Non-delegable admin-only nodes */
+const ADMIN_ONLY_NODES = new Set([
+  'company.users', 'company.settings', 'company.sharing',
+]);
+
+/**
+ * Resolve effective permission level for a nodeId.
+ * Returns 'FULL' | 'VIEW' | 'NONE'.
+ *
+ * Logic:
+ * - SuperAdmin / accountType=ADMIN → always FULL
+ * - accessScope=FULL → always FULL
+ * - accessScope=RESTRICTED → check overrides with inheritance
+ */
+export function resolvePermission(
+  membership: MembershipContext | null,
+  nodeId: string,
+  isSuperAdmin?: boolean
+): { level: 'FULL' | 'VIEW' | 'NONE'; canDelete: boolean } {
+  // SuperAdmin bypass
+  if (isSuperAdmin) return { level: 'FULL', canDelete: true };
+  // No membership
+  if (!membership) return { level: 'NONE', canDelete: false };
+  // Admin account → full access everywhere
+  if (membership.accountType === 'ADMIN') return { level: 'FULL', canDelete: true };
+  // Admin-only nodes → block non-admin
+  if (ADMIN_ONLY_NODES.has(nodeId)) return { level: 'NONE', canDelete: false };
+  // Full access scope → full everywhere (but no delete unless admin)
+  if (membership.accessScope === 'FULL') return { level: 'FULL', canDelete: false };
+
+  // Restricted → check overrides with parent inheritance
+  const overrides = membership.permissionOverrides ?? [];
+  const overrideMap = new Map(overrides.map(o => [o.nodeId, o]));
+
+  // Check exact match first
+  const exact = overrideMap.get(nodeId);
+  if (exact) return { level: exact.level as any, canDelete: exact.canDelete };
+
+  // Check parent (e.g. "infrastructure.devices" → "infrastructure")
+  const dotIdx = nodeId.indexOf('.');
+  if (dotIdx > 0) {
+    const parentId = nodeId.substring(0, dotIdx);
+    const parent = overrideMap.get(parentId);
+    if (parent) return { level: parent.level as any, canDelete: parent.canDelete };
+  }
+
+  // No override → default NONE for restricted users
+  return { level: 'NONE', canDelete: false };
+}
+
+/**
+ * Middleware: require specific permission level on a node.
+ * Usage: requirePermission('infrastructure.devices', 'VIEW')  → at least VIEW
+ *        requirePermission('invoicing.documents', 'FULL')     → need FULL (create/edit)
+ *        requirePermission('invoicing.documents', 'DELETE')   → need canDelete
+ */
+export function requirePermission(nodeId: string, minLevel: 'VIEW' | 'FULL' | 'DELETE') {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (req.user?.isSuperAdmin) { next(); return; }
+
+    const perm = resolvePermission(req.membership ?? null, nodeId, req.user?.isSuperAdmin);
+
+    if (minLevel === 'DELETE') {
+      if (!perm.canDelete && req.membership?.accountType !== 'ADMIN') {
+        res.status(403).json({ error: 'Brak uprawnień do usuwania', node: nodeId });
+        return;
+      }
+      next(); return;
+    }
+
+    const levelRank = { 'NONE': 0, 'VIEW': 1, 'FULL': 2 };
+    if (levelRank[perm.level] < levelRank[minLevel]) {
+      res.status(403).json({ error: 'Niewystarczające uprawnienia', node: nodeId, required: minLevel, current: perm.level });
+      return;
+    }
+
+    next();
   };
 }
 

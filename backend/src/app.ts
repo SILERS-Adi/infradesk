@@ -62,6 +62,7 @@ import shippingRouter from './modules/packaging/shipping.routes';
 import billingRouter from './modules/billing/billing.routes';
 import sharingRouter from './modules/sharing/sharing.routes';
 import menuPreferencesRouter from './modules/menu-preferences/menu-preferences.routes';
+import permissionsRouter from './modules/permissions/permissions.routes';
 
 // Middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -209,6 +210,7 @@ app.use('/api/packaging/shipping', authenticate, requireModule('packaging'), shi
 app.use('/api/billing', billingRouter);
 app.use('/api/sharing', sharingRouter);
 app.use('/api/menu-preferences', menuPreferencesRouter);
+app.use('/api/permissions', permissionsRouter);
 app.use('/api/service/vehicles', authenticate, requireModule('skp'), serviceVehiclesRouter);
 app.use('/api/service/inspections', authenticate, requireModule('skp'), serviceInspectionsRouter);
 // Public agent endpoints (no auth)
