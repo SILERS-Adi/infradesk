@@ -4,7 +4,7 @@ import { apiClient } from '../../../api/client';
 import { useWorkspaceContext } from '../../../hooks/useWorkspaceContext';
 import toast from 'react-hot-toast';
 import {
-  Share2, Send, UserPlus, Shield, Monitor, MapPin, ChevronRight, X, Check, Loader2, Link2Off, Building2, User, Mail,
+  Share2, Send, UserPlus, Shield, Monitor, MapPin, ChevronRight, X, Check, Loader2, Link2Off, Building2, User, Mail, Clock, Calendar, Edit3, Save,
 } from 'lucide-react';
 import { devicesApi } from '../../../api/devices';
 import { locationsApi } from '../../../api/locations';
@@ -59,6 +59,34 @@ export default function SharingPage() {
     onSuccess: () => { toast.success('Dostęp cofnięty'); qc.invalidateQueries({ queryKey: ['sharing'] }); },
     onError: (err: any) => toast.error(err?.response?.data?.error || 'Błąd'),
   });
+
+  const contractMutation = useMutation({
+    mutationFn: (payload: any) => apiClient.patch('/sharing/contract', payload),
+    onSuccess: () => { toast.success('Warunki zapisane'); qc.invalidateQueries({ queryKey: ['sharing'] }); setEditingContract(null); },
+    onError: (err: any) => toast.error(err?.response?.data?.error || 'Błąd'),
+  });
+
+  const [editingContract, setEditingContract] = useState<string | null>(null);
+  const [contractForm, setContractForm] = useState<any>({});
+
+  const contractTypeLabels: Record<string, string> = {
+    UNLIMITED: 'Bezterminowo',
+    HOURLY: 'Godzinowy',
+    MONTHLY: 'Miesięczny',
+    YEARLY: 'Roczny',
+  };
+
+  const startEditContract = (m: any) => {
+    setEditingContract(m.id);
+    setContractForm({
+      contractType: m.contractType || 'UNLIMITED',
+      contractHours: m.contractHours || '',
+      contractMonthlyValue: m.contractMonthlyValue || '',
+      hourlyRate: m.hourlyRate || '',
+      contractStartDate: m.contractStartDate ? m.contractStartDate.slice(0, 10) : '',
+      contractEndDate: m.contractEndDate ? m.contractEndDate.slice(0, 10) : '',
+    });
+  };
 
   const managing = data?.managing || [];
   const managedBy = data?.managedBy || [];
@@ -159,6 +187,90 @@ export default function SharingPage() {
                       </div>
                     </div>
                   )}
+                  {/* Contract terms */}
+                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 12 }}>
+                    {editingContract === m.id ? (
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--td)', marginBottom: 10 }}>Warunki współpracy</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                          <div>
+                            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--ts)', display: 'block', marginBottom: 4 }}>Typ rozliczenia</label>
+                            <select value={contractForm.contractType} onChange={e => setContractForm((p: any) => ({ ...p, contractType: e.target.value }))}
+                              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--t)', fontSize: 12 }}>
+                              <option value="UNLIMITED">Bezterminowo</option>
+                              <option value="HOURLY">Godzinowy</option>
+                              <option value="MONTHLY">Miesięczny</option>
+                              <option value="YEARLY">Roczny</option>
+                            </select>
+                          </div>
+                          {contractForm.contractType === 'HOURLY' && (
+                            <>
+                              <div>
+                                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--ts)', display: 'block', marginBottom: 4 }}>Stawka/h (PLN)</label>
+                                <input type="number" value={contractForm.hourlyRate} onChange={e => setContractForm((p: any) => ({ ...p, hourlyRate: e.target.value }))}
+                                  style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--t)', fontSize: 12 }} />
+                              </div>
+                              <div>
+                                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--ts)', display: 'block', marginBottom: 4 }}>Limit godzin</label>
+                                <input type="number" value={contractForm.contractHours} onChange={e => setContractForm((p: any) => ({ ...p, contractHours: e.target.value }))}
+                                  style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--t)', fontSize: 12 }} />
+                              </div>
+                            </>
+                          )}
+                          {(contractForm.contractType === 'MONTHLY' || contractForm.contractType === 'YEARLY') && (
+                            <div>
+                              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--ts)', display: 'block', marginBottom: 4 }}>Kwota {contractForm.contractType === 'MONTHLY' ? 'mies.' : 'roczna'} (PLN)</label>
+                              <input type="number" value={contractForm.contractMonthlyValue} onChange={e => setContractForm((p: any) => ({ ...p, contractMonthlyValue: e.target.value }))}
+                                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--t)', fontSize: 12 }} />
+                            </div>
+                          )}
+                          <div>
+                            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--ts)', display: 'block', marginBottom: 4 }}>Od</label>
+                            <input type="date" value={contractForm.contractStartDate} onChange={e => setContractForm((p: any) => ({ ...p, contractStartDate: e.target.value }))}
+                              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--t)', fontSize: 12 }} />
+                          </div>
+                          {contractForm.contractType !== 'UNLIMITED' && (
+                            <div>
+                              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--ts)', display: 'block', marginBottom: 4 }}>Do</label>
+                              <input type="date" value={contractForm.contractEndDate} onChange={e => setContractForm((p: any) => ({ ...p, contractEndDate: e.target.value }))}
+                                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--t)', fontSize: 12 }} />
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button onClick={() => contractMutation.mutate({ managementId: m.id, ...contractForm })}
+                            disabled={contractMutation.isPending}
+                            style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            {contractMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Zapisz
+                          </button>
+                          <button onClick={() => setEditingContract(null)}
+                            style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'none', color: 'var(--ts)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+                            Anuluj
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <Clock size={13} color="var(--tm)" />
+                          <span style={{ fontSize: 12, color: 'var(--ts)' }}>
+                            {contractTypeLabels[m.contractType] || 'Bezterminowo'}
+                            {m.contractType === 'HOURLY' && m.hourlyRate ? ` · ${m.hourlyRate} PLN/h` : ''}
+                            {m.contractType === 'HOURLY' && m.contractHours ? ` · limit ${m.contractHours}h` : ''}
+                            {(m.contractType === 'MONTHLY' || m.contractType === 'YEARLY') && m.contractMonthlyValue ? ` · ${m.contractMonthlyValue} PLN` : ''}
+                            {m.contractStartDate ? ` · od ${new Date(m.contractStartDate).toLocaleDateString('pl-PL')}` : ''}
+                            {m.contractEndDate ? ` do ${new Date(m.contractEndDate).toLocaleDateString('pl-PL')}` : ''}
+                          </span>
+                        </div>
+                        {isAdmin && (
+                          <button onClick={() => startEditContract(m)}
+                            style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'none', color: 'var(--tm)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <Edit3 size={11} /> Edytuj
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -210,6 +322,20 @@ export default function SharingPage() {
                       </div>
                     </div>
                   )}
+                  {/* Contract terms */}
+                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Clock size={13} color="var(--tm)" />
+                      <span style={{ fontSize: 12, color: 'var(--ts)' }}>
+                        {contractTypeLabels[m.contractType] || 'Bezterminowo'}
+                        {m.contractType === 'HOURLY' && m.hourlyRate ? ` \u00b7 ${m.hourlyRate} PLN/h` : ''}
+                        {m.contractType === 'HOURLY' && m.contractHours ? ` \u00b7 limit ${m.contractHours}h` : ''}
+                        {(m.contractType === 'MONTHLY' || m.contractType === 'YEARLY') && m.contractMonthlyValue ? ` \u00b7 ${m.contractMonthlyValue} PLN` : ''}
+                        {m.contractStartDate ? ` \u00b7 od ${new Date(m.contractStartDate).toLocaleDateString('pl-PL')}` : ''}
+                        {m.contractEndDate ? ` do ${new Date(m.contractEndDate).toLocaleDateString('pl-PL')}` : ''}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>

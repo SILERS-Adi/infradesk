@@ -273,4 +273,40 @@ router.post('/revoke', async (req: Request, res: Response, next: NextFunction) =
   } catch (err) { next(err); }
 });
 
+// ── Update contract terms ──
+router.patch('/contract', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const wsId = req.workspaceId;
+    const userId = req.user!.userId;
+    if (!wsId) { res.status(400).json({ error: 'Workspace context required' }); return; }
+
+    const { managementId, contractType, contractHours, contractMonthlyValue, hourlyRate, contractStartDate, contractEndDate } = req.body;
+    if (!managementId) { res.status(400).json({ error: 'managementId required' }); return; }
+
+    const mgmt = await prisma.workspaceManagement.findUnique({ where: { id: managementId } });
+    if (!mgmt) throw new AppError('Not found', 404);
+    if (mgmt.mspWorkspaceId !== wsId && mgmt.companyWorkspaceId !== wsId) throw new AppError('No access', 403);
+
+    // Verify admin role
+    const membership = await prisma.workspaceMembership.findFirst({
+      where: { userId, workspaceId: wsId, role: { in: ['OWNER', 'ADMIN'] }, status: 'ACTIVE' },
+    });
+    if (!membership) { res.status(403).json({ error: 'Brak uprawnień' }); return; }
+
+    const updated = await prisma.workspaceManagement.update({
+      where: { id: managementId },
+      data: {
+        contractType: contractType ?? undefined,
+        contractHours: contractHours != null ? Number(contractHours) : undefined,
+        contractMonthlyValue: contractMonthlyValue != null ? Number(contractMonthlyValue) : undefined,
+        hourlyRate: hourlyRate != null ? Number(hourlyRate) : undefined,
+        contractStartDate: contractStartDate ? new Date(contractStartDate) : undefined,
+        contractEndDate: contractEndDate ? new Date(contractEndDate) : undefined,
+      },
+    });
+
+    res.json(updated);
+  } catch (err) { next(err); }
+});
+
 export default router;

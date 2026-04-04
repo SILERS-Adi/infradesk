@@ -285,6 +285,7 @@ model WorkspaceManagement {
   status      ManagementStatus @default(ACTIVE)
   accessLevel ManagementAccess @default(FULL_MANAGEMENT)
 
+  contractType         String?   // UNLIMITED | HOURLY | MONTHLY | YEARLY
   contractHours        Int?
   contractMonthlyValue Float?
   hourlyRate           Float?
