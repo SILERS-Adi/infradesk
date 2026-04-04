@@ -1,14 +1,44 @@
 import { apiClient } from './client';
 
+// Backend returns: { relationId, workspace: {...}, permissions: {...}, stats: {...} }
+export interface OperatorClientRaw {
+  relationId: string;
+  workspace: {
+    id: string;
+    name: string;
+    slug: string;
+    legalName?: string;
+    taxId?: string;
+    email?: string;
+    phone?: string;
+    logoUrl?: string;
+    city?: string;
+    isActive: boolean;
+  };
+  permissions: Record<string, boolean>;
+  isDefaultHelpdeskProvider: boolean;
+  stats: {
+    deviceCount: number;
+    ticketCount: number;
+    activeTickets: number;
+  };
+}
+
+// Flattened for UI convenience
 export interface OperatorClient {
   id: string;
+  relationId: string;
   name: string;
   slug: string;
-  organizationType: string;
+  email?: string;
+  phone?: string;
+  city?: string;
+  taxId?: string;
   ticketCount: number;
+  activeTickets: number;
   deviceCount: number;
-  userCount: number;
-  createdAt: string;
+  isDefault: boolean;
+  createdAt?: string;
 }
 
 export interface OperatorTicket {
@@ -19,40 +49,59 @@ export interface OperatorTicket {
   priority: string;
   type: string;
   createdAt: string;
-  clientWorkspaceName?: string;
-  clientWorkspaceId?: string;
-  assignedTo?: { firstName: string; lastName: string } | null;
-  createdBy?: { firstName: string; lastName: string } | null;
-}
-
-export interface OperatorDevice {
-  id: string;
-  name: string;
-  type: string;
-  status: string;
-  ipAddress?: string;
-  clientWorkspaceName?: string;
-  clientWorkspaceId?: string;
+  workspace?: { id: string; name: string; slug: string };
+  assignedTo?: { id: string; firstName: string; lastName: string } | null;
+  createdBy?: { id: string; firstName: string; lastName: string } | null;
 }
 
 export interface OperatorStats {
-  totalClients: number;
-  totalTickets: number;
-  pendingTickets: number;
-  totalDevices: number;
-  activeAlerts: number;
+  clientCount: number;
+  deviceCount: number;
+  ticketCount: number;
+  activeTickets: number;
+  agentCount: number;
+}
+
+export interface CreateClientPayload {
+  name: string;
+  legalName?: string;
+  taxId?: string;
+  email?: string;
+  phone?: string;
+  contactPerson?: string;
+  city?: string;
+}
+
+function flattenClient(raw: OperatorClientRaw): OperatorClient {
+  return {
+    id: raw.workspace.id,
+    relationId: raw.relationId,
+    name: raw.workspace.name,
+    slug: raw.workspace.slug,
+    email: raw.workspace.email,
+    phone: raw.workspace.phone,
+    city: raw.workspace.city,
+    taxId: raw.workspace.taxId,
+    ticketCount: raw.stats.ticketCount,
+    activeTickets: raw.stats.activeTickets,
+    deviceCount: raw.stats.deviceCount,
+    isDefault: raw.isDefaultHelpdeskProvider,
+  };
 }
 
 export const operatorApi = {
   getClients: () =>
-    apiClient.get<OperatorClient[]>('/api/operator/clients').then(r => r.data),
+    apiClient.get<OperatorClientRaw[]>('/api/operator/clients').then(r => r.data.map(flattenClient)),
 
-  getTickets: (params?: { clientWorkspaceId?: string; status?: string; page?: number; limit?: number }) =>
-    apiClient.get<{ tickets: OperatorTicket[]; total: number }>('/api/operator/tickets', { params }).then(r => r.data),
+  getTickets: (params?: { clientWorkspaceId?: string; status?: string; page?: number; per_page?: number }) =>
+    apiClient.get<{ data: OperatorTicket[]; pagination: { total: number; page: number; per_page: number } }>('/api/operator/tickets', { params }).then(r => r.data),
 
-  getDevices: (params?: { clientWorkspaceId?: string; page?: number; limit?: number }) =>
-    apiClient.get<{ devices: OperatorDevice[]; total: number }>('/api/operator/devices', { params }).then(r => r.data),
+  getDevices: (params?: { clientWorkspaceId?: string }) =>
+    apiClient.get<any[]>('/api/operator/devices', { params }).then(r => r.data),
 
   getStats: () =>
     apiClient.get<OperatorStats>('/api/operator/stats').then(r => r.data),
+
+  createClient: (data: CreateClientPayload) =>
+    apiClient.post<{ workspace: any; relation: any }>('/api/operator/clients', data).then(r => r.data),
 };

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Ticket, Monitor, Bell, Clock } from 'lucide-react';
+import { Building2, Ticket, Monitor, Bot, Clock } from 'lucide-react';
 import { operatorApi } from '../../api/operator';
 import { KpiCard } from '../../components/ui/KpiCard';
 import { DataTable, type Column } from '../../components/ui/DataTable';
@@ -22,7 +22,7 @@ export default function OperatorDashboard() {
 
   const { data: ticketsData, isLoading: ticketsLoading } = useQuery({
     queryKey: ['operator', 'tickets', 'recent'],
-    queryFn: () => operatorApi.getTickets({ limit: 10 }),
+    queryFn: () => operatorApi.getTickets({ per_page: 10 }),
     refetchInterval: 30_000,
   });
 
@@ -38,7 +38,7 @@ export default function OperatorDashboard() {
     { key: 'title', header: 'Tytuł', render: (r) => (
       <span style={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{r.title}</span>
     )},
-    { key: 'client', header: 'Klient', render: (r) => r.clientWorkspaceName ?? '—' },
+    { key: 'client', header: 'Klient', render: (r) => r.workspace?.name ?? '—' },
     { key: 'status', header: 'Status', render: (r) => <TicketStatusBadge status={r.status as TicketStatus} /> },
     { key: 'priority', header: 'Priorytet', render: (r) => <PriorityBadge priority={r.priority as TicketPriority} /> },
     { key: 'createdAt', header: 'Data', render: (r) => new Date(r.createdAt).toLocaleDateString('pl') },
@@ -54,31 +54,31 @@ export default function OperatorDashboard() {
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 28 }}>
         <KpiCard
           label="Klienci"
-          value={String(stats?.totalClients ?? 0)}
+          value={String(stats?.clientCount ?? 0)}
           icon={<Building2 size={20} color="#fff" />}
           color="#6366F1"
           onClick={() => navigate('/operator/clients')}
         />
         <KpiCard
           label="Zgłoszenia"
-          value={String(stats?.totalTickets ?? 0)}
-          sub={`${stats?.pendingTickets ?? 0} oczekujących`}
+          value={String(stats?.ticketCount ?? 0)}
+          sub={`${stats?.activeTickets ?? 0} aktywnych`}
           icon={<Ticket size={20} color="#fff" />}
           color="#F59E0B"
           onClick={() => navigate('/operator/tickets')}
         />
         <KpiCard
           label="Urządzenia"
-          value={String(stats?.totalDevices ?? 0)}
+          value={String(stats?.deviceCount ?? 0)}
           icon={<Monitor size={20} color="#fff" />}
           color="#22C55E"
           onClick={() => navigate('/operator/devices')}
         />
         <KpiCard
-          label="Alerty"
-          value={String(stats?.activeAlerts ?? 0)}
-          icon={<Bell size={20} color="#fff" />}
-          color="#EF4444"
+          label="Agenty"
+          value={String(stats?.agentCount ?? 0)}
+          icon={<Bot size={20} color="#fff" />}
+          color="#8B5CF6"
         />
       </div>
 
@@ -97,7 +97,7 @@ export default function OperatorDashboard() {
         </div>
         <DataTable
           columns={ticketColumns}
-          data={ticketsData?.tickets ?? []}
+          data={ticketsData?.data ?? []}
           loading={ticketsLoading}
           onRowClick={(t) => navigate(`/tickets/${t.id}`)}
           keyExtractor={(t) => t.id}
@@ -118,13 +118,13 @@ export default function OperatorDashboard() {
                 key={c.id}
                 className="page-card"
                 style={{ padding: 16, cursor: 'pointer' }}
-                onClick={() => navigate(`/operator/clients`)}
+                onClick={() => navigate('/operator/clients')}
               >
                 <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--t)', marginBottom: 8 }}>{c.name}</div>
                 <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--tm)' }}>
                   <span>{c.ticketCount} zgłoszeń</span>
                   <span>{c.deviceCount} urządzeń</span>
-                  <span>{c.userCount} użytkowników</span>
+                  <span>{c.activeTickets} aktywnych</span>
                 </div>
               </div>
             ))}

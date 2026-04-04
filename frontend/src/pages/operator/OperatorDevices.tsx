@@ -5,38 +5,46 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { DeviceStatusBadge } from '../../components/ui/StatusBadge';
 import type { DeviceStatus } from '../../types';
-import type { OperatorDevice, OperatorClient } from '../../api/operator';
+
+interface DeviceRow {
+  id: string;
+  name: string;
+  type: string;
+  status: string;
+  ipAddress?: string;
+  hostname?: string;
+  workspace?: { id: string; name: string };
+  location?: { id: string; name: string };
+}
 
 export default function OperatorDevices() {
   const [clientFilter, setClientFilter] = useState<string>('');
-  const [page, setPage] = useState(1);
-  const limit = 25;
 
   const { data: clients } = useQuery({
     queryKey: ['operator', 'clients'],
     queryFn: operatorApi.getClients,
   });
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['operator', 'devices', clientFilter, page],
+  const { data: devices, isLoading } = useQuery({
+    queryKey: ['operator', 'devices', clientFilter],
     queryFn: () => operatorApi.getDevices({
       clientWorkspaceId: clientFilter || undefined,
-      page,
-      limit,
     }),
   });
 
-  const totalPages = Math.ceil((data?.total ?? 0) / limit);
-
-  const columns: Column<OperatorDevice>[] = [
+  const columns: Column<DeviceRow>[] = [
     { key: 'name', header: 'Nazwa', render: (r) => (
-      <span style={{ fontWeight: 600, color: 'var(--t)' }}>{r.name}</span>
+      <div>
+        <span style={{ fontWeight: 600, color: 'var(--t)' }}>{r.name}</span>
+        {r.hostname && <div style={{ fontSize: 11, color: 'var(--td)' }}>{r.hostname}</div>}
+      </div>
     )},
-    { key: 'type', header: 'Typ', render: (r) => r.type },
+    { key: 'type', header: 'Typ' },
     { key: 'status', header: 'Status', render: (r) => <DeviceStatusBadge status={r.status as DeviceStatus} /> },
     { key: 'ipAddress', header: 'IP', render: (r) => r.ipAddress || '—' },
+    { key: 'location', header: 'Lokalizacja', render: (r) => r.location?.name ?? '—' },
     { key: 'client', header: 'Klient', render: (r) => (
-      <span style={{ fontSize: 12, color: 'var(--tm)' }}>{r.clientWorkspaceName ?? '—'}</span>
+      <span style={{ fontSize: 12, color: 'var(--tm)' }}>{r.workspace?.name ?? '—'}</span>
     )},
   ];
 
@@ -47,7 +55,7 @@ export default function OperatorDevices() {
       <div style={{ marginBottom: 16 }}>
         <select
           value={clientFilter}
-          onChange={(e) => { setClientFilter(e.target.value); setPage(1); }}
+          onChange={(e) => setClientFilter(e.target.value)}
           className="input"
           style={{ minWidth: 200 }}
         >
@@ -60,24 +68,12 @@ export default function OperatorDevices() {
 
       <DataTable
         columns={columns}
-        data={data?.devices ?? []}
+        data={(devices as DeviceRow[]) ?? []}
         loading={isLoading}
         keyExtractor={(r) => r.id}
         emptyTitle="Brak urządzeń"
         emptyDescription="Nie znaleziono urządzeń dla wybranych kryteriów"
       />
-
-      {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 16 }}>
-          <button className="btn-secondary" disabled={page <= 1} onClick={() => setPage(p => p - 1)} style={{ fontSize: 12 }}>
-            Poprzednia
-          </button>
-          <span style={{ fontSize: 12, color: 'var(--tm)', padding: '6px 12px' }}>{page} / {totalPages}</span>
-          <button className="btn-secondary" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} style={{ fontSize: 12 }}>
-            Następna
-          </button>
-        </div>
-      )}
     </div>
   );
 }

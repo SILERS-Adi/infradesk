@@ -34,6 +34,79 @@ async function getClientWorkspaceIds(operatorWsId: string, filterClientId?: stri
   return relations.map(r => r.clientWorkspaceId);
 }
 
+// Helper: generate slug from name
+function slugify(text: string): string {
+  return text.toLowerCase().replace(/[ąćęłńóśżź]/g, c => 'acelnoszzaceelnooszz'['ąćęłńóśżź'.indexOf(c)] ?? c)
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48);
+}
+
+async function uniqueSlug(base: string): Promise<string> {
+  let slug = slugify(base);
+  let attempt = 0;
+  while (true) {
+    const candidate = attempt === 0 ? slug : `${slug}-${attempt}`;
+    const exists = await prisma.workspace.findUnique({ where: { slug: candidate } });
+    if (!exists) return candidate;
+    attempt++;
+  }
+}
+
+// POST /api/operator/clients — create a new client workspace + relation
+router.post('/clients', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), requireOperator, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const operatorWsId = req.workspaceId!;
+    const { name, legalName, taxId, email, phone, contactPerson, city } = req.body;
+
+    if (!name || !name.trim()) { res.status(400).json({ error: 'Nazwa firmy jest wymagana' }); return; }
+
+    const slug = await uniqueSlug(name);
+
+    // Create client workspace
+    const workspace = await prisma.workspace.create({
+      data: {
+        name: name.trim(),
+        slug,
+        type: 'COMPANY',
+        organizationType: 'client_external_it',
+        legalName: legalName?.trim() || null,
+        taxId: taxId?.trim() || null,
+        email: email?.trim() || null,
+        phone: phone?.trim() || null,
+        city: city?.trim() || null,
+        plan: 'FREE',
+        enabledModules: ['infrastructure', 'service-desk'],
+      },
+    });
+
+    // Create workspace relation (operator → client)
+    const relation = await prisma.workspaceRelation.create({
+      data: {
+        clientWorkspaceId: workspace.id,
+        providerWorkspaceId: operatorWsId,
+        canViewDevices: true,
+        canViewUsers: true,
+        canViewLocations: true,
+        canReceiveTickets: true,
+        canCreateTicketsOnBehalf: true,
+        canAccessAlerts: true,
+        isDefaultHelpdeskProvider: true,
+        status: 'ACTIVE',
+      },
+    });
+
+    // Set helpdesk settings on client workspace to route to this operator
+    await prisma.workspaceHelpdeskSettings.create({
+      data: {
+        workspaceId: workspace.id,
+        ticketRoutingMode: 'send_to_default_provider',
+        defaultProviderWorkspaceId: operatorWsId,
+      },
+    });
+
+    res.status(201).json({ workspace, relation });
+  } catch (err) { next(err); }
+});
+
 // GET /api/operator/clients — list all client companies
 router.get('/clients', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), requireOperator, async (req: Request, res: Response, next: NextFunction) => {
   try {

@@ -7,14 +7,14 @@ import { DataTable, type Column } from '../../components/ui/DataTable';
 import { TicketStatusBadge } from '../../components/ui/StatusBadge';
 import { PriorityBadge } from '../../components/ui/PriorityBadge';
 import type { TicketStatus, TicketPriority } from '../../types';
-import type { OperatorTicket, OperatorClient } from '../../api/operator';
+import type { OperatorTicket } from '../../api/operator';
 
 export default function OperatorTickets() {
   const navigate = useNavigate();
   const [clientFilter, setClientFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [page, setPage] = useState(1);
-  const limit = 25;
+  const perPage = 25;
 
   const { data: clients } = useQuery({
     queryKey: ['operator', 'clients'],
@@ -27,12 +27,12 @@ export default function OperatorTickets() {
       clientWorkspaceId: clientFilter || undefined,
       status: statusFilter || undefined,
       page,
-      limit,
+      per_page: perPage,
     }),
     refetchInterval: 15_000,
   });
 
-  const totalPages = Math.ceil((data?.total ?? 0) / limit);
+  const totalPages = Math.ceil((data?.pagination?.total ?? 0) / perPage);
 
   const columns: Column<OperatorTicket>[] = [
     { key: 'ticketNumber', header: 'Numer', render: (r) => (
@@ -42,7 +42,7 @@ export default function OperatorTickets() {
       <span style={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{r.title}</span>
     )},
     { key: 'client', header: 'Klient', render: (r) => (
-      <span style={{ fontSize: 12, color: 'var(--tm)' }}>{r.clientWorkspaceName ?? '—'}</span>
+      <span style={{ fontSize: 12, color: 'var(--tm)' }}>{r.workspace?.name ?? '—'}</span>
     )},
     { key: 'status', header: 'Status', render: (r) => <TicketStatusBadge status={r.status as TicketStatus} /> },
     { key: 'priority', header: 'Priorytet', render: (r) => <PriorityBadge priority={r.priority as TicketPriority} /> },
@@ -85,7 +85,7 @@ export default function OperatorTickets() {
 
       <DataTable
         columns={columns}
-        data={data?.tickets ?? []}
+        data={data?.data ?? []}
         loading={isLoading}
         onRowClick={(t) => navigate(`/tickets/${t.id}`)}
         keyExtractor={(t) => t.id}
@@ -96,23 +96,13 @@ export default function OperatorTickets() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 16 }}>
-          <button
-            className="btn-secondary"
-            disabled={page <= 1}
-            onClick={() => setPage(p => p - 1)}
-            style={{ fontSize: 12 }}
-          >
+          <button className="btn-secondary" disabled={page <= 1} onClick={() => setPage(p => p - 1)} style={{ fontSize: 12 }}>
             Poprzednia
           </button>
           <span style={{ fontSize: 12, color: 'var(--tm)', padding: '6px 12px' }}>
             {page} / {totalPages}
           </span>
-          <button
-            className="btn-secondary"
-            disabled={page >= totalPages}
-            onClick={() => setPage(p => p + 1)}
-            style={{ fontSize: 12 }}
-          >
+          <button className="btn-secondary" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} style={{ fontSize: 12 }}>
             Następna
           </button>
         </div>
