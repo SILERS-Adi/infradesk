@@ -2,3 +2,6 @@ node_modules
 dist
 .env
 *.log
+schema.prisma
+schema.prisma.bak
+schema_hybrid.prisma.bak
