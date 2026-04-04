@@ -218,7 +218,7 @@ window.addEventListener('pywebviewready', () => {
     window.pywebview.api.get_init_data().then(data => {
       if (data) {
         hasHomeMode = data.hasHomeMode !== false;
-        appName = data.appName || 'InfraDesk';
+        appName = data.appName || 'Asystent Home';
         appVersion = data.appVersion || '5.0.0';
         applyConfig(data);
       }

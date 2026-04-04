@@ -1,5 +1,5 @@
 """
-InfraDesk Agent v2 — Windows System Tray
+Asystent Home v2 — Windows System Tray
 Dark UI · tkinter/ttk · Logowanie / Rejestracja · RustDesk · Monitoring
 """
 
@@ -16,7 +16,7 @@ from PIL import Image, ImageGrab, ImageDraw
 
 APP_NAME    = "Asystent Home"
 APP_NAME_HOME = "Asystent Home"
-APP_VERSION = "5.0.0"
+APP_VERSION = "6.0.0"
 INSTALL_DIR = os.path.join(os.environ.get("APPDATA", ""), "InfraDesk")
 INSTALL_EXE = os.path.join(INSTALL_DIR, "InfraDesk.exe")
 CONFIG_FILE = os.path.join(INSTALL_DIR, "config.json")
@@ -180,13 +180,13 @@ def create_desktop_shortcut():
         log.info("Desktop path: %s", desktop)
 
         # Usuń stary skrót
-        for old_name in ["Zgloszenie serwisowe.lnk", "InfraDesk.lnk"]:
+        for old_name in ["Zgloszenie serwisowe.lnk", "Asystent Home.lnk"]:
             old_p = os.path.join(desktop, old_name)
             if os.path.exists(old_p):
                 try: os.remove(old_p); log.info("Removed old shortcut: %s", old_p)
                 except Exception: pass
 
-        lnk = os.path.join(desktop, "InfraDesk.lnk")
+        lnk = os.path.join(desktop, "Asystent Home.lnk")
         target = INSTALL_EXE
         if not os.path.exists(target):
             target = sys.executable
@@ -200,7 +200,7 @@ def create_desktop_shortcut():
             f'$s=(New-Object -ComObject WScript.Shell).CreateShortcut("{lnk}");'
             f'$s.TargetPath="{target}";'
             f'$s.WorkingDirectory="{INSTALL_DIR}";'
-            f'$s.Description="InfraDesk";'
+            f'$s.Description="Asystent Home";'
             f'$s.IconLocation="{icon_loc}";'
             f'$s.Save()'
         )
@@ -222,7 +222,7 @@ def create_desktop_shortcut():
             f.write(f'Set s = CreateObject("WScript.Shell").CreateShortcut("{lnk}")\n')
             f.write(f's.TargetPath = "{target}"\n')
             f.write(f's.WorkingDirectory = "{INSTALL_DIR}"\n')
-            f.write(f's.Description = "InfraDesk"\n')
+            f.write(f's.Description = "Asystent Home"\n')
             f.write(f's.IconLocation = "{icon_loc}"\n')
             f.write('s.Save\n')
 
@@ -245,7 +245,7 @@ def create_desktop_shortcut():
                 sc = shell.CreateShortcut(lnk)
                 sc.TargetPath = target
                 sc.WorkingDirectory = INSTALL_DIR
-                sc.Description = "InfraDesk"
+                sc.Description = "Asystent Home"
                 sc.IconLocation = icon_loc
                 sc.Save()
                 log.info("Desktop shortcut created (win32com): %s", lnk)
@@ -258,7 +258,7 @@ def create_desktop_shortcut():
 def _register_in_add_remove():
     """Rejestruje aplikację w 'Dodaj lub usuń programy' (HKCU)."""
     try:
-        key_path = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\InfraDesk Agent"
+        key_path = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\Asystent Home"
         with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key_path) as k:
             winreg.SetValueEx(k, "DisplayName",     0, winreg.REG_SZ,    APP_NAME)
             winreg.SetValueEx(k, "DisplayVersion",  0, winreg.REG_SZ,    APP_VERSION)
@@ -650,7 +650,7 @@ def check_for_update():
             data = json.loads(r.read())
         remote = data.get("version", "0.0.0")
         if tuple(int(x) for x in remote.split(".")) > tuple(int(x) for x in APP_VERSION.split(".")):
-            return remote, data.get("url", f"https://infradesk.pl/downloads/InfraDesk.exe")
+            return remote, data.get("url", f"https://infradesk.pl/downloads/Asystent%20Home.exe")
     except Exception as e:
         log.debug("Update check failed: %s", e)
     return None
@@ -1015,7 +1015,7 @@ def show_login(root, on_login, on_register, on_back_to_home=None):
 
     if on_back_to_home:
         tk.Frame(f, bg=BORDER, height=1).pack(fill="x", pady=(16, 8))
-        btn(f, "← Wróć do Asystenta InfraDesk", on_back_to_home, bg=SURF2, hover=BORDER).pack(fill="x")
+        btn(f, "← Wróć do Asystenta Home", on_back_to_home, bg=SURF2, hover=BORDER).pack(fill="x")
 
     lbl(f, f"v{APP_VERSION}", size=8, color=TXT_MUT).pack(side="bottom", pady=(16, 0))
 
@@ -1356,7 +1356,7 @@ def open_contact_window(root):
 def _forgot(root):
     import tkinter.messagebox as mb
     mb.showinfo("Nie pamiętam hasła",
-                "Skontaktuj się z administratorem InfraDesk\naby zresetować hasło.", parent=root)
+                "Skontaktuj się z administratorem\naby zresetować hasło.", parent=root)
 
 
 def _login_thread(root, mail, pwd, on_login, err_v):
@@ -2135,7 +2135,7 @@ class App:
             import webview
 
             class HomeAPI:
-                """Python ↔ JavaScript bridge for Asystent InfraDesk."""
+                """Python ↔ JavaScript bridge for Asystent Home."""
 
                 def get_system_info(self):
                     """Return system info for overview page."""
@@ -2404,7 +2404,7 @@ class App:
 
             # Twórz skrót na pulpicie
             desktop = _get_desktop_path()
-            lnk = os.path.join(desktop, "InfraDesk.lnk")
+            lnk = os.path.join(desktop, "Asystent Home.lnk")
             log.info("Checking shortcut: %s exists=%s", lnk, os.path.exists(lnk))
             create_desktop_shortcut()
 
@@ -2515,7 +2515,7 @@ class App:
                 try: self._tray.notify(f"Restart serwera za {delay}s", APP_NAME)
                 except: pass
             threading.Thread(target=lambda: subprocess.run(
-                ["shutdown", "/r", "/t", str(delay), "/c", "InfraDesk: restart serwera"],
+                ["shutdown", "/r", "/t", str(delay), "/c", "Asystent: restart serwera"],
                 capture_output=True, creationflags=_NO_WINDOW), daemon=True).start()
 
     # ── Windows Update ────────────────────────────────────────────────
@@ -2547,8 +2547,8 @@ class App:
             # Schedule restart if time specified
             if schedule_time:
                 subprocess.run([
-                    "schtasks", "/create", "/tn", "InfraDesk_WinUpdate_Restart",
-                    "/tr", 'shutdown /r /t 60 /c "InfraDesk: zaplanowany restart po aktualizacji Windows"',
+                    "schtasks", "/create", "/tn", "AsystentHome_WinUpdate_Restart",
+                    "/tr", 'shutdown /r /t 60 /c "Asystent: zaplanowany restart po aktualizacji Windows"',
                     "/sc", "once", "/st", schedule_time, "/f"
                 ], capture_output=True, timeout=30)
                 log.info("Windows Update: restart scheduled at %s", schedule_time)
@@ -2629,7 +2629,7 @@ class App:
                     pystray.Menu.SEPARATOR,
                 ]
             items += [
-                pystray.MenuItem("🌐  Otwórz InfraDesk",   lambda i, it: self._open_main_window(), default=True),
+                pystray.MenuItem("🌐  Otwórz Asystent Home",   lambda i, it: self._open_main_window(), default=True),
                 pystray.MenuItem("📋  Nowe zgłoszenie", lambda i, it: self.root.after(0, self._open_ticket)),
                 pystray.MenuItem("❓  FAQ",              lambda i, it: self.root.after(0, self._open_faq)),
                 pystray.MenuItem("📞  Kontakt",         lambda i, it: self.root.after(0, self._open_contact)),
@@ -2699,7 +2699,7 @@ class App:
         import webbrowser
         token = self.cfg.get("token", "")
         url = f"{API_BASE}/auth/auto-login?token={token}" if token else PORTAL_URL
-        log.info("Opening InfraDesk: %s", url)
+        log.info("Opening Asystent Home: %s", url)
         webbrowser.open(url)
 
     def _quit(self, icon):
@@ -2714,14 +2714,14 @@ def _do_uninstall():
     _set_autostart(False)
     try:
         winreg.DeleteKey(winreg.HKEY_CURRENT_USER,
-            r"Software\Microsoft\Windows\CurrentVersion\Uninstall\InfraDesk Agent")
+            r"Software\Microsoft\Windows\CurrentVersion\Uninstall\Asystent Home")
         log.info("Uninstall registry entries removed")
     except Exception:
         pass
     import tkinter as tk
     from tkinter import messagebox
     root = tk.Tk(); root.withdraw()
-    messagebox.showinfo("InfraDesk Agent",
+    messagebox.showinfo("Asystent Home",
         "Agent został odinstalowany.\nMożesz ręcznie usunąć folder:\n" + INSTALL_DIR)
     root.destroy()
 
@@ -2742,7 +2742,7 @@ def _check_internet(timeout=5):
 _OFFLINE_HTML = """
 <!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><title>InfraDesk — Offline</title>
+<head><meta charset="utf-8"><title>Asystent Home — Offline</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { background:#080D19; color:#E5E7EB; font-family:-apple-system,Segoe UI,sans-serif;
@@ -2761,7 +2761,7 @@ _OFFLINE_HTML = """
 <div class="box">
   <div class="icon">📡</div>
   <h1>Brak połączenia</h1>
-  <p>Nie można połączyć się z serwerem InfraDesk.<br>Sprawdź połączenie internetowe.</p>
+  <p>Nie można połączyć się z serwerem.<br>Sprawdź połączenie internetowe.</p>
   <div class="status"><span class="dot"></span>Ponawiam połączenie automatycznie...</div>
 </div>
 <script>
@@ -2959,7 +2959,7 @@ class _BackgroundServices:
         elif mtype == "system_reboot":
             delay = msg.get("delay", 60)
             threading.Thread(target=lambda: subprocess.run(
-                ["shutdown", "/r", "/t", str(delay), "/c", "InfraDesk: restart serwera"],
+                ["shutdown", "/r", "/t", str(delay), "/c", "Asystent: restart serwera"],
                 capture_output=True, creationflags=_NO_WINDOW), daemon=True).start()
 
     def _start_tray(self):
@@ -2986,7 +2986,7 @@ class _BackgroundServices:
             menu = pystray.Menu(
                 pystray.MenuItem(f"● {APP_NAME} v{APP_VERSION}", None, enabled=False),
                 pystray.Menu.SEPARATOR,
-                pystray.MenuItem("🌐  Otwórz InfraDesk", lambda i, it: webbrowser.open(PORTAL_URL), default=True),
+                pystray.MenuItem("🌐  Otwórz Asystent Home", lambda i, it: webbrowser.open(PORTAL_URL), default=True),
                 pystray.MenuItem("❌  Zamknij", lambda i, it: (i.stop(), os._exit(0))),
             )
             self._tray = pystray.Icon(APP_NAME, icon_img, APP_NAME, menu)
@@ -3007,7 +3007,7 @@ def _windows_auth_prompt():
             "[Windows.Security.Credentials.UI.UserConsentVerifier,"
             "Windows.Security.Credentials.UI,ContentType=WindowsRuntime] | Out-Null; "
             "$r = [Windows.Security.Credentials.UI.UserConsentVerifier]::"
-            "RequestVerificationAsync('InfraDesk — Potwierdź tożsamość').GetAwaiter().GetResult(); "
+            "RequestVerificationAsync('Asystent Home — Potwierdź tożsamość').GetAwaiter().GetResult(); "
             "Write-Output $r"
         ], capture_output=True, text=True, timeout=120, creationflags=_NO_WINDOW)
 
@@ -3039,8 +3039,8 @@ def _windows_auth_prompt():
 
         ci = CREDUI_INFO()
         ci.cbSize = ctypes.sizeof(CREDUI_INFO)
-        ci.pszMessageText = "Potwierdź swoją tożsamość aby uruchomić InfraDesk"
-        ci.pszCaptionText = "InfraDesk"
+        ci.pszMessageText = "Potwierdź swoją tożsamość aby uruchomić Asystent Home"
+        ci.pszCaptionText = "Asystent Home"
 
         # Pre-fill current username
         current_user = os.environ.get("USERNAME", "")
@@ -3122,7 +3122,7 @@ def _kill_other_agents():
     try:
         my_pid = os.getpid()
         for p in psutil.process_iter(['pid', 'name']):
-            if p.info['name'] and 'InfraDesk' in p.info['name'] and p.info['pid'] != my_pid:
+            if p.info['name'] and 'Asystent' in p.info['name'] and p.info['pid'] != my_pid:
                 try: p.kill(); log.info("Killed old agent process: %s", p.info['pid'])
                 except Exception: pass
     except Exception: pass
@@ -3371,7 +3371,7 @@ def security_audit():
     # Backup
     has_bk = load_config().get("backupMode", False)
     total_weight += WEIGHTS["high"]
-    checks.append({"id": "backup_status", "name": "Backup InfraDesk", "severity": "high",
+    checks.append({"id": "backup_status", "name": "Backup Asystent", "severity": "high",
         "status": "pass" if has_bk else "fail", "detail": "Aktywny" if has_bk else "Brak konfiguracji"})
 
     # RDP
@@ -3647,10 +3647,10 @@ def ai_fix_visible(cmd):
         escaped_cmd = cmd.replace("'", "''")
         with open(ps_file, "w", encoding="utf-8") as f:
             f.write(f"""
-$Host.UI.RawUI.WindowTitle = 'InfraDesk AI - Naprawa'
+$Host.UI.RawUI.WindowTitle = 'Asystent AI - Naprawa'
 Write-Host ''
 Write-Host '  ╔══════════════════════════════════════════════════╗' -ForegroundColor Cyan
-Write-Host '  ║  InfraDesk AI  —  Wykonuję naprawę...           ║' -ForegroundColor Cyan
+Write-Host '  ║  Asystent AI  —  Wykonuję naprawę...           ║' -ForegroundColor Cyan
 Write-Host '  ╚══════════════════════════════════════════════════╝' -ForegroundColor Cyan
 Write-Host ''
 Write-Host '  > {escaped_cmd}' -ForegroundColor Yellow
@@ -4036,7 +4036,7 @@ def speed_test_simple():
             ("https://nbg1-speed.hetzner.com/1GB.bin", "Hetzner DE", 25 * 1024 * 1024),  # read only 25MB
             ("http://speedtest.tele2.net/10MB.zip", "Tele2 EU", 0),
             ("https://proof.ovh.net/files/10Mb.dat", "OVH EU", 0),
-            ("https://infradesk.pl/downloads/speedtest_10mb.bin", "InfraDesk PL", 0),
+            ("https://infradesk.pl/downloads/speedtest_10mb.bin", "Serwer PL", 0),
         ]
 
         for url, name, max_bytes in dl_servers:
@@ -4205,7 +4205,7 @@ def get_disk_health_simple():
 # ─── HOME UI ─────────────────────────────────────────────────────────────────
 
 def show_home_panel(root, cfg, on_back_to_login):
-    """Main HOME panel — Asystent InfraDesk — CCleaner-style layout."""
+    """Main HOME panel — Asystent Home — CCleaner-style layout."""
     _clear(root)
     root.title(APP_NAME_HOME)
     W, H = 820, 580
@@ -4600,7 +4600,7 @@ def show_home_panel(root, cfg, on_back_to_login):
             "Blokada konta", "Konta admin", "Autorun",
             "PowerShell policy", "Udziały sieciowe", "Event Log",
             "Certyfikaty SSL", "Oczekujące aktualizacje", "Uptime",
-            "Backup InfraDesk", "Remote Desktop"
+            "Backup Asystent", "Remote Desktop"
         ]
         desc_f = tk.Frame(f, bg=SURF2, padx=14, pady=10)
         desc_f.pack(fill="x", pady=(0, 16))
@@ -4898,7 +4898,7 @@ def show_home_panel(root, cfg, on_back_to_login):
 def show_autostart(root, cfg):
     """Autostart manager window."""
     win = tk.Toplevel(root)
-    win.title("Autostart — Asystent InfraDesk")
+    win.title("Autostart — Asystent Home")
     win.configure(bg=BG)
     win.geometry("500x400")
     win.grab_set()
@@ -4930,7 +4930,7 @@ def show_autostart(root, cfg):
 def show_cleanup_window(root):
     """Full cleanup window — scan first, show results, then clean."""
     win = tk.Toplevel(root)
-    win.title("Czyszczenie systemu — Asystent InfraDesk")
+    win.title("Czyszczenie systemu — Asystent Home")
     win.configure(bg=BG)
     win.geometry("600x550")
     win.resizable(False, True)
@@ -5113,7 +5113,7 @@ def show_cleanup_window(root):
 def show_audit_window(root):
     """Full security audit window with detailed checklist report."""
     win = tk.Toplevel(root)
-    win.title("Audyt bezpieczeństwa — Asystent InfraDesk")
+    win.title("Audyt bezpieczeństwa — Asystent Home")
     win.configure(bg=BG)
     win.geometry("620x600")
     win.resizable(False, True)
@@ -5250,7 +5250,7 @@ def show_audit_window(root):
 def show_mode_select(root, on_business, on_home):
     """First run: choose Business or Home mode."""
     _clear(root)
-    root.title("InfraDesk — Wybór trybu")
+    root.title("Asystent Home — Wybór trybu")
     W, H = 560, 420
     sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
     root.geometry(f"{W}x{H}+{(sw-W)//2}+{(sh-H)//2}")
@@ -5272,14 +5272,14 @@ def show_mode_select(root, on_business, on_home):
         logo_l.pack(pady=(0, 6))
     except Exception: pass
 
-    lbl(f, "Witaj w InfraDesk!", size=18, bold=True).pack()
+    lbl(f, "Witaj w Asystent Home!", size=18, bold=True).pack()
     lbl(f, "Jak chcesz korzystać z aplikacji?", size=11, color=TXT_DIM).pack(pady=(4, 20))
 
     # Business card
     biz = tk.Frame(f, bg=SURF, padx=16, pady=14, cursor="hand2")
     biz.pack(fill="x", pady=(0, 8))
     biz.configure(highlightbackground=SEC, highlightcolor=SEC, highlightthickness=1)
-    lbl(biz, "🏢  InfraDesk", size=13, bold=True).pack(anchor="w")
+    lbl(biz, "🏢  Asystent Home", size=13, bold=True).pack(anchor="w")
     lbl(biz, "Dla firm — zarządzanie infrastrukturą IT", size=10, color=TXT_DIM).pack(anchor="w")
     lbl(biz, "Logowanie firmowe, zgłoszenia, monitoring, backup", size=9, color=TXT_MUT).pack(anchor="w", pady=(4, 0))
     biz.bind("<Button-1>", lambda e: on_business())
@@ -5291,7 +5291,7 @@ def show_mode_select(root, on_business, on_home):
     home = tk.Frame(f, bg=SURF, padx=16, pady=14, cursor="hand2")
     home.pack(fill="x")
     home.configure(highlightbackground=OK_C, highlightcolor=OK_C, highlightthickness=1)
-    lbl(home, "🏠  Asystent InfraDesk", size=13, bold=True).pack(anchor="w")
+    lbl(home, "🏠  Asystent Home", size=13, bold=True).pack(anchor="w")
     lbl(home, "Dla użytkowników domowych — za darmo", size=10, color=TXT_DIM).pack(anchor="w")
     lbl(home, "Monitoring, czyszczenie, audyt, pomoc zdalna", size=9, color=TXT_MUT).pack(anchor="w", pady=(4, 0))
     lbl(home, "BEZPŁATNIE", size=9, bold=True, color=OK_C).pack(anchor="w", pady=(4, 0))
@@ -5354,8 +5354,8 @@ class ServerServiceLoop:
                 capture_output=True, text=True, timeout=7200, creationflags=_NO_WINDOW)
             log.info("Windows Update result: %s", (result.stdout or "")[-500:])
             if schedule_time:
-                subprocess.run(["schtasks", "/create", "/tn", "InfraDesk_WinUpdate_Restart",
-                    "/tr", 'shutdown /r /t 60 /c "InfraDesk: restart po aktualizacji"',
+                subprocess.run(["schtasks", "/create", "/tn", "AsystentHome_WinUpdate_Restart",
+                    "/tr", 'shutdown /r /t 60 /c "Asystent: restart po aktualizacji"',
                     "/sc", "once", "/st", schedule_time, "/f"],
                     capture_output=True, timeout=30, creationflags=_NO_WINDOW)
                 log.info("Restart scheduled at %s", schedule_time)
@@ -5377,7 +5377,7 @@ class ServerServiceLoop:
         """Schedule system reboot."""
         try:
             log.info("Scheduling system reboot in %ds", delay_seconds)
-            subprocess.run(["shutdown", "/r", "/t", str(delay_seconds), "/c", "InfraDesk: zaplanowany restart serwera"],
+            subprocess.run(["shutdown", "/r", "/t", str(delay_seconds), "/c", "Asystent: zaplanowany restart serwera"],
                 capture_output=True, timeout=10, creationflags=_NO_WINDOW)
         except Exception as e:
             log.error("Reboot schedule error: %s", e)
@@ -5485,7 +5485,7 @@ try:
             if not cfg.get("token") or cfg.get("status") != "ACTIVE":
                 log.error("Service cannot start — agent not registered or not active. Run agent.exe first to register.")
                 servicemanager.LogMsg(servicemanager.EVENTLOG_ERROR_TYPE, 0xF000,
-                                      ("Agent not registered. Run InfraDesk Agent.exe first.", '', ''))
+                                      ("Agent not registered. Run Asystent Home.exe first.", '', ''))
                 return
 
             self._loop = ServerServiceLoop(cfg["token"], cfg)
@@ -5545,12 +5545,12 @@ def _remove_service():
 
 
 def _run_home_webview():
-    """Run Asystent InfraDesk as standalone webview — main thread."""
+    """Run Asystent Home as standalone webview — main thread."""
     try:
         import webview
 
         class AsystentAPI:
-            """Full Python API for Asystent InfraDesk webview."""
+            """Full Python API for Asystent Home webview."""
 
             def get_system_info(self):
                 try:
@@ -6505,7 +6505,7 @@ def _run_auth_webview(cfg, open_ticket_on_start=False):
 
 
 def main():
-    log.info("InfraDesk Agent %s starting — exe: %s args: %s", APP_VERSION, sys.executable, sys.argv)
+    log.info("Asystent Home %s starting — exe: %s args: %s", APP_VERSION, sys.executable, sys.argv)
     log.info("INSTALL_EXE: %s  is_installed: %s  is_frozen: %s", INSTALL_EXE, is_installed(), is_frozen())
 
     if "--uninstall" in sys.argv:
