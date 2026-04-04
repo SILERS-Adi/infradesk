@@ -60,7 +60,7 @@ router.post('/invite', async (req: Request, res: Response, next: NextFunction) =
     const userId = req.user!.userId;
     if (!wsId) { res.status(400).json({ error: 'Workspace context required' }); return; }
 
-    const { email, accessLevel, scope, deviceIds, locationIds, message } = req.body;
+    const { email, accessLevel, scope, deviceIds, locationIds, message, contractType, hourlyRate, contractHours, contractMonthlyValue, contractStartDate, contractEndDate } = req.body;
     if (!email) { res.status(400).json({ error: 'Email jest wymagany' }); return; }
 
     // Check ownership
@@ -72,6 +72,10 @@ router.post('/invite', async (req: Request, res: Response, next: NextFunction) =
     const workspace = await prisma.workspace.findUnique({ where: { id: wsId }, select: { name: true, email: true } });
     const token = crypto.randomBytes(32).toString('hex');
 
+    const terms = (contractType || hourlyRate || contractHours || contractMonthlyValue || contractStartDate || contractEndDate)
+      ? { contractType, hourlyRate, contractHours, contractMonthlyValue, contractStartDate, contractEndDate }
+      : null;
+
     const invite = await prisma.sharingInvitation.create({
       data: {
         fromWorkspaceId: wsId,
@@ -81,6 +85,7 @@ router.post('/invite', async (req: Request, res: Response, next: NextFunction) =
         deviceIds: deviceIds || [],
         locationIds: locationIds || [],
         message: message || null,
+        contractTerms: terms,
         token,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
         createdByUserId: userId,
@@ -111,7 +116,7 @@ router.post('/request', async (req: Request, res: Response, next: NextFunction) 
     const userId = req.user!.userId;
     if (!wsId) { res.status(400).json({ error: 'Workspace context required' }); return; }
 
-    const { email, scope, deviceIds, locationIds, message } = req.body;
+    const { email, scope, deviceIds, locationIds, message, contractType, hourlyRate, contractHours, contractMonthlyValue, contractStartDate, contractEndDate } = req.body;
     if (!email) { res.status(400).json({ error: 'Email firmy IT jest wymagany' }); return; }
 
     const membership = await prisma.workspaceMembership.findFirst({
@@ -122,6 +127,10 @@ router.post('/request', async (req: Request, res: Response, next: NextFunction) 
     const workspace = await prisma.workspace.findUnique({ where: { id: wsId }, select: { name: true } });
     const token = crypto.randomBytes(32).toString('hex');
 
+    const terms = (contractType || hourlyRate || contractHours || contractMonthlyValue || contractStartDate || contractEndDate)
+      ? { contractType, hourlyRate, contractHours, contractMonthlyValue, contractStartDate, contractEndDate }
+      : null;
+
     const invite = await prisma.sharingInvitation.create({
       data: {
         fromWorkspaceId: wsId,
@@ -131,6 +140,7 @@ router.post('/request', async (req: Request, res: Response, next: NextFunction) 
         deviceIds: deviceIds || [],
         locationIds: locationIds || [],
         message: message || null,
+        contractTerms: terms,
         token,
         direction: 'REQUEST', // company requests MSP
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
@@ -190,12 +200,21 @@ router.post('/accept', async (req: Request, res: Response, next: NextFunction) =
         data: { status: 'ACTIVE', accessLevel: invite.accessLevel as any },
       });
     } else {
+      const ct = invite.contractTerms as any;
       mgmt = await prisma.workspaceManagement.create({
         data: {
           mspWorkspaceId: mspId,
           companyWorkspaceId: companyId,
           status: 'ACTIVE',
           accessLevel: invite.accessLevel as any,
+          ...(ct ? {
+            contractType: ct.contractType || null,
+            contractHours: ct.contractHours ? Number(ct.contractHours) : null,
+            contractMonthlyValue: ct.contractMonthlyValue ? Number(ct.contractMonthlyValue) : null,
+            hourlyRate: ct.hourlyRate ? Number(ct.hourlyRate) : null,
+            contractStartDate: ct.contractStartDate ? new Date(ct.contractStartDate) : null,
+            contractEndDate: ct.contractEndDate ? new Date(ct.contractEndDate) : null,
+          } : {}),
         },
       });
     }

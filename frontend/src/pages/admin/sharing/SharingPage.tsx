@@ -24,6 +24,12 @@ export default function SharingPage() {
   const [accessLevel, setAccessLevel] = useState('FULL_MANAGEMENT');
   const [scope, setScope] = useState('ALL');
   const [message, setMessage] = useState('');
+  const [formContractType, setFormContractType] = useState('UNLIMITED');
+  const [formHourlyRate, setFormHourlyRate] = useState('');
+  const [formContractHours, setFormContractHours] = useState('');
+  const [formMonthlyValue, setFormMonthlyValue] = useState('');
+  const [formStartDate, setFormStartDate] = useState('');
+  const [formEndDate, setFormEndDate] = useState('');
   const [selectedDeviceIds, setSelectedDeviceIds] = useState<Set<string>>(new Set());
   const [selectedLocationIds, setSelectedLocationIds] = useState<Set<string>>(new Set());
 
@@ -506,6 +512,56 @@ export default function SharingPage() {
             </div>
           )}
 
+          {/* Contract terms */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ts)', display: 'block', marginBottom: 6 }}>Czas trwania</label>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+              {(['UNLIMITED', 'HOURLY', 'MONTHLY', 'YEARLY'] as const).map(ct => (
+                <button key={ct} onClick={() => setFormContractType(ct)} style={{
+                  padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: formContractType === ct ? 700 : 500,
+                  border: `1px solid ${formContractType === ct ? 'var(--accent)' : 'var(--border)'}`,
+                  background: formContractType === ct ? 'var(--accent-g, rgba(79,140,255,0.1))' : 'var(--bg)',
+                  color: formContractType === ct ? 'var(--accent)' : 'var(--ts)', cursor: 'pointer',
+                }}>{contractTypeLabels[ct]}</button>
+              ))}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {formContractType === 'HOURLY' && (
+                <>
+                  <div>
+                    <label style={{ fontSize: 11, color: 'var(--tm)', display: 'block', marginBottom: 3 }}>Stawka PLN/h</label>
+                    <input type="number" value={formHourlyRate} onChange={e => setFormHourlyRate(e.target.value)} placeholder="150"
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--t)', fontSize: 13, outline: 'none' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, color: 'var(--tm)', display: 'block', marginBottom: 3 }}>Limit godzin</label>
+                    <input type="number" value={formContractHours} onChange={e => setFormContractHours(e.target.value)} placeholder="20"
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--t)', fontSize: 13, outline: 'none' }} />
+                  </div>
+                </>
+              )}
+              {(formContractType === 'MONTHLY' || formContractType === 'YEARLY') && (
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--tm)', display: 'block', marginBottom: 3 }}>Kwota {formContractType === 'MONTHLY' ? 'miesięczna' : 'roczna'} (PLN)</label>
+                  <input type="number" value={formMonthlyValue} onChange={e => setFormMonthlyValue(e.target.value)} placeholder={formContractType === 'MONTHLY' ? '2000' : '20000'}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--t)', fontSize: 13, outline: 'none' }} />
+                </div>
+              )}
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--tm)', display: 'block', marginBottom: 3 }}>Od</label>
+                <input type="date" value={formStartDate} onChange={e => setFormStartDate(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--t)', fontSize: 13, outline: 'none' }} />
+              </div>
+              {formContractType !== 'UNLIMITED' && (
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--tm)', display: 'block', marginBottom: 3 }}>Do</label>
+                  <input type="date" value={formEndDate} onChange={e => setFormEndDate(e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--t)', fontSize: 13, outline: 'none' }} />
+                </div>
+              )}
+            </div>
+          </div>
+
           <div style={{ marginBottom: 20 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ts)', display: 'block', marginBottom: 6 }}>Wiadomość (opcjonalnie)</label>
             <textarea value={message} onChange={e => setMessage(e.target.value)} placeholder="Np. Prosimy o obsługę naszych 14 stanowisk..."
@@ -514,6 +570,12 @@ export default function SharingPage() {
 
           <button onClick={() => inviteMutation.mutate({
               email, accessLevel, scope, message: message || undefined,
+              contractType: formContractType,
+              hourlyRate: formHourlyRate || undefined,
+              contractHours: formContractHours || undefined,
+              contractMonthlyValue: formMonthlyValue || undefined,
+              contractStartDate: formStartDate || undefined,
+              contractEndDate: formEndDate || undefined,
               deviceIds: scope === 'SELECTED' ? Array.from(selectedDeviceIds) : undefined,
               locationIds: scope === 'SELECTED' ? Array.from(selectedLocationIds) : undefined,
             })}
@@ -542,13 +604,71 @@ export default function SharingPage() {
               style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--t)', fontSize: 14, outline: 'none' }} />
           </div>
 
+          {/* Contract terms */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ts)', display: 'block', marginBottom: 6 }}>Czas trwania</label>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+              {(['UNLIMITED', 'HOURLY', 'MONTHLY', 'YEARLY'] as const).map(ct => (
+                <button key={ct} onClick={() => setFormContractType(ct)} style={{
+                  padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: formContractType === ct ? 700 : 500,
+                  border: `1px solid ${formContractType === ct ? 'var(--accent)' : 'var(--border)'}`,
+                  background: formContractType === ct ? 'var(--accent-g, rgba(79,140,255,0.1))' : 'var(--bg)',
+                  color: formContractType === ct ? 'var(--accent)' : 'var(--ts)', cursor: 'pointer',
+                }}>{contractTypeLabels[ct]}</button>
+              ))}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {formContractType === 'HOURLY' && (
+                <>
+                  <div>
+                    <label style={{ fontSize: 11, color: 'var(--tm)', display: 'block', marginBottom: 3 }}>Stawka PLN/h</label>
+                    <input type="number" value={formHourlyRate} onChange={e => setFormHourlyRate(e.target.value)} placeholder="150"
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--t)', fontSize: 13, outline: 'none' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, color: 'var(--tm)', display: 'block', marginBottom: 3 }}>Limit godzin</label>
+                    <input type="number" value={formContractHours} onChange={e => setFormContractHours(e.target.value)} placeholder="20"
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--t)', fontSize: 13, outline: 'none' }} />
+                  </div>
+                </>
+              )}
+              {(formContractType === 'MONTHLY' || formContractType === 'YEARLY') && (
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--tm)', display: 'block', marginBottom: 3 }}>Kwota {formContractType === 'MONTHLY' ? 'miesięczna' : 'roczna'} (PLN)</label>
+                  <input type="number" value={formMonthlyValue} onChange={e => setFormMonthlyValue(e.target.value)} placeholder={formContractType === 'MONTHLY' ? '2000' : '20000'}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--t)', fontSize: 13, outline: 'none' }} />
+                </div>
+              )}
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--tm)', display: 'block', marginBottom: 3 }}>Od</label>
+                <input type="date" value={formStartDate} onChange={e => setFormStartDate(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--t)', fontSize: 13, outline: 'none' }} />
+              </div>
+              {formContractType !== 'UNLIMITED' && (
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--tm)', display: 'block', marginBottom: 3 }}>Do</label>
+                  <input type="date" value={formEndDate} onChange={e => setFormEndDate(e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--t)', fontSize: 13, outline: 'none' }} />
+                </div>
+              )}
+            </div>
+          </div>
+
           <div style={{ marginBottom: 20 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ts)', display: 'block', marginBottom: 6 }}>Wiadomość</label>
             <textarea value={message} onChange={e => setMessage(e.target.value)} placeholder="Np. Szukamy firmy do obsługi IT naszych biur..."
               rows={3} style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--t)', fontSize: 13, outline: 'none', resize: 'vertical' }} />
           </div>
 
-          <button onClick={() => requestMutation.mutate({ email, scope: 'ALL', message: message || undefined })}
+          <button onClick={() => requestMutation.mutate({
+              email, scope: 'ALL', message: message || undefined,
+              contractType: formContractType,
+              hourlyRate: formHourlyRate || undefined,
+              contractHours: formContractHours || undefined,
+              contractMonthlyValue: formMonthlyValue || undefined,
+              contractStartDate: formStartDate || undefined,
+              contractEndDate: formEndDate || undefined,
+            })}
             disabled={!email || requestMutation.isPending}
             style={{
               width: '100%', padding: '14px 20px', borderRadius: 12, border: 'none',

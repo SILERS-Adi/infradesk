@@ -845,6 +845,7 @@ model SharingInvitation {
   locationIds      Json      @default("[]")
   direction        String    @default("INVITE") // INVITE | REQUEST
   message          String?
+  contractTerms    Json?     // { contractType, hourlyRate, contractHours, contractMonthlyValue, contractStartDate, contractEndDate }
   token            String    @unique
   status           String    @default("PENDING") // PENDING | ACCEPTED | DECLINED | EXPIRED
   expiresAt        DateTime
