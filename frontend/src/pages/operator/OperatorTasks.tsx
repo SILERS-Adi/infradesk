@@ -33,7 +33,7 @@ export default function OperatorTasks() {
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['operator', 'tasks', clientFilter, page],
-    queryFn: () => apiClient.get<{ data: OperatorTask[]; pagination: { total: number } }>('/api/operator/tasks', {
+    queryFn: () => apiClient.get<{ data: OperatorTask[]; pagination: { total: number } }>('/operator/tasks', {
       params: { clientWorkspaceId: clientFilter || undefined, page, per_page: perPage },
     }).then(r => r.data),
   });

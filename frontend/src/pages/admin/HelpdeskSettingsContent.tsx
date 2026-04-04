@@ -31,12 +31,12 @@ export default function HelpdeskSettingsContent() {
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ['helpdesk-settings'],
-    queryFn: () => apiClient.get<HelpdeskSettings>('/api/helpdesk-settings').then(r => r.data),
+    queryFn: () => apiClient.get<HelpdeskSettings>('/helpdesk-settings').then(r => r.data),
   });
 
   const { data: relations } = useQuery({
     queryKey: ['workspace-relations'],
-    queryFn: () => apiClient.get<{ asClient: ProviderRelation[]; asProvider: any[] }>('/api/workspace-relations').then(r => r.data.asClient ?? []),
+    queryFn: () => apiClient.get<{ asClient: ProviderRelation[]; asProvider: any[] }>('/workspace-relations').then(r => r.data.asClient ?? []),
   });
 
   const [form, setForm] = useState<HelpdeskSettings>({
@@ -60,7 +60,7 @@ export default function HelpdeskSettingsContent() {
   }, [settings]);
 
   const mutation = useMutation({
-    mutationFn: (data: Partial<HelpdeskSettings>) => apiClient.put('/api/helpdesk-settings', data).then(r => r.data),
+    mutationFn: (data: Partial<HelpdeskSettings>) => apiClient.put('/helpdesk-settings', data).then(r => r.data),
     onSuccess: () => { toast.success('Ustawienia zapisane'); queryClient.invalidateQueries({ queryKey: ['helpdesk-settings'] }); },
     onError: (err: any) => { toast.error(err?.response?.data?.error ?? 'Błąd zapisu'); },
   });

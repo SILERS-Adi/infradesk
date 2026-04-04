@@ -33,7 +33,7 @@ function OrganizationTypeCard() {
     if (newType === wsType) return;
     setSaving(true);
     try {
-      await apiClient.put('/api/workspaces/onboarding', { organizationType: newType });
+      await apiClient.put('/workspaces/onboarding', { organizationType: newType });
       toast.success('Typ organizacji zmieniony — przeładowuję...');
       setTimeout(() => window.location.reload(), 500);
     } catch (err: any) {

@@ -178,12 +178,12 @@ function AddClientForm({ onClose, onSuccess }: { onClose: () => void; onSuccess:
 function LinkExistingForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const { data: available, isLoading } = useQuery({
     queryKey: ['operator', 'clients', 'available'],
-    queryFn: () => apiClient.get<any[]>('/api/operator/clients/available').then(r => r.data),
+    queryFn: () => apiClient.get<any[]>('/operator/clients/available').then(r => r.data),
   });
 
   const linkMutation = useMutation({
     mutationFn: (clientWorkspaceId: string) =>
-      apiClient.post('/api/operator/clients/link', { clientWorkspaceId }).then(r => r.data),
+      apiClient.post('/operator/clients/link', { clientWorkspaceId }).then(r => r.data),
     onSuccess: (_, wsId) => {
       const name = available?.find((w: any) => w.id === wsId)?.name ?? 'Firma';
       toast.success(`${name} podpięta jako klient`);

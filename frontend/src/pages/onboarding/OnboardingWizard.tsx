@@ -61,7 +61,7 @@ export default function OnboardingWizard() {
     if (!orgType) return;
     setSaving(true);
     try {
-      await apiClient.put('/api/workspaces/onboarding', {
+      await apiClient.put('/workspaces/onboarding', {
         organizationType: orgType,
         ticketRoutingMode: routingMode,
       });
@@ -69,7 +69,7 @@ export default function OnboardingWizard() {
       // If client with external IT and email provided, send invitation request
       if (orgType === 'client' && providerEmail) {
         try {
-          await apiClient.post('/api/sharing/request', { email: providerEmail, scope: 'ALL' });
+          await apiClient.post('/sharing/request', { email: providerEmail, scope: 'ALL' });
           toast.success('Prośba o obsługę wysłana do ' + providerEmail);
         } catch { /* ignore — not critical */ }
       }
@@ -79,7 +79,7 @@ export default function OnboardingWizard() {
         const emails = inviteEmails.split(/[,;\n]+/).map(e => e.trim()).filter(Boolean);
         for (const email of emails) {
           try {
-            await apiClient.post('/api/users/invite', { email, role: 'MEMBER' });
+            await apiClient.post('/users/invite', { email, role: 'MEMBER' });
           } catch { /* ignore individual failures */ }
         }
         if (emails.length > 0) toast.success(`Zaproszono ${emails.length} użytkowników`);

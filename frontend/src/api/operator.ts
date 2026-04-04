@@ -91,17 +91,17 @@ function flattenClient(raw: OperatorClientRaw): OperatorClient {
 
 export const operatorApi = {
   getClients: () =>
-    apiClient.get<OperatorClientRaw[]>('/api/operator/clients').then(r => r.data.map(flattenClient)),
+    apiClient.get<OperatorClientRaw[]>('/operator/clients').then(r => r.data.map(flattenClient)),
 
   getTickets: (params?: { clientWorkspaceId?: string; status?: string; page?: number; per_page?: number }) =>
-    apiClient.get<{ data: OperatorTicket[]; pagination: { total: number; page: number; per_page: number } }>('/api/operator/tickets', { params }).then(r => r.data),
+    apiClient.get<{ data: OperatorTicket[]; pagination: { total: number; page: number; per_page: number } }>('/operator/tickets', { params }).then(r => r.data),
 
   getDevices: (params?: { clientWorkspaceId?: string }) =>
-    apiClient.get<any[]>('/api/operator/devices', { params }).then(r => r.data),
+    apiClient.get<any[]>('/operator/devices', { params }).then(r => r.data),
 
   getStats: () =>
-    apiClient.get<OperatorStats>('/api/operator/stats').then(r => r.data),
+    apiClient.get<OperatorStats>('/operator/stats').then(r => r.data),
 
   createClient: (data: CreateClientPayload) =>
-    apiClient.post<{ workspace: any; relation: any }>('/api/operator/clients', data).then(r => r.data),
+    apiClient.post<{ workspace: any; relation: any }>('/operator/clients', data).then(r => r.data),
 };
