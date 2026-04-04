@@ -54,4 +54,9 @@ export const ticketsApi = {
     const { data } = await apiClient.post<Ticket>(`/tickets/${id}/cancel`, {});
     return data;
   },
+
+  rate: async (id: string, payload: { rating: number; ratingComment?: string }) => {
+    const { data } = await apiClient.post(`/tickets/${id}/rate`, payload);
+    return data;
+  },
 };

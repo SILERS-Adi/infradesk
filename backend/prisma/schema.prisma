@@ -678,6 +678,12 @@ model Ticket {
   reporterName      String?
   reporterPhone     String?
 
+  // Customer satisfaction rating (1-3 stars)
+  rating            Int?
+  ratingComment     String?
+  ratedAt           DateTime?
+  ratedByUserId     String?
+
   workspace     Workspace       @relation("TicketWorkspace", fields: [workspaceId], references: [id])
   location      Location        @relation(fields: [locationId], references: [id])
   device        Device?         @relation(fields: [deviceId], references: [id])

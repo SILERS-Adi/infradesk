@@ -423,6 +423,21 @@ export function TicketsListPage() {
         return <span className="text-[10px] font-semibold" style={{ color: 'var(--tm)' }}>{d}</span>;
       },
     },
+
+    // Ocena
+    {
+      key: 'rating', label: 'Ocena', group: 'Status', defaultVisible: true,
+      render: (t: Ticket) => {
+        if (!t.rating) return <span style={{ color: 'var(--td)', fontSize: 11 }}>—</span>;
+        return (
+          <span style={{ display: 'inline-flex', gap: 1 }}>
+            {[1, 2, 3].map(s => (
+              <span key={s} style={{ fontSize: 12, lineHeight: 1 }}>{s <= t.rating ? '⭐' : ''}</span>
+            ))}
+          </span>
+        );
+      },
+    },
   ], [activeTab, technicians]);
 
   const visibleCols = visibleKeys.map(k => ALL_COLUMNS.find(c => c.key === k)).filter(Boolean) as ColDef[];

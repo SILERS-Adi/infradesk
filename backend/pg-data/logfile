@@ -1,0 +1,195 @@
+2026-03-31 19:09:56.088 CEST [12236] LOG:  starting PostgreSQL 18.3 on x86_64-windows, compiled by msvc-19.44.35222, 64-bit
+2026-03-31 19:09:56.094 CEST [12236] LOG:  listening on IPv6 address "::1", port 5433
+2026-03-31 19:09:56.094 CEST [12236] LOG:  listening on IPv4 address "127.0.0.1", port 5433
+2026-03-31 19:09:56.218 CEST [23464] LOG:  database system was shut down at 2026-03-31 19:09:39 CEST
+2026-03-31 19:09:56.233 CEST [12236] LOG:  database system is ready to accept connections
+2026-03-31 19:10:15.639 CEST [18060] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-03-31 19:10:15.777 CEST [40276] ERROR:  relation "User" does not exist
+2026-03-31 19:10:15.777 CEST [40276] STATEMENT:  -- CreateEnums
+	CREATE TYPE "TenantPlan" AS ENUM ('FREE', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE');
+	CREATE TYPE "TenantType" AS ENUM ('PERSONAL', 'BUSINESS', 'MSP');
+	CREATE TYPE "PartnershipStatus" AS ENUM ('PENDING', 'ACTIVE', 'REJECTED', 'REVOKED');
+	
+	-- CreateTable: Tenant
+	CREATE TABLE "Tenant" (
+	    "id" TEXT NOT NULL,
+	    "name" TEXT NOT NULL,
+	    "slug" TEXT NOT NULL,
+	    "domain" TEXT,
+	    "tenantKey" TEXT NOT NULL DEFAULT gen_random_uuid()::text,
+	    "tenantType" "TenantType" NOT NULL DEFAULT 'BUSINESS',
+	    "plan" "TenantPlan" NOT NULL DEFAULT 'FREE',
+	    "parentTenantId" TEXT,
+	    "defaultPartnerId" TEXT,
+	    "isActive" BOOLEAN NOT NULL DEFAULT true,
+	    "logoUrl" TEXT,
+	    "primaryColor" TEXT DEFAULT '#6D28D9',
+	    "maxAgents" INTEGER NOT NULL DEFAULT 10,
+	    "maxUsers" INTEGER NOT NULL DEFAULT 5,
+	    "ownerEmail" TEXT NOT NULL,
+	    "enabledModules" JSONB,
+	    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	    "updatedAt" TIMESTAMP(3) NOT NULL,
+	
+	    CONSTRAINT "Tenant_pkey" PRIMARY KEY ("id")
+	);
+	CREATE UNIQUE INDEX "Tenant_slug_key" ON "Tenant"("slug");
+	CREATE UNIQUE INDEX "Tenant_domain_key" ON "Tenant"("domain");
+	CREATE UNIQUE INDEX "Tenant_tenantKey_key" ON "Tenant"("tenantKey");
+	
+	-- Add tenantId columns to all tables
+	ALTER TABLE "User" ADD COLUMN "tenantId" TEXT;
+	ALTER TABLE "Client" ADD COLUMN "tenantId" TEXT;
+	ALTER TABLE "Location" ADD COLUMN "tenantId" TEXT;
+	ALTER TABLE "DeviceType" ADD COLUMN "tenantId" TEXT;
+	ALTER TABLE "Device" ADD COLUMN "tenantId" TEXT;
+	ALTER TABLE "AccessType" ADD COLUMN "tenantId" TEXT;
+	ALTER TABLE "Credential" ADD COLUMN "tenantId" TEXT;
+	ALTER TABLE "Ticket" ADD COLUMN "tenantId" TEXT;
+	ALTER TABLE "ActivityLog" ADD COLUMN "tenantId" TEXT;
+	ALTER TABLE "CrmActivity" ADD COLUMN "tenantId" TEXT;
+	ALTER TABLE "WorkSession" ADD COLUMN "tenantId" TEXT;
+	ALTER TABLE "AgentRegistration" ADD COLUMN "tenantId" TEXT;
+	ALTER TABLE "BackupConfig" ADD COLUMN "tenantId" TEXT;
+	ALTER TABLE "PushSubscription" ADD COLUMN "tenantId" TEXT;
+	ALTER TABLE "Task" ADD COLUMN "tenantId" TEXT;
+	ALTER TABLE "Order" ADD COLUMN "tenantId" TEXT;
+	ALTER TABLE "Delegation" ADD COLUMN "tenantId" TEXT;
+	
+	-- Migrate Setting from key-based PK to id-based PK with tenant scope
+	-- Step 1: Create new Setting table
+	CREATE TABLE "Setting_new" (
+	    "id" TEXT NOT NULL DEFAULT gen_random_uuid()::text,
+	    "tenantId" TEXT,
+	    "key" TEXT NOT NULL,
+	    "value" TEXT NOT NULL,
+	    "updatedAt" TIMESTAMP(3) NOT NULL,
+	
+	    CONSTRAINT "Setting_new_pkey" PRIMARY KEY ("id")
+	);
+	-- Step 2: Copy data
+	INSERT INTO "Setting_new" ("id", "key", "value", "updatedAt")
+	SELECT gen_random_uuid()::text, "key", "value", "updatedAt" FROM "Setting";
+	-- Step 3: Drop old, rename new
+	DROP TABLE "Setting";
+	ALTER TABLE "Setting_new" RENAME TO "Setting";
+	CREATE UNIQUE INDEX "Setting_tenantId_key_key" ON "Setting"("tenantId", "key");
+	
+	-- Migrate AppSetting from key-based PK to id-based PK with tenant scope
+	CREATE TABLE "AppSetting_new" (
+	    "id" TEXT NOT NULL DEFAULT gen_random_uuid()::text,
+	    "tenantId" TEXT,
+	    "key" TEXT NOT NULL,
+	    "value" TEXT NOT NULL,
+	    "updatedAt" TIMESTAMP(3) NOT NULL,
+	
+	    CONSTRAINT "AppSetting_new_pkey" PRIMARY KEY ("id")
+	);
+	INSERT INTO "AppSetting_new" ("id", "key", "value", "updatedAt")
+	SELECT gen_random_uuid()::text, "key", "value", "updatedAt" FROM "AppSetting";
+	DROP TABLE "AppSetting";
+	ALTER TABLE "AppSetting_new" RENAME TO "AppSetting";
+	CREATE UNIQUE INDEX "AppSetting_tenantId_key_key" ON "AppSetting"("tenantId", "key");
+	
+	-- Add foreign keys for tenantId
+	ALTER TABLE "User" ADD CONSTRAINT "User_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+	ALTER TABLE "Client" ADD CONSTRAINT "Client_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+	ALTER TABLE "Location" ADD CONSTRAINT "Location_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+	ALTER TABLE "DeviceType" ADD CONSTRAINT "DeviceType_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+	ALTER TABLE "Device" ADD CONSTRAINT "Device_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+	ALTER TABLE "AccessType" ADD CONSTRAINT "AccessType_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+	ALTER TABLE "Credential" ADD CONSTRAINT "Credential_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+	ALTER TABLE "Ticket" ADD CONSTRAINT "Ticket_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+	ALTER TABLE "ActivityLog" ADD CONSTRAINT "ActivityLog_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+	ALTER TABLE "CrmActivity" ADD CONSTRAINT "CrmActivity_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+	ALTER TABLE "WorkSession" ADD CONSTRAINT "WorkSession_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+	ALTER TABLE "AgentRegistration" ADD CONSTRAINT "AgentRegistration_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+	ALTER TABLE "BackupConfig" ADD CONSTRAINT "BackupConfig_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+	ALTER TABLE "PushSubscription" ADD CONSTRAINT "PushSubscription_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+	ALTER TABLE "Task" ADD CONSTRAINT "Task_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+	ALTER TABLE "Order" ADD CONSTRAINT "Order_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+	ALTER TABLE "Delegation" ADD CONSTRAINT "Delegation_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+	ALTER TABLE "Setting" ADD CONSTRAINT "Setting_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+	ALTER TABLE "AppSetting" ADD CONSTRAINT "AppSetting_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+	
+	-- Self-reference for parent tenant (MSP → child)
+	ALTER TABLE "Tenant" ADD CONSTRAINT "Tenant_parentTenantId_fkey" FOREIGN KEY ("parentTenantId") REFERENCES "Tenant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+	
+2026-03-31 19:10:15.788 CEST [40276] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-03-31 19:10:34.308 CEST [37320] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-03-31 19:10:35.327 CEST [27028] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-03-31 19:13:11.431 CEST [40548] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-03-31 19:13:33.578 CEST [6812] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-03-31 19:14:56.205 CEST [40720] LOG:  checkpoint starting: time
+2026-03-31 19:17:13.090 CEST [40720] LOG:  checkpoint complete: wrote 1252 buffers (7.6%), wrote 3 SLRU buffers; 1 WAL file(s) added, 0 removed, 0 recycled; write=136.342 s, sync=0.428 s, total=136.886 s; sync files=559, longest=0.007 s, average=0.001 s; distance=7047 kB, estimate=7047 kB; lsn=0/1ED2EC8, redo lsn=0/1ED2E38
+2026-03-31 19:19:56.133 CEST [40720] LOG:  checkpoint starting: time
+2026-03-31 19:20:02.801 CEST [40720] LOG:  checkpoint complete: wrote 60 buffers (0.4%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=6.561 s, sync=0.063 s, total=6.668 s; sync files=43, longest=0.004 s, average=0.002 s; distance=35 kB, estimate=6346 kB; lsn=0/1EDBDE8, redo lsn=0/1EDBD58
+2026-03-31 19:34:56.833 CEST [40720] LOG:  checkpoint starting: time
+2026-03-31 19:34:59.266 CEST [40720] LOG:  checkpoint complete: wrote 22 buffers (0.1%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=2.396 s, sync=0.018 s, total=2.433 s; sync files=19, longest=0.002 s, average=0.001 s; distance=19 kB, estimate=5713 kB; lsn=0/1EE1558, redo lsn=0/1EE0C98
+2026-03-31 21:44:56.474 CEST [40720] LOG:  checkpoint starting: time
+2026-03-31 21:44:58.514 CEST [40720] LOG:  checkpoint complete: wrote 18 buffers (0.1%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=1.966 s, sync=0.052 s, total=2.041 s; sync files=19, longest=0.014 s, average=0.003 s; distance=18 kB, estimate=5143 kB; lsn=0/1EE5568, redo lsn=0/1EE5510
+2026-03-31 21:54:56.525 CEST [40720] LOG:  checkpoint starting: time
+2026-03-31 21:54:58.872 CEST [40720] LOG:  checkpoint complete: wrote 21 buffers (0.1%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=2.293 s, sync=0.030 s, total=2.348 s; sync files=22, longest=0.004 s, average=0.002 s; distance=23 kB, estimate=4631 kB; lsn=0/1EEB188, redo lsn=0/1EEB130
+2026-03-31 21:59:56.888 CEST [40720] LOG:  checkpoint starting: time
+2026-03-31 22:00:00.704 CEST [40720] LOG:  checkpoint complete: wrote 34 buffers (0.2%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=3.705 s, sync=0.078 s, total=3.817 s; sync files=29, longest=0.010 s, average=0.003 s; distance=33 kB, estimate=4171 kB; lsn=0/1EF37D8, redo lsn=0/1EF3748
+2026-03-31 22:09:56.723 CEST [40720] LOG:  checkpoint starting: time
+2026-03-31 22:10:00.426 CEST [40720] LOG:  checkpoint complete: wrote 33 buffers (0.2%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=3.617 s, sync=0.061 s, total=3.704 s; sync files=32, longest=0.009 s, average=0.002 s; distance=43 kB, estimate=3759 kB; lsn=0/1EFE5A8, redo lsn=0/1EFE518
+2026-03-31 22:14:56.446 CEST [40720] LOG:  checkpoint starting: time
+2026-03-31 22:15:01.126 CEST [40720] LOG:  checkpoint complete: wrote 42 buffers (0.3%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=4.607 s, sync=0.055 s, total=4.680 s; sync files=39, longest=0.008 s, average=0.002 s; distance=56 kB, estimate=3388 kB; lsn=0/1F0C878, redo lsn=0/1F0C820
+2026-03-31 23:29:56.265 CEST [40720] LOG:  checkpoint starting: time
+2026-03-31 23:30:01.258 CEST [40720] LOG:  checkpoint complete: wrote 45 buffers (0.3%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=4.930 s, sync=0.045 s, total=4.994 s; sync files=43, longest=0.002 s, average=0.002 s; distance=135 kB, estimate=3063 kB; lsn=0/1F2E7B0, redo lsn=0/1F2E720
+2026-03-31 23:44:56.278 CEST [40720] LOG:  checkpoint starting: time
+2026-03-31 23:45:00.728 CEST [40720] LOG:  checkpoint complete: wrote 40 buffers (0.2%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=4.396 s, sync=0.043 s, total=4.451 s; sync files=39, longest=0.002 s, average=0.002 s; distance=98 kB, estimate=2767 kB; lsn=0/1F472D8, redo lsn=0/1F47280
+2026-03-31 23:49:57.768 CEST [40720] LOG:  checkpoint starting: time
+2026-03-31 23:49:58.229 CEST [40720] LOG:  checkpoint complete: wrote 4 buffers (0.0%), wrote 0 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.432 s, sync=0.015 s, total=0.462 s; sync files=4, longest=0.006 s, average=0.004 s; distance=8 kB, estimate=2491 kB; lsn=0/1F493E8, redo lsn=0/1F49390
+2026-03-31 23:57:13.409 CEST [21476] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-03-31 23:57:13.964 CEST [40756] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-03-31 23:59:57.255 CEST [40720] LOG:  checkpoint starting: time
+2026-04-01 00:00:13.678 CEST [40720] LOG:  checkpoint complete: wrote 149 buffers (0.9%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=16.342 s, sync=0.037 s, total=16.424 s; sync files=40, longest=0.002 s, average=0.001 s; distance=1204 kB, estimate=2362 kB; lsn=0/20764D8, redo lsn=0/2076448
+2026-04-01 03:20:03.048 CEST [12236] LOG:  could not reserve shared memory region (addr=00000180DAD80000) for child 00000000000014D8: error code 487
+2026-04-01 05:32:55.186 CEST [5284] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-04-01 05:32:55.186 CEST [18360] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-04-01 05:34:58.206 CEST [40720] LOG:  checkpoint starting: time
+2026-04-01 05:35:02.487 CEST [40720] LOG:  checkpoint complete: wrote 20 buffers (0.1%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=2.318 s, sync=1.859 s, total=4.281 s; sync files=19, longest=1.599 s, average=0.098 s; distance=73 kB, estimate=2133 kB; lsn=0/2088BC0, redo lsn=0/2088B30
+2026-04-01 05:36:59.849 CEST [23688] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-04-01 05:36:59.849 CEST [10636] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-04-01 05:39:58.494 CEST [40720] LOG:  checkpoint starting: time
+2026-04-01 05:39:59.941 CEST [40720] LOG:  checkpoint complete: wrote 13 buffers (0.1%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=1.414 s, sync=0.014 s, total=1.448 s; sync files=14, longest=0.002 s, average=0.001 s; distance=30 kB, estimate=1923 kB; lsn=0/20903A8, redo lsn=0/2090350
+2026-04-01 06:01:42.673 CEST [40720] LOG:  checkpoint starting: immediate force wait
+2026-04-01 06:01:42.685 CEST [40720] LOG:  checkpoint complete: wrote 1 buffers (0.0%), wrote 0 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.002 s, sync=0.002 s, total=0.013 s; sync files=1, longest=0.002 s, average=0.002 s; distance=1 kB, estimate=1731 kB; lsn=0/2090800, redo lsn=0/20907A8
+2026-04-01 06:01:48.081 CEST [30128] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-04-01 06:01:48.747 CEST [7308] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-04-01 06:03:37.416 CEST [1252] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-04-01 06:03:52.529 CEST [12752] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-04-01 06:04:08.414 CEST [20956] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-04-01 06:05:56.623 CEST [40720] LOG:  checkpoint starting: immediate force wait
+2026-04-01 06:05:56.640 CEST [40720] LOG:  checkpoint complete: wrote 3 buffers (0.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.003 s, sync=0.005 s, total=0.017 s; sync files=4, longest=0.002 s, average=0.002 s; distance=6227 kB, estimate=6227 kB; lsn=0/26A5650, redo lsn=0/26A55F8
+2026-04-01 06:06:00.001 CEST [39984] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-04-01 06:06:00.862 CEST [40716] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-04-01 06:10:56.654 CEST [40720] LOG:  checkpoint starting: time
+2026-04-01 06:13:07.986 CEST [40720] LOG:  checkpoint complete: wrote 1206 buffers (7.4%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=130.849 s, sync=0.455 s, total=131.333 s; sync files=499, longest=0.005 s, average=0.001 s; distance=6241 kB, estimate=6241 kB; lsn=0/2CBDB38, redo lsn=0/2CBDAA8
+2026-04-01 06:25:56.036 CEST [40720] LOG:  checkpoint starting: time
+2026-04-01 06:25:59.233 CEST [40720] LOG:  checkpoint complete: wrote 28 buffers (0.2%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=3.063 s, sync=0.095 s, total=3.198 s; sync files=29, longest=0.007 s, average=0.004 s; distance=32 kB, estimate=5620 kB; lsn=0/2CC5DB0, redo lsn=0/2CC5D58
+2026-04-01 07:10:56.321 CEST [40720] LOG:  checkpoint starting: time
+2026-04-01 07:10:59.491 CEST [40720] LOG:  checkpoint complete: wrote 28 buffers (0.2%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=3.052 s, sync=0.057 s, total=3.171 s; sync files=29, longest=0.013 s, average=0.002 s; distance=38 kB, estimate=5062 kB; lsn=0/2CCF760, redo lsn=0/2CCF6D0
+2026-04-01 07:25:56.509 CEST [40720] LOG:  checkpoint starting: time
+2026-04-01 07:25:59.691 CEST [40720] LOG:  checkpoint complete: wrote 28 buffers (0.2%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=3.069 s, sync=0.065 s, total=3.182 s; sync files=29, longest=0.011 s, average=0.003 s; distance=44 kB, estimate=4560 kB; lsn=0/2CDA8E8, redo lsn=0/2CDA890

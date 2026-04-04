@@ -204,6 +204,10 @@ export interface Ticket {
   serviceMode?: 'REMOTE' | 'ONSITE' | null;
   reporterName?: string;
   reporterPhone?: string;
+  rating?: number | null;
+  ratingComment?: string | null;
+  ratedAt?: string | null;
+  ratedByUserId?: string | null;
   createdAt: string;
   updatedAt: string;
   comments?: TicketComment[];

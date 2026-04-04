@@ -54,6 +54,16 @@ export async function getAdminDashboard(workspaceId?: string | null) {
     }),
   ]);
 
+  // Rating stats
+  const ratedTickets = await prisma.ticket.findMany({
+    where: { ...wf, rating: { not: null } },
+    select: { rating: true },
+  });
+  const ratingCount = ratedTickets.length;
+  const ratingAvg = ratingCount > 0
+    ? Math.round((ratedTickets.reduce((sum, t) => sum + (t.rating ?? 0), 0) / ratingCount) * 10) / 10
+    : null;
+
   return {
     totalLocations,
     totalDevices,
@@ -63,6 +73,8 @@ export async function getAdminDashboard(workspaceId?: string | null) {
     myTickets: openTickets,
     recentTickets,
     recentDevices,
+    ratingAvg,
+    ratingCount,
   };
 }
 

@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Send, Lock, Pencil, X, Check, Trash2 } from 'lucide-react';
+import { Send, Lock, Pencil, X, Check, Trash2, Star } from 'lucide-react';
 import { AttachmentGallery } from '../../../components/ui/AttachmentGallery';
 import toast from 'react-hot-toast';
 import { ticketsApi } from '../../../api/tickets';
@@ -331,6 +331,9 @@ export function TicketDetailPage() {
             </Section>
           )}
 
+          {/* Ocena klienta */}
+          <TicketRatingSection ticket={ticket} />
+
           {/* Anuluj */}
           {isAdminOrTech && canEdit && (
             <Section title="Akcje">
@@ -344,5 +347,80 @@ export function TicketDetailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/* ── Rating Section ──────────────────────────────────────────────────────── */
+
+function TicketRatingSection({ ticket }: { ticket: any }) {
+  const qc = useQueryClient();
+  const [hover, setHover] = useState(0);
+  const [comment, setComment] = useState('');
+  const [showComment, setShowComment] = useState(false);
+
+  const isCompleted = ['COMPLETED', 'RESOLVED', 'CLOSED'].includes(ticket.status);
+  if (!isCompleted) return null;
+
+  const rateMut = useMutation({
+    mutationFn: (data: { rating: number; ratingComment?: string }) =>
+      ticketsApi.rate(ticket.id, data),
+    onSuccess: () => {
+      toast.success('Dziękujemy za ocenę!');
+      qc.invalidateQueries({ queryKey: ['ticket'] });
+    },
+    onError: () => toast.error('Błąd zapisu oceny'),
+  });
+
+  const handleRate = (rating: number) => {
+    if (ticket.rating) return;
+    rateMut.mutate({ rating, ratingComment: comment.trim() || undefined });
+  };
+
+  return (
+    <Section title="Ocena klienta">
+      {ticket.rating ? (
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: ticket.ratingComment ? 8 : 0 }}>
+            {[1, 2, 3].map(s => (
+              <Star key={s} size={22} fill={s <= ticket.rating ? '#F59E0B' : 'none'} color={s <= ticket.rating ? '#F59E0B' : 'var(--border)'} strokeWidth={s <= ticket.rating ? 0 : 1.5} />
+            ))}
+            <span style={{ fontSize: 13, color: 'var(--tm)', marginLeft: 4 }}>{ticket.rating}/3</span>
+          </div>
+          {ticket.ratingComment && (
+            <p style={{ fontSize: 12, color: 'var(--ts)', margin: 0, fontStyle: 'italic' }}>"{ticket.ratingComment}"</p>
+          )}
+        </div>
+      ) : (
+        <div>
+          <p style={{ fontSize: 12, color: 'var(--tm)', margin: '0 0 10px' }}>Oceń jakość obsługi</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 }}>
+            {[1, 2, 3].map(s => (
+              <button key={s}
+                onMouseEnter={() => setHover(s)}
+                onMouseLeave={() => setHover(0)}
+                onClick={() => handleRate(s)}
+                disabled={rateMut.isPending}
+                style={{
+                  background: 'none', border: 'none', padding: 2, cursor: 'pointer',
+                  transform: hover === s ? 'scale(1.25)' : 'scale(1)', transition: 'transform 0.15s',
+                }}>
+                <Star size={26} fill={s <= (hover || 0) ? '#F59E0B' : 'none'} color={s <= (hover || 0) ? '#F59E0B' : 'var(--border)'} strokeWidth={s <= (hover || 0) ? 0 : 1.5} />
+              </button>
+            ))}
+          </div>
+          {!showComment ? (
+            <button onClick={() => setShowComment(true)} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              + Dodaj komentarz
+            </button>
+          ) : (
+            <div>
+              <textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Opcjonalny komentarz..." rows={2}
+                style={{ width: '100%', fontSize: 12, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--hover-bg)', color: 'var(--t)', resize: 'none', marginBottom: 8 }} />
+              <p style={{ fontSize: 10, color: 'var(--td)', margin: 0 }}>Kliknij gwiazdkę aby ocenić</p>
+            </div>
+          )}
+        </div>
+      )}
+    </Section>
   );
 }
