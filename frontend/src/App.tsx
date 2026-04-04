@@ -24,6 +24,7 @@ const OperatorPartners = React.lazy(() => import('./pages/operator/OperatorPartn
 
 // Helpdesk Settings
 const PortalSettingsPage = React.lazy(() => import('./pages/admin/PortalSettingsPage'));
+const TicketNewPage = React.lazy(() => import('./pages/admin/tickets/TicketNewPage'));
 
 // Public
 const PublicTicketForm = React.lazy(() => import('./pages/public/PublicTicketForm'));
@@ -170,6 +171,7 @@ function AdminRoutes() {
         <Route path="devices" element={<DevicesListPage />} />
         <Route path="devices/:id" element={<DeviceDetailPage />} />
         <Route path="tickets" element={<TicketsListPage />} />
+        <Route path="tickets/new" element={<React.Suspense fallback={null}><TicketNewPage /></React.Suspense>} />
         <Route path="tickets/queue" element={<TicketsQueuePage />} />
         <Route path="tickets/reports" element={<TicketReportsPage />} />
         <Route path="tickets/:id" element={<TicketDetailPage />} />

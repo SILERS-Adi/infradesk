@@ -162,7 +162,7 @@ export const SYSTEM_ITEMS: SystemMenuItem[] = [
   { id: 'int-portal',      to: '/portal-settings',      label: 'Portal i obsługa',     icon: Settings,        groupId: 'helpdesk',     defaultOrder: 4, adminOnly: true },
 
   // ── CLIENT: ZGŁOSZENIA ──
-  { id: 'cli-tickets',     to: '/tickets',              label: 'Moje zgłoszenia',      icon: Ticket,          groupId: 'client-tickets', defaultOrder: 0, badgeKey: 'ticketQueue' },
+  { id: 'cli-tickets',     to: '/tickets',              label: 'Moje zgłoszenia',      icon: Ticket,          groupId: 'client-tickets', defaultOrder: 0, badgeKey: 'ticketQueue', end: true },
   { id: 'cli-new-ticket',  to: '/tickets/new',          label: 'Nowe zgłoszenie',      icon: Plus,            groupId: 'client-tickets', defaultOrder: 1 },
 
   // ── MSP: KLIENCI ──
