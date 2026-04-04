@@ -235,8 +235,27 @@ model Workspace {
   allegroAccounts  AllegroAccount[]  @relation("AllegroAccountWorkspace")
   syncLogs         SyncLog[]         @relation("SyncLogWorkspace")
 
+  menuPreferences    UserMenuPreference[] @relation("MenuPrefWorkspace")
+
   @@index([type])
   @@index([isActive])
+}
+
+model UserMenuPreference {
+  id          String   @id @default(uuid())
+  userId      String
+  workspaceId String
+  layout      Json
+  version     Int      @default(1)
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation("MenuPrefWorkspace", fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+  @@index([userId])
+  @@index([workspaceId])
 }
 
 model WorkspaceMembership {
@@ -388,6 +407,7 @@ model User {
   pushSubscriptions     PushSubscription[]
   notifications         Notification[]      @relation("NotificationRecipient")
   sentNotifications     Notification[]      @relation("NotificationSender")
+  menuPreferences       UserMenuPreference[]
 }
 
 model TechPosition {

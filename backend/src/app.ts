@@ -60,6 +60,7 @@ import pakDashboardRouter from './modules/packaging/dashboard.routes';
 import wavesRouter from './modules/packaging/waves.routes';
 import billingRouter from './modules/billing/billing.routes';
 import sharingRouter from './modules/sharing/sharing.routes';
+import menuPreferencesRouter from './modules/menu-preferences/menu-preferences.routes';
 
 // Middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -204,6 +205,7 @@ app.use('/api/packaging/dashboard', pakDashboardRouter);
 app.use('/api/packaging/waves', wavesRouter);
 app.use('/api/billing', billingRouter);
 app.use('/api/sharing', sharingRouter);
+app.use('/api/menu-preferences', menuPreferencesRouter);
 app.use('/api/service/vehicles', serviceVehiclesRouter);
 app.use('/api/service/inspections', serviceInspectionsRouter);
 // Public agent endpoints (no auth)
