@@ -1,12 +1,13 @@
 /**
- * IDS 1.0 — PakOps Batches Page (Full)
- * Batch management: create, list, detail, assign
+ * IDS 1.0 — PakOps Packaging Board (Original Design)
+ * Grid of order/batch cards with progress bars, "Pakuj" buttons
+ * 2-column grid, color-coded progress
  * Connected to: GET/POST /api/packaging/batches/*
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Layers, Plus, RefreshCw, Eye, ChevronRight, Package, Truck,
+  Layers, Plus, RefreshCw, Package, Truck, ChevronRight, Clock,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -15,12 +16,19 @@ import { PageHeader } from '../../../components/ui/PageHeader';
 import { Card } from '../../../components/ui/Card';
 import { Badge } from '../../../components/ui/Badge';
 import { Button } from '../../../components/ui/Button';
+import { Modal } from '../../../components/ui/Modal';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../../components/ui/EmptyState';
-import { Modal } from '../../../components/ui/Modal';
-import { BATCH_STATUS, ORDER_STATUS } from './constants';
-import { fmtDate, fmtMoney } from './utils';
-import type { Batch, BatchOrder, BadgeColor } from './types';
+import { BATCH_STATUS } from './constants';
+import { fmtDate } from './utils';
+import type { Batch, BadgeColor } from './types';
+
+function progressColor(pct: number): string {
+  if (pct === 100) return '#4ADE80';
+  if (pct >= 70) return '#A78BFA';
+  if (pct >= 40) return '#FBBF24';
+  return '#6366F1';
+}
 
 export function PackagingBoardPage() {
   const navigate = useNavigate();
@@ -28,7 +36,6 @@ export function PackagingBoardPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [createMode, setCreateMode] = useState<'date' | 'courier'>('date');
-  const [expandedBatch, setExpandedBatch] = useState<string | null>(null);
 
   const { data: batches, isLoading } = useQuery<Batch[]>({
     queryKey: ['packaging', 'batches', statusFilter],
@@ -38,12 +45,6 @@ export function PackagingBoardPage() {
       const { data } = await api.get('/packaging/batches', { params });
       return data;
     },
-  });
-
-  const { data: batchDetail } = useQuery<Batch>({
-    queryKey: ['packaging', 'batches', expandedBatch],
-    queryFn: async () => { const { data } = await api.get(`/packaging/batches/${expandedBatch}`); return data; },
-    enabled: !!expandedBatch,
   });
 
   const createMut = useMutation({
@@ -78,16 +79,23 @@ export function PackagingBoardPage() {
     { value: 'COMPLETED', label: 'Zakończone' },
   ];
 
-  if (isLoading) return <><PageHeader title="Batche" /><LoadingSpinner /></>;
+  const tabStyle = (active: boolean): React.CSSProperties => ({
+    padding: '8px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
+    fontSize: 12, fontWeight: 600, transition: 'all .15s',
+    background: active ? 'var(--accent)' : 'transparent',
+    color: active ? '#fff' : 'var(--tm)',
+  });
+
+  if (isLoading) return <><PageHeader title="Pakowanie" /><LoadingSpinner /></>;
 
   return (
     <>
-      <PageHeader title="Batche" subtitle="Zarządzanie partiami zamówień" actions={
+      <PageHeader title="Pakowanie" subtitle="Batche do realizacji" actions={
         <div style={{ display: 'flex', gap: 8 }}>
           <Button variant="ghost" size="sm" icon={<RefreshCw size={14} />}
             onClick={() => queryClient.invalidateQueries({ queryKey: ['packaging', 'batches'] })}>Odśwież</Button>
           <Button variant="primary" size="sm" icon={<Plus size={14} />}
-            onClick={() => setShowCreate(true)}>Nowy batch</Button>
+            onClick={() => setShowCreate(true)} style={{ background: '#6366F1' }}>Nowy batch</Button>
         </div>
       } />
 
@@ -96,12 +104,7 @@ export function PackagingBoardPage() {
         <div style={{ display: 'flex', gap: 4, marginBottom: 20, padding: 4, borderRadius: 10, background: 'var(--hover-bg)' }}>
           {filterTabs.map(t => (
             <button key={t.value} onClick={() => setStatusFilter(t.value)}
-              style={{
-                padding: '8px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                fontSize: 12, fontWeight: 600, transition: 'all .15s',
-                background: statusFilter === t.value ? 'var(--accent)' : 'transparent',
-                color: statusFilter === t.value ? '#fff' : 'var(--tm)',
-              }}>
+              style={tabStyle(statusFilter === t.value)}>
               {t.label}
             </button>
           ))}
@@ -110,109 +113,94 @@ export function PackagingBoardPage() {
         {batchList.length === 0 ? (
           <Card>
             <EmptyState icon={<Layers style={{ width: 28, height: 28, color: 'var(--td)' }} />}
-              title="Brak batchy" description="Utwórz nowy batch, aby pogrupować zamówienia do realizacji."
+              title="Brak batchy" description="Utwórz nowy batch, aby pogrupować zamówienia."
               action={<Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={() => setShowCreate(true)}>Nowy batch</Button>} />
           </Card>
         ) : (
-          <div style={{ display: 'grid', gap: 12 }}>
+          /* ── 2-column grid of batch cards ── */
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
             {batchList.map(b => {
               const bs = BATCH_STATUS[b.status] || { label: b.status, color: 'gray' as BadgeColor };
-              const isExpanded = expandedBatch === b.id;
-              const progress = b.orderCount > 0 ? (b.packedCount / b.orderCount) * 100 : 0;
+              const pct = b.orderCount > 0 ? Math.round((b.packedCount / b.orderCount) * 100) : 0;
+              const barColor = progressColor(pct);
+
               return (
-                <div key={b.id}>
-                  <div className="page-card" style={{ padding: 0, overflow: 'hidden' }}>
-                    <div
-                      onClick={() => setExpandedBatch(isExpanded ? null : b.id)}
-                      style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        padding: '16px 20px', cursor: 'pointer', transition: 'background .15s',
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--hover-bg)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div key={b.id} className="page-card" style={{
+                  padding: 0, overflow: 'hidden', transition: 'var(--trf)',
+                  cursor: 'pointer',
+                }}
+                  onClick={() => navigate(`/packaging/batches/${b.id}`)}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.transform = ''; }}
+                >
+                  <div style={{ padding: '18px 20px' }}>
+                    {/* Header row */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{
-                          width: 40, height: 40, borderRadius: 10, background: 'var(--hover-bg)',
+                          width: 36, height: 36, borderRadius: 9, background: barColor + '18',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                         }}>
-                          <Layers size={18} style={{ color: 'var(--accent)' }} />
+                          <Package size={18} style={{ color: barColor }} />
                         </div>
                         <div>
                           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--t)' }}>
-                            {b.name || `Batch #${b.id.slice(0, 6)}`}
+                            {b.name || `Paczka ${b.courierName || ''} ${fmtDate(b.createdAt)}`}
                           </div>
-                          <div style={{ fontSize: 12, color: 'var(--tm)', marginTop: 2 }}>
+                          <div style={{ fontSize: 11, color: 'var(--tm)' }}>
                             {b.orderCount} zamówień · {b.mode === 'courier' ? 'Wg kuriera' : 'Wg daty'}
-                            {b.courierName && ` · ${b.courierName}`}
                           </div>
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        {/* Mini progress */}
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: 8, fontSize: 11, color: 'var(--tm)', marginBottom: 4 }}>
-                            <span><Package size={11} style={{ marginRight: 2 }} />{b.packedCount}/{b.orderCount}</span>
-                            <span><Truck size={11} style={{ marginRight: 2 }} />{b.shippedCount}</span>
-                          </div>
-                          <div style={{ width: 100, height: 4, borderRadius: 2, background: 'var(--border)' }}>
-                            <div style={{ height: '100%', borderRadius: 2, background: 'var(--accent)', width: `${progress}%`, transition: 'width 0.3s' }} />
-                          </div>
-                        </div>
-                        <Badge color={bs.color}>{bs.label}</Badge>
-                        <span style={{ fontSize: 12, color: 'var(--tm)' }}>{fmtDate(b.createdAt)}</span>
-                        <ChevronRight size={16} style={{
-                          color: 'var(--tm)', transition: 'transform .2s',
-                          transform: isExpanded ? 'rotate(90deg)' : 'rotate(0)',
+                      <Badge color={bs.color}>{bs.label}</Badge>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <span style={{ fontSize: 11, color: 'var(--tm)' }}>
+                          <Package size={11} style={{ marginRight: 3, verticalAlign: 'middle' }} />{b.packedCount}/{b.orderCount}
+                          <span style={{ marginLeft: 10 }}><Truck size={11} style={{ marginRight: 3, verticalAlign: 'middle' }} />{b.shippedCount}</span>
+                        </span>
+                        <span style={{ fontSize: 13, fontWeight: 800, color: barColor }}>{pct}%</span>
+                      </div>
+                      <div style={{ height: 8, borderRadius: 4, background: 'var(--border)' }}>
+                        <div style={{
+                          height: '100%', borderRadius: 4, background: barColor,
+                          width: `${pct}%`, transition: 'width 0.4s ease',
                         }} />
                       </div>
                     </div>
 
-                    {/* Expanded: batch orders */}
-                    {isExpanded && (
-                      <div style={{ borderTop: '1px solid var(--border)' }}>
-                        {/* Actions */}
-                        <div style={{ padding: '10px 20px', display: 'flex', gap: 8, background: 'var(--hover-bg)' }}>
-                          {b.status === 'OPEN' && (
-                            <Button size="sm" variant="primary" icon={<ChevronRight size={12} />}
-                              loading={takeMut.isPending} onClick={() => takeMut.mutate(b.id)}>
-                              Przejmij batch
-                            </Button>
-                          )}
-                        </div>
-                        {/* Orders in batch */}
-                        {batchDetail?.orders ? (
-                          batchDetail.orders.map(o => {
-                            const os = ORDER_STATUS[o.status] || { label: o.status, color: 'gray' as BadgeColor };
-                            return (
-                              <div key={o.id}
-                                onClick={() => navigate(`/packaging/orders/${o.id}`)}
-                                style={{
-                                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                  padding: '10px 20px', borderBottom: '1px solid var(--border)', cursor: 'pointer',
-                                  transition: 'background .15s',
-                                }}
-                                onMouseEnter={e => { e.currentTarget.style.background = 'var(--hover-bg)'; }}
-                                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                              >
-                                <div>
-                                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--t)', fontFamily: 'monospace' }}>
-                                    {o.externalOrderId || o.id.slice(0, 8)}
-                                  </span>
-                                  <span style={{ fontSize: 12, color: 'var(--tm)', marginLeft: 8 }}>{o.addressName || '—'}</span>
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--t)' }}>{fmtMoney(o.totalAmount)} zł</span>
-                                  <Badge color={os.color}>{os.label}</Badge>
-                                </div>
-                              </div>
-                            );
-                          })
-                        ) : (
-                          <div style={{ padding: 16, textAlign: 'center' }}><LoadingSpinner /></div>
-                        )}
-                      </div>
-                    )}
+                    {/* Action row */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 11, color: 'var(--tm)' }}>
+                        <Clock size={11} style={{ marginRight: 3, verticalAlign: 'middle' }} />
+                        {fmtDate(b.createdAt)}
+                      </span>
+                      {b.status === 'OPEN' ? (
+                        <button onClick={e => { e.stopPropagation(); takeMut.mutate(b.id); }}
+                          style={{
+                            padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                            background: '#6366F1', color: '#fff', fontSize: 12, fontWeight: 700,
+                            display: 'flex', alignItems: 'center', gap: 6, transition: 'all .15s',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = '#4F46E5'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = '#6366F1'; }}
+                        >
+                          Pakuj <ChevronRight size={14} />
+                        </button>
+                      ) : b.status === 'IN_PROGRESS' ? (
+                        <button onClick={e => { e.stopPropagation(); navigate(`/packaging/batches/${b.id}`); }}
+                          style={{
+                            padding: '8px 18px', borderRadius: 8, border: '1px solid var(--accent)',
+                            background: 'transparent', color: 'var(--accent)', fontSize: 12, fontWeight: 700,
+                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                          }}>
+                          Kontynuuj <ChevronRight size={14} />
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               );
@@ -226,7 +214,8 @@ export function PackagingBoardPage() {
         footer={
           <>
             <Button variant="secondary" onClick={() => setShowCreate(false)}>Anuluj</Button>
-            <Button variant="primary" loading={createMut.isPending} onClick={() => createMut.mutate()}>Utwórz</Button>
+            <Button variant="primary" loading={createMut.isPending} onClick={() => createMut.mutate()}
+              style={{ background: '#6366F1' }}>Utwórz</Button>
           </>
         }
       >
@@ -235,15 +224,15 @@ export function PackagingBoardPage() {
           {(['date', 'courier'] as const).map(mode => (
             <label key={mode}
               style={{
-                display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px',
-                borderRadius: 8, border: `1px solid ${createMode === mode ? 'var(--accent)' : 'var(--border)'}`,
-                background: createMode === mode ? 'var(--accent-g)' : 'transparent',
+                display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px',
+                borderRadius: 10, border: `2px solid ${createMode === mode ? 'var(--accent)' : 'var(--border)'}`,
+                background: createMode === mode ? 'var(--accent-g, rgba(99,102,241,0.06))' : 'transparent',
                 cursor: 'pointer', transition: 'all .15s',
               }}>
               <input type="radio" checked={createMode === mode} onChange={() => setCreateMode(mode)}
                 style={{ accentColor: 'var(--accent)' }} />
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t)' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t)' }}>
                   {mode === 'date' ? 'Wg daty' : 'Wg kuriera'}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--tm)' }}>

@@ -1,10 +1,16 @@
 /**
- * IDS 1.0 — PakOps Order/Shipment Detail (Full)
- * Connected to: GET /api/packaging/orders/:id
+ * IDS 1.0 — PakOps Shipment/Batch Detail (Original Design)
+ * List of customers/orders in a batch with "Pakuj >" buttons
+ * Expandable rows showing items, green accent for completed
+ * Connected to: GET /api/packaging/orders/:id, GET /api/packaging/batches/:id
  */
 import { useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Package, User, Truck, Calendar, Copy, Trash2, MapPin, Edit3, Clock, MessageSquare, Play } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+  Package, User, Truck, Calendar, Copy, Trash2, MapPin,
+  Edit3, Clock, MessageSquare, Play, ChevronRight, ChevronDown,
+  CheckCircle2,
+} from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import api from '../../../api/client';
@@ -40,6 +46,7 @@ interface OrderDetail {
   shippedAt?: string;
   deliveredAt?: string;
   packingSessionId?: string;
+  batchId?: string;
   items: {
     id: string; name: string; sku?: string; quantity: number;
     unitPrice: number | string; image?: string;
@@ -47,44 +54,48 @@ interface OrderDetail {
   statusHistory?: { status: string; changedAt: string; changedBy?: string }[];
 }
 
-function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-      <span style={{ fontSize: 12, color: 'var(--tm)' }}>{label}</span>
-      <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--t)', textAlign: 'right' }}>{value}</span>
-    </div>
-  );
-}
-
-function SectionLabel({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-      <Icon size={14} style={{ color: 'var(--accent)' }} />
-      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--td)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
-    </div>
-  );
+interface BatchDetail {
+  id: string;
+  name?: string;
+  status: string;
+  courierName?: string;
+  orderCount: number;
+  packedCount: number;
+  orders?: OrderDetail[];
 }
 
 export function ShipmentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesText, setNotesText] = useState('');
 
+  // Try to load as order first
   const { data: order, isLoading } = useQuery<OrderDetail>({
     queryKey: ['packaging', 'order', id],
     queryFn: async () => { const { data } = await api.get(`/packaging/orders/${id}`); return data; },
     enabled: !!id,
   });
 
+  // Also try batch
+  const { data: batch } = useQuery<BatchDetail>({
+    queryKey: ['packaging', 'batch', id],
+    queryFn: async () => {
+      try { const { data } = await api.get(`/packaging/batches/${id}`); return data; }
+      catch { return null; }
+    },
+    enabled: !!id,
+  });
+
   const statusMut = useMutation({
-    mutationFn: async (newStatus: string) => {
-      await api.put(`/packaging/orders/${id}`, { status: newStatus });
+    mutationFn: async ({ orderId, newStatus }: { orderId: string; newStatus: string }) => {
+      await api.put(`/packaging/orders/${orderId}`, { status: newStatus });
     },
     onSuccess: () => {
       toast.success('Status zmieniony');
-      queryClient.invalidateQueries({ queryKey: ['packaging', 'order', id] });
+      queryClient.invalidateQueries({ queryKey: ['packaging'] });
     },
     onError: () => toast.error('Nie udało się zmienić statusu'),
   });
@@ -107,8 +118,139 @@ export function ShipmentDetailPage() {
     onError: () => toast.error('Nie udało się usunąć'),
   });
 
-  if (isLoading) return <><PageHeader title="Zamówienie" back="/packaging/orders" /><LoadingSpinner /></>;
+  if (isLoading) return <><PageHeader title="Szczegóły" back="/packaging/orders" /><LoadingSpinner /></>;
 
+  /* ── Batch detail view: list of customers/orders ── */
+  if (batch && batch.orders && batch.orders.length > 0) {
+    const pct = batch.orderCount > 0 ? Math.round((batch.packedCount / batch.orderCount) * 100) : 0;
+
+    return (
+      <>
+        <PageHeader
+          title={batch.name || `Batch #${id?.slice(0, 6)}`}
+          subtitle={`${batch.orderCount} zamówień · ${batch.courierName || 'Mix'}`}
+          back="/packaging/batches"
+        />
+        <div style={{ padding: '0 24px 24px', maxWidth: 900 }}>
+          {/* Batch progress */}
+          <div className="page-card" style={{ padding: '16px 20px', marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ts)' }}>
+                {batch.packedCount}/{batch.orderCount} spakowane
+              </span>
+              <span style={{ fontSize: 14, fontWeight: 800, color: pct === 100 ? '#4ADE80' : 'var(--accent)' }}>{pct}%</span>
+            </div>
+            <div style={{ height: 8, borderRadius: 4, background: 'var(--border)' }}>
+              <div style={{
+                height: '100%', borderRadius: 4,
+                background: pct === 100 ? '#4ADE80' : 'var(--accent)',
+                width: `${pct}%`, transition: 'width 0.4s',
+              }} />
+            </div>
+          </div>
+
+          {/* Order rows */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {batch.orders.map(o => {
+              const st = ORDER_STATUS[o.status] || { label: o.status, color: 'gray' as BadgeColor };
+              const isPacked = ['PACKED', 'SHIPPED', 'DELIVERED'].includes(o.status);
+              const isExpanded = expandedOrder === o.id;
+
+              return (
+                <div key={o.id} className="page-card" style={{
+                  padding: 0, overflow: 'hidden',
+                  borderLeft: isPacked ? '4px solid #4ADE80' : '4px solid transparent',
+                }}>
+                  {/* Main row */}
+                  <div
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '14px 20px', cursor: 'pointer', transition: 'background .12s',
+                    }}
+                    onClick={() => setExpandedOrder(isExpanded ? null : o.id)}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--hover-bg)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      {/* Status indicator */}
+                      <div style={{
+                        width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                        background: isPacked ? 'rgba(34,197,94,0.1)' : 'var(--hover-bg)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        {isPacked ? (
+                          <CheckCircle2 size={18} style={{ color: '#4ADE80' }} />
+                        ) : (
+                          <Package size={18} style={{ color: 'var(--tm)' }} />
+                        )}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--t)' }}>
+                          {o.addressName || '—'}
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--tm)' }}>
+                          {o.externalOrderId || o.id.slice(0, 8)} · {o.items?.length || 0} poz. · {fmtMoney(o.totalAmount)} zł
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <Badge color={st.color}>{st.label}</Badge>
+                      {!isPacked && (
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            navigate(`/packaging/packing?order=${o.id}`);
+                          }}
+                          style={{
+                            padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                            background: '#6366F1', color: '#fff', fontSize: 12, fontWeight: 700,
+                            display: 'flex', alignItems: 'center', gap: 4, transition: 'all .15s',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = '#4F46E5'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = '#6366F1'; }}
+                        >
+                          Pakuj <ChevronRight size={14} />
+                        </button>
+                      )}
+                      {isExpanded ? <ChevronDown size={16} style={{ color: 'var(--tm)' }} /> : <ChevronRight size={16} style={{ color: 'var(--tm)' }} />}
+                    </div>
+                  </div>
+
+                  {/* Expanded: items */}
+                  {isExpanded && o.items && (
+                    <div style={{ borderTop: '1px solid var(--border)', background: 'var(--hover-bg)' }}>
+                      {o.items.map(item => (
+                        <div key={item.id} style={{
+                          display: 'flex', alignItems: 'center', gap: 10, padding: '10px 20px 10px 64px',
+                          borderBottom: '1px solid var(--border)',
+                        }}>
+                          {item.image ? (
+                            <img src={item.image} alt="" style={{ width: 32, height: 32, borderRadius: 4, objectFit: 'cover', flexShrink: 0 }} />
+                          ) : (
+                            <div style={{ width: 32, height: 32, borderRadius: 4, background: 'var(--bg-card, var(--bg))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <Package size={14} style={{ color: 'var(--td)' }} />
+                            </div>
+                          )}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--t)' }}>{item.name}</div>
+                            {item.sku && <div style={{ fontSize: 10, color: 'var(--tm)', fontFamily: 'monospace' }}>{item.sku}</div>}
+                          </div>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>x{item.quantity}</span>
+                          <span style={{ fontSize: 12, color: 'var(--tm)', minWidth: 70, textAlign: 'right' }}>{fmtMoney(item.unitPrice)} zł</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  /* ── Single order detail view ── */
   if (!order) return (
     <>
       <PageHeader title="Zamówienie" back="/packaging/orders" />
@@ -120,14 +262,10 @@ export function ShipmentDetailPage() {
   );
 
   const st = ORDER_STATUS[order.status] || { label: order.status, color: 'gray' as BadgeColor };
-
-  // Progress
   const steps = ['NEW', 'PAID', 'PICKING', 'PACKING', 'PACKED', 'SHIPPED', 'DELIVERED'];
   const stepLabels = ['Nowe', 'Opłacone', 'Zbieranie', 'Pakowanie', 'Spakowane', 'Wysłane', 'Dostarczone'];
   const currentIdx = steps.indexOf(order.status);
   const progress = currentIdx >= 0 ? ((currentIdx + 1) / steps.length) * 100 : 0;
-
-  const itemsTotal = order.items.reduce((sum, i) => sum + i.quantity * Number(i.unitPrice), 0);
 
   return (
     <>
@@ -138,16 +276,17 @@ export function ShipmentDetailPage() {
         actions={
           <div style={{ display: 'flex', gap: 8 }}>
             {order.packingSessionId && (
-              <Link to={`/packaging/packing?session=${order.packingSessionId}`} style={{ textDecoration: 'none' }}>
-                <Button size="sm" variant="secondary" icon={<Play size={14} />}>Sesja pakowania</Button>
-              </Link>
+              <Button size="sm" variant="secondary" icon={<Play size={14} />}
+                onClick={() => navigate(`/packaging/packing?session=${order.packingSessionId}`)}>
+                Sesja pakowania
+              </Button>
             )}
             <Button size="sm" variant="secondary" icon={<Copy size={14} />}>Duplikuj</Button>
           </div>
         }
       />
       <div style={{ padding: '0 24px 24px', maxWidth: 1100 }}>
-        {/* Status badge */}
+        {/* Status badges */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' }}>
           <Badge color={st.color}>{st.label}</Badge>
           {order.paymentStatus && <Badge color={order.paymentStatus === 'PAID' ? 'green' : 'yellow'}>{order.paymentStatus}</Badge>}
@@ -173,36 +312,69 @@ export function ShipmentDetailPage() {
           {/* Customer info */}
           <Card noPadding>
             <div style={{ padding: '20px 24px' }}>
-              <SectionLabel icon={User} label="Klient" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                <User size={14} style={{ color: 'var(--accent)' }} />
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--td)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Klient</span>
+              </div>
               <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--t)', marginBottom: 4 }}>{order.addressName || '—'}</div>
               {order.addressEmail && <div style={{ fontSize: 13, color: 'var(--ts)' }}>{order.addressEmail}</div>}
               {order.addressPhone && <div style={{ fontSize: 13, color: 'var(--ts)' }}>{order.addressPhone}</div>}
               <div style={{ height: 1, background: 'var(--border)', margin: '16px 0' }} />
-              <SectionLabel icon={MapPin} label="Adres dostawy" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                <MapPin size={14} style={{ color: 'var(--accent)' }} />
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--td)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Adres dostawy</span>
+              </div>
               {order.addressStreet && <div style={{ fontSize: 13, color: 'var(--ts)' }}>{order.addressStreet}</div>}
               {(order.addressZip || order.addressCity) && (
                 <div style={{ fontSize: 13, color: 'var(--ts)' }}>{order.addressZip} {order.addressCity}</div>
               )}
               <div style={{ height: 1, background: 'var(--border)', margin: '16px 0' }} />
-              <SectionLabel icon={Truck} label="Dostawa" />
-              <InfoRow label="Kurier" value={order.courierName || '—'} />
-              <InfoRow label="Metoda" value={order.deliveryMethod || '—'} />
-              {order.trackingNumber && <InfoRow label="Tracking" value={<span style={{ fontFamily: 'monospace' }}>{order.trackingNumber}</span>} />}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                <Truck size={14} style={{ color: 'var(--accent)' }} />
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--td)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Dostawa</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+                <span style={{ fontSize: 12, color: 'var(--tm)' }}>Kurier</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--t)' }}>{order.courierName || '—'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+                <span style={{ fontSize: 12, color: 'var(--tm)' }}>Metoda</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--t)' }}>{order.deliveryMethod || '—'}</span>
+              </div>
+              {order.trackingNumber && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+                  <span style={{ fontSize: 12, color: 'var(--tm)' }}>Tracking</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--t)', fontFamily: 'monospace' }}>{order.trackingNumber}</span>
+                </div>
+              )}
             </div>
           </Card>
 
           {/* Dates & notes */}
           <Card noPadding>
             <div style={{ padding: '20px 24px' }}>
-              <SectionLabel icon={Calendar} label="Daty" />
-              <InfoRow label="Utworzono" value={fmtDateTime(order.createdAt)} />
-              {order.paidAt && <InfoRow label="Opłacono" value={fmtDateTime(order.paidAt)} />}
-              {order.packedAt && <InfoRow label="Spakowano" value={fmtDateTime(order.packedAt)} />}
-              {order.shippedAt && <InfoRow label="Wysłano" value={fmtDateTime(order.shippedAt)} />}
-              {order.deliveredAt && <InfoRow label="Dostarczono" value={fmtDateTime(order.deliveredAt)} />}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                <Calendar size={14} style={{ color: 'var(--accent)' }} />
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--td)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Daty</span>
+              </div>
+              {[
+                { label: 'Utworzono', value: fmtDateTime(order.createdAt) },
+                order.paidAt && { label: 'Opłacono', value: fmtDateTime(order.paidAt) },
+                order.packedAt && { label: 'Spakowano', value: fmtDateTime(order.packedAt) },
+                order.shippedAt && { label: 'Wysłano', value: fmtDateTime(order.shippedAt) },
+                order.deliveredAt && { label: 'Dostarczono', value: fmtDateTime(order.deliveredAt) },
+              ].filter(Boolean).map((row: any) => (
+                <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: 12, color: 'var(--tm)' }}>{row.label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--t)' }}>{row.value}</span>
+                </div>
+              ))}
 
               <div style={{ height: 1, background: 'var(--border)', margin: '16px 0' }} />
-              <SectionLabel icon={MessageSquare} label="Notatki wewnętrzne" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                <MessageSquare size={14} style={{ color: 'var(--accent)' }} />
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--td)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Notatki wewnętrzne</span>
+              </div>
               {editingNotes ? (
                 <div>
                   <textarea value={notesText}
@@ -308,31 +480,31 @@ export function ShipmentDetailPage() {
             <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               {order.status === 'NEW' && (
                 <Button size="sm" variant="secondary" loading={statusMut.isPending}
-                  onClick={() => statusMut.mutate('PAID')}>Oznacz jako opłacone</Button>
+                  onClick={() => statusMut.mutate({ orderId: order.id, newStatus: 'PAID' })}>Oznacz jako opłacone</Button>
               )}
               {order.status === 'PAID' && (
                 <Button size="sm" variant="secondary" icon={<Package size={14} />} loading={statusMut.isPending}
-                  onClick={() => statusMut.mutate('PICKING')}>Rozpocznij zbieranie</Button>
+                  onClick={() => statusMut.mutate({ orderId: order.id, newStatus: 'PICKING' })}>Rozpocznij zbieranie</Button>
               )}
               {(order.status === 'PICKING' || order.status === 'PICKED') && (
                 <Button size="sm" variant="secondary" icon={<Package size={14} />} loading={statusMut.isPending}
-                  onClick={() => statusMut.mutate('PACKING')}>Rozpocznij pakowanie</Button>
+                  onClick={() => statusMut.mutate({ orderId: order.id, newStatus: 'PACKING' })}>Rozpocznij pakowanie</Button>
               )}
               {order.status === 'PACKING' && (
                 <Button size="sm" variant="secondary" icon={<Package size={14} />} loading={statusMut.isPending}
-                  onClick={() => statusMut.mutate('PACKED')}>Oznacz jako spakowane</Button>
+                  onClick={() => statusMut.mutate({ orderId: order.id, newStatus: 'PACKED' })}>Oznacz jako spakowane</Button>
               )}
               {order.status === 'PACKED' && (
                 <Button size="sm" variant="secondary" icon={<Truck size={14} />} loading={statusMut.isPending}
-                  onClick={() => statusMut.mutate('SHIPPED')}>Oznacz jako wysłane</Button>
+                  onClick={() => statusMut.mutate({ orderId: order.id, newStatus: 'SHIPPED' })}>Oznacz jako wysłane</Button>
               )}
               {order.status === 'SHIPPED' && (
                 <Button size="sm" variant="secondary" icon={<Truck size={14} />} loading={statusMut.isPending}
-                  onClick={() => statusMut.mutate('DELIVERED')}>Oznacz jako dostarczone</Button>
+                  onClick={() => statusMut.mutate({ orderId: order.id, newStatus: 'DELIVERED' })}>Oznacz jako dostarczone</Button>
               )}
               {!['CANCELLED', 'DELIVERED', 'RETURNED'].includes(order.status) && (
                 <Button size="sm" variant="ghost" loading={statusMut.isPending}
-                  onClick={() => { if (confirm('Anulować zamówienie?')) statusMut.mutate('CANCELLED'); }}>Anuluj zamówienie</Button>
+                  onClick={() => { if (confirm('Anulować zamówienie?')) statusMut.mutate({ orderId: order.id, newStatus: 'CANCELLED' }); }}>Anuluj zamówienie</Button>
               )}
               <div style={{ marginLeft: 'auto' }}>
                 <Button size="sm" variant="danger" icon={<Trash2 size={14} />} loading={deleteMut.isPending}

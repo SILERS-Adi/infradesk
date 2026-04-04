@@ -1,12 +1,14 @@
 /**
- * IDS 1.0 — PakOps Packing Station (Full)
- * Queue -> Start session -> Scan items -> Photo -> Complete
+ * IDS 1.0 — PakOps Packing Station (Original Design)
+ * Left: product items with large images, qty, price, "Spakuj" per item
+ * Right: customer info, delivery info, package dimensions
+ * Bottom bar: totals + "Generuj list przewozowy"
  * Connected to: GET /api/packaging/packing/*
  */
 import { useState, useRef } from 'react';
 import {
-  Package, CheckCircle2, Truck, AlertTriangle, RefreshCw,
-  Camera, X, Barcode, Upload,
+  Package, CheckCircle2, Truck, RefreshCw,
+  Camera, X, Barcode, MapPin, User, Box,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -100,7 +102,7 @@ export function PackingStationPage() {
     onError: () => toast.error('Nie udało się dodać zdjęcia'),
   });
 
-  // Complete
+  // Complete / generate waybill
   const completeMut = useMutation({
     mutationFn: async () => {
       const sessionId = activeSession?.id;
@@ -111,7 +113,7 @@ export function PackingStationPage() {
       }
     },
     onSuccess: () => {
-      toast.success('Zamówienie spakowane!');
+      toast.success('List przewozowy wygenerowany!');
       setActiveOrderId(null);
       setCheckedItems(new Set());
       setPhotos([]);
@@ -137,7 +139,7 @@ export function PackingStationPage() {
     onError: () => toast.error('Nie udało się anulować'),
   });
 
-  const toggleItem = (itemId: string) => {
+  const packItem = (itemId: string) => {
     setCheckedItems(prev => {
       const next = new Set(prev);
       next.has(itemId) ? next.delete(itemId) : next.add(itemId);
@@ -155,10 +157,7 @@ export function PackingStationPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result as string;
-      photoMut.mutate(base64);
-    };
+    reader.onloadend = () => { photoMut.mutate(reader.result as string); };
     reader.readAsDataURL(file);
     e.target.value = '';
   };
@@ -169,6 +168,8 @@ export function PackingStationPage() {
 
   const allChecked = activeOrder ? activeOrder.items.every(i => checkedItems.has(i.id)) : false;
   const queueItems = queue || [];
+  const totalItemsCount = activeOrder ? activeOrder.items.reduce((s, i) => s + i.quantity, 0) : 0;
+  const totalAmount = activeOrder ? Number(activeOrder.totalAmount) : 0;
 
   if (loadingQueue) return <><PageHeader title="Stacja pakowania" /><LoadingSpinner /></>;
 
@@ -178,205 +179,266 @@ export function PackingStationPage() {
         actions={<Button variant="ghost" size="sm" icon={<RefreshCw size={14} />} onClick={() => refetchQueue()}>Odśwież</Button>} />
 
       <div style={{ padding: '0 24px 24px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: 20, minHeight: 500 }}>
+        {!activeOrderId ? (
+          /* ── Queue: select an order ── */
+          queueItems.length === 0 ? (
+            <Card>
+              <EmptyState icon={<Package style={{ width: 28, height: 28, color: 'var(--td)' }} />}
+                title="Brak zamówień" description="Wszystkie zamówienia zostały spakowane." />
+            </Card>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
+              {queueItems.map(o => {
+                return (
+                  <div key={o.id} className="page-card" style={{ padding: '16px 20px', cursor: 'pointer', transition: 'var(--trf)' }}
+                    onClick={() => selectOrder(o)}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.transform = ''; }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--t)', fontFamily: 'monospace' }}>
+                        {o.externalOrderId || o.id.slice(0, 8)}
+                      </span>
+                      <Badge color={STATUS_COLORS[o.status] || 'gray'}>{o.status}</Badge>
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ts)', marginBottom: 4 }}>{o.addressName || '—'}</div>
+                    <div style={{ fontSize: 11, color: 'var(--tm)' }}>
+                      {o._count?.items || o.items?.length || '?'} poz. · {o.courierName || '—'} · {fmtMoney(o.totalAmount)} zł
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        ) : loadingOrder ? <LoadingSpinner /> : activeOrder ? (
+          /* ── Active packing: left items / right info ── */
+          <>
+            {/* Scan bar */}
+            <div style={{
+              marginBottom: 16, padding: '10px 16px', borderRadius: 'var(--rs, 10px)',
+              background: 'var(--hover-bg)', display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+              <Barcode size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+              <input type="text" value={scanInput} onChange={e => setScanInput(e.target.value)}
+                onKeyDown={handleScan} placeholder="Skanuj kod kreskowy / wpisz SKU..." autoFocus
+                style={{
+                  flex: 1, padding: '8px 0', border: 'none', background: 'transparent',
+                  color: 'var(--t)', fontSize: 14, fontFamily: 'monospace', outline: 'none',
+                }} />
+              {scanMut.isPending && <LoadingSpinner />}
+            </div>
 
-          {/* Left: Queue */}
-          <Card title="Kolejka pakowania" noPadding>
-            {queueItems.length === 0 ? (
-              <EmptyState title="Brak zamówień" description="Wszystkie zamówienia zostały spakowane." />
-            ) : (
-              <div style={{ maxHeight: 'calc(100vh - 250px)', overflowY: 'auto' }}>
-                {queueItems.map(o => {
-                  const isActive = activeOrderId === o.id;
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 20, marginBottom: 16 }}>
+              {/* LEFT: Product items with large images */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {activeOrder.items.map(item => {
+                  const packed = checkedItems.has(item.id);
                   return (
-                    <button key={o.id} onClick={() => selectOrder(o)} type="button"
-                      style={{
-                        display: 'block', width: '100%', padding: '14px 16px', textAlign: 'left',
-                        borderBottom: '1px solid var(--border)', cursor: 'pointer',
-                        background: isActive ? 'var(--accent-g)' : 'transparent',
-                        borderLeft: isActive ? '3px solid var(--accent)' : '3px solid transparent',
-                        transition: 'var(--trf)',
-                      }}
-                      onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--hover-bg)'; }}
-                      onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = isActive ? 'var(--accent-g)' : 'transparent'; }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--t)', fontFamily: 'monospace' }}>
-                          {o.externalOrderId || o.id.slice(0, 8)}
-                        </span>
-                        <Badge color={STATUS_COLORS[o.status] || 'gray'}>{o.status}</Badge>
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--ts)' }}>{o.addressName || '—'}</div>
-                      <div style={{ fontSize: 11, color: 'var(--tm)', marginTop: 2 }}>
-                        {o._count?.items || o.items?.length || '?'} poz. · {o.courierName || '—'} · {fmtMoney(o.totalAmount)} zł
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </Card>
-
-          {/* Right: Packing area */}
-          <div>
-            {!activeOrderId ? (
-              <Card>
-                <EmptyState
-                  icon={<Package style={{ width: 28, height: 28, color: 'var(--td)' }} />}
-                  title="Wybierz zamówienie"
-                  description="Kliknij zamówienie z kolejki po lewej, aby rozpocząć pakowanie."
-                />
-              </Card>
-            ) : loadingOrder ? <LoadingSpinner /> : activeOrder ? (
-              <>
-                {/* Order header */}
-                <Card noPadding>
-                  <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--t)', fontFamily: 'monospace' }}>
-                        {activeOrder.externalOrderId || activeOrder.id.slice(0, 8)}
-                      </div>
-                      <div style={{ fontSize: 13, color: 'var(--ts)', marginTop: 4 }}>{activeOrder.addressName} · {activeOrder.addressCity}</div>
-                      {activeOrder.addressStreet && <div style={{ fontSize: 12, color: 'var(--tm)' }}>{activeOrder.addressStreet}, {activeOrder.addressZip}</div>}
-                      {activeOrder.addressPhone && <div style={{ fontSize: 12, color: 'var(--tm)' }}>Tel: {activeOrder.addressPhone}</div>}
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--accent)' }}>{fmtMoney(activeOrder.totalAmount)} zł</div>
-                      {activeOrder.courierName && <Badge color="indigo">{activeOrder.courierName}</Badge>}
-                    </div>
-                  </div>
-                </Card>
-
-                {/* Scan input */}
-                <div style={{
-                  margin: '12px 0', padding: '10px 16px', borderRadius: 'var(--rs)',
-                  background: 'var(--hover-bg)', display: 'flex', alignItems: 'center', gap: 10,
-                }}>
-                  <Barcode size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                  <input
-                    type="text" value={scanInput} onChange={e => setScanInput(e.target.value)}
-                    onKeyDown={handleScan} placeholder="Skanuj kod kreskowy / wpisz SKU..."
-                    autoFocus
-                    style={{
-                      flex: 1, padding: '8px 0', border: 'none', background: 'transparent',
-                      color: 'var(--t)', fontSize: 14, fontFamily: 'monospace', outline: 'none',
-                    }}
-                  />
-                  {scanMut.isPending && <LoadingSpinner />}
-                </div>
-
-                {/* Progress */}
-                <div style={{
-                  margin: '0 0 12px', padding: '8px 16px', borderRadius: 'var(--rs)',
-                  background: allChecked ? 'rgba(34,197,94,0.08)' : 'var(--hover-bg)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: allChecked ? '#4ADE80' : 'var(--ts)' }}>
-                    {allChecked ? 'Wszystkie pozycje sprawdzone' : `${checkedItems.size} / ${activeOrder.items.length} pozycji`}
-                  </span>
-                  <div style={{ width: 140, height: 6, borderRadius: 3, background: 'var(--border)' }}>
-                    <div style={{
-                      height: '100%', borderRadius: 3,
-                      background: allChecked ? '#4ADE80' : 'var(--accent)',
-                      width: `${activeOrder.items.length > 0 ? (checkedItems.size / activeOrder.items.length) * 100 : 0}%`,
-                      transition: 'width 0.3s',
-                    }} />
-                  </div>
-                </div>
-
-                {/* Items checklist */}
-                <Card title="Pozycje do spakowania" noPadding>
-                  {activeOrder.items.map(item => {
-                    const checked = checkedItems.has(item.id);
-                    return (
-                      <button key={item.id} onClick={() => toggleItem(item.id)} type="button"
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '12px 16px',
-                          borderBottom: '1px solid var(--border)', cursor: 'pointer', textAlign: 'left',
-                          background: checked ? 'rgba(34,197,94,0.06)' : 'transparent', transition: 'var(--trf)',
-                        }}
-                        onMouseEnter={e => { if (!checked) e.currentTarget.style.background = 'var(--hover-bg)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = checked ? 'rgba(34,197,94,0.06)' : 'transparent'; }}
-                      >
+                    <div key={item.id} className="page-card" style={{
+                      padding: 0, overflow: 'hidden',
+                      opacity: packed ? 0.6 : 1,
+                      borderLeft: packed ? '4px solid #4ADE80' : '4px solid transparent',
+                      transition: 'all .2s',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'stretch' }}>
+                        {/* Image */}
                         <div style={{
-                          width: 24, height: 24, borderRadius: 6, flexShrink: 0,
-                          border: checked ? 'none' : '2px solid var(--border)',
-                          background: checked ? '#4ADE80' : 'transparent',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          width: 120, minHeight: 100, background: 'var(--hover-bg)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                         }}>
-                          {checked && <CheckCircle2 size={16} color="#fff" />}
+                          {item.image ? (
+                            <img src={item.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <Package size={32} style={{ color: 'var(--td)' }} />
+                          )}
                         </div>
-                        {item.image && (
-                          <img src={item.image} alt="" style={{ width: 36, height: 36, borderRadius: 4, objectFit: 'cover', flexShrink: 0 }} />
-                        )}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: checked ? 'var(--tm)' : 'var(--t)', textDecoration: checked ? 'line-through' : 'none' }}>{item.name}</div>
-                          {item.sku && <div style={{ fontSize: 11, color: 'var(--tm)', fontFamily: 'monospace' }}>{item.sku}</div>}
-                        </div>
-                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--t)' }}>x{item.quantity}</div>
-                          <div style={{ fontSize: 11, color: 'var(--tm)' }}>{fmtMoney(item.unitPrice)} zł</div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </Card>
-
-                {/* Photo section */}
-                <div style={{ marginTop: 12 }}>
-                  <Card title="Zdjęcia paczki" action={
-                    <Button variant="ghost" size="sm" icon={<Camera size={14} />}
-                      onClick={() => fileRef.current?.click()} loading={photoMut.isPending}>
-                      Dodaj zdjęcie
-                    </Button>
-                  }>
-                    <input ref={fileRef} type="file" accept="image/*" capture="environment"
-                      onChange={handleFileUpload} style={{ display: 'none' }} />
-                    {photos.length === 0 ? (
-                      <div style={{ padding: 20, textAlign: 'center', color: 'var(--tm)', fontSize: 13 }}>
-                        Brak zdjęć. Kliknij "Dodaj zdjęcie" aby zrobić zdjęcie paczki.
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        {photos.map((p, i) => (
-                          <div key={i} style={{ position: 'relative' }}>
-                            <img src={p} alt={`Zdjęcie ${i + 1}`}
-                              style={{ width: 80, height: 80, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border)' }} />
-                            <button onClick={() => setPhotos(prev => prev.filter((_, j) => j !== i))}
+                        {/* Info */}
+                        <div style={{ flex: 1, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div>
+                            <div style={{
+                              fontSize: 14, fontWeight: 700, color: 'var(--t)', marginBottom: 4,
+                              textDecoration: packed ? 'line-through' : 'none',
+                            }}>{item.name}</div>
+                            {item.sku && <div style={{ fontSize: 11, color: 'var(--tm)', fontFamily: 'monospace', marginBottom: 4 }}>{item.sku}</div>}
+                            <div style={{ fontSize: 13, color: 'var(--tm)' }}>{fmtMoney(item.unitPrice)} zł/szt</div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                            <div style={{
+                              fontSize: 22, fontWeight: 800, color: 'var(--accent)',
+                              background: 'var(--accent-g, rgba(99,102,241,0.08))',
+                              borderRadius: 8, padding: '4px 12px',
+                            }}>
+                              x{item.quantity}
+                            </div>
+                            <button onClick={() => packItem(item.id)}
                               style={{
-                                position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%',
-                                background: '#F87171', border: 'none', cursor: 'pointer', display: 'flex',
-                                alignItems: 'center', justifyContent: 'center',
+                                padding: '10px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                                background: packed ? '#4ADE80' : '#6366F1', color: '#fff',
+                                fontSize: 13, fontWeight: 700, transition: 'all .15s',
+                                display: 'flex', alignItems: 'center', gap: 6,
                               }}>
-                              <X size={12} color="#fff" />
+                              {packed ? <><CheckCircle2 size={16} /> Spakowano</> : 'Spakuj'}
                             </button>
                           </div>
-                        ))}
+                        </div>
                       </div>
-                    )}
-                  </Card>
-                </div>
+                    </div>
+                  );
+                })}
 
-                {/* Actions */}
-                <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
-                  <Button
-                    variant="primary" size="lg"
-                    icon={allChecked ? <Truck size={16} /> : <AlertTriangle size={16} />}
-                    onClick={() => completeMut.mutate()}
-                    loading={completeMut.isPending}
-                    disabled={!allChecked}
-                    style={{ flex: 1 }}
-                  >
-                    {allChecked ? 'Oznacz jako spakowane' : `Sprawdź wszystkie (${activeOrder.items.length - checkedItems.size} pozostało)`}
+                {/* Photos section */}
+                <Card title="Zdjęcia paczki" action={
+                  <Button variant="ghost" size="sm" icon={<Camera size={14} />}
+                    onClick={() => fileRef.current?.click()} loading={photoMut.isPending}>
+                    Dodaj
                   </Button>
-                  <Button variant="secondary" size="lg" onClick={() => cancelMut.mutate()} loading={cancelMut.isPending}>
-                    Anuluj
-                  </Button>
+                }>
+                  <input ref={fileRef} type="file" accept="image/*" capture="environment"
+                    onChange={handleFileUpload} style={{ display: 'none' }} />
+                  {photos.length === 0 ? (
+                    <div style={{ padding: 16, textAlign: 'center', color: 'var(--tm)', fontSize: 12 }}>
+                      Brak zdjęć. Dodaj zdjęcie paczki przed wysyłką.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {photos.map((p, i) => (
+                        <div key={i} style={{ position: 'relative' }}>
+                          <img src={p} alt="" style={{ width: 70, height: 70, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border)' }} />
+                          <button onClick={() => setPhotos(prev => prev.filter((_, j) => j !== i))}
+                            style={{
+                              position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%',
+                              background: '#F87171', border: 'none', cursor: 'pointer', display: 'flex',
+                              alignItems: 'center', justifyContent: 'center',
+                            }}>
+                            <X size={10} color="#fff" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              </div>
+
+              {/* RIGHT: Customer & delivery info panel */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {/* Customer card */}
+                <Card noPadding>
+                  <div style={{ padding: '18px 20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+                      <User size={14} style={{ color: 'var(--accent)' }} />
+                      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--td)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Klient</span>
+                    </div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--t)', marginBottom: 6 }}>
+                      {activeOrder.addressName || '—'}
+                    </div>
+                    {activeOrder.addressPhone && (
+                      <div style={{ fontSize: 13, color: 'var(--tm)', marginBottom: 2 }}>Tel: {activeOrder.addressPhone}</div>
+                    )}
+
+                    <div style={{ height: 1, background: 'var(--border)', margin: '14px 0' }} />
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                      <MapPin size={14} style={{ color: 'var(--accent)' }} />
+                      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--td)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Adres dostawy</span>
+                    </div>
+                    {activeOrder.addressStreet && (
+                      <div style={{ fontSize: 13, color: 'var(--ts)', marginBottom: 2 }}>{activeOrder.addressStreet}</div>
+                    )}
+                    <div style={{ fontSize: 13, color: 'var(--ts)' }}>
+                      {activeOrder.addressZip} {activeOrder.addressCity}
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Delivery card */}
+                <Card noPadding>
+                  <div style={{ padding: '18px 20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+                      <Truck size={14} style={{ color: 'var(--accent)' }} />
+                      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--td)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Dostawa</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ fontSize: 12, color: 'var(--tm)' }}>Kurier</span>
+                      <Badge color="indigo">{activeOrder.courierName || activeOrder.deliveryMethod || '—'}</Badge>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ fontSize: 12, color: 'var(--tm)' }}>Metoda</span>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--t)' }}>{activeOrder.deliveryMethod || '—'}</span>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Package dimensions card */}
+                <Card noPadding>
+                  <div style={{ padding: '18px 20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+                      <Box size={14} style={{ color: 'var(--accent)' }} />
+                      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--td)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Wymiary paczki</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                      {['Szer.', 'Wys.', 'Gł.'].map(d => (
+                        <div key={d} style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 10, color: 'var(--tm)', marginBottom: 4 }}>{d}</div>
+                          <div style={{
+                            padding: '8px', borderRadius: 6, background: 'var(--hover-bg)',
+                            fontSize: 14, fontWeight: 700, color: 'var(--t)',
+                          }}>—</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Order summary */}
+                <div className="page-card" style={{
+                  padding: '16px 20px', background: 'var(--accent-g, rgba(99,102,241,0.04))',
+                }}>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--t)', fontFamily: 'monospace', marginBottom: 6 }}>
+                    {activeOrder.externalOrderId || activeOrder.id.slice(0, 8)}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ fontSize: 12, color: 'var(--tm)' }}>Pozycje</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--t)' }}>{totalItemsCount} szt</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 12, color: 'var(--tm)' }}>Wartość</span>
+                    <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--accent)' }}>{fmtMoney(totalAmount)} zł</span>
+                  </div>
                 </div>
-              </>
-            ) : null}
-          </div>
-        </div>
+              </div>
+            </div>
+
+            {/* Bottom bar: totals + actions */}
+            <div className="page-card" style={{
+              padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              position: 'sticky', bottom: 0, zIndex: 10,
+            }}>
+              <div style={{ display: 'flex', gap: 24 }}>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--td)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Pozycje</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--t)' }}>{checkedItems.size}/{activeOrder.items.length}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--td)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Łączna kwota</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)' }}>{fmtMoney(totalAmount)} zł</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <Button variant="secondary" onClick={() => cancelMut.mutate()} loading={cancelMut.isPending}>
+                  Anuluj
+                </Button>
+                <Button variant="primary" size="lg"
+                  icon={allChecked ? <Truck size={16} /> : <Package size={16} />}
+                  onClick={() => completeMut.mutate()}
+                  loading={completeMut.isPending}
+                  disabled={!allChecked}
+                  style={{ background: allChecked ? '#6366F1' : undefined }}>
+                  Generuj list przewozowy
+                </Button>
+              </div>
+            </div>
+          </>
+        ) : null}
       </div>
     </>
   );
