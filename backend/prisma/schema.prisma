@@ -235,7 +235,8 @@ model Workspace {
   allegroAccounts  AllegroAccount[]  @relation("AllegroAccountWorkspace")
   syncLogs         SyncLog[]         @relation("SyncLogWorkspace")
 
-  menuPreferences    UserMenuPreference[] @relation("MenuPrefWorkspace")
+  menuPreferences      UserMenuPreference[]  @relation("MenuPrefWorkspace")
+  permissionSchemas    PermissionSchema[]    @relation("PermissionSchemaWorkspace")
 
   @@index([type])
   @@index([isActive])
@@ -313,6 +314,20 @@ model AccessGrant {
   @@unique([membershipId, resourceType, resourceId])
   @@index([membershipId])
   @@index([resourceType, resourceId])
+}
+
+model PermissionSchema {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String
+  description String?
+  overrides   Json     // { nodeId, level, canDelete }[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation("PermissionSchemaWorkspace", fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
 }
 
 model WorkspaceManagement {
@@ -562,6 +577,15 @@ model Credential {
   additionalData     String?
   notes              String?
   isSharedWithClient Boolean            @default(false)
+
+  // Sejf haseł v2
+  visibility      String   @default("COMPANY")  // PRIVATE | COMPANY | SHARED
+  programName     String?
+  programCategory String?  // BROWSER | EMAIL | ERP | SYSTEM | OTHER
+  importSource    String?  // MANUAL | CSV | AGENT
+  importedAt      DateTime?
+  windowsAccount  Boolean  @default(false)
+
   createdByUserId    String
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt

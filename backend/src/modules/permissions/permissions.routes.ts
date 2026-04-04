@@ -174,4 +174,75 @@ router.put('/:membershipId', withWorkspaceMembership, authorizeWorkspace('OWNER'
   } catch (err) { next(err); }
 });
 
+// ── Permission Schemas (templates) ──
+
+// GET /api/permissions/schemas — list all schemas for workspace
+router.get('/schemas/list', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const wsId = req.workspaceId;
+    if (!wsId) { res.status(400).json({ error: 'Workspace context required' }); return; }
+    const schemas = await prisma.permissionSchema.findMany({
+      where: { workspaceId: wsId },
+      orderBy: { name: 'asc' },
+    });
+    res.json(schemas);
+  } catch (err) { next(err); }
+});
+
+// POST /api/permissions/schemas — create a new schema
+router.post('/schemas', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const wsId = req.workspaceId;
+    if (!wsId) { res.status(400).json({ error: 'Workspace context required' }); return; }
+    const { name, description, overrides } = req.body;
+    if (!name) { res.status(400).json({ error: 'Nazwa schematu jest wymagana' }); return; }
+    const schema = await prisma.permissionSchema.create({
+      data: { workspaceId: wsId, name, description: description || null, overrides: overrides || [] },
+    });
+    res.status(201).json(schema);
+  } catch (err) { next(err); }
+});
+
+// PUT /api/permissions/schemas/:id — update schema
+router.put('/schemas/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const wsId = req.workspaceId;
+    const { id } = req.params;
+    const { name, description, overrides } = req.body;
+    const existing = await prisma.permissionSchema.findUnique({ where: { id } });
+    if (!existing || existing.workspaceId !== wsId) { res.status(404).json({ error: 'Schema not found' }); return; }
+    const updated = await prisma.permissionSchema.update({
+      where: { id },
+      data: { name: name ?? existing.name, description: description ?? existing.description, overrides: overrides ?? existing.overrides },
+    });
+    res.json(updated);
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/permissions/schemas/:id
+router.delete('/schemas/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const wsId = req.workspaceId;
+    const { id } = req.params;
+    const existing = await prisma.permissionSchema.findUnique({ where: { id } });
+    if (!existing || existing.workspaceId !== wsId) { res.status(404).json({ error: 'Schema not found' }); return; }
+    await prisma.permissionSchema.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// POST /api/permissions/schemas/:id/duplicate
+router.post('/schemas/:id/duplicate', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const wsId = req.workspaceId;
+    const { id } = req.params;
+    const existing = await prisma.permissionSchema.findUnique({ where: { id } });
+    if (!existing || existing.workspaceId !== wsId) { res.status(404).json({ error: 'Schema not found' }); return; }
+    const copy = await prisma.permissionSchema.create({
+      data: { workspaceId: wsId, name: `${existing.name} (kopia)`, description: existing.description, overrides: existing.overrides },
+    });
+    res.status(201).json(copy);
+  } catch (err) { next(err); }
+});
+
 export default router;

@@ -94,12 +94,41 @@ export function PermissionTreeEditor({ overrides, onChange, readOnly }: Props) {
     onChange(newOverrides);
   };
 
+  const setAllModules = (level: string) => {
+    if (readOnly || !treeData) return;
+    const newOverrides: Override[] = [];
+    for (const mod of treeData) {
+      newOverrides.push({ nodeId: mod.nodeId, level, canDelete: false });
+    }
+    onChange(newOverrides);
+  };
+
   if (!treeData) {
     return <div style={{ padding: 20, textAlign: 'center', color: 'var(--tm)', fontSize: 12 }}>Ładowanie drzewa uprawnień...</div>;
   }
 
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+      {/* Quick actions */}
+      {!readOnly && (
+        <div style={{ display: 'flex', gap: 6, padding: '8px 12px', borderBottom: '1px solid var(--border)', background: 'var(--hover-bg)' }}>
+          <span style={{ fontSize: 10, color: 'var(--tm)', marginRight: 4, lineHeight: '24px' }}>Szybkie ustawienie:</span>
+          {[
+            { label: 'Wszystko pełne', level: 'FULL', color: '#22C55E' },
+            { label: 'Wszystko podgląd', level: 'VIEW', color: '#3B82F6' },
+            { label: 'Wszystko zablokowane', level: 'NONE', color: '#6B7280' },
+          ].map(a => (
+            <button key={a.level} type="button" onClick={() => setAllModules(a.level)}
+              style={{
+                padding: '3px 10px', borderRadius: 6, border: `1px solid ${a.color}30`,
+                background: `${a.color}10`, color: a.color,
+                fontSize: 10, fontWeight: 600, cursor: 'pointer',
+              }}>
+              {a.label}
+            </button>
+          ))}
+        </div>
+      )}
       {/* Header */}
       <div style={{
         display: 'grid', gridTemplateColumns: '1fr 140px 80px', gap: 8,

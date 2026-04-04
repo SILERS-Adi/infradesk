@@ -14,6 +14,7 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useWorkspaceContext } from '../../hooks/useWorkspaceContext';
 import { useWorkspace } from '../../store/workspaceStore';
 import { PermissionTreeEditor } from '../../components/permissions/PermissionTreeEditor';
+import { PermissionSchemas } from '../../components/permissions/PermissionSchemas';
 import { getInitials, formatDate } from '../../utils/helpers';
 import type { MemberRole, ScopeType } from '../../types';
 
@@ -24,7 +25,7 @@ function getAccountLabel(m: WsMember): { label: string; color: string; desc: str
   const as_ = (m as any).accessScope ?? (m.role === 'MEMBER' || m.role === 'VIEWER' ? 'RESTRICTED' : 'FULL');
   if (at === 'ADMIN') return { label: 'Administrator', color: '#8B5CF6', desc: 'Pełny dostęp do firmy' };
   if (as_ === 'FULL') return { label: 'Użytkownik', color: '#3B82F6', desc: 'Pełny dostęp' };
-  return { label: 'Użytkownik', color: '#6B7280', desc: 'Ograniczony dostęp' };
+  return { label: 'Użytkownik', color: '#F59E0B', desc: 'Spersonalizowany dostęp' };
 }
 
 function AccountBadge({ member }: { member: WsMember }) {
@@ -50,7 +51,7 @@ function AccessScopeBadge({ member }: { member: WsMember }) {
       background: 'rgba(251,191,36,0.1)', color: '#FBBF24',
       display: 'inline-flex', alignItems: 'center', gap: 3,
     }}>
-      <Eye style={{ width: 9, height: 9 }} /> Ograniczony
+      <Eye style={{ width: 9, height: 9 }} /> Spersonalizowany
     </span>
   );
 }
@@ -481,7 +482,7 @@ function MemberForm({ member, onSuccess }: { member?: WsMember; onSuccess: () =>
                   border: `1px solid ${accessScope === 'FULL' ? 'var(--accent)' : 'var(--border)'}`,
                 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: accessScope === 'FULL' ? 'var(--accent)' : 'var(--t)' }}>Pełny dostęp</div>
-                  <div style={{ fontSize: 10, color: 'var(--td)' }}>Dostęp do wszystkich aktywnych modułów (bez usuwania)</div>
+                  <div style={{ fontSize: 10, color: 'var(--td)' }}>Użytkownik ma dostęp do wszystkich funkcji w firmie</div>
                 </button>
                 <button type="button" onClick={() => setAccessScope('RESTRICTED')} style={{
                   flex: 1, padding: '10px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
@@ -489,9 +490,9 @@ function MemberForm({ member, onSuccess }: { member?: WsMember; onSuccess: () =>
                   border: `1px solid ${accessScope === 'RESTRICTED' ? '#FBBF24' : 'var(--border)'}`,
                 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: accessScope === 'RESTRICTED' ? '#FBBF24' : 'var(--t)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Eye style={{ width: 12, height: 12 }} /> Ograniczony dostęp
+                    <Eye style={{ width: 12, height: 12 }} /> Spersonalizowany dostęp
                   </div>
-                  <div style={{ fontSize: 10, color: 'var(--td)' }}>Uprawnienia ustawiane ręcznie per moduł</div>
+                  <div style={{ fontSize: 10, color: 'var(--td)' }}>Dostęp ustawiany indywidualnie dla modułów i sekcji</div>
                 </button>
               </div>
             </div>
@@ -507,9 +508,14 @@ function MemberForm({ member, onSuccess }: { member?: WsMember; onSuccess: () =>
             </div>
           )}
 
-          {/* Drzewo uprawnień — tylko dla Użytkownika z Ograniczonym dostępem */}
+          {/* Drzewo uprawnień — tylko dla Użytkownika ze Spersonalizowanym dostępem */}
           {accountType === 'USER' && accessScope === 'RESTRICTED' && (
             <div>
+              <PermissionSchemas
+                currentOverrides={permOverrides}
+                onApply={(overrides) => setPermOverrides(overrides)}
+                onSave={() => {}}
+              />
               <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--ts)', marginBottom: 6, display: 'block' }}>Drzewo uprawnień</label>
               <PermissionTreeEditor
                 overrides={permOverrides}
@@ -674,7 +680,7 @@ function MemberForm({ member, onSuccess }: { member?: WsMember; onSuccess: () =>
               <span style={{ fontSize: 11, color: 'var(--accent)' }}>Pełny dostęp</span>
             ) : (
               <div>
-                <span style={{ fontSize: 10, fontWeight: 600, color: '#FBBF24' }}>Ograniczony</span>
+                <span style={{ fontSize: 10, fontWeight: 600, color: '#FBBF24' }}>Spersonalizowany</span>
                 <div style={{ fontSize: 10, color: 'var(--ts)', marginTop: 4 }}>
                   {selectedLocations.length > 0 && <div>{selectedLocations.length} lokalizacji</div>}
                   {selectedDevices.length > 0 && <div>{selectedDevices.length} urzadzen</div>}
