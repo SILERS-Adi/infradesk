@@ -7,6 +7,9 @@ import { useWorkspace } from './store/workspaceStore';
 import { workspacesApi } from './api/workspaces';
 import { authApi } from './api/auth';
 
+// Onboarding
+import OnboardingWizard from './pages/onboarding/OnboardingWizard';
+
 // Layouts
 import { OperationsLayout } from './components/layout/OperationsLayout';
 import { PortalLayout } from './components/layout/PortalLayout';
@@ -387,6 +390,9 @@ export default function App() {
             {/* Redirects — architecture migration */}
             <Route path="/credentials" element={<Navigate to="/vault" replace />} />
             <Route path="/workspace-members" element={<Navigate to="/users" replace />} />
+
+            {/* Onboarding wizard */}
+            <Route path="/onboarding" element={<OnboardingWizard />} />
 
             {/* Portal (CLIENT) */}
             <Route path="/portal/*" element={<PortalRoutes />} />
