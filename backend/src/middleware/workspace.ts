@@ -281,6 +281,66 @@ export function authorizeWorkspace(...allowedRoles: MemberRole[]) {
 
 
 // ══════════════════════════════════════════════════════════════════════
+//  Module access guard
+//
+//  Checks that the active workspace has the required module enabled.
+//  Handles backward-compatible module key migration.
+//
+//  Usage:
+//    router.get('/', authenticate, withWorkspaceMembership, requireModule('invoicing'), handler)
+// ══════════════════════════════════════════════════════════════════════
+
+/** Maps old module keys to new ones */
+const MODULE_MIGRATION: Record<string, string[]> = {
+  'helpdesk': ['infrastructure', 'service-desk'],
+  'service': ['skp'],
+};
+
+function isModuleEnabled(enabledModules: string[], moduleKey: string): boolean {
+  if (enabledModules.includes(moduleKey)) return true;
+  for (const [oldKey, newKeys] of Object.entries(MODULE_MIGRATION)) {
+    if (newKeys.includes(moduleKey) && enabledModules.includes(oldKey)) return true;
+  }
+  return false;
+}
+
+export function requireModule(moduleKey: string) {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    // SuperAdmin bypass
+    if (req.user?.isSuperAdmin) { next(); return; }
+
+    const wsId = req.workspaceId;
+    if (!wsId) {
+      res.status(400).json({ error: 'Workspace context required' });
+      return;
+    }
+
+    // Fetch workspace enabledModules
+    const ws = await prisma.workspace.findUnique({
+      where: { id: wsId },
+      select: { enabledModules: true },
+    });
+
+    if (!ws) {
+      res.status(404).json({ error: 'Workspace not found' });
+      return;
+    }
+
+    if (!isModuleEnabled(ws.enabledModules, moduleKey)) {
+      res.status(403).json({
+        error: 'Module not enabled for this workspace',
+        module: moduleKey,
+        code: 'MODULE_DISABLED',
+      });
+      return;
+    }
+
+    next();
+  };
+}
+
+
+// ══════════════════════════════════════════════════════════════════════
 //  Etap 1C — Scope filters for Prisma queries
 //
 //  These helpers generate Prisma `where` clauses that enforce

@@ -66,7 +66,7 @@ import menuPreferencesRouter from './modules/menu-preferences/menu-preferences.r
 // Middleware
 import { errorHandler } from './middleware/errorHandler';
 import { authenticate } from './middleware/auth';
-import { resolveWorkspace } from './middleware/workspace';
+import { resolveWorkspace, requireModule } from './middleware/workspace';
 import { requestLogger } from './middleware/requestLogger';
 import prisma from './lib/prisma';
 
@@ -189,27 +189,28 @@ app.use('/api/tenant', tenantRoutes);
 app.use('/api/partners', partnersRouter);
 app.use('/api/superadmin', superadminRouter);
 app.use('/api/subscriptions', subscriptionsRouter);
-app.use('/api/invoicing/documents', invoicingRouter);
-app.use('/api/invoicing/contractors', contractorsRouter);
-app.use('/api/invoicing/products', productsRouter);
-app.use('/api/invoicing/reports', invoicingReportsRouter);
-app.use('/api/invoicing/payments', invoicingPaymentsRouter);
-app.use('/api/packaging/shipments', packagingRouter);
-app.use('/api/packaging/reports', packagingReportsRouter);
-app.use('/api/packaging/orders', packagingOrdersRouter);
-app.use('/api/packaging/packing', packingRouter);
-app.use('/api/packaging/picking', pickingRouter);
-app.use('/api/packaging/batches', batchesRouter);
-app.use('/api/packaging/carriers', carriersRouter);
-app.use('/api/packaging/customers', pakCustomersRouter);
-app.use('/api/packaging/dashboard', pakDashboardRouter);
-app.use('/api/packaging/waves', wavesRouter);
-app.use('/api/packaging/shipping', shippingRouter);
+// Module-gated routes — requireModule checks workspace.enabledModules
+app.use('/api/invoicing/documents', authenticate, requireModule('invoicing'), invoicingRouter);
+app.use('/api/invoicing/contractors', authenticate, requireModule('invoicing'), contractorsRouter);
+app.use('/api/invoicing/products', authenticate, requireModule('invoicing'), productsRouter);
+app.use('/api/invoicing/reports', authenticate, requireModule('invoicing'), invoicingReportsRouter);
+app.use('/api/invoicing/payments', authenticate, requireModule('invoicing'), invoicingPaymentsRouter);
+app.use('/api/packaging/shipments', authenticate, requireModule('packaging'), packagingRouter);
+app.use('/api/packaging/reports', authenticate, requireModule('packaging'), packagingReportsRouter);
+app.use('/api/packaging/orders', authenticate, requireModule('packaging'), packagingOrdersRouter);
+app.use('/api/packaging/packing', authenticate, requireModule('packaging'), packingRouter);
+app.use('/api/packaging/picking', authenticate, requireModule('packaging'), pickingRouter);
+app.use('/api/packaging/batches', authenticate, requireModule('packaging'), batchesRouter);
+app.use('/api/packaging/carriers', authenticate, requireModule('packaging'), carriersRouter);
+app.use('/api/packaging/customers', authenticate, requireModule('packaging'), pakCustomersRouter);
+app.use('/api/packaging/dashboard', authenticate, requireModule('packaging'), pakDashboardRouter);
+app.use('/api/packaging/waves', authenticate, requireModule('packaging'), wavesRouter);
+app.use('/api/packaging/shipping', authenticate, requireModule('packaging'), shippingRouter);
 app.use('/api/billing', billingRouter);
 app.use('/api/sharing', sharingRouter);
 app.use('/api/menu-preferences', menuPreferencesRouter);
-app.use('/api/service/vehicles', serviceVehiclesRouter);
-app.use('/api/service/inspections', serviceInspectionsRouter);
+app.use('/api/service/vehicles', authenticate, requireModule('skp'), serviceVehiclesRouter);
+app.use('/api/service/inspections', authenticate, requireModule('skp'), serviceInspectionsRouter);
 // Public agent endpoints (no auth)
 app.get('/api/agent/contact', getContactHandler);
 app.get('/api/agent/faq',     getFaqHandler);
