@@ -358,9 +358,6 @@ function TicketRatingSection({ ticket }: { ticket: any }) {
   const [comment, setComment] = useState('');
   const [showComment, setShowComment] = useState(false);
 
-  const isCompleted = ['COMPLETED', 'RESOLVED', 'CLOSED'].includes(ticket.status);
-  if (!isCompleted) return null;
-
   const rateMut = useMutation({
     mutationFn: (data: { rating: number; ratingComment?: string }) =>
       ticketsApi.rate(ticket.id, data),
@@ -370,6 +367,9 @@ function TicketRatingSection({ ticket }: { ticket: any }) {
     },
     onError: () => toast.error('Błąd zapisu oceny'),
   });
+
+  const isCompleted = ['COMPLETED', 'RESOLVED', 'CLOSED'].includes(ticket.status);
+  if (!isCompleted) return null;
 
   const handleRate = (rating: number) => {
     if (ticket.rating) return;
