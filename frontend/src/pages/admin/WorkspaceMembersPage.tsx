@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Trash2, Edit2, Shield, Eye, UserPlus, MapPin, Monitor, ChevronDown, ChevronRight, X, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { workspacesApi, type WsMember } from '../../api/workspaces';
+import { apiClient } from '../../api/client';
 import { locationsApi } from '../../api/locations';
 import { devicesApi } from '../../api/devices';
 import { usersApi } from '../../api/users';
@@ -12,27 +13,22 @@ import { Modal } from '../../components/ui/Modal';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useWorkspaceContext } from '../../hooks/useWorkspaceContext';
 import { useWorkspace } from '../../store/workspaceStore';
+import { PermissionTreeEditor } from '../../components/permissions/PermissionTreeEditor';
 import { getInitials, formatDate } from '../../utils/helpers';
 import type { MemberRole, ScopeType } from '../../types';
 
-/* ── Role config ─────────────────────────────────────────────────── */
+/* ── Account type config (UI: polskie nazwy) ───────────────────── */
 
-const ROLES: { id: MemberRole; label: string; color: string; desc: string }[] = [
-  { id: 'OWNER', label: 'Owner', color: '#8B5CF6', desc: 'Pelny dostep + billing + usuwanie workspace' },
-  { id: 'ADMIN', label: 'Admin', color: '#6366F1', desc: 'Zarzadzanie uzytkownikami, ustawieniami, wszystkimi modulami' },
-  { id: 'TECHNICIAN', label: 'Technik', color: '#3B82F6', desc: 'Praca operacyjna: tickety, urzadzenia, sesje' },
-  { id: 'MEMBER', label: 'Czlonek', color: '#6B7280', desc: 'Dostep bazowy: tickety, portal' },
-  { id: 'VIEWER', label: 'Podglad', color: '#9CA3AF', desc: 'Tylko odczyt' },
-];
-
-function getRoleConfig(role: string) {
-  return ROLES.find(r => r.id === role) ?? ROLES[4];
+function getAccountLabel(m: WsMember): { label: string; color: string; desc: string } {
+  const at = (m as any).accountType ?? (m.role === 'OWNER' || m.role === 'ADMIN' ? 'ADMIN' : 'USER');
+  const as_ = (m as any).accessScope ?? (m.role === 'MEMBER' || m.role === 'VIEWER' ? 'RESTRICTED' : 'FULL');
+  if (at === 'ADMIN') return { label: 'Administrator', color: '#8B5CF6', desc: 'Pełny dostęp do firmy' };
+  if (as_ === 'FULL') return { label: 'Użytkownik', color: '#3B82F6', desc: 'Pełny dostęp' };
+  return { label: 'Użytkownik', color: '#6B7280', desc: 'Ograniczony dostęp' };
 }
 
-/* ── Role badge ──────────────────────────────────────────────────── */
-
-function RoleBadge({ role }: { role: string }) {
-  const c = getRoleConfig(role);
+function AccountBadge({ member }: { member: WsMember }) {
+  const c = getAccountLabel(member);
   return (
     <span style={{
       fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
@@ -43,8 +39,11 @@ function RoleBadge({ role }: { role: string }) {
   );
 }
 
-function ScopeBadge({ scope }: { scope: string }) {
-  if (scope !== 'SCOPED') return null;
+function AccessScopeBadge({ member }: { member: WsMember }) {
+  const at = (member as any).accountType ?? 'USER';
+  const as_ = (member as any).accessScope ?? 'FULL';
+  if (at === 'ADMIN') return <span style={{ fontSize: 10, color: 'var(--tm)' }}>Pełny</span>;
+  if (as_ === 'FULL') return <span style={{ fontSize: 10, color: 'var(--tm)' }}>Pełny dostęp</span>;
   return (
     <span style={{
       fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
@@ -75,7 +74,7 @@ export function WorkspaceMembersPage() {
 
   const removeMutation = useMutation({
     mutationFn: (id: string) => workspacesApi.removeMember(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['workspace-members'] }); toast.success('Uzytkownik usuniety'); setDeleteTarget(null); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['workspace-members'] }); toast.success('Użytkownik usunięty'); setDeleteTarget(null); },
     onError: (e: any) => toast.error(e?.response?.data?.error ?? 'Blad'),
   });
 
@@ -89,8 +88,8 @@ export function WorkspaceMembersPage() {
   return (
     <div>
       <PageHeader
-        title="Czlonkowie workspace"
-        subtitle={`${members.length} uzytkownikow · ${workspace?.name ?? ''}`}
+        title="Użytkownicy"
+        subtitle={`${members.length} użytkowników · ${workspace?.name ?? ''}`}
         actions={canManageUsers ? (
           <Button icon={<UserPlus className="h-4 w-4" />} onClick={() => setShowAdd(true)}>
             Dodaj uzytkownika
@@ -130,17 +129,17 @@ export function WorkspaceMembersPage() {
           <table className="w-full text-sm">
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Uzytkownik</th>
-                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Rola</th>
-                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Zakres</th>
-                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Zrodlo</th>
-                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Granty</th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Użytkownik</th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Typ konta</th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Zakres dostępu</th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Źródło</th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Zasoby</th>
                 {canManageUsers && <th className="w-24" />}
               </tr>
             </thead>
             <tbody>
               {filtered.map(m => {
-                const rc = getRoleConfig(m.role);
+                const ac = getAccountLabel(m);
                 return (
                   <tr key={m.id} className="group" style={{ borderBottom: '1px solid var(--border)' }}
                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--hover-bg)')}
@@ -149,7 +148,7 @@ export function WorkspaceMembersPage() {
                       <div className="flex items-center gap-3">
                         <div style={{
                           width: 30, height: 30, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: `linear-gradient(135deg, ${rc.color}, ${rc.color}88)`, fontSize: 10, fontWeight: 700, color: '#fff',
+                          background: `linear-gradient(135deg, ${ac.color}, ${ac.color}88)`, fontSize: 10, fontWeight: 700, color: '#fff',
                         }}>
                           {getInitials(m.user.firstName, m.user.lastName)}
                         </div>
@@ -159,15 +158,9 @@ export function WorkspaceMembersPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3"><RoleBadge role={m.role} /></td>
+                    <td className="px-4 py-3"><AccountBadge member={m} /></td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5">
-                        {m.scopeType === 'FULL' ? (
-                          <span style={{ fontSize: 10, color: 'var(--tm)' }}>Pelny</span>
-                        ) : (
-                          <ScopeBadge scope={m.scopeType} />
-                        )}
-                      </div>
+                      <AccessScopeBadge member={m} />
                     </td>
                     <td className="px-4 py-3">
                       <span style={{ fontSize: 10, color: 'var(--td)' }}>
@@ -215,7 +208,7 @@ export function WorkspaceMembersPage() {
       </div>
 
       {/* Add modal */}
-      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Dodaj uzytkownika do workspace" size="lg">
+      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Dodaj użytkownika" size="lg">
         <MemberForm onSuccess={() => { setShowAdd(false); qc.invalidateQueries({ queryKey: ['workspace-members'] }); }} />
       </Modal>
 
@@ -228,8 +221,8 @@ export function WorkspaceMembersPage() {
       <ConfirmDialog
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        title="Usun uzytkownika z workspace"
-        message={deleteTarget ? `Czy na pewno chcesz usunac ${deleteTarget.user.firstName} ${deleteTarget.user.lastName} (${deleteTarget.user.email}) z tego workspace?` : ''}
+        title="Usuń użytkownika"
+        message={deleteTarget ? `Czy na pewno chcesz usunąć ${deleteTarget.user.firstName} ${deleteTarget.user.lastName} (${deleteTarget.user.email})?` : ''}
         confirmLabel="Usun"
         onConfirm={() => { if (deleteTarget) removeMutation.mutate(deleteTarget.id); }}
         loading={removeMutation.isPending}
@@ -244,8 +237,30 @@ function MemberForm({ member, onSuccess }: { member?: WsMember; onSuccess: () =>
   const isEdit = !!member;
   const { isOwner } = useWorkspaceContext();
   const [email, setEmail] = useState(member?.user.email ?? '');
-  const [role, setRole] = useState<string>(member?.role ?? 'TECHNICIAN');
-  const [scopeType, setScopeType] = useState<string>(member?.scopeType ?? 'FULL');
+
+  // New permission model
+  const memberAccountType = (member as any)?.accountType ?? (member?.role === 'OWNER' || member?.role === 'ADMIN' ? 'ADMIN' : 'USER');
+  const memberAccessScope = (member as any)?.accessScope ?? (member?.role === 'MEMBER' || member?.role === 'VIEWER' ? 'RESTRICTED' : 'FULL');
+  const [accountType, setAccountType] = useState<string>(memberAccountType);
+  const [accessScope, setAccessScope] = useState<string>(memberAccessScope);
+  const [permOverrides, setPermOverrides] = useState<{ nodeId: string; level: string; canDelete?: boolean }[]>([]);
+
+  // Load existing overrides when editing
+  useEffect(() => {
+    if (!isEdit || !member) return;
+    apiClient.get(`/permissions/${member.id}`)
+      .then(r => {
+        if (r.data.permissionOverrides) setPermOverrides(r.data.permissionOverrides);
+        if (r.data.accountType) setAccountType(r.data.accountType);
+        if (r.data.accessScope) setAccessScope(r.data.accessScope);
+      })
+      .catch(() => {}); // silently fail if endpoint not available yet
+  }, [isEdit, member]);
+
+  // Legacy compat
+  const role = accountType === 'ADMIN' ? (member?.role === 'OWNER' ? 'OWNER' : 'ADMIN')
+    : accessScope === 'FULL' ? 'TECHNICIAN' : 'MEMBER';
+  const scopeType = member?.scopeType ?? 'FULL';
   const [grantSearch, setGrantSearch] = useState('');
   const [expandedLocs, setExpandedLocs] = useState<Set<string>>(new Set());
   const [selectedDevices, setSelectedDevices] = useState<string[]>(
@@ -367,14 +382,23 @@ function MemberForm({ member, onSuccess }: { member?: WsMember; onSuccess: () =>
 
   const addMutation = useMutation({
     mutationFn: () => workspacesApi.addMember({ email, role, scopeType, grants: scopeType === 'SCOPED' ? buildGrants() : undefined }),
-    onSuccess: () => { toast.success('Uzytkownik dodany'); onSuccess(); },
+    onSuccess: () => { toast.success('Użytkownik dodany'); onSuccess(); },
     onError: (e: any) => toast.error(e?.response?.data?.error ?? 'Blad'),
   });
 
   const editMutation = useMutation({
-    mutationFn: () => workspacesApi.updateMember(member!.id, { role, scopeType, grants: buildGrants() }),
+    mutationFn: async () => {
+      // Update legacy role + scope via existing endpoint
+      await workspacesApi.updateMember(member!.id, { role, scopeType, grants: buildGrants() });
+      // Update new permission model
+      await apiClient.put(`/permissions/${member!.id}`, {
+        accountType,
+        accessScope,
+        overrides: accessScope === 'RESTRICTED' ? permOverrides : [],
+      });
+    },
     onSuccess: () => { toast.success('Zapisano zmiany'); onSuccess(); },
-    onError: (e: any) => toast.error(e?.response?.data?.error ?? 'Blad'),
+    onError: (e: any) => toast.error(e?.response?.data?.error ?? 'Błąd'),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -383,15 +407,12 @@ function MemberForm({ member, onSuccess }: { member?: WsMember; onSuccess: () =>
     if (isEdit) editMutation.mutate(); else addMutation.mutate();
   };
 
-  // Roles available (OWNER only for current OWNER)
-  const availableRoles = ROLES.filter(r => r.id !== 'OWNER' || isOwner);
-
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '10px 14px', borderRadius: 10, fontSize: 13,
     background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)',
   };
 
-  const rc = getRoleConfig(role);
+  const ac = getAccountLabel({ ...member, accountType, accessScope } as any);
   const totalGrants = selectedLocations.length + selectedDevices.length;
 
   return (
@@ -426,81 +447,76 @@ function MemberForm({ member, onSuccess }: { member?: WsMember; onSuccess: () =>
             </div>
           )}
 
-          {/* Role templates */}
-          {!isEdit && (
+          {/* Typ konta */}
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--ts)', marginBottom: 4, display: 'block' }}>Typ konta</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="button" onClick={() => { setAccountType('ADMIN'); setAccessScope('FULL'); }} style={{
+                flex: 1, padding: '10px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                background: accountType === 'ADMIN' ? 'rgba(139,92,246,0.08)' : 'transparent',
+                border: `1px solid ${accountType === 'ADMIN' ? '#8B5CF6' : 'var(--border)'}`,
+              }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: accountType === 'ADMIN' ? '#8B5CF6' : 'var(--t)' }}>Administrator</div>
+                <div style={{ fontSize: 10, color: 'var(--td)' }}>Pełny dostęp do firmy, zarządzanie użytkownikami i ustawieniami</div>
+              </button>
+              <button type="button" onClick={() => setAccountType('USER')} style={{
+                flex: 1, padding: '10px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                background: accountType === 'USER' ? 'rgba(59,130,246,0.08)' : 'transparent',
+                border: `1px solid ${accountType === 'USER' ? '#3B82F6' : 'var(--border)'}`,
+              }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: accountType === 'USER' ? '#3B82F6' : 'var(--t)' }}>Użytkownik</div>
+                <div style={{ fontSize: 10, color: 'var(--td)' }}>Dostęp do wybranych modułów wg zakresu</div>
+              </button>
+            </div>
+          </div>
+
+          {/* Zakres dostępu — tylko dla Użytkownika */}
+          {accountType === 'USER' && (
             <div>
-              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--ts)', marginBottom: 4, display: 'block' }}>Szybki preset</label>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {[
-                  { label: 'Technik (pelny)', role: 'TECHNICIAN', scope: 'FULL', icon: '🔧' },
-                  { label: 'Technik (lokalizacja)', role: 'TECHNICIAN', scope: 'SCOPED', icon: '📍' },
-                  { label: 'Podglad (monitoring)', role: 'VIEWER', scope: 'FULL', icon: '👁' },
-                ].map(tpl => (
-                  <button key={tpl.label} type="button"
-                    onClick={() => { setRole(tpl.role); setScopeType(tpl.scope); }}
-                    style={{
-                      fontSize: 10, fontWeight: 500, padding: '5px 10px', borderRadius: 8, cursor: 'pointer',
-                      background: role === tpl.role && scopeType === tpl.scope ? 'var(--accent-g)' : 'var(--hover-bg)',
-                      border: `1px solid ${role === tpl.role && scopeType === tpl.scope ? 'var(--accent)' : 'var(--border)'}`,
-                      color: role === tpl.role && scopeType === tpl.scope ? 'var(--accent)' : 'var(--ts)',
-                    }}>
-                    {tpl.icon} {tpl.label}
-                  </button>
-                ))}
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--ts)', marginBottom: 4, display: 'block' }}>Zakres dostępu</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" onClick={() => setAccessScope('FULL')} style={{
+                  flex: 1, padding: '10px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                  background: accessScope === 'FULL' ? 'var(--accent-g)' : 'transparent',
+                  border: `1px solid ${accessScope === 'FULL' ? 'var(--accent)' : 'var(--border)'}`,
+                }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: accessScope === 'FULL' ? 'var(--accent)' : 'var(--t)' }}>Pełny dostęp</div>
+                  <div style={{ fontSize: 10, color: 'var(--td)' }}>Dostęp do wszystkich aktywnych modułów (bez usuwania)</div>
+                </button>
+                <button type="button" onClick={() => setAccessScope('RESTRICTED')} style={{
+                  flex: 1, padding: '10px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                  background: accessScope === 'RESTRICTED' ? 'rgba(251,191,36,0.08)' : 'transparent',
+                  border: `1px solid ${accessScope === 'RESTRICTED' ? '#FBBF24' : 'var(--border)'}`,
+                }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: accessScope === 'RESTRICTED' ? '#FBBF24' : 'var(--t)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Eye style={{ width: 12, height: 12 }} /> Ograniczony dostęp
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--td)' }}>Uprawnienia ustawiane ręcznie per moduł</div>
+                </button>
               </div>
             </div>
           )}
 
-          {/* Role selection */}
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--ts)', marginBottom: 4, display: 'block' }}>Rola</label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {availableRoles.map(r => {
-                const isDisabled = r.id === 'OWNER' && !isOwner;
-                return (
-                  <label key={r.id} style={{
-                    display: 'flex', alignItems: 'center', gap: 10, padding: '7px 12px', borderRadius: 10,
-                    cursor: isDisabled ? 'not-allowed' : 'pointer', opacity: isDisabled ? 0.4 : 1,
-                    background: role === r.id ? `${r.color}10` : 'transparent',
-                    border: `1px solid ${role === r.id ? `${r.color}40` : 'var(--border)'}`,
-                  }}>
-                    <input type="radio" name="role" value={r.id} checked={role === r.id}
-                      onChange={() => !isDisabled && setRole(r.id)} disabled={isDisabled}
-                      style={{ accentColor: r.color }} />
-                    <div style={{ flex: 1 }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: role === r.id ? r.color : 'var(--t)' }}>{r.label}</span>
-                      <span style={{ fontSize: 10, color: 'var(--td)', marginLeft: 6 }}>{r.desc}</span>
-                    </div>
-                  </label>
-                );
-              })}
+          {/* Komunikat dla Administratora */}
+          {accountType === 'ADMIN' && (
+            <div style={{
+              padding: '10px 14px', borderRadius: 10, background: 'rgba(139,92,246,0.06)',
+              border: '1px solid rgba(139,92,246,0.12)', fontSize: 11, color: 'var(--ts)',
+            }}>
+              <strong style={{ color: '#8B5CF6' }}>Administrator</strong> ma pełny dostęp do wszystkich modułów, użytkowników, ustawień i danych firmy.
             </div>
-          </div>
+          )}
 
-          {/* Scope toggle */}
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--ts)', marginBottom: 4, display: 'block' }}>Zakres dostepu</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button type="button" onClick={() => setScopeType('FULL')} style={{
-                flex: 1, padding: '10px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-                background: scopeType === 'FULL' ? 'var(--accent-g)' : 'transparent',
-                border: `1px solid ${scopeType === 'FULL' ? 'var(--accent)' : 'var(--border)'}`,
-              }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: scopeType === 'FULL' ? 'var(--accent)' : 'var(--t)' }}>Pelny dostep</div>
-                <div style={{ fontSize: 10, color: 'var(--td)' }}>Widzi wszystko w workspace</div>
-              </button>
-              <button type="button" onClick={() => setScopeType('SCOPED')} style={{
-                flex: 1, padding: '10px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-                background: scopeType === 'SCOPED' ? 'rgba(251,191,36,0.08)' : 'transparent',
-                border: `1px solid ${scopeType === 'SCOPED' ? '#FBBF24' : 'var(--border)'}`,
-              }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: scopeType === 'SCOPED' ? '#FBBF24' : 'var(--t)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Eye style={{ width: 12, height: 12 }} /> Ograniczony
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--td)' }}>Tylko wybrane lokalizacje / urzadzenia</div>
-              </button>
+          {/* Drzewo uprawnień — tylko dla Użytkownika z Ograniczonym dostępem */}
+          {accountType === 'USER' && accessScope === 'RESTRICTED' && (
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--ts)', marginBottom: 6, display: 'block' }}>Drzewo uprawnień</label>
+              <PermissionTreeEditor
+                overrides={permOverrides}
+                onChange={setPermOverrides}
+              />
             </div>
-          </div>
+          )}
 
           {/* Grant selection tree (SCOPED only) */}
           {scopeType === 'SCOPED' && (
@@ -645,20 +661,20 @@ function MemberForm({ member, onSuccess }: { member?: WsMember; onSuccess: () =>
             </div>
           )}
 
-          {/* Role */}
+          {/* Typ konta */}
           <div>
-            <div style={{ fontSize: 9, color: 'var(--td)' }}>Rola</div>
-            <RoleBadge role={role} />
+            <div style={{ fontSize: 9, color: 'var(--td)' }}>Typ konta</div>
+            <span style={{ fontSize: 11, fontWeight: 600, color: ac.color }}>{ac.label}</span>
           </div>
 
-          {/* Scope */}
+          {/* Zakres */}
           <div>
             <div style={{ fontSize: 9, color: 'var(--td)' }}>Zakres</div>
-            {scopeType === 'FULL' ? (
-              <span style={{ fontSize: 11, color: 'var(--accent)' }}>Pelny dostep</span>
+            {accountType === 'ADMIN' || accessScope === 'FULL' ? (
+              <span style={{ fontSize: 11, color: 'var(--accent)' }}>Pełny dostęp</span>
             ) : (
               <div>
-                <ScopeBadge scope="SCOPED" />
+                <span style={{ fontSize: 10, fontWeight: 600, color: '#FBBF24' }}>Ograniczony</span>
                 <div style={{ fontSize: 10, color: 'var(--ts)', marginTop: 4 }}>
                   {selectedLocations.length > 0 && <div>{selectedLocations.length} lokalizacji</div>}
                   {selectedDevices.length > 0 && <div>{selectedDevices.length} urzadzen</div>}
