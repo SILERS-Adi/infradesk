@@ -202,6 +202,9 @@ model Workspace {
   lastConfig         Json? // saved configurator state for renewal
   paidUntil          DateTime?
 
+  // Multi-tenant organization type
+  organizationType String @default("internal_it") // client_external_it | internal_it | it_operator
+
   workspaceKey String   @unique @default(uuid())
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
@@ -238,8 +241,55 @@ model Workspace {
   menuPreferences      UserMenuPreference[]  @relation("MenuPrefWorkspace")
   permissionSchemas    PermissionSchema[]    @relation("PermissionSchemaWorkspace")
 
+  // Multi-tenant relations
+  clientRelations      WorkspaceRelation[]   @relation("RelationClient")
+  providerRelations    WorkspaceRelation[]   @relation("RelationProvider")
+  helpdeskSettings     WorkspaceHelpdeskSettings?
+
   @@index([type])
   @@index([isActive])
+}
+
+model WorkspaceRelation {
+  id                       String   @id @default(uuid())
+  clientWorkspaceId        String
+  providerWorkspaceId      String
+
+  canViewDevices           Boolean  @default(true)
+  canViewUsers             Boolean  @default(false)
+  canViewLocations         Boolean  @default(true)
+  canReceiveTickets        Boolean  @default(true)
+  canCreateTicketsOnBehalf Boolean  @default(true)
+  canAccessAlerts          Boolean  @default(true)
+
+  isDefaultHelpdeskProvider Boolean @default(false)
+
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  clientWorkspace   Workspace @relation("RelationClient", fields: [clientWorkspaceId], references: [id], onDelete: Cascade)
+  providerWorkspace Workspace @relation("RelationProvider", fields: [providerWorkspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([clientWorkspaceId, providerWorkspaceId])
+  @@index([clientWorkspaceId])
+  @@index([providerWorkspaceId])
+}
+
+model WorkspaceHelpdeskSettings {
+  id                         String  @id @default(uuid())
+  workspaceId                String  @unique
+
+  ticketRoutingMode          String  @default("internal_only") // internal_only | send_to_default_provider | ask_each_time
+  defaultProviderWorkspaceId String?
+  allowUserProviderSelection Boolean @default(false)
+  allowAssistantAutoCreate   Boolean @default(true)
+  allowAlertAutoCreate       Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
 model UserMenuPreference {
@@ -601,13 +651,15 @@ model Credential {
 }
 
 model Ticket {
-  id                String         @id @default(uuid())
-  ticketNumber      String         @unique
-  workspaceId       String
-  locationId        String
-  deviceId          String?
-  createdByUserId   String
-  assignedToUserId  String?
+  id                    String         @id @default(uuid())
+  ticketNumber          String         @unique
+  workspaceId           String
+  requesterWorkspaceId  String?        // firma zgłaszająca (null = wewnętrzne)
+  providerWorkspaceId   String?        // firma obsługująca (null = wewnętrzne)
+  locationId            String
+  deviceId              String?
+  createdByUserId       String
+  assignedToUserId      String?
   type              TicketType     @default(INCIDENT)
   priority          TicketPriority @default(MEDIUM)
   status            TicketStatus   @default(PENDING)
