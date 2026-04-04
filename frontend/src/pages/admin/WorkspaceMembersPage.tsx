@@ -208,12 +208,12 @@ export function WorkspaceMembersPage() {
       </div>
 
       {/* Add modal */}
-      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Dodaj użytkownika" size="lg">
+      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Dodaj użytkownika" size="full">
         <MemberForm onSuccess={() => { setShowAdd(false); qc.invalidateQueries({ queryKey: ['workspace-members'] }); }} />
       </Modal>
 
       {/* Edit modal */}
-      <Modal open={!!editTarget} onClose={() => setEditTarget(null)} title={editTarget ? `Edytuj: ${editTarget.user.firstName} ${editTarget.user.lastName}` : ''} size="lg">
+      <Modal open={!!editTarget} onClose={() => setEditTarget(null)} title={editTarget ? `Edytuj: ${editTarget.user.firstName} ${editTarget.user.lastName}` : ''} size="full">
         {editTarget && <MemberForm member={editTarget} onSuccess={() => { setEditTarget(null); qc.invalidateQueries({ queryKey: ['workspace-members'] }); }} />}
       </Modal>
 

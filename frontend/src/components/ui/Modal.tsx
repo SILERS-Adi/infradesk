@@ -12,7 +12,7 @@ interface ModalProps {
   noPadding?: boolean;
 }
 
-const sizeMap = { sm: 380, md: 440, lg: 520, xl: 600, '2xl': 680 };
+const sizeMap = { sm: 380, md: 440, lg: 520, xl: 600, '2xl': 680, '3xl': 820, full: 960 };
 
 export function Modal({ open, onClose, title, children, size = 'md', footer, noPadding }: ModalProps) {
   useEffect(() => {
