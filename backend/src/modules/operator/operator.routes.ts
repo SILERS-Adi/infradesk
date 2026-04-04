@@ -15,8 +15,8 @@ async function requireOperator(req: Request, res: Response, next: NextFunction):
   if (!wsId) { res.status(400).json({ error: 'Workspace context required' }); return; }
 
   const ws = await prisma.workspace.findUnique({ where: { id: wsId }, select: { organizationType: true } });
-  if (!ws || ws.organizationType !== 'it_operator') {
-    res.status(403).json({ error: 'Dostępne tylko dla Centrum Obsługi IT', code: 'NOT_OPERATOR' });
+  if (!ws || (ws.organizationType !== 'msp' && ws.organizationType !== 'it_operator')) {
+    res.status(403).json({ error: 'Dostępne tylko dla MSP / Centrum Obsługi IT', code: 'NOT_OPERATOR' });
     return;
   }
   next();
@@ -67,7 +67,7 @@ router.post('/clients', withWorkspaceMembership, authorizeWorkspace('OWNER', 'AD
         name: name.trim(),
         slug,
         type: 'COMPANY',
-        organizationType: 'client_external_it',
+        organizationType: 'client',
         legalName: legalName?.trim() || null,
         taxId: taxId?.trim() || null,
         email: email?.trim() || null,

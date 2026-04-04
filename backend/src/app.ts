@@ -403,7 +403,7 @@ app.put('/api/workspaces/onboarding', authenticate, async (req, res, next) => {
 
     const { organizationType, ticketRoutingMode, defaultProviderWorkspaceId } = req.body;
 
-    if (organizationType && ['client_external_it', 'internal_it', 'it_operator'].includes(organizationType)) {
+    if (organizationType && ['client', 'internal_it', 'msp', 'client_external_it', 'it_operator'].includes(organizationType)) {
       await prisma.workspace.update({ where: { id: wsId }, data: { organizationType } });
     }
 

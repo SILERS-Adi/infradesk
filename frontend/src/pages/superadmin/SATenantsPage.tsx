@@ -12,9 +12,12 @@ const TYPE_COLORS: Record<string, { label: string; color: string; bg: string }> 
 };
 
 const ORG_TYPE_COLORS: Record<string, { label: string; color: string; bg: string }> = {
-  client_external_it: { label: 'Klient zew. IT', color: '#3B82F6', bg: 'rgba(59,130,246,0.1)' },
+  msp:                { label: 'MSP',             color: '#F59E0B', bg: 'rgba(245,158,11,0.1)' },
   internal_it:        { label: 'Dział IT',        color: '#8B5CF6', bg: 'rgba(139,92,246,0.1)' },
-  it_operator:        { label: 'Centrum IT',      color: '#F59E0B', bg: 'rgba(245,158,11,0.1)' },
+  client:             { label: 'Klient',          color: '#3B82F6', bg: 'rgba(59,130,246,0.1)' },
+  // Backward compat
+  it_operator:        { label: 'MSP',             color: '#F59E0B', bg: 'rgba(245,158,11,0.1)' },
+  client_external_it: { label: 'Klient',          color: '#3B82F6', bg: 'rgba(59,130,246,0.1)' },
 };
 
 const PLANS = ['FREE', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE'];
@@ -266,9 +269,9 @@ export default function SATenantsPage() {
 
               <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--td)', marginTop: 8 }}>TYP ORGANIZACJI</div>
               <select value={editData.organizationType ?? 'internal_it'} onChange={e => setEditData({ ...editData, organizationType: e.target.value })} style={inputStyle}>
-                <option value="client_external_it">Klient z obsługą zewnętrzną</option>
+                <option value="msp">MSP — Centrum Obsługi IT</option>
                 <option value="internal_it">Dział IT wewnętrzny</option>
-                <option value="it_operator">Centrum Obsługi IT</option>
+                <option value="client">Klient</option>
               </select>
 
               <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--td)', marginTop: 8 }}>KONTAKT</div>

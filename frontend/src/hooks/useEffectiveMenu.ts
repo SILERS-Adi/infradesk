@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import {
   SYSTEM_GROUPS, SYSTEM_ITEMS, ITEMS_BY_ID, GROUPS_BY_ID,
-  buildDefaultLayout,
+  buildDefaultLayout, getFeatureFlags,
   type MenuLayout, type MenuGroupConfig, type SystemMenuItem, type SystemMenuGroup,
+  type FeatureFlags,
 } from '../config/menuRegistry';
 import { useMenuStore } from '../store/menuStore';
 import { useWorkspaceContext } from './useWorkspaceContext';
@@ -30,14 +31,14 @@ export interface EffectiveItem {
   badgeKey?: string;
   hidden: boolean;
   isFavorite: boolean;
+  locked?: boolean;
 }
 
 /**
- * Merges system registry + user layout + permissions into the effective menu.
- * New system items not in user's layout are auto-appended to their default group.
+ * Merges system registry + user layout + permissions + feature flags into effective menu.
  */
 export function useEffectiveMenu(): EffectiveGroup[] {
-  const { isAdmin, hasModule, organizationType } = useWorkspaceContext();
+  const { isAdmin, hasModule, wsType, wsPlan, features } = useWorkspaceContext();
   const { user } = useAuth();
   const isSuperAdmin = !!user?.isSuperAdmin;
 
@@ -50,13 +51,17 @@ export function useEffectiveMenu(): EffectiveGroup[] {
   return useMemo(() => {
     const effective = layout ?? buildDefaultLayout();
 
-    // Permission checkers — modular architecture
+    // Debug
+    if (typeof window !== 'undefined' && (window as any).__INFRADESK_DEBUG) {
+      console.log('[Menu]', { wsType, wsPlan, features });
+    }
+
     const canSeeGroup = (groupId: string): boolean => {
       const sg = GROUPS_BY_ID.get(groupId);
-      if (!sg) return true; // custom group — always visible
+      if (!sg) return true; // custom group
       if (sg.superadminOnly) return isSuperAdmin;
-      if (sg.orgTypes && !sg.orgTypes.includes(organizationType)) return false;
-      if (sg.permanent) return true; // permanent sections always visible
+      if (sg.wsTypes && !sg.wsTypes.includes(wsType)) return false;
+      if (sg.permanent) return true;
       if (sg.module && !hasModule(sg.module)) return false;
       if (sg.adminOnly) return isAdmin;
       return true;
@@ -64,67 +69,53 @@ export function useEffectiveMenu(): EffectiveGroup[] {
 
     const canSeeItem = (itemId: string): boolean => {
       const si = ITEMS_BY_ID.get(itemId);
-      if (!si) return false; // unknown item — skip
-      if (si.orgTypes && !si.orgTypes.includes(organizationType)) return false;
+      if (!si) return false;
+      if (si.wsTypes && !si.wsTypes.includes(wsType)) return false;
+      if (si.feature && !(features as unknown as Record<string, boolean>)[si.feature]) return false;
       if (si.module && !hasModule(si.module)) return false;
       if (si.adminOnly) return isAdmin;
       return true;
     };
 
-    // Collect all item IDs present in layout (groups + hidden)
+    // Collect known items
     const knownItemIds = new Set<string>();
     for (const group of effective.groups) {
       for (const itemId of group.items) knownItemIds.add(itemId);
     }
     for (const id of effective.hiddenItems) knownItemIds.add(id);
 
-    // Auto-discovery: find system items NOT in layout → append to default group
+    // Auto-discovery: new system items not in layout
     const workingGroups: MenuGroupConfig[] = effective.groups.map(g => ({ ...g, items: [...g.items] }));
 
     for (const sysItem of SYSTEM_ITEMS) {
       if (knownItemIds.has(sysItem.id)) continue;
-      // New item — find or create its default group
       let targetGroup = workingGroups.find(g => g.id === sysItem.groupId);
       if (!targetGroup) {
         const sysGroup = GROUPS_BY_ID.get(sysItem.groupId);
         if (sysGroup) {
-          // Find insertion point: before admin/platform groups
-          const adminIdx = workingGroups.findIndex(g => g.id === 'admin');
-          const insertAt = adminIdx >= 0 ? adminIdx : workingGroups.length;
+          const insertAt = workingGroups.length;
           targetGroup = { id: sysGroup.id, items: [] };
           workingGroups.splice(insertAt, 0, targetGroup);
         }
       }
-      if (targetGroup) {
-        targetGroup.items.push(sysItem.id);
-      }
+      if (targetGroup) targetGroup.items.push(sysItem.id);
     }
 
     const hiddenSet = new Set(effective.hiddenItems);
     const collapsedSet = new Set(effective.collapsedGroups);
     const favoriteSet = new Set(effective.favoriteItems ?? []);
 
-    // Build effective groups
     const result: EffectiveGroup[] = [];
 
     for (const gc of workingGroups) {
       if (gc.isSeparator) {
         result.push({
-          id: gc.id,
-          label: '',
-          color: null,
-          isCustom: false,
-          isSeparator: true,
-          isPlatform: false,
-          isFavorites: false,
-          isCollapsed: false,
-          systemGroup: null,
-          items: [],
+          id: gc.id, label: '', color: null, isCustom: false, isSeparator: true,
+          isPlatform: false, isFavorites: false, isCollapsed: false, systemGroup: null, items: [],
         });
         continue;
       }
 
-      // Permission check on group level (skip module/role-gated groups user can't see)
       if (!gc.isCustom && gc.id !== 'favorites' && !canSeeGroup(gc.id)) continue;
 
       const sysGroup = GROUPS_BY_ID.get(gc.id) ?? null;
@@ -144,13 +135,12 @@ export function useEffectiveMenu(): EffectiveGroup[] {
           badgeKey: si.badgeKey,
           hidden: hiddenSet.has(si.id),
           isFavorite: favoriteSet.has(si.id),
+          locked: si.locked,
         });
       }
 
-      // In normal mode: skip empty favorites, skip groups with no visible items
       if (!isEditMode && isFavoritesGroup && items.filter(i => !i.hidden).length === 0) continue;
       if (!isEditMode && !isFavoritesGroup && items.filter(i => !i.hidden).length === 0) continue;
-      // In edit mode: skip groups with no items (unless custom or favorites)
       if (isEditMode && items.length === 0 && !gc.isCustom && !isFavoritesGroup) continue;
 
       result.push({
@@ -168,5 +158,5 @@ export function useEffectiveMenu(): EffectiveGroup[] {
     }
 
     return result;
-  }, [layout, isAdmin, isSuperAdmin, hasModule, organizationType, isEditMode, editLayout, savedLayout]);
+  }, [layout, isAdmin, isSuperAdmin, hasModule, wsType, wsPlan, features, isEditMode, editLayout, savedLayout]);
 }

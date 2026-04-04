@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Settings, FileText, ListChecks, Route, Clock, Share2, Eye, Bell } from 'lucide-react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useWorkspaceContext } from '../../hooks/useWorkspaceContext';
-import type { OrgType } from '../../config/menuRegistry';
+import type { WorkspaceType } from '../../config/menuRegistry';
 
 // Lazy imports for existing sub-pages
 import HelpdeskSettingsContent from './HelpdeskSettingsContent';
@@ -12,25 +12,25 @@ interface Tab {
   id: string;
   label: string;
   icon: typeof Settings;
-  orgTypes?: OrgType[]; // if set, tab only visible for these org types
+  wsTypes?: WorkspaceType[];
 }
 
 const TABS: Tab[] = [
   { id: 'general',        label: 'Ogólne',                 icon: Settings },
   { id: 'forms',          label: 'Formularze zgłoszeń',    icon: FileText },
   { id: 'categories',     label: 'Kategorie i priorytety', icon: ListChecks },
-  { id: 'rules',          label: 'Reguły obsługi',         icon: Route,     orgTypes: ['internal_it', 'it_operator'] },
-  { id: 'sla',            label: 'SLA',                    icon: Clock,     orgTypes: ['internal_it', 'it_operator'] },
+  { id: 'rules',          label: 'Reguły obsługi',         icon: Route,     wsTypes: ['internal_it', 'msp'] },
+  { id: 'sla',            label: 'SLA',                    icon: Clock,     wsTypes: ['internal_it', 'msp'] },
   { id: 'sharing',        label: 'Udostępnianie',          icon: Share2 },
-  { id: 'visibility',     label: 'Widoczność dla klienta', icon: Eye,       orgTypes: ['it_operator'] },
+  { id: 'visibility',     label: 'Widoczność dla klienta', icon: Eye,       wsTypes: ['msp'] },
   { id: 'notifications',  label: 'Powiadomienia',          icon: Bell },
 ];
 
 export default function PortalSettingsPage() {
-  const { organizationType } = useWorkspaceContext();
+  const { wsType } = useWorkspaceContext();
   const [activeTab, setActiveTab] = useState('general');
 
-  const visibleTabs = TABS.filter(t => !t.orgTypes || t.orgTypes.includes(organizationType));
+  const visibleTabs = TABS.filter(t => !t.wsTypes || t.wsTypes.includes(wsType));
 
   // If active tab was hidden, fallback to first
   if (!visibleTabs.find(t => t.id === activeTab)) {

@@ -6,16 +6,16 @@ import { apiClient } from '../../api/client';
 import { useAuth } from '../../store/authStore';
 import { useTheme } from '../../store/themeStore';
 
-type OrgType = 'client_external_it' | 'internal_it' | 'it_operator';
+type WsType = 'msp' | 'internal_it' | 'client';
 type RoutingMode = 'internal_only' | 'send_to_default_provider' | 'ask_each_time';
 
-const ORG_TYPES: { id: OrgType; icon: typeof Building2; label: string; desc: string; color: string }[] = [
+const WS_TYPES: { id: WsType; icon: typeof Building2; label: string; desc: string; color: string }[] = [
   {
-    id: 'client_external_it',
-    icon: Headphones,
-    label: 'Korzystam z zewnętrznej obsługi IT',
-    desc: 'Moja firma jest obsługiwana przez zewnętrzną firmę informatyczną',
-    color: '#3B82F6',
+    id: 'msp',
+    icon: Building2,
+    label: 'Świadczę obsługę IT dla klientów',
+    desc: 'Jestem firmą IT obsługującą wielu klientów — MSP / Centrum Obsługi IT',
+    color: '#F59E0B',
   },
   {
     id: 'internal_it',
@@ -25,11 +25,11 @@ const ORG_TYPES: { id: OrgType; icon: typeof Building2; label: string; desc: str
     color: '#8B5CF6',
   },
   {
-    id: 'it_operator',
-    icon: Building2,
-    label: 'Świadczę obsługę IT dla klientów',
-    desc: 'Jestem firmą IT obsługującą wielu klientów — Centrum Obsługi IT',
-    color: '#F59E0B',
+    id: 'client',
+    icon: Headphones,
+    label: 'Korzystam z zewnętrznej obsługi IT',
+    desc: 'Moja firma jest obsługiwana przez zewnętrzną firmę informatyczną',
+    color: '#3B82F6',
   },
 ];
 
@@ -46,7 +46,7 @@ export default function OnboardingWizard() {
   const isLight = resolved === 'light';
 
   const [step, setStep] = useState(1);
-  const [orgType, setOrgType] = useState<OrgType | null>(null);
+  const [orgType, setOrgType] = useState<WsType | null>(null);
   const [routingMode, setRoutingMode] = useState<RoutingMode>('internal_only');
   const [providerEmail, setProviderEmail] = useState('');
   const [saving, setSaving] = useState(false);
@@ -67,7 +67,7 @@ export default function OnboardingWizard() {
       });
 
       // If client with external IT and email provided, send invitation request
-      if (orgType === 'client_external_it' && providerEmail) {
+      if (orgType === 'client' && providerEmail) {
         try {
           await apiClient.post('/api/sharing/request', { email: providerEmail, scope: 'ALL' });
           toast.success('Prośba o obsługę wysłana do ' + providerEmail);
@@ -106,10 +106,10 @@ export default function OnboardingWizard() {
       setStep(3);
       return;
     }
-    if (step === 1 && orgType === 'client_external_it') {
+    if (step === 1 && orgType === 'client') {
       setRoutingMode('send_to_default_provider');
     }
-    if (step === 1 && orgType === 'it_operator') {
+    if (step === 1 && orgType === 'msp') {
       setRoutingMode('internal_only');
     }
 
@@ -172,7 +172,7 @@ export default function OnboardingWizard() {
               <p className="text-sm mb-6" style={{ color: 'var(--tm)' }}>Wybierz, jak korzystasz z IT w swojej firmie</p>
 
               <div className="flex flex-col gap-3">
-                {ORG_TYPES.map(ot => {
+                {WS_TYPES.map(ot => {
                   const Icon = ot.icon;
                   const selected = orgType === ot.id;
                   return (
@@ -206,14 +206,14 @@ export default function OnboardingWizard() {
             </div>
           )}
 
-          {/* Step 2: Helpdesk routing (client_external_it + it_operator) */}
+          {/* Step 2: Helpdesk routing (client + msp) */}
           {step === 2 && orgType !== 'internal_it' && (
             <div>
               <h2 className="text-lg font-bold mb-1" style={{ color: 'var(--t)' }}>
-                {orgType === 'client_external_it' ? 'Jak chcesz obsługiwać zgłoszenia?' : 'Konfiguracja Help Desk'}
+                {orgType === 'client' ? 'Jak chcesz obsługiwać zgłoszenia?' : 'Konfiguracja Help Desk'}
               </h2>
               <p className="text-sm mb-6" style={{ color: 'var(--tm)' }}>
-                {orgType === 'client_external_it'
+                {orgType === 'client'
                   ? 'Zdecyduj, gdzie trafiają Twoje zgłoszenia serwisowe'
                   : 'Skonfiguruj domyślny tryb obsługi zgłoszeń'}
               </p>
@@ -240,7 +240,7 @@ export default function OnboardingWizard() {
           )}
 
           {/* Step 3: Provider email (client) or first client info (operator) */}
-          {isOnProviderStep && orgType === 'client_external_it' && (
+          {isOnProviderStep && orgType === 'client' && (
             <div>
               <h2 className="text-lg font-bold mb-1" style={{ color: 'var(--t)' }}>Połącz z firmą IT</h2>
               <p className="text-sm mb-6" style={{ color: 'var(--tm)' }}>
@@ -262,7 +262,7 @@ export default function OnboardingWizard() {
             </div>
           )}
 
-          {isOnProviderStep && orgType === 'it_operator' && (
+          {isOnProviderStep && orgType === 'msp' && (
             <div>
               <h2 className="text-lg font-bold mb-1" style={{ color: 'var(--t)' }}>Centrum Obsługi IT</h2>
               <p className="text-sm mb-6" style={{ color: 'var(--tm)' }}>

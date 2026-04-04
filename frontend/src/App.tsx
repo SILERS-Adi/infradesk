@@ -20,6 +20,7 @@ const OperatorCalendar = React.lazy(() => import('./pages/operator/OperatorCalen
 const OperatorAlerts = React.lazy(() => import('./pages/operator/OperatorAlerts'));
 const OperatorSessions = React.lazy(() => import('./pages/operator/OperatorSessions'));
 const OperatorBilling = React.lazy(() => import('./pages/operator/OperatorBilling'));
+const OperatorPartners = React.lazy(() => import('./pages/operator/OperatorPartners'));
 
 // Helpdesk Settings
 const PortalSettingsPage = React.lazy(() => import('./pages/admin/PortalSettingsPage'));
@@ -252,6 +253,7 @@ function AdminRoutes() {
         <Route path="operator/alerts" element={<React.Suspense fallback={null}><OperatorAlerts /></React.Suspense>} />
         <Route path="operator/sessions" element={<React.Suspense fallback={null}><OperatorSessions /></React.Suspense>} />
         <Route path="operator/billing" element={<React.Suspense fallback={null}><OperatorBilling /></React.Suspense>} />
+        <Route path="operator/partners" element={<React.Suspense fallback={null}><OperatorPartners /></React.Suspense>} />
         <Route path="superadmin" element={<RequireSuperAdmin><SADashboardPage /></RequireSuperAdmin>} />
         <Route path="superadmin/tenants" element={<RequireSuperAdmin><SATenantsPage /></RequireSuperAdmin>} />
         <Route path="superadmin/users" element={<RequireSuperAdmin><SAUsersPage /></RequireSuperAdmin>} />

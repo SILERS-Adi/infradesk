@@ -19,18 +19,18 @@ interface PinRequest {
   createdAt: string;
 }
 
-const ORG_TYPES = [
-  { id: 'client_external_it', icon: Headphones, label: 'Klient z obsługą zewnętrzną', desc: 'Firma obsługiwana przez zewnętrzną firmę IT', color: '#3B82F6' },
+const WS_TYPES = [
+  { id: 'msp', icon: Building2, label: 'MSP — Centrum Obsługi IT', desc: 'Firma IT obsługująca wielu klientów', color: '#F59E0B' },
   { id: 'internal_it', icon: Shield, label: 'Dział IT wewnętrzny', desc: 'Własny dział IT lub samodzielne zarządzanie', color: '#8B5CF6' },
-  { id: 'it_operator', icon: Building2, label: 'Centrum Obsługi IT', desc: 'Firma IT obsługująca wielu klientów', color: '#F59E0B' },
+  { id: 'client', icon: Headphones, label: 'Klient', desc: 'Firma obsługiwana przez zewnętrzną firmę IT', color: '#3B82F6' },
 ] as const;
 
 function OrganizationTypeCard() {
-  const { organizationType } = useWorkspaceContext();
+  const { wsType } = useWorkspaceContext();
   const [saving, setSaving] = useState(false);
 
   const handleChange = async (newType: string) => {
-    if (newType === organizationType) return;
+    if (newType === wsType) return;
     setSaving(true);
     try {
       await apiClient.put('/api/workspaces/onboarding', { organizationType: newType });
@@ -48,9 +48,9 @@ function OrganizationTypeCard() {
         Wpływa na menu, routing zgłoszeń i dostępne moduły. Zmiana wymaga odświeżenia strony.
       </p>
       <div className="flex flex-col gap-3">
-        {ORG_TYPES.map(ot => {
+        {WS_TYPES.map(ot => {
           const Icon = ot.icon;
-          const selected = organizationType === ot.id;
+          const selected = wsType === ot.id;
           return (
             <button
               key={ot.id}
