@@ -82,4 +82,78 @@ router.get('/shipment-info/:orderId', async (req: Request, res: Response, next: 
   } catch (err) { next(err); }
 });
 
+/**
+ * POST /create-shipment — Local shipment creation (no courier API)
+ * Updates Shipment status to PACKED, records dimensions, generates local waybill ID.
+ * Does NOT contact external courier API — real integration = Etap C.
+ * Does NOT set shippedAt (no real dispatch happened).
+ */
+router.post('/create-shipment', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const workspaceId = req.workspaceId!;
+    const userId = req.user!.userId;
+    const { order_id, length, width, height, weight } = req.body;
+
+    if (!order_id) {
+      res.status(400).json({ detail: 'order_id jest wymagane' });
+      return;
+    }
+
+    const shipment = await prisma.shipment.findFirst({
+      where: { id: order_id, workspaceId },
+    });
+    if (!shipment) {
+      res.status(404).json({ detail: 'Zamówienie nie znalezione' });
+      return;
+    }
+
+    if (shipment.status === 'PACKED' || shipment.status === 'SHIPPED') {
+      res.status(409).json({ detail: 'Zamówienie jest już spakowane lub wysłane' });
+      return;
+    }
+
+    const waybill = `WB-${Date.now()}`;
+    const weightGrams = Math.round((weight || 1) * 1000);
+    const dims = `${length || 30}×${width || 20}×${height || 15} cm, ${weight || 1.0} kg`;
+    const oldStatus = shipment.status.toLowerCase();
+
+    await prisma.shipment.update({
+      where: { id: shipment.id },
+      data: {
+        status: 'PACKED',
+        trackingNumber: waybill,
+        totalWeight: weightGrams,
+        notes: shipment.notes
+          ? `${shipment.notes}\nWymiary: ${dims}`
+          : `Wymiary: ${dims}`,
+      },
+    });
+
+    await prisma.shipmentStatusHistory.create({
+      data: {
+        shipmentId: shipment.id,
+        oldStatus,
+        newStatus: 'packed',
+        changedById: userId,
+        note: `Przesyłka utworzona lokalnie (${dims})`,
+      },
+    });
+
+    res.json({
+      shipment_id: shipment.id,
+      waybill,
+    });
+  } catch (err) { next(err); }
+});
+
+/**
+ * POST /label — Download shipping label PDF
+ * Currently returns 501 — real label generation requires courier API integration (Etap C).
+ */
+router.post('/label', async (_req: Request, res: Response) => {
+  res.status(501).json({
+    detail: 'Generowanie etykiet wymaga integracji z API kuriera. Nadaj przesyłkę ręcznie przez panel kuriera.',
+  });
+});
+
 export default router;
