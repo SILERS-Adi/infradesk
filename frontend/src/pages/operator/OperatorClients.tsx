@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Building2, Monitor, Ticket, Plus, X, Loader2, AlertTriangle } from 'lucide-react';
+import { Building2, Monitor, Ticket, Plus, X, Loader2, AlertTriangle, Link2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { operatorApi, type CreateClientPayload } from '../../api/operator';
+import { apiClient } from '../../api/client';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
@@ -11,6 +12,7 @@ import type { OperatorClient } from '../../api/operator';
 export default function OperatorClients() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+  const [showLink, setShowLink] = useState(false);
 
   const { data: clients, isLoading, isError } = useQuery({
     queryKey: ['operator', 'clients'],
@@ -71,11 +73,26 @@ export default function OperatorClients() {
         title="Klienci"
         subtitle="Firmy obsługiwane przez Twoje Centrum IT"
         actions={
-          <button className="btn-primary" onClick={() => setShowForm(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Plus size={16} /> Dodaj klienta
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn-secondary" onClick={() => setShowLink(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Link2 size={16} /> Podepnij firmę
+            </button>
+            <button className="btn-primary" onClick={() => setShowForm(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Plus size={16} /> Nowy klient
+            </button>
+          </div>
         }
       />
+
+      {showLink && (
+        <LinkExistingForm
+          onClose={() => setShowLink(false)}
+          onSuccess={() => {
+            setShowLink(false);
+            queryClient.invalidateQueries({ queryKey: ['operator'] });
+          }}
+        />
+      )}
 
       {showForm && (
         <AddClientForm
@@ -154,6 +171,69 @@ function AddClientForm({ onClose, onSuccess }: { onClose: () => void; onSuccess:
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+function LinkExistingForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const { data: available, isLoading } = useQuery({
+    queryKey: ['operator', 'clients', 'available'],
+    queryFn: () => apiClient.get<any[]>('/api/operator/clients/available').then(r => r.data),
+  });
+
+  const linkMutation = useMutation({
+    mutationFn: (clientWorkspaceId: string) =>
+      apiClient.post('/api/operator/clients/link', { clientWorkspaceId }).then(r => r.data),
+    onSuccess: (_, wsId) => {
+      const name = available?.find((w: any) => w.id === wsId)?.name ?? 'Firma';
+      toast.success(`${name} podpięta jako klient`);
+      onSuccess();
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.error ?? 'Błąd podpinania'),
+  });
+
+  return (
+    <div className="page-card" style={{ padding: 24, marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--t)', margin: 0 }}>Podepnij istniejącą firmę</h3>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--tm)', padding: 4 }}><X size={18} /></button>
+      </div>
+
+      {isLoading ? (
+        <div style={{ padding: 20, textAlign: 'center', color: 'var(--tm)', fontSize: 13 }}>Ładowanie...</div>
+      ) : !available || available.length === 0 ? (
+        <div style={{ padding: 20, textAlign: 'center', color: 'var(--tm)', fontSize: 13 }}>
+          Wszystkie firmy w systemie są już podpięte jako Twoi klienci.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <p style={{ fontSize: 12, color: 'var(--tm)', margin: '0 0 8px' }}>
+            Wybierz firmę, którą chcesz obsługiwać. Zostanie podpięta jako Twój klient z pełnymi uprawnieniami.
+          </p>
+          {available.map((ws: any) => (
+            <div key={ws.id} style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '12px 16px', borderRadius: 10, border: '1px solid var(--border)',
+            }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t)' }}>{ws.name}</div>
+                <div style={{ fontSize: 11, color: 'var(--td)' }}>
+                  {[ws.city, ws.taxId, ws.email].filter(Boolean).join(' · ') || ws.slug}
+                </div>
+              </div>
+              <button
+                className="btn-primary"
+                onClick={() => linkMutation.mutate(ws.id)}
+                disabled={linkMutation.isPending}
+                style={{ fontSize: 12, padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 4 }}
+              >
+                {linkMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}
+                Podepnij
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

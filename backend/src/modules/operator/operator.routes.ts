@@ -107,6 +107,72 @@ router.post('/clients', withWorkspaceMembership, authorizeWorkspace('OWNER', 'AD
   } catch (err) { next(err); }
 });
 
+// GET /api/operator/clients/available — list workspaces not yet linked to this operator
+router.get('/clients/available', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), requireOperator, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const wsId = req.workspaceId!;
+
+    // Get already linked client IDs
+    const linked = await prisma.workspaceRelation.findMany({
+      where: { providerWorkspaceId: wsId },
+      select: { clientWorkspaceId: true },
+    });
+    const linkedIds = new Set(linked.map(r => r.clientWorkspaceId));
+    linkedIds.add(wsId); // exclude self
+
+    const available = await prisma.workspace.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, slug: true, organizationType: true, city: true, taxId: true, email: true },
+      orderBy: { name: 'asc' },
+    });
+
+    res.json(available.filter(w => !linkedIds.has(w.id)));
+  } catch (err) { next(err); }
+});
+
+// POST /api/operator/clients/link — link existing workspace as client
+router.post('/clients/link', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), requireOperator, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const operatorWsId = req.workspaceId!;
+    const { clientWorkspaceId } = req.body;
+
+    if (!clientWorkspaceId) { res.status(400).json({ error: 'clientWorkspaceId jest wymagany' }); return; }
+    if (clientWorkspaceId === operatorWsId) { res.status(400).json({ error: 'Nie możesz podpiąć siebie' }); return; }
+
+    // Check workspace exists
+    const clientWs = await prisma.workspace.findUnique({ where: { id: clientWorkspaceId }, select: { id: true, name: true } });
+    if (!clientWs) { res.status(404).json({ error: 'Workspace nie znaleziony' }); return; }
+
+    // Create or reactivate relation
+    const relation = await prisma.workspaceRelation.upsert({
+      where: { clientWorkspaceId_providerWorkspaceId: { clientWorkspaceId, providerWorkspaceId: operatorWsId } },
+      create: {
+        clientWorkspaceId,
+        providerWorkspaceId: operatorWsId,
+        canViewDevices: true,
+        canViewUsers: true,
+        canViewLocations: true,
+        canReceiveTickets: true,
+        canCreateTicketsOnBehalf: true,
+        canAccessAlerts: true,
+        isDefaultHelpdeskProvider: true,
+        status: 'ACTIVE',
+      },
+      update: { status: 'ACTIVE', canViewDevices: true, canViewUsers: true, canViewLocations: true, canReceiveTickets: true, canCreateTicketsOnBehalf: true, canAccessAlerts: true },
+    });
+
+    // Set client's org type to 'client' and helpdesk settings
+    await prisma.workspace.update({ where: { id: clientWorkspaceId }, data: { organizationType: 'client' } });
+    await prisma.workspaceHelpdeskSettings.upsert({
+      where: { workspaceId: clientWorkspaceId },
+      create: { workspaceId: clientWorkspaceId, ticketRoutingMode: 'send_to_default_provider', defaultProviderWorkspaceId: operatorWsId },
+      update: { ticketRoutingMode: 'send_to_default_provider', defaultProviderWorkspaceId: operatorWsId },
+    });
+
+    res.status(201).json({ relation, workspace: clientWs });
+  } catch (err) { next(err); }
+});
+
 // POST /api/operator/clients/invite — send invitation to a client
 router.post('/clients/invite', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), requireOperator, async (req: Request, res: Response, next: NextFunction) => {
   try {
