@@ -14,7 +14,6 @@ import { useMenuPreference } from '../../../hooks/useMenuPreference';
 import { useMenuStore } from '../../../store/menuStore';
 import { ITEMS_BY_ID } from '../../../config/menuRegistry';
 import { SidebarGroup } from './SidebarGroup';
-import { SidebarEditToggle } from './SidebarEditToggle';
 import { SidebarEditToolbar } from './SidebarEditToolbar';
 import { SidebarAddMenu } from './SidebarAddMenu';
 
@@ -143,8 +142,7 @@ export function SidebarNav({ collapsed, mobile, onMobileClose }: Props) {
     // Normal mode — no DnD
     return (
       <nav className="sidebar-nav">
-        {!collapsed && !mobile && <SidebarEditToggle />}
-        {groups.map(group => (
+          {groups.map(group => (
           <SidebarGroup
             key={group.id}
             group={group}

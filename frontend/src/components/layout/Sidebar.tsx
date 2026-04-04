@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { ChevronLeft, ChevronRight, X, Sun, Moon, SunMoon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Sun, Moon, SunMoon, SlidersHorizontal } from 'lucide-react';
 import { useTheme } from '../../store/themeStore';
 import { useMenuStore } from '../../store/menuStore';
 import { clsx } from 'clsx';
@@ -16,6 +16,7 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
   const { resolved: themeResolved } = useTheme();
   const isEditMode = useMenuStore(s => s.isEditMode);
   const cancelEditMode = useMenuStore(s => s.cancelEditMode);
+  const enterEditMode = useMenuStore(s => s.enterEditMode);
 
   // Auto-exit edit mode when sidebar collapses or on mobile
   useEffect(() => {
@@ -50,6 +51,12 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
 
       {/* Footer */}
       <div className="sidebar-footer">
+        {!collapsed && !mobile && !isEditMode && (
+          <div className="mode-switch" onClick={enterEditMode} style={{ marginBottom: 2 }}>
+            <SlidersHorizontal style={{ width: 12, height: 12, color: 'var(--tm)' }} />
+            <span className="mode-label">Dostosuj menu</span>
+          </div>
+        )}
         {!collapsed && (
           <div className="mode-switch" onClick={onToggle}>
             <span className="mode-label">Zwiń panel</span>
