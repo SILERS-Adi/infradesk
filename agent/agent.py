@@ -6377,7 +6377,7 @@ def _run_auth_webview(cfg, open_ticket_on_start=False):
             elif token and status != "ACTIVE":
                 start_page = "waiting"
             return {
-                "hasHomeMode": True,
+                "hasHomeMode": False,
                 "appName": APP_NAME,
                 "appVersion": APP_VERSION,
                 "startPage": start_page,
