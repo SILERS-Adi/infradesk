@@ -8,9 +8,11 @@ import {
 import toast from 'react-hot-toast';
 import { useAuth } from '../../store/authStore';
 import { useWorkspaceContext } from '../../hooks/useWorkspaceContext';
+import { useWorkspace } from '../../store/workspaceStore';
 import { useGeolocation } from '../../hooks/useGeolocation';
 import { sessionsApi } from '../../api/sessions';
 import { GeofencePrompt } from '../mobile/GeofencePrompt';
+import { NoWorkspacePage } from '../../pages/auth/NoWorkspacePage';
 
 interface Props { children: ReactNode }
 
@@ -37,7 +39,8 @@ export function MobileLayout({ children }: Props) {
   const [showProfile, setShowProfile] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
 
-  const { isAdmin: wsIsAdmin, isTechnician: wsIsTech, isMember, isViewer } = useWorkspaceContext();
+  const { isAdmin: wsIsAdmin, isTechnician: wsIsTech, isMember, isViewer, workspace } = useWorkspaceContext();
+  const { isLoading: wsLoading, resolved: wsResolved } = useWorkspace();
   const isAdminOrTech = wsIsAdmin || wsIsTech;
   const geo = useGeolocation(isAdminOrTech ?? false);
   const [showPrompt, setShowPrompt] = useState(true);
@@ -56,6 +59,8 @@ export function MobileLayout({ children }: Props) {
 
   if (isLoading) return (<div className="min-h-screen flex items-center justify-center" style={{ background: '#040a16' }}><div className="animate-spin h-7 w-7 border-2 border-violet-500 border-t-transparent rounded-full" /></div>);
   if (!isAuthenticated || !user) return <Navigate to="/login" replace />;
+  if (!wsResolved) return (<div className="min-h-screen flex items-center justify-center" style={{ background: '#040a16' }}><div className="animate-spin h-7 w-7 border-2 border-violet-500 border-t-transparent rounded-full" /></div>);
+  if (!workspace && !user?.isSuperAdmin) return <NoWorkspacePage />;
   if (isMember || isViewer) return <Navigate to="/portal" replace />;
 
   const isActiveTab = (tab: any) => tab.path && (tab.exact ? location.pathname === tab.path : location.pathname.startsWith(tab.path));

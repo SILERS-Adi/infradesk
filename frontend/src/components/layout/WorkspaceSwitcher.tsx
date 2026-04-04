@@ -29,7 +29,7 @@ const ROLE_LABELS: Record<MemberRole, string> = {
 
 export function WorkspaceSwitcher() {
   const { isAuthenticated } = useAuth();
-  const { workspaces, current, switchWorkspace, setWorkspaces, isLoading } = useWorkspace();
+  const { workspaces, current, switchWorkspace, setWorkspaces, markResolved, isLoading } = useWorkspace();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [dropPos, setDropPos] = useState({ top: 0, left: 0 });
@@ -38,7 +38,7 @@ export function WorkspaceSwitcher() {
   const dropRef = useRef<HTMLDivElement>(null);
 
   // Fetch workspaces
-  const { data } = useQuery({
+  const { data, isError, isFetched } = useQuery({
     queryKey: ['workspaces', 'my'],
     queryFn: workspacesApi.getMyWorkspaces,
     enabled: isAuthenticated,
@@ -50,8 +50,18 @@ export function WorkspaceSwitcher() {
   useEffect(() => {
     if (data && data.length > 0) {
       setWorkspaces(data);
+    } else if (data && data.length === 0) {
+      // User has no workspaces — mark resolved so guards can show fallback
+      markResolved();
     }
-  }, [data, setWorkspaces]);
+  }, [data, setWorkspaces, markResolved]);
+
+  // If query failed, also mark resolved so guards don't hang
+  useEffect(() => {
+    if (isError && isLoading) {
+      markResolved();
+    }
+  }, [isError, isLoading, markResolved]);
 
   // Close on outside click (check both trigger ref and portal dropdown ref)
   useEffect(() => {

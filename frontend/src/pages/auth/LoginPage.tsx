@@ -234,7 +234,7 @@ function getReturnTo(): string | null {
 export function LoginPage() {
   const navigate = useNavigate();
   const { setTokens, setUser } = useAuth();
-  const { setWorkspaces } = useWorkspace();
+  const { setWorkspaces, markResolved } = useWorkspace();
   const [loading, setLoading] = useState(false);
   const [showVersionPicker, setShowVersionPicker] = useState(false);
   const [focused, setFocused] = useState('');
@@ -253,10 +253,12 @@ export function LoginPage() {
       setUser(response.user);
       subscribeToPush().catch(() => {});
       // Fetch and set workspace BEFORE navigating (prevents data leaks)
+      let myWorkspaces: any[] = [];
       try {
         const ws = await workspacesApi.getMyWorkspaces();
-        if (ws && ws.length > 0) setWorkspaces(ws);
-      } catch { /* workspace will be resolved by WorkspaceSwitcher */ }
+        if (ws && ws.length > 0) { setWorkspaces(ws); myWorkspaces = ws; }
+        else { markResolved(); }
+      } catch { markResolved(); }
 
       // Determine redirect destination
       const returnTo = getReturnTo();
@@ -269,12 +271,23 @@ export function LoginPage() {
       const workspaces = response.workspaces as { id: string; slug: string; type: string; isDefault: boolean }[] | undefined;
       const defaultWs = workspaces?.find(w => w.isDefault) || workspaces?.[0];
       if (defaultWs?.type === 'COMPANY' && defaultWs.slug && window.location.hostname === 'infradesk.pl') {
-        window.location.href = `https://${defaultWs.slug}.infradesk.pl/dashboard`;
+        // Determine correct landing page based on role
+        const wsMatch = myWorkspaces.find((w: any) => w.workspaceId === defaultWs.id) || myWorkspaces[0];
+        const landingRole = wsMatch?.role;
+        const landingPath = (landingRole === 'MEMBER' || landingRole === 'VIEWER') ? '/portal' : '/dashboard';
+        window.location.href = `https://${defaultWs.slug}.infradesk.pl${landingPath}`;
         return;
       }
 
-      if (isMobile) setShowVersionPicker(true);
-      else navigate('/dashboard');
+      // Determine correct route based on workspace role
+      const currentWs = myWorkspaces.find((w: any) => w.isDefault) || myWorkspaces[0];
+      const userRole = currentWs?.role;
+      const isSuperAdmin = response.user?.isSuperAdmin;
+      const isPortalUser = (userRole === 'MEMBER' || userRole === 'VIEWER') && !isSuperAdmin;
+      const defaultRoute = isPortalUser ? '/portal' : '/dashboard';
+
+      if (isMobile && !isPortalUser) setShowVersionPicker(true);
+      else navigate(defaultRoute);
     } catch (err: unknown) {
       const msg = err && typeof err === 'object' && 'response' in err
         ? (err as { response?: { data?: { message?: string } } }).response?.data?.message : null;

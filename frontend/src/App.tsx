@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth, getStoredToken } from './store/authStore';
+import { useWorkspace } from './store/workspaceStore';
+import { workspacesApi } from './api/workspaces';
 import { authApi } from './api/auth';
 
 // Layouts
@@ -292,6 +294,26 @@ function UserRefresher() {
   return null;
 }
 
+/** Fetches workspaces globally so guards don't deadlock waiting for layout-level WorkspaceSwitcher */
+function WorkspaceResolver() {
+  const { isAuthenticated } = useAuth();
+  const { resolved, setWorkspaces, markResolved } = useWorkspace();
+  const done = React.useRef(false);
+
+  React.useEffect(() => {
+    if (done.current || resolved || !isAuthenticated) return;
+    done.current = true;
+    workspacesApi.getMyWorkspaces()
+      .then(ws => {
+        if (ws && ws.length > 0) setWorkspaces(ws);
+        else markResolved();
+      })
+      .catch(() => markResolved());
+  }, [isAuthenticated, resolved, setWorkspaces, markResolved]);
+
+  return null;
+}
+
 function RequireSuperAdmin({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   if (!(user as any)?.isSuperAdmin) return <Navigate to="/dashboard" replace />;
@@ -303,8 +325,8 @@ function NotFoundPage() {
     <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
       <h1 className="text-4xl font-bold" style={{ color: 'var(--t, #fff)' }}>404</h1>
       <p className="text-sm" style={{ color: 'var(--tm, rgba(255,255,255,0.5))' }}>Strona nie została znaleziona</p>
-      <a href="/dashboard" className="text-sm font-medium px-4 py-2 rounded-lg" style={{ background: 'var(--accent-g, rgba(79,140,255,0.12))', color: 'var(--accent, #4F8CFF)' }}>
-        Wróć do panelu
+      <a href="/" className="text-sm font-medium px-4 py-2 rounded-lg" style={{ background: 'var(--accent-g, rgba(79,140,255,0.12))', color: 'var(--accent, #4F8CFF)' }}>
+        Wróć do strony głównej
       </a>
     </div>
   );
@@ -324,6 +346,7 @@ export default function App() {
           />
           <AutoLoginHandler />
           <UserRefresher />
+          <WorkspaceResolver />
           <Routes>
             {/* Auth */}
             <Route path="/login" element={<LoginPage />} />

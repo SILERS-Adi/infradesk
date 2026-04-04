@@ -16,13 +16,17 @@ interface WorkspaceStore {
   workspaces: WorkspaceMembership[];
   /** Currently active workspace */
   current: WorkspaceMembership | null;
-  /** Loading state */
+  /** True until setWorkspaces / markResolved is called for the first time */
   isLoading: boolean;
+  /** True once workspace resolution finished (success, empty, or error) */
+  resolved: boolean;
   /** Preview mode — simulates another user's access */
   preview: PreviewMembership | null;
 
   /** Set workspaces from API response and auto-select current */
   setWorkspaces: (workspaces: WorkspaceMembership[]) => void;
+  /** Mark resolution complete without data (e.g. API error) */
+  markResolved: () => void;
   /** Switch to a different workspace */
   switchWorkspace: (workspaceId: string) => void;
   /** Enter preview mode */
@@ -37,6 +41,7 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => ({
   workspaces: [],
   current: null,
   isLoading: true,
+  resolved: false,
   preview: null,
 
   setWorkspaces: (workspaces) => {
@@ -51,7 +56,11 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => ({
       localStorage.setItem(STORAGE_KEY, current.workspaceId);
     }
 
-    set({ workspaces, current, isLoading: false });
+    set({ workspaces, current, isLoading: false, resolved: true });
+  },
+
+  markResolved: () => {
+    set({ isLoading: false, resolved: true });
   },
 
   switchWorkspace: (workspaceId) => {
@@ -67,7 +76,7 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => ({
 
   clear: () => {
     localStorage.removeItem(STORAGE_KEY);
-    set({ workspaces: [], current: null, isLoading: true, preview: null });
+    set({ workspaces: [], current: null, isLoading: true, resolved: false, preview: null });
   },
 }));
 

@@ -2,6 +2,8 @@ import { type ReactNode, useState } from 'react';
 import { Navigate, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../store/authStore';
 import { useWorkspaceContext } from '../../hooks/useWorkspaceContext';
+import { useWorkspace } from '../../store/workspaceStore';
+import { NoWorkspacePage } from '../../pages/auth/NoWorkspacePage';
 import {
   LayoutDashboard, MapPin, Monitor, Ticket, Plus, LogOut, ShoppingCart, Menu, X, Receipt, KeyRound,
 } from 'lucide-react';
@@ -21,6 +23,7 @@ const navItems = [
 export function PortalLayout({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading, user, logout } = useAuth();
   const { workspace } = useWorkspaceContext();
+  const { resolved: wsResolved } = useWorkspace();
   const navigate = useNavigate();
   const [mobileNav, setMobileNav] = useState(false);
 
@@ -30,6 +33,12 @@ export function PortalLayout({ children }: { children: ReactNode }) {
     </div>
   );
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!wsResolved) return (
+    <div className="h-screen flex items-center justify-center" style={{ background: '#040a16' }}>
+      <div className="animate-spin h-7 w-7 border-2 border-orange-500 border-t-transparent rounded-full" />
+    </div>
+  );
+  if (!workspace) return <NoWorkspacePage />;
 
   const initials = user ? getInitials(user.firstName, user.lastName) : '?';
 
