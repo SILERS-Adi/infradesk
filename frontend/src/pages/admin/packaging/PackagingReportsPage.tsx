@@ -36,8 +36,14 @@ export function PackagingReportsPage() {
   const { data: oldStats } = useQuery<any>({
     queryKey: ['packaging', 'reports', 'legacy'],
     queryFn: async () => {
-      try { const { data } = await api.get('/packaging/reports/stats'); return data; }
-      catch { return null; }
+      try {
+        const now = new Date();
+        const from = new Date(now); from.setDate(from.getDate() - parseInt(range));
+        const { data } = await api.get('/packaging/reports/summary', {
+          params: { date_from: from.toISOString().slice(0,10), date_to: now.toISOString().slice(0,10) },
+        });
+        return data;
+      } catch { return null; }
     },
   });
 

@@ -71,7 +71,7 @@ export function ShipmentNewPage() {
           weight: i.weight,
         })),
       };
-      const { data } = await api.post('/packaging/shipments', payload);
+      const { data } = await api.post('/packaging/orders', payload);
       toast.success(status === 'PENDING' ? 'Przesyłka zapisana' : 'Pakowanie rozpoczęte');
       navigate(`/packaging/shipments/${data.id}`);
     } catch (err: any) {

@@ -4,16 +4,6 @@
 
 import type { BadgeColor } from './types';
 
-export const STATUS_MAP: Record<string, { label: string; color: BadgeColor }> = {
-  pending:   { label: 'Oczekuje',    color: 'yellow' },
-  packing:   { label: 'Pakowanie',   color: 'blue' },
-  packed:    { label: 'Spakowana',   color: 'indigo' },
-  shipped:   { label: 'Wysłana',     color: 'green' },
-  delivered: { label: 'Dostarczono', color: 'green' },
-  error:     { label: 'Błąd',        color: 'red' },
-  cancelled: { label: 'Anulowana',   color: 'gray' },
-};
-
 export const ORDER_STATUS: Record<string, { label: string; color: BadgeColor }> = {
   NEW:       { label: 'Nowe',        color: 'blue' },
   PAID:      { label: 'Opłacone',    color: 'green' },
@@ -55,15 +45,6 @@ export const COURIER_MAP: Record<string, { label: string; color: BadgeColor }> =
   poczta:  { label: 'Poczta Polska', color: 'blue' },
   odbior:  { label: 'Odbiór osobisty', color: 'gray' },
 };
-
-export const STATUS_FILTER_OPTIONS = [
-  { value: '', label: 'Wszystkie statusy' },
-  { value: 'pending', label: 'Oczekujące' },
-  { value: 'packing', label: 'W pakowaniu' },
-  { value: 'packed', label: 'Spakowane' },
-  { value: 'shipped', label: 'Wysłane' },
-  { value: 'error', label: 'Błędy' },
-];
 
 export const COURIER_FILTER_OPTIONS = [
   { value: '', label: 'Wszyscy kurierzy' },

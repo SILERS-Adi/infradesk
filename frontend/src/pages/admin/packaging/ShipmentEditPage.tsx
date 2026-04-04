@@ -1,7 +1,7 @@
 /**
  * IDS 1.0 — Edit Shipment (ModuleFormTemplate)
- * Loads from GET /api/packaging/shipments/:id
- * Saves via PUT /api/packaging/shipments/:id
+ * Loads from GET /api/packaging/orders/:id
+ * Saves via PUT /api/packaging/orders/:id
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -43,7 +43,7 @@ export function ShipmentEditPage() {
     if (!id) return;
     setLoading(true);
     try {
-      const { data } = await api.get(`/packaging/shipments/${id}`);
+      const { data } = await api.get(`/packaging/orders/${id}`);
       setTitle(data.orderNumber || '');
       setOrderNumber(data.orderNumber || '');
       setCustomerName(data.clientName || '');
@@ -86,7 +86,7 @@ export function ShipmentEditPage() {
     if (!validate()) return;
     setSaving(true);
     try {
-      await api.put(`/packaging/shipments/${id}`, {
+      await api.put(`/packaging/orders/${id}`, {
         orderNumber: orderNumber.trim(),
         customerName: customerName.trim(),
         customerEmail: customerEmail.trim() || undefined,
@@ -99,7 +99,7 @@ export function ShipmentEditPage() {
         })),
       });
       toast.success('Przesyłka zaktualizowana');
-      navigate(`/packaging/shipments/${id}`);
+      navigate(`/packaging/orders/${id}`);
     } catch (err: any) {
       toast.error(err?.response?.data?.error || 'Nie udało się zapisać przesyłki');
     } finally { setSaving(false); }
@@ -109,7 +109,7 @@ export function ShipmentEditPage() {
 
   return (
     <>
-      <PageHeader title={`Edytuj ${title}`} subtitle="Zmień dane przesyłki" back={`/packaging/shipments/${id}`} />
+      <PageHeader title={`Edytuj ${title}`} subtitle="Zmień dane przesyłki" back={`/packaging/orders/${id}`} />
       <div style={{ padding: '0 24px 120px', maxWidth: 920, margin: '0 auto' }}>
         {Object.keys(errors).length > 0 && (
           <div style={{ marginBottom: 20 }}>
@@ -203,7 +203,7 @@ export function ShipmentEditPage() {
       </div>
 
       <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 20, background: 'var(--bg2)', borderTop: '1px solid var(--border)', padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
-        <Button variant="ghost" onClick={() => navigate(`/packaging/shipments/${id}`)} disabled={saving}>Anuluj</Button>
+        <Button variant="ghost" onClick={() => navigate(`/packaging/orders/${id}`)} disabled={saving}>Anuluj</Button>
         <Button variant="primary" icon={<Save size={14} />} onClick={handleSave} loading={saving}>Zapisz zmiany</Button>
       </div>
     </>
