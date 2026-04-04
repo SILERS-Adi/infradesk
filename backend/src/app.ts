@@ -63,6 +63,9 @@ import billingRouter from './modules/billing/billing.routes';
 import sharingRouter from './modules/sharing/sharing.routes';
 import menuPreferencesRouter from './modules/menu-preferences/menu-preferences.routes';
 import permissionsRouter from './modules/permissions/permissions.routes';
+import workspaceRelationsRouter from './modules/workspace-relations/workspace-relations.routes';
+import helpdeskSettingsRouter from './modules/helpdesk-settings/helpdesk-settings.routes';
+import operatorRouter from './modules/operator/operator.routes';
 
 // Middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -221,6 +224,9 @@ app.use('/api/billing', billingRouter);
 app.use('/api/sharing', sharingRouter);
 app.use('/api/menu-preferences', menuPreferencesRouter);
 app.use('/api/permissions', permissionsRouter);
+app.use('/api/workspace-relations', workspaceRelationsRouter);
+app.use('/api/helpdesk-settings', helpdeskSettingsRouter);
+app.use('/api/operator', operatorRouter);
 app.use('/api/service/vehicles', authenticate, requireModule('skp'), serviceVehiclesRouter);
 app.use('/api/service/inspections', authenticate, requireModule('skp'), serviceInspectionsRouter);
 // Public agent endpoints (no auth)
@@ -258,7 +264,7 @@ app.get('/api/workspaces/my', authenticate, async (req, res, next) => {
         workspace: {
           select: {
             id: true, name: true, slug: true, type: true, plan: true,
-            logoUrl: true, primaryColor: true, isActive: true, enabledModules: true,
+            logoUrl: true, primaryColor: true, isActive: true, enabledModules: true, organizationType: true,
             subscriptionStatus: true, trialEndDate: true, billingCycle: true, monthlyPrice: true, lastConfig: true, paidUntil: true,
             managedBy: {
               where: { status: 'ACTIVE' },
@@ -285,6 +291,7 @@ app.get('/api/workspaces/my', authenticate, async (req, res, next) => {
       isDefault: m.isDefault,
       allowedModules: m.allowedModules,
       enabledModules: migrateModuleKeys(m.workspace.enabledModules ?? ['helpdesk']),
+      organizationType: m.workspace.organizationType ?? 'internal_it',
       managedBy: (m.workspace.managedBy as any)?.[0]?.mspWorkspace?.name ?? null,
       subscriptionStatus: m.workspace.subscriptionStatus,
       trialEndDate: m.workspace.trialEndDate,
@@ -299,6 +306,37 @@ app.get('/api/workspaces/my', authenticate, async (req, res, next) => {
 });
 
 // Save workspace configuration (from configurator)
+// Onboarding — set organization type + helpdesk settings
+app.put('/api/workspaces/onboarding', authenticate, async (req, res, next) => {
+  try {
+    const userId = req.user!.userId;
+    const wsId = req.workspaceId;
+    if (!wsId) { res.status(400).json({ error: 'Workspace context required' }); return; }
+
+    // Verify OWNER/ADMIN
+    const membership = await prisma.workspaceMembership.findFirst({
+      where: { userId, workspaceId: wsId, role: { in: ['OWNER', 'ADMIN'] }, status: 'ACTIVE' },
+    });
+    if (!membership && !req.user!.isSuperAdmin) { res.status(403).json({ error: 'Brak uprawnień' }); return; }
+
+    const { organizationType, ticketRoutingMode, defaultProviderWorkspaceId } = req.body;
+
+    if (organizationType && ['client_external_it', 'internal_it', 'it_operator'].includes(organizationType)) {
+      await prisma.workspace.update({ where: { id: wsId }, data: { organizationType } });
+    }
+
+    if (ticketRoutingMode) {
+      await prisma.workspaceHelpdeskSettings.upsert({
+        where: { workspaceId: wsId },
+        create: { workspaceId: wsId, ticketRoutingMode, defaultProviderWorkspaceId: defaultProviderWorkspaceId ?? null },
+        update: { ticketRoutingMode, defaultProviderWorkspaceId: defaultProviderWorkspaceId ?? undefined },
+      });
+    }
+
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
 app.post('/api/workspaces/save-config', authenticate, async (req, res, next) => {
   try {
     const userId = req.user!.userId;
