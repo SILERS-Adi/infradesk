@@ -11,6 +11,12 @@ const TYPE_COLORS: Record<string, { label: string; color: string; bg: string }> 
   PERSONAL: { label: 'Osobisty', color: '#10B981', bg: 'rgba(16,185,129,0.1)' },
 };
 
+const ORG_TYPE_COLORS: Record<string, { label: string; color: string; bg: string }> = {
+  client_external_it: { label: 'Klient zew. IT', color: '#3B82F6', bg: 'rgba(59,130,246,0.1)' },
+  internal_it:        { label: 'Dział IT',        color: '#8B5CF6', bg: 'rgba(139,92,246,0.1)' },
+  it_operator:        { label: 'Centrum IT',      color: '#F59E0B', bg: 'rgba(245,158,11,0.1)' },
+};
+
 const PLANS = ['FREE', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE'];
 
 export default function SATenantsPage() {
@@ -58,6 +64,7 @@ export default function SATenantsPage() {
       addressLine1: ws.addressLine1 || '', postalCode: ws.postalCode || '', city: ws.city || '', country: ws.country || 'PL',
       maxAgents: ws.maxAgents ?? 10, maxUsers: ws.maxUsers ?? 5,
       enabledModules: ws.enabledModules ?? ['helpdesk'],
+      organizationType: ws.organizationType ?? 'internal_it',
       isActive: ws.isActive,
     });
   };
@@ -102,6 +109,7 @@ export default function SATenantsPage() {
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
                 <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 10, fontWeight: 700, color: 'var(--tm)', textTransform: 'uppercase' }}>Nazwa</th>
                 <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 10, fontWeight: 700, color: 'var(--tm)', textTransform: 'uppercase' }}>Typ</th>
+                <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 10, fontWeight: 700, color: 'var(--tm)', textTransform: 'uppercase' }}>Organizacja</th>
                 <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 10, fontWeight: 700, color: 'var(--tm)', textTransform: 'uppercase' }}>Plan</th>
                 <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 10, fontWeight: 700, color: 'var(--tm)', textTransform: 'uppercase' }}>NIP</th>
                 <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 10, fontWeight: 700, color: 'var(--tm)', textTransform: 'uppercase' }}>Miasto</th>
@@ -124,6 +132,11 @@ export default function SATenantsPage() {
                     </td>
                     <td style={{ padding: '10px 14px' }}>
                       <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 6, background: tc.bg, color: tc.color }}>{tc.label}</span>
+                    </td>
+                    <td style={{ padding: '10px 14px' }}>
+                      {(() => { const oc = ORG_TYPE_COLORS[ws.organizationType] ?? ORG_TYPE_COLORS.internal_it; return (
+                        <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 6, background: oc.bg, color: oc.color }}>{oc.label}</span>
+                      ); })()}
                     </td>
                     <td style={{ padding: '10px 14px', fontSize: 11, color: 'var(--ts)' }}>{ws.plan}</td>
                     <td style={{ padding: '10px 14px', fontSize: 11, color: 'var(--td)' }}>{ws.taxId || '—'}</td>
@@ -250,6 +263,13 @@ export default function SATenantsPage() {
                   {editData.isActive ? 'Aktywny' : 'Nieaktywny'}
                 </label>
               </div>
+
+              <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--td)', marginTop: 8 }}>TYP ORGANIZACJI</div>
+              <select value={editData.organizationType ?? 'internal_it'} onChange={e => setEditData({ ...editData, organizationType: e.target.value })} style={inputStyle}>
+                <option value="client_external_it">Klient z obsługą zewnętrzną</option>
+                <option value="internal_it">Dział IT wewnętrzny</option>
+                <option value="it_operator">Centrum Obsługi IT</option>
+              </select>
 
               <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--td)', marginTop: 8 }}>KONTAKT</div>
               <input value={editData.taxId} onChange={e => setEditData({ ...editData, taxId: e.target.value })} placeholder="NIP" style={inputStyle} />
