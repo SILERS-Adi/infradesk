@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Mail, Send, History } from 'lucide-react';
+import { Mail, Send, History, Building2, Shield, Headphones, Check, Loader2 } from 'lucide-react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { settingsApi, downloadsApi } from '../../api/downloads';
+import { apiClient } from '../../api/client';
 import { formatDate } from '../../utils/helpers';
+import { useWorkspaceContext } from '../../hooks/useWorkspaceContext';
 
 interface PinRequest {
   id: string;
@@ -15,6 +17,72 @@ interface PinRequest {
   expiresAt: string;
   usedAt: string | null;
   createdAt: string;
+}
+
+const ORG_TYPES = [
+  { id: 'client_external_it', icon: Headphones, label: 'Klient z obsługą zewnętrzną', desc: 'Firma obsługiwana przez zewnętrzną firmę IT', color: '#3B82F6' },
+  { id: 'internal_it', icon: Shield, label: 'Dział IT wewnętrzny', desc: 'Własny dział IT lub samodzielne zarządzanie', color: '#8B5CF6' },
+  { id: 'it_operator', icon: Building2, label: 'Centrum Obsługi IT', desc: 'Firma IT obsługująca wielu klientów', color: '#F59E0B' },
+] as const;
+
+function OrganizationTypeCard() {
+  const { organizationType } = useWorkspaceContext();
+  const [saving, setSaving] = useState(false);
+
+  const handleChange = async (newType: string) => {
+    if (newType === organizationType) return;
+    setSaving(true);
+    try {
+      await apiClient.put('/api/workspaces/onboarding', { organizationType: newType });
+      toast.success('Typ organizacji zmieniony — przeładowuję...');
+      setTimeout(() => window.location.reload(), 500);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error ?? 'Błąd zapisu');
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card title="Typ organizacji">
+      <p className="text-xs mb-4" style={{ color: 'var(--tm)' }}>
+        Wpływa na menu, routing zgłoszeń i dostępne moduły. Zmiana wymaga odświeżenia strony.
+      </p>
+      <div className="flex flex-col gap-3">
+        {ORG_TYPES.map(ot => {
+          const Icon = ot.icon;
+          const selected = organizationType === ot.id;
+          return (
+            <button
+              key={ot.id}
+              onClick={() => handleChange(ot.id)}
+              disabled={saving}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px',
+                borderRadius: 12, textAlign: 'left', cursor: saving ? 'wait' : 'pointer',
+                border: `2px solid ${selected ? ot.color : 'var(--border)'}`,
+                background: selected ? `${ot.color}08` : 'transparent',
+                opacity: saving ? 0.6 : 1,
+              }}
+            >
+              <div style={{
+                width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                background: selected ? `${ot.color}15` : 'var(--hover-bg)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Icon style={{ width: 20, height: 20, color: selected ? ot.color : 'var(--tm)' }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: selected ? ot.color : 'var(--t)' }}>{ot.label}</div>
+                <div style={{ fontSize: 11, color: 'var(--tm)', marginTop: 2 }}>{ot.desc}</div>
+              </div>
+              {selected && <Check style={{ width: 18, height: 18, color: ot.color, flexShrink: 0 }} />}
+              {saving && <Loader2 style={{ width: 18, height: 18, flexShrink: 0 }} className="animate-spin" />}
+            </button>
+          );
+        })}
+      </div>
+    </Card>
+  );
 }
 
 function SmtpSettingsCard() {
@@ -196,6 +264,7 @@ export function SettingsPage() {
         title="Ustawienia"
         subtitle="Konfiguracja systemu InfraDesk"
       />
+      <OrganizationTypeCard />
       <SmtpSettingsCard />
       <PinRequestsCard />
     </div>
