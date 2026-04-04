@@ -315,7 +315,7 @@ export function CarriersPage() {
               </div>
               <div style={{ gridColumn: '1 / -1', marginTop: 8 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t)', marginBottom: 12 }}>Domyślne wymiary paczki</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
                   <div>
                     <span style={labelStyle}>Szerokość (cm)</span>
                     <input type="number" style={inputStyle} value={configForm.defaultWidth || ''} onChange={e => setConfigForm(p => ({ ...p, defaultWidth: Number(e.target.value) }))} />
