@@ -68,7 +68,24 @@ const PERMISSION_TREE = [
   {
     nodeId: 'vault',
     label: 'Sejf haseł',
-    children: [],
+    children: [
+      { nodeId: 'vault.mine', label: 'Moje wpisy' },
+      { nodeId: 'vault.shared', label: 'Współdzielone' },
+    ],
+  },
+  {
+    nodeId: 'company',
+    label: 'Moja firma',
+    adminOnly: true,
+    children: [
+      { nodeId: 'company.data', label: 'Moje dane' },
+      { nodeId: 'company.locations', label: 'Lokalizacje' },
+      { nodeId: 'company.users', label: 'Użytkownicy', adminOnly: true },
+      { nodeId: 'company.settings', label: 'Ustawienia', adminOnly: true },
+      { nodeId: 'company.sharing', label: 'Udostępnianie', adminOnly: true },
+      { nodeId: 'company.smtp', label: 'SMTP', adminOnly: true },
+      { nodeId: 'company.billing', label: 'Billing', adminOnly: true },
+    ],
   },
 ];
 

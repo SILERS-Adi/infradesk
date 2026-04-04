@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/auth';
-import { withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
+import { withWorkspaceMembership, authorizeWorkspace, requirePermission } from '../../middleware/workspace';
 import { validate } from '../../middleware/validate';
 import { createDocumentSchema, updateDocumentSchema } from './invoicing.validation';
 import * as ctrl from './invoicing.controller';
@@ -35,6 +35,7 @@ router.put('/:id',
 router.delete('/:id',
   withWorkspaceMembership,
   authorizeWorkspace('OWNER', 'ADMIN'),
+  requirePermission('invoicing.documents', 'DELETE'),
   ctrl.deleteDocument,
 );
 

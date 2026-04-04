@@ -161,31 +161,41 @@ app.post('/api/speedtest/upload', express.raw({ limit: '50mb', type: '*/*' }), (
 // Public QR code resolve endpoint (no auth required)
 app.get('/api/qr/:qrCodeValue', getDeviceByQr);
 
-// Protected API routes
+// ── Auth (public + protected mix) ──
 app.use('/api/auth', authRoutes);
-app.use('/api/users', usersRoutes);
-app.use('/api/locations', locationsRoutes);
-app.use('/api/devices', devicesRoutes);
-app.use('/api/credentials', credentialsRoutes);
-app.use('/api/tickets', ticketsRoutes);
-app.use('/api/tickets/reports', ticketReportsRouter);
-app.use('/api/activity-logs', activityLogsRoutes);
+
+// ── Core (no module guard — always available) ──
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/upload', uploadRoutes);
-app.use('/api/crm', crmRoutes);
-app.use('/api/access-types', accessTypesRoutes);
-app.use('/api/agent', agentRoutes);
-app.use('/api/sessions', sessionsRoutes);
-app.use('/api/settings', settingsRoutes);
-app.use('/api/tasks', tasksRouter);
-app.use('/api/orders', ordersRouter);
-app.use('/api/delegations', delegationsRouter);
-app.use('/api/ai', aiRouter);
 app.use('/api/notifications', notificationsRouter);
-app.use('/api/downloads', downloadsRouter);
-app.use('/api/geolocation', geolocationRouter);
-app.use('/api/backup', backupRouter);
 app.use('/api/push', pushRouter);
+app.use('/api/access-types', accessTypesRoutes);
+app.use('/api/geolocation', geolocationRouter);
+
+// ── Permanent sections (always available, no module guard) ──
+app.use('/api/credentials', credentialsRoutes);            // Sejf haseł
+app.use('/api/ai', aiRouter);                              // Asystent AI
+app.use('/api/locations', locationsRoutes);                 // Moja firma: Lokalizacje
+app.use('/api/users', usersRoutes);                        // Moja firma: Użytkownicy
+app.use('/api/settings', settingsRoutes);                  // Moja firma: Ustawienia
+app.use('/api/downloads', downloadsRouter);                // Moja firma: Pobieranie
+
+// ── Module: infrastructure ──
+app.use('/api/devices', authenticate, requireModule('infrastructure'), devicesRoutes);
+app.use('/api/agent', agentRoutes);                        // Agent has mixed public+authenticated
+app.use('/api/activity-logs', authenticate, requireModule('infrastructure'), activityLogsRoutes);
+app.use('/api/backup', authenticate, requireModule('infrastructure'), backupRouter);
+
+// ── Module: service-desk ──
+app.use('/api/tickets', authenticate, requireModule('service-desk'), ticketsRoutes);
+app.use('/api/tickets/reports', authenticate, requireModule('service-desk'), ticketReportsRouter);
+app.use('/api/tasks', authenticate, requireModule('service-desk'), tasksRouter);
+app.use('/api/orders', authenticate, requireModule('service-desk'), ordersRouter);
+app.use('/api/delegations', authenticate, requireModule('service-desk'), delegationsRouter);
+app.use('/api/crm', authenticate, requireModule('service-desk'), crmRoutes);
+app.use('/api/sessions', authenticate, requireModule('service-desk'), sessionsRoutes);
+
+// ── Admin / platform ──
 app.use('/api/tenant', tenantRoutes);
 app.use('/api/partners', partnersRouter);
 app.use('/api/superadmin', superadminRouter);

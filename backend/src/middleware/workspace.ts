@@ -303,9 +303,16 @@ export function authorizeWorkspace(...allowedRoles: MemberRole[]) {
 //  requirePermission(): middleware that blocks if user lacks access.
 // ══════════════════════════════════════════════════════════════════════
 
-/** Non-delegable admin-only nodes */
+/** Non-delegable admin-only nodes — cannot be granted via permission tree */
 const ADMIN_ONLY_NODES = new Set([
-  'company.users', 'company.settings', 'company.sharing',
+  'company.users',          // Zarządzanie użytkownikami
+  'company.settings',       // Ustawienia globalne workspace
+  'company.sharing',        // Udostępnianie
+  'company.smtp',           // Konfiguracja SMTP
+  'company.billing',        // Billing / subskrypcja
+  'company.api-keys',       // Klucze API
+  'company.integrations',   // Krytyczne integracje
+  'module-settings',        // Ustawienia modułów (przyszłościowe)
 ]);
 
 /**

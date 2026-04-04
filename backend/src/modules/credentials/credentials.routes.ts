@@ -8,7 +8,7 @@ import {
   removeCredential,
 } from './credentials.controller';
 import { authenticate } from '../../middleware/auth';
-import { withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
+import { withWorkspaceMembership, authorizeWorkspace, requirePermission } from '../../middleware/workspace';
 import { validate } from '../../middleware/validate';
 import { createCredentialSchema, updateCredentialSchema } from './credentials.validation';
 
@@ -22,6 +22,6 @@ import { credentialRevealLimiter } from '../../middleware/rateLimit';
 router.post('/:id/reveal', credentialRevealLimiter, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'), revealCredentialPassword);
 router.post('/', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), validate(createCredentialSchema), postCredential);
 router.patch('/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), validate(updateCredentialSchema), patchCredential);
-router.delete('/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), removeCredential);
+router.delete('/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), requirePermission('vault', 'DELETE'), removeCredential);
 
 export default router;
