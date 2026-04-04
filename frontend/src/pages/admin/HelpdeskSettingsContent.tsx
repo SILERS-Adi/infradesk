@@ -190,6 +190,12 @@ export default function HelpdeskSettingsContent() {
   const providers = (relations as ProviderRelation[] | undefined) ?? [];
   const mode = form.ticketRoutingMode as RoutingMode;
 
+  const MODE_DESC: Record<RoutingMode, string> = {
+    internal_only: 'Zgłoszenia będą obsługiwane przez Twój zespół',
+    send_to_default_provider: 'Zgłoszenia będą automatycznie przekazywane do wybranej firmy IT',
+    ask_each_time: 'Użytkownik wybiera firmę IT przy każdym zgłoszeniu',
+  };
+
   return (
     <div>
       {/* Save */}
@@ -201,8 +207,23 @@ export default function HelpdeskSettingsContent() {
         </button>
       </div>
 
+      {/* Header */}
+      <div style={{ marginBottom: 20 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--t)', margin: '0 0 6px' }}>
+          Jak chcesz obsługiwać zgłoszenia?
+        </h2>
+        <p style={{ fontSize: 13, color: 'var(--tm)', margin: 0, lineHeight: 1.5 }}>
+          Wybierz, czy zgłoszenia mają trafiać do Twojego zespołu, zewnętrznej firmy IT, czy użytkownik ma wybierać przy każdym zgłoszeniu.
+        </p>
+      </div>
+
       {/* Hero diagram */}
       <RoutingPreview mode={mode} />
+
+      {/* Dynamic description */}
+      <p style={{ fontSize: 13, color: 'var(--tm)', textAlign: 'center', margin: '-12px 0 20px', fontStyle: 'italic' }}>
+        {MODE_DESC[mode]}
+      </p>
 
       {/* Segmented control */}
       <div style={{
@@ -230,7 +251,7 @@ export default function HelpdeskSettingsContent() {
         })}
       </div>
 
-      {/* Default provider (only for external mode) */}
+      {/* Conditional UI per mode */}
       {mode === 'send_to_default_provider' && (
         <div style={{ marginBottom: 24, padding: '16px 20px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg-card, var(--bg2))' }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t)', marginBottom: 8 }}>Domyślna firma IT</div>
@@ -245,9 +266,19 @@ export default function HelpdeskSettingsContent() {
         </div>
       )}
 
-      {/* Toggles */}
+      {mode === 'ask_each_time' && (
+        <div style={{
+          marginBottom: 24, padding: '14px 20px', borderRadius: 12,
+          background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.12)',
+        }}>
+          <p style={{ fontSize: 13, color: 'var(--ts)', margin: 0 }}>
+            Przy tworzeniu zgłoszenia użytkownik zobaczy listę dostępnych firm IT i wybierze, kto ma obsłużyć sprawę.
+          </p>
+        </div>
+      )}
+
+      {/* Toggles — only automation options (no "user selects" — that's the manual mode) */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <ToggleRow label="Użytkownik może wybrać firmę IT" desc="Pozwól użytkownikom ręcznie wybrać, do której firmy IT trafi zgłoszenie" checked={form.allowUserProviderSelection} onChange={v => setForm(f => ({ ...f, allowUserProviderSelection: v }))} />
         <ToggleRow label="Asystent AI może tworzyć zgłoszenia" desc="AI automatycznie tworzy zgłoszenia na podstawie wykrytych problemów" checked={form.allowAssistantAutoCreate} onChange={v => setForm(f => ({ ...f, allowAssistantAutoCreate: v }))} />
         <ToggleRow label="Alerty agentów tworzą zgłoszenia" desc="Automatyczne tworzenie zgłoszeń gdy agent wykryje problem" checked={form.allowAlertAutoCreate} onChange={v => setForm(f => ({ ...f, allowAlertAutoCreate: v }))} />
       </div>
