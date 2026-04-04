@@ -16,6 +16,7 @@ import { Button } from '../../../components/ui/Button';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { Modal } from '../../../components/ui/Modal';
+import { Alert } from '../../../components/ui/Alert';
 import type { CourierEntity, CarrierEntity, ClientConfig } from './types';
 
 type Tab = 'couriers' | 'carriers' | 'config';
@@ -40,12 +41,12 @@ export function CarriersPage() {
   const [crCourierId, setCrCourierId] = useState('');
 
   // Queries
-  const { data: couriers, isLoading: loadingC } = useQuery<CourierEntity[]>({
+  const { data: couriers, isLoading: loadingC, isError: isErrorC } = useQuery<CourierEntity[]>({
     queryKey: ['packaging', 'couriers'],
     queryFn: async () => { const { data } = await api.get('/packaging/carriers/couriers'); return data; },
   });
 
-  const { data: carriers, isLoading: loadingCr } = useQuery<CarrierEntity[]>({
+  const { data: carriers, isLoading: loadingCr, isError: isErrorCr } = useQuery<CarrierEntity[]>({
     queryKey: ['packaging', 'carriers'],
     queryFn: async () => { const { data } = await api.get('/packaging/carriers'); return data; },
   });
@@ -188,6 +189,13 @@ export function CarriersPage() {
           <button onClick={() => { setTab('config'); populateConfig(); }} style={tabStyle(tab === 'config')}>Konfiguracja</button>
         </div>
 
+        {/* Error state */}
+        {(isErrorC || isErrorCr) && (
+          <div style={{ marginBottom: 16 }}>
+            <Alert type="error">Nie udało się załadować danych</Alert>
+          </div>
+        )}
+
         {/* Couriers tab */}
         {tab === 'couriers' && (
           <Card title="Kurierzy" action={
@@ -258,7 +266,7 @@ export function CarriersPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <button
                         onClick={() => toggleCarrierMut.mutate({ id: c.id, active: !c.active })}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: c.active ? '#4ADE80' : 'var(--tm)', display: 'flex' }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: c.active ? '#059669' : 'var(--tm)', display: 'flex' }}
                         title={c.active ? 'Aktywny' : 'Nieaktywny'}>
                         {c.active ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
                       </button>

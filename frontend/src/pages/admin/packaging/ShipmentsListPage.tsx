@@ -16,6 +16,7 @@ import { SearchInput } from '../../../components/ui/SearchInput';
 import { Pagination } from '../../../components/ui/Pagination';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { Alert } from '../../../components/ui/Alert';
 import { ORDER_STATUS, ORDER_STATUS_TABS } from './constants';
 import { fmtMoney, fmtDate } from './utils';
 import type { BadgeColor } from './types';
@@ -63,7 +64,7 @@ export function ShipmentsListPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
 
-  const { data: result, isLoading } = useQuery({
+  const { data: result, isLoading, isError } = useQuery({
     queryKey: ['packaging', 'orders', page, search, statusFilter, sortBy, sortDir],
     queryFn: async () => {
       const params: Record<string, string> = { page: String(page), per_page: '50' };
@@ -179,7 +180,9 @@ export function ShipmentsListPage() {
         </div>
 
         {/* Data table */}
-        {isLoading ? <LoadingSpinner /> : items.length === 0 ? (
+        {isError ? (
+          <div style={{ marginBottom: 16 }}><Alert type="error">Nie udało się załadować danych</Alert></div>
+        ) : isLoading ? <LoadingSpinner /> : items.length === 0 ? (
           <div className="page-card" style={{ padding: 40 }}>
             <EmptyState title="Brak zamówień" description="Zamówienia pojawią się po synchronizacji." />
           </div>

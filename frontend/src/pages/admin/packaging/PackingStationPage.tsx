@@ -19,6 +19,7 @@ import { Badge } from '../../../components/ui/Badge';
 import { Button } from '../../../components/ui/Button';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { Alert } from '../../../components/ui/Alert';
 import type { PackingQueueItem, PackingSession, BadgeColor } from './types';
 import { fmtMoney } from './utils';
 
@@ -35,7 +36,7 @@ export function PackingStationPage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Queue
-  const { data: queue, isLoading: loadingQueue, refetch: refetchQueue } = useQuery<PackingQueueItem[]>({
+  const { data: queue, isLoading: loadingQueue, isError, refetch: refetchQueue } = useQuery<PackingQueueItem[]>({
     queryKey: ['packaging', 'packing', 'queue'],
     queryFn: async () => { const { data } = await api.get('/packaging/packing/queue'); return data; },
   });
@@ -172,6 +173,8 @@ export function PackingStationPage() {
   const totalAmount = activeOrder ? Number(activeOrder.totalAmount) : 0;
 
   if (loadingQueue) return <><PageHeader title="Stacja pakowania" /><LoadingSpinner /></>;
+  if (isError) return <><PageHeader title="Stacja pakowania" /><div style={{ padding: '0 24px' }}><Alert type="error">Nie udało się załadować danych</Alert></div></>;
+
 
   return (
     <>
@@ -228,7 +231,7 @@ export function PackingStationPage() {
               {scanMut.isPending && <LoadingSpinner />}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 20, marginBottom: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(280px, 360px)', gap: 20, marginBottom: 16 }}>
               {/* LEFT: Product items with large images */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {activeOrder.items.map(item => {
@@ -237,7 +240,7 @@ export function PackingStationPage() {
                     <div key={item.id} className="page-card" style={{
                       padding: 0, overflow: 'hidden',
                       opacity: packed ? 0.6 : 1,
-                      borderLeft: packed ? '4px solid #4ADE80' : '4px solid transparent',
+                      borderLeft: packed ? '4px solid #059669' : '4px solid transparent',
                       transition: 'all .2s',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'stretch' }}>
@@ -273,7 +276,7 @@ export function PackingStationPage() {
                             <button onClick={() => packItem(item.id)}
                               style={{
                                 padding: '10px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                                background: packed ? '#4ADE80' : '#6366F1', color: '#fff',
+                                background: packed ? '#059669' : 'var(--accent)', color: '#fff',
                                 fontSize: 13, fontWeight: 700, transition: 'all .15s',
                                 display: 'flex', alignItems: 'center', gap: 6,
                               }}>
@@ -432,7 +435,7 @@ export function PackingStationPage() {
                   onClick={() => completeMut.mutate()}
                   loading={completeMut.isPending}
                   disabled={!allChecked}
-                  style={{ background: allChecked ? '#6366F1' : undefined }}>
+                  style={{ background: allChecked ? 'var(--accent)' : undefined }}>
                   Generuj list przewozowy
                 </Button>
               </div>

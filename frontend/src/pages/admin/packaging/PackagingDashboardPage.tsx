@@ -52,12 +52,12 @@ function WaveRow({ wave }: { wave: Wave }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
           <span style={{ fontSize: 11, color: 'var(--tm)' }}>{wave.packedCount}/{wave.orderCount} spakowane</span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: pct === 100 ? '#4ADE80' : 'var(--accent)' }}>{pct}%</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: pct === 100 ? '#059669' : 'var(--accent)' }}>{pct}%</span>
         </div>
         <div style={{ height: 6, borderRadius: 3, background: 'var(--border)' }}>
           <div style={{
             height: '100%', borderRadius: 3,
-            background: pct === 100 ? '#4ADE80' : 'var(--accent)',
+            background: pct === 100 ? '#059669' : 'var(--accent)',
             width: `${pct}%`, transition: 'width 0.4s ease',
           }} />
         </div>
@@ -100,17 +100,17 @@ export function PackagingDashboardPage() {
   const gaugePct = totalOrders > 0 ? Math.round((packed / totalOrders) * 100) : 0;
 
   const kpis = [
-    { label: 'Wszystkie zamówienia', value: totalOrders, icon: <ShoppingCart size={20} color="#fff" />, color: '#6366F1' },
-    { label: 'Spakowane', value: packed, icon: <CheckCircle2 size={20} color="#fff" />, color: '#4ADE80' },
+    { label: 'Wszystkie zamówienia', value: totalOrders, icon: <ShoppingCart size={20} color="#fff" />, color: 'var(--accent)' },
+    { label: 'Spakowane', value: packed, icon: <CheckCircle2 size={20} color="#fff" />, color: '#059669' },
     { label: 'Do realizacji', value: toProcess, icon: <Send size={20} color="#fff" />, color: '#FB923C' },
     { label: 'Zwroty', value: returns, icon: <RotateCcw size={20} color="#fff" />, color: '#F87171' },
   ];
 
   const quickActions = [
-    { label: 'Zamówienia', count: totalOrders, icon: <ShoppingCart size={22} />, path: '/packaging/orders', color: '#6366F1' },
+    { label: 'Zamówienia', count: totalOrders, icon: <ShoppingCart size={22} />, path: '/packaging/orders', color: 'var(--accent)' },
     { label: 'Zbieranie', count: s.PAID || 0, icon: <ClipboardList size={22} />, path: '/packaging/picking', color: '#FBBF24' },
     { label: 'Pakowanie', count: s.PACKING || 0, icon: <Package size={22} />, path: '/packaging/packing', color: '#FB923C' },
-    { label: 'Wysyłki', count: s.SHIPPED || 0, icon: <Truck size={22} />, path: '/packaging/batches', color: '#818CF8' },
+    { label: 'Wysyłki', count: s.SHIPPED || 0, icon: <Truck size={22} />, path: '/packaging/batches', color: 'var(--accent)' },
   ];
 
   return (
@@ -139,13 +139,13 @@ export function PackagingDashboardPage() {
           </div>
           <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--td)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Przychód dziś</div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: '#4ADE80' }}>{fmtMoney(s.revenueToday || 0)} zł</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: '#059669' }}>{fmtMoney(s.revenueToday || 0)} zł</div>
             <div style={{ fontSize: 11, color: 'var(--tm)', marginTop: 6 }}>Miesiąc: <b style={{ color: 'var(--accent)' }}>{fmtMoney(s.revenueMonth || 0)} zł</b></div>
           </div>
         </div>
 
         {/* KPI cards row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12, marginBottom: 24 }}>
           {kpis.map(k => (
             <div key={k.label} className="page-card" style={{ padding: '20px 22px' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
@@ -178,7 +178,7 @@ export function PackagingDashboardPage() {
         </Card>
 
         {/* Quick action cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginTop: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12, marginTop: 24 }}>
           {quickActions.map(a => (
             <div key={a.label} className="page-card"
               onClick={() => navigate(a.path)}

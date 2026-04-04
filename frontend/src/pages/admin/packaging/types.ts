@@ -14,15 +14,6 @@ export type OrderStatus =
   | 'CANCELLED'
   | 'RETURNED';
 
-export type ShipmentStatus =
-  | 'pending'
-  | 'packing'
-  | 'packed'
-  | 'shipped'
-  | 'delivered'
-  | 'error'
-  | 'cancelled';
-
 export type Courier =
   | 'inpost'
   | 'dpd'
@@ -46,7 +37,7 @@ export interface Shipment {
   clientName: string;
   clientEmail?: string;
   clientPhone?: string;
-  status: ShipmentStatus;
+  status: string;
   courier: Courier;
   trackingNumber?: string;
   items: ShipmentItem[];
@@ -61,7 +52,7 @@ export interface ShipmentRow {
   id: string;
   orderNumber: string;
   clientName: string;
-  status: ShipmentStatus;
+  status: string;
   courier: Courier;
   itemCount: number;
   totalWeight: number;

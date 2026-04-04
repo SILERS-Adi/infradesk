@@ -24,10 +24,10 @@ import { fmtDate } from './utils';
 import type { Batch, BadgeColor } from './types';
 
 function progressColor(pct: number): string {
-  if (pct === 100) return '#4ADE80';
+  if (pct === 100) return '#059669';
   if (pct >= 70) return '#A78BFA';
   if (pct >= 40) return '#FBBF24';
-  return '#6366F1';
+  return 'var(--accent)';
 }
 
 export function PackagingBoardPage() {
@@ -95,7 +95,7 @@ export function PackagingBoardPage() {
           <Button variant="ghost" size="sm" icon={<RefreshCw size={14} />}
             onClick={() => queryClient.invalidateQueries({ queryKey: ['packaging', 'batches'] })}>Odśwież</Button>
           <Button variant="primary" size="sm" icon={<Plus size={14} />}
-            onClick={() => setShowCreate(true)} style={{ background: '#6366F1' }}>Nowy batch</Button>
+            onClick={() => setShowCreate(true)} style={{ background: 'var(--accent)' }}>Nowy batch</Button>
         </div>
       } />
 
@@ -182,11 +182,11 @@ export function PackagingBoardPage() {
                         <button onClick={e => { e.stopPropagation(); takeMut.mutate(b.id); }}
                           style={{
                             padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                            background: '#6366F1', color: '#fff', fontSize: 12, fontWeight: 700,
+                            background: 'var(--accent)', color: '#fff', fontSize: 12, fontWeight: 700,
                             display: 'flex', alignItems: 'center', gap: 6, transition: 'all .15s',
                           }}
-                          onMouseEnter={e => { e.currentTarget.style.background = '#4F46E5'; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = '#6366F1'; }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'var(--accent)'; }}
                         >
                           Pakuj <ChevronRight size={14} />
                         </button>
@@ -215,7 +215,7 @@ export function PackagingBoardPage() {
           <>
             <Button variant="secondary" onClick={() => setShowCreate(false)}>Anuluj</Button>
             <Button variant="primary" loading={createMut.isPending} onClick={() => createMut.mutate()}
-              style={{ background: '#6366F1' }}>Utwórz</Button>
+              style={{ background: 'var(--accent)' }}>Utwórz</Button>
           </>
         }
       >

@@ -76,7 +76,7 @@ export function WavesPage() {
           </div>
           <div className="page-card" style={{ flex: '1 1 160px', padding: '16px 20px' }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--td)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Wysłane</div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: '#4ADE80' }}>{totalShipped}</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: '#059669' }}>{totalShipped}</div>
           </div>
         </div>
 
@@ -108,7 +108,7 @@ export function WavesPage() {
                     return (
                       <div key={w.id} className="page-card" style={{
                         padding: 0, overflow: 'hidden',
-                        borderLeft: `3px solid ${isLate ? '#F87171' : isComplete ? '#4ADE80' : 'var(--accent)'}`,
+                        borderLeft: `3px solid ${isLate ? '#F87171' : isComplete ? '#059669' : 'var(--accent)'}`,
                       }}>
                         <div style={{ padding: '16px 18px' }}>
                           {/* Header row */}
@@ -118,7 +118,7 @@ export function WavesPage() {
                               <Badge color={ws.color}>{ws.label}</Badge>
                             </div>
                             {isLate && <AlertTriangle size={16} style={{ color: '#F87171' }} />}
-                            {isComplete && <CheckCircle2 size={16} style={{ color: '#4ADE80' }} />}
+                            {isComplete && <CheckCircle2 size={16} style={{ color: '#059669' }} />}
                           </div>
 
                           {/* Pickup time */}
@@ -140,7 +140,7 @@ export function WavesPage() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#A78BFA' }}>
                               <CheckCircle2 size={13} /> {w.packedCount} spakowanych
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#4ADE80' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#059669' }}>
                               <Truck size={13} /> {w.shippedCount} wysłanych
                             </div>
                           </div>
@@ -154,7 +154,7 @@ export function WavesPage() {
                             <div style={{ height: 6, borderRadius: 3, background: 'var(--border)' }}>
                               <div style={{
                                 height: '100%', borderRadius: 3, transition: 'width 0.3s',
-                                background: isComplete ? '#4ADE80' : isLate ? '#F87171' : 'var(--accent)',
+                                background: isComplete ? '#059669' : isLate ? '#F87171' : 'var(--accent)',
                                 width: `${progress}%`,
                               }} />
                             </div>

@@ -86,7 +86,7 @@ export function PackagingReportsPage() {
         {/* Summary KPIs */}
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
           <KpiCard label="Zamówień (okres)" value={String(totalOrders)} icon={<Package size={20} color="#fff" />} color="var(--accent)" />
-          <KpiCard label="Przychód (okres)" value={`${fmtMoney(totalRevenue)} zł`} icon={<TrendingUp size={20} color="#fff" />} color="#4ADE80" />
+          <KpiCard label="Przychód (okres)" value={`${fmtMoney(totalRevenue)} zł`} icon={<TrendingUp size={20} color="#fff" />} color="#059669" />
           <KpiCard label="Średnia wartość" value={`${fmtMoney(avgOrderValue)} zł`} icon={<BarChart3 size={20} color="#fff" />} color="#60A5FA" />
           <KpiCard label="Przychód dzisiaj" value={`${fmtMoney(s.revenueToday || 0)} zł`} icon={<Calendar size={20} color="#fff" />} color="#FBBF24" />
           <KpiCard label="Przychód miesiąc" value={`${fmtMoney(s.revenueMonth || 0)} zł`} icon={<Truck size={20} color="#fff" />} color="#A78BFA" />
@@ -101,7 +101,7 @@ export function PackagingReportsPage() {
               <div>
                 <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 11, color: 'var(--tm)' }}>
                   <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: 'var(--accent)', marginRight: 4 }} />Zamówienia</span>
-                  <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#4ADE80', marginRight: 4 }} />Przychód</span>
+                  <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#059669', marginRight: 4 }} />Przychód</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 200, padding: '0 4px', overflow: 'hidden' }}>
                   {chartData.map((d, i) => {
@@ -112,7 +112,7 @@ export function PackagingReportsPage() {
                         <div title={`${d.date}: ${d.orders} zam. / ${fmtMoney(d.revenue)} zł`}
                           style={{ display: 'flex', gap: 1, alignItems: 'flex-end', width: '100%', justifyContent: 'center' }}>
                           <div style={{ width: '40%', maxWidth: 14, height: hOrders, borderRadius: '3px 3px 0 0', background: 'var(--accent)', opacity: 0.85 }} />
-                          <div style={{ width: '40%', maxWidth: 14, height: hRevenue, borderRadius: '3px 3px 0 0', background: '#4ADE80', opacity: 0.7 }} />
+                          <div style={{ width: '40%', maxWidth: 14, height: hRevenue, borderRadius: '3px 3px 0 0', background: '#059669', opacity: 0.7 }} />
                         </div>
                         {chartData.length <= 14 && (
                           <div style={{ fontSize: 9, color: 'var(--tm)', marginTop: 4, whiteSpace: 'nowrap' }}>{d.date.slice(5)}</div>

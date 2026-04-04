@@ -138,12 +138,12 @@ export function ShipmentDetailPage() {
               <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ts)' }}>
                 {batch.packedCount}/{batch.orderCount} spakowane
               </span>
-              <span style={{ fontSize: 14, fontWeight: 800, color: pct === 100 ? '#4ADE80' : 'var(--accent)' }}>{pct}%</span>
+              <span style={{ fontSize: 14, fontWeight: 800, color: pct === 100 ? '#059669' : 'var(--accent)' }}>{pct}%</span>
             </div>
             <div style={{ height: 8, borderRadius: 4, background: 'var(--border)' }}>
               <div style={{
                 height: '100%', borderRadius: 4,
-                background: pct === 100 ? '#4ADE80' : 'var(--accent)',
+                background: pct === 100 ? '#059669' : 'var(--accent)',
                 width: `${pct}%`, transition: 'width 0.4s',
               }} />
             </div>
@@ -159,7 +159,7 @@ export function ShipmentDetailPage() {
               return (
                 <div key={o.id} className="page-card" style={{
                   padding: 0, overflow: 'hidden',
-                  borderLeft: isPacked ? '4px solid #4ADE80' : '4px solid transparent',
+                  borderLeft: isPacked ? '4px solid #059669' : '4px solid transparent',
                 }}>
                   {/* Main row */}
                   <div
@@ -179,7 +179,7 @@ export function ShipmentDetailPage() {
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                       }}>
                         {isPacked ? (
-                          <CheckCircle2 size={18} style={{ color: '#4ADE80' }} />
+                          <CheckCircle2 size={18} style={{ color: '#059669' }} />
                         ) : (
                           <Package size={18} style={{ color: 'var(--tm)' }} />
                         )}
@@ -203,11 +203,11 @@ export function ShipmentDetailPage() {
                           }}
                           style={{
                             padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                            background: '#6366F1', color: '#fff', fontSize: 12, fontWeight: 700,
+                            background: 'var(--accent)', color: '#fff', fontSize: 12, fontWeight: 700,
                             display: 'flex', alignItems: 'center', gap: 4, transition: 'all .15s',
                           }}
-                          onMouseEnter={e => { e.currentTarget.style.background = '#4F46E5'; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = '#6366F1'; }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'var(--accent)'; }}
                         >
                           Pakuj <ChevronRight size={14} />
                         </button>

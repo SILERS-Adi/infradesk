@@ -19,6 +19,7 @@ import { Button } from '../../../components/ui/Button';
 import { Modal } from '../../../components/ui/Modal';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { Alert } from '../../../components/ui/Alert';
 import { COURIER_OPTIONS } from './constants';
 import type { PickingListItem, PickingSession, PickingSessionItem } from './types';
 
@@ -30,7 +31,7 @@ export function PickingPage() {
   const [selectedCourier, setSelectedCourier] = useState<string | null>(null);
 
   // Aggregated products
-  const { data: pickingList, isLoading: loadingList } = useQuery<PickingListItem[]>({
+  const { data: pickingList, isLoading: loadingList, isError } = useQuery<PickingListItem[]>({
     queryKey: ['packaging', 'picking', 'list'],
     queryFn: async () => { const { data } = await api.get('/packaging/picking/list'); return data; },
   });
@@ -107,6 +108,8 @@ export function PickingPage() {
   const allPicked = totalRequired > 0 && totalPicked >= totalRequired;
 
   if (loadingList) return <><PageHeader title="Zbieranie" /><LoadingSpinner /></>;
+  if (isError) return <><PageHeader title="Zbieranie" /><div style={{ padding: '0 24px' }}><Alert type="error">Nie udało się załadować danych</Alert></div></>;
+
 
   return (
     <>
@@ -120,7 +123,7 @@ export function PickingPage() {
             {!activeSessionId && products.length > 0 && (
               <Button variant="primary" size="sm" icon={<Play size={14} />}
                 onClick={() => setShowBatchModal(true)}
-                style={{ background: '#6366F1' }}>
+                style={{ background: 'var(--accent)' }}>
                 Rozpocznij zbieranie
               </Button>
             )}
@@ -167,7 +170,7 @@ export function PickingPage() {
                   {/* Quantity badge */}
                   <div style={{
                     position: 'absolute', top: 8, right: 8,
-                    background: '#6366F1', color: '#fff',
+                    background: 'var(--accent)', color: '#fff',
                     fontSize: 14, fontWeight: 800, borderRadius: 8,
                     padding: '4px 10px', minWidth: 32, textAlign: 'center',
                   }}>
@@ -204,13 +207,13 @@ export function PickingPage() {
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 background: allPicked ? 'rgba(34,197,94,0.06)' : 'transparent',
               }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: allPicked ? '#4ADE80' : 'var(--ts)' }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: allPicked ? '#059669' : 'var(--ts)' }}>
                   {allPicked ? 'Wszystko zebrane!' : `${totalPicked} / ${totalRequired} sztuk`}
                 </span>
                 <div style={{ width: 160, height: 6, borderRadius: 3, background: 'var(--border)' }}>
                   <div style={{
                     height: '100%', borderRadius: 3,
-                    background: allPicked ? '#4ADE80' : 'var(--accent)',
+                    background: allPicked ? '#059669' : 'var(--accent)',
                     width: `${totalRequired > 0 ? (totalPicked / totalRequired) * 100 : 0}%`,
                     transition: 'width 0.3s',
                   }} />
@@ -230,7 +233,7 @@ export function PickingPage() {
                         <div style={{
                           width: 28, height: 28, borderRadius: 7, flexShrink: 0,
                           border: done ? 'none' : '2px solid var(--border)',
-                          background: done ? '#4ADE80' : 'transparent',
+                          background: done ? '#059669' : 'transparent',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                         }}>
                           {done && <CheckCircle2 size={16} color="#fff" />}
@@ -255,7 +258,7 @@ export function PickingPage() {
                           </button>
                           <span style={{
                             fontSize: 16, fontWeight: 800, minWidth: 50, textAlign: 'center',
-                            color: done ? '#4ADE80' : 'var(--t)',
+                            color: done ? '#059669' : 'var(--t)',
                           }}>
                             {item.pickedQty}/{item.requiredQty}
                           </span>
@@ -264,7 +267,7 @@ export function PickingPage() {
                               width: 28, height: 28, borderRadius: 6, border: '1px solid var(--border)',
                               background: done ? 'rgba(34,197,94,0.1)' : 'var(--hover-bg)',
                               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              color: done ? '#4ADE80' : 'var(--accent)',
+                              color: done ? '#059669' : 'var(--accent)',
                             }}>
                             <Plus size={14} />
                           </button>
@@ -307,7 +310,7 @@ export function PickingPage() {
             <Button variant="secondary" onClick={() => setShowBatchModal(false)}>Anuluj</Button>
             <Button variant="primary" loading={startMut.isPending}
               onClick={() => startMut.mutate({ mode: batchMode, courier: selectedCourier || undefined })}
-              style={{ background: '#6366F1' }}>
+              style={{ background: 'var(--accent)' }}>
               Rozpocznij
             </Button>
           </>
