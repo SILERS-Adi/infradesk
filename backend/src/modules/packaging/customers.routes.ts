@@ -5,100 +5,165 @@ import prisma from '../../lib/prisma';
 const router = Router();
 router.use(authenticate);
 
-// ── GET / — List customers (paginated, searchable) ─────────────────
+/**
+ * GET / — List customers (paginated, searchable, sortable)
+ * Matches PakOps: GET /customers/
+ */
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const workspaceId = req.workspaceId!;
-    const { search, page, per_page } = req.query as Record<string, string>;
-    const pageNum = page ? parseInt(page) : 1;
-    const perPage = per_page ? parseInt(per_page) : 50;
-    const skip = (pageNum - 1) * perPage;
+    const {
+      search,
+      page: pageStr,
+      per_page: perPageStr,
+      sort: sortParam,
+    } = req.query as Record<string, string>;
+
+    const page = pageStr ? Math.max(1, parseInt(pageStr)) : 1;
+    const perPage = perPageStr ? Math.min(100, Math.max(1, parseInt(perPageStr))) : 20;
 
     const where: any = { workspaceId };
     if (search) {
       where.OR = [
+        { login: { contains: search, mode: 'insensitive' } },
         { firstName: { contains: search, mode: 'insensitive' } },
         { lastName: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
-        { login: { contains: search, mode: 'insensitive' } },
         { companyName: { contains: search, mode: 'insensitive' } },
-        { phone: { contains: search } },
+        { email: { contains: search, mode: 'insensitive' } },
       ];
     }
 
-    const [customers, total] = await prisma.$transaction([
-      prisma.packingCustomer.findMany({
-        where,
-        orderBy: { lastOrderAt: 'desc' },
-        skip,
-        take: perPage,
-      }),
-      prisma.packingCustomer.count({ where }),
-    ]);
+    const total = await prisma.packingCustomer.count({ where });
+
+    // Sort
+    const sortField = sortParam || '-totalOrders';
+    const desc = sortField.startsWith('-');
+    const fieldName = desc ? sortField.slice(1) : sortField;
+    const fieldMap: Record<string, string> = {
+      total_orders: 'totalOrders',
+      total_spent: 'totalSpent',
+      last_order_at: 'lastOrderAt',
+      created_at: 'createdAt',
+    };
+    const prismaField = fieldMap[fieldName] || fieldName;
+    const orderBy: any = { [prismaField]: desc ? 'desc' : 'asc' };
+
+    const customers = await prisma.packingCustomer.findMany({
+      where,
+      orderBy,
+      skip: (page - 1) * perPage,
+      take: perPage,
+    });
 
     res.json({
-      data: customers,
+      items: customers.map(c => ({
+        id: c.id,
+        allegro_user_id: c.allegroUserId,
+        login: c.login,
+        email: c.email,
+        first_name: c.firstName,
+        last_name: c.lastName,
+        company_name: c.companyName,
+        phone: c.phone,
+        total_orders: c.totalOrders,
+        total_spent: c.totalSpent || 0,
+        last_order_at: c.lastOrderAt ? c.lastOrderAt.toISOString() : null,
+        created_at: c.createdAt.toISOString(),
+      })),
       total,
-      page: pageNum,
-      perPage,
-      totalPages: Math.ceil(total / perPage),
+      page,
+      per_page: perPage,
+      pages: Math.ceil(total / perPage),
     });
   } catch (err) { next(err); }
 });
 
-// ── GET /:id — Customer details with shipment history ──────────────
-router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
+/**
+ * GET /:customer_id — Customer detail with order history
+ * Matches PakOps: GET /customers/{customer_id}
+ */
+router.get('/:customer_id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const workspaceId = req.workspaceId!;
 
     const customer = await prisma.packingCustomer.findFirst({
-      where: { id: req.params.id, workspaceId },
-      include: {
-        shipments: {
-          orderBy: { createdAt: 'desc' },
-          take: 50,
-          select: {
-            id: true,
-            orderNumber: true,
-            status: true,
-            totalAmount: true,
-            courier: true,
-            createdAt: true,
-            trackingNumber: true,
-          },
-        },
-      },
+      where: { id: req.params.customer_id, workspaceId },
     });
-
     if (!customer) {
-      res.status(404).json({ error: 'Customer not found' });
+      res.status(404).json({ detail: 'Customer not found' });
       return;
     }
 
-    res.json(customer);
+    // Get orders
+    const orders = await prisma.shipment.findMany({
+      where: { customerId: customer.id },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      select: {
+        id: true,
+        externalId: true,
+        orderNumber: true,
+        status: true,
+        totalAmount: true,
+        createdAt: true,
+      },
+    });
+
+    res.json({
+      id: customer.id,
+      allegro_user_id: customer.allegroUserId,
+      login: customer.login,
+      email: customer.email,
+      first_name: customer.firstName,
+      last_name: customer.lastName,
+      company_name: customer.companyName,
+      phone: customer.phone,
+      address_street: customer.addressStreet,
+      address_city: customer.addressCity,
+      address_zip: customer.addressZip,
+      nip: customer.nip,
+      notes: customer.notes,
+      total_orders: customer.totalOrders,
+      total_spent: customer.totalSpent || 0,
+      first_order_at: customer.firstOrderAt ? customer.firstOrderAt.toISOString() : null,
+      last_order_at: customer.lastOrderAt ? customer.lastOrderAt.toISOString() : null,
+      created_at: customer.createdAt.toISOString(),
+      orders: orders.map(o => ({
+        id: o.id,
+        allegro_order_id: o.externalId || o.orderNumber,
+        status: o.status.toLowerCase(),
+        total_amount: o.totalAmount || 0,
+        allegro_created_at: o.createdAt.toISOString(),
+      })),
+    });
   } catch (err) { next(err); }
 });
 
-// ── PATCH /:id — Update notes ──────────────────────────────────────
-router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => {
+/**
+ * PATCH /:customer_id — Update customer notes
+ * Matches PakOps: PATCH /customers/{customer_id}
+ */
+router.patch('/:customer_id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const workspaceId = req.workspaceId!;
     const { notes } = req.body;
 
     const customer = await prisma.packingCustomer.findFirst({
-      where: { id: req.params.id, workspaceId },
+      where: { id: req.params.customer_id, workspaceId },
     });
     if (!customer) {
-      res.status(404).json({ error: 'Customer not found' });
+      res.status(404).json({ detail: 'Customer not found' });
       return;
     }
 
-    const updated = await prisma.packingCustomer.update({
-      where: { id: customer.id },
-      data: { notes },
-    });
+    if (notes !== undefined) {
+      await prisma.packingCustomer.update({
+        where: { id: customer.id },
+        data: { notes },
+      });
+    }
 
-    res.json(updated);
+    res.json({ status: 'ok' });
   } catch (err) { next(err); }
 });
 

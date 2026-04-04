@@ -1170,7 +1170,7 @@ model Shipment {
   customerName   String
   customerEmail  String?
   customerPhone  String?
-  status         ShipmentStatus @default(PENDING)
+  status         ShipmentStatus @default(NEW)
   courier        String         @default("inpost")
   trackingNumber String?
   totalWeight    Int            @default(0)
@@ -1219,12 +1219,16 @@ model Shipment {
 }
 
 model ShipmentItem {
-  id         String  @id @default(uuid())
-  shipmentId String
-  name       String
-  sku        String?
-  quantity   Int     @default(1)
-  weight     Int     @default(0)
+  id             String  @id @default(uuid())
+  shipmentId     String
+  name           String
+  sku            String?
+  quantity       Int     @default(1)
+  weight         Int     @default(0)
+  unitPrice      Float   @default(0)
+  totalPrice     Float   @default(0)
+  allegroOfferId String?
+  imageUrl       String?
 
   shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
 
@@ -1232,13 +1236,18 @@ model ShipmentItem {
 }
 
 enum ShipmentStatus {
-  PENDING
+  NEW
+  PAID
+  PICKING
+  PICKED
   PACKING
   PACKED
   SHIPPED
   DELIVERED
-  ERROR
   CANCELLED
+  RETURNED
+  ERROR
+  PENDING
 }
 
 enum ShipmentSource {
@@ -1424,12 +1433,12 @@ model Carrier {
   pickupTime  String?
   isActive    Boolean  @default(true)
   sortOrder   Int      @default(0)
-  courierId   String
+  courierId   String?
   workspaceId String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  courier   Courier   @relation(fields: [courierId], references: [id], onDelete: Cascade)
+  courier   Courier?  @relation(fields: [courierId], references: [id], onDelete: SetNull)
   workspace Workspace @relation("CarrierWorkspace", fields: [workspaceId], references: [id])
 
   @@index([workspaceId])
