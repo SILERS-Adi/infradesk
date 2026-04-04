@@ -1556,7 +1556,21 @@ class BusinessAPI:
             if attachment_urls:
                 full_desc += "\n\nZalaczniki:\n" + "\n".join(attachment_urls)
 
-            result = do_ticket(self.token, full_title, full_desc, priority)
+            payload = {"title": full_title, "description": full_desc, "priority": priority}
+            log.info("submit_ticket payload: %s", {k: v[:80] if isinstance(v, str) else v for k, v in payload.items()})
+
+            h = {"Content-Type": "application/json", "Authorization": f"Bearer {self.token}"}
+            r = requests.post(f"{API_BASE}/agent/ticket", json=payload, headers=h, timeout=15)
+            log.info("submit_ticket response: status=%s body=%s", r.status_code, r.text[:500])
+
+            if r.status_code == 409:
+                # Retry once — ticketNumber race condition
+                import time; time.sleep(0.5)
+                r = requests.post(f"{API_BASE}/agent/ticket", json=payload, headers=h, timeout=15)
+                log.info("submit_ticket retry: status=%s body=%s", r.status_code, r.text[:500])
+
+            r.raise_for_status()
+            result = r.json()
 
             # Cleanup
             for path in self._screenshots.values():
@@ -1565,8 +1579,148 @@ class BusinessAPI:
             self._screenshots.clear()
 
             return {"ok": True, "ticketId": result.get("id")}
+        except requests.exceptions.HTTPError as e:
+            body = ""
+            try: body = e.response.text[:300]
+            except Exception: pass
+            log.error("submit_ticket HTTP %s: %s", e.response.status_code if e.response else '?', body)
+            return {"ok": False, "error": f"Blad serwera ({e.response.status_code if e.response else '?'}): {body[:100]}"}
+        except Exception as e:
+            log.error("submit_ticket error: %s", e)
+            return {"ok": False, "error": str(e)}
+
+    def get_workspaces(self):
+        """Get workspaces/companies this agent is assigned to."""
+        try:
+            status = check_status(self.token)
+            if status and isinstance(status, dict):
+                ws = status.get("workspace") or status.get("workspaceName")
+                wid = status.get("workspaceId")
+                return [{"id": wid, "name": ws or "Moja firma"}] if wid else []
+            return []
+        except Exception:
+            return []
+
+    def get_remote_programs(self):
+        """Detect installed remote access programs with IDs and status."""
+        programs = []
+
+        # RustDesk
+        rd_installed = is_rustdesk_installed()
+        rd_id = _rustdesk_id() if rd_installed else None
+        rd_exe = None
+        for p in [r"C:\Program Files\SILERS\SILERS.exe",
+                   r"C:\Program Files\RustDesk\rustdesk.exe",
+                   r"C:\Program Files (x86)\RustDesk\rustdesk.exe"]:
+            if os.path.exists(p):
+                rd_exe = p; break
+        rd_password = None
+        try:
+            # RustDesk password from config
+            rd_cfg_path = os.path.join(os.environ.get("APPDATA", ""), "RustDesk", "config", "RustDesk2.toml")
+            if not os.path.exists(rd_cfg_path):
+                rd_cfg_path = os.path.join(os.environ.get("APPDATA", ""), "SILERS", "config", "SILERS2.toml")
+            if os.path.exists(rd_cfg_path):
+                with open(rd_cfg_path, encoding="utf-8") as f:
+                    for line in f:
+                        if line.strip().startswith("password"):
+                            rd_password = line.split("=", 1)[1].strip().strip("'\"")
+                            break
+        except Exception: pass
+        programs.append({
+            "name": "RustDesk",
+            "installed": rd_installed,
+            "exe": rd_exe,
+            "id": rd_id,
+            "password": rd_password,
+            "canInstall": True,
+        })
+
+        # AnyDesk
+        ad_installed = False
+        ad_exe = None
+        ad_id = None
+        for p in [r"C:\Program Files (x86)\AnyDesk\AnyDesk.exe",
+                   r"C:\Program Files\AnyDesk\AnyDesk.exe",
+                   os.path.join(os.environ.get("APPDATA", ""), "AnyDesk", "AnyDesk.exe"),
+                   os.path.join(os.environ.get("LOCALAPPDATA", ""), "AnyDesk", "AnyDesk.exe")]:
+            if os.path.exists(p):
+                ad_installed = True; ad_exe = p; break
+        if ad_installed and ad_exe:
+            try:
+                r = subprocess.run([ad_exe, "--get-id"], capture_output=True, text=True, timeout=5, creationflags=_NO_WINDOW)
+                ad_id = r.stdout.strip() if r.returncode == 0 else None
+            except Exception: pass
+        # Try reading from system info
+        if not ad_id:
+            try:
+                cfg_path = os.path.join(os.environ.get("APPDATA", ""), "AnyDesk", "system.conf")
+                if not os.path.exists(cfg_path):
+                    cfg_path = os.path.join(os.environ.get("PROGRAMDATA", ""), "AnyDesk", "system.conf")
+                if os.path.exists(cfg_path):
+                    with open(cfg_path, encoding="utf-8", errors="ignore") as f:
+                        for line in f:
+                            if "ad.anynet.id" in line:
+                                ad_id = line.split("=", 1)[1].strip()
+                                break
+            except Exception: pass
+        programs.append({
+            "name": "AnyDesk",
+            "installed": ad_installed,
+            "exe": ad_exe,
+            "id": ad_id,
+            "password": None,
+            "canInstall": False,
+        })
+
+        # TeamViewer
+        tv_installed = False
+        tv_exe = None
+        tv_id = None
+        for p in [r"C:\Program Files\TeamViewer\TeamViewer.exe",
+                   r"C:\Program Files (x86)\TeamViewer\TeamViewer.exe"]:
+            if os.path.exists(p):
+                tv_installed = True; tv_exe = p; break
+        if tv_installed:
+            try:
+                key_path = r"SOFTWARE\WOW6432Node\TeamViewer"
+                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path) as k:
+                    tv_id = str(winreg.QueryValueEx(k, "ClientID")[0])
+            except Exception:
+                try:
+                    key_path = r"SOFTWARE\TeamViewer"
+                    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path) as k:
+                        tv_id = str(winreg.QueryValueEx(k, "ClientID")[0])
+                except Exception: pass
+        programs.append({
+            "name": "TeamViewer",
+            "installed": tv_installed,
+            "exe": tv_exe,
+            "id": tv_id,
+            "password": None,
+            "canInstall": False,
+        })
+
+        return programs
+
+    def launch_program(self, exe_path):
+        """Launch any program by path."""
+        try:
+            if os.path.exists(exe_path):
+                subprocess.Popen([exe_path], creationflags=_NO_WINDOW)
+                return {"ok": True}
+            return {"ok": False, "error": "Plik nie istnieje"}
         except Exception as e:
             return {"ok": False, "error": str(e)}
+
+    def copy_to_clipboard(self, text):
+        """Copy text to clipboard."""
+        try:
+            subprocess.run(["powershell", "-Command", f"Set-Clipboard -Value '{text}'"],
+                          creationflags=_NO_WINDOW, timeout=5)
+            return {"ok": True}
+        except Exception:
+            return {"ok": False}
 
     def get_connection_status(self):
         try:
