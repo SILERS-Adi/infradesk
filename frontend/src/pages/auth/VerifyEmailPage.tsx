@@ -34,9 +34,7 @@ export default function VerifyEmailPage() {
       });
   }, [token]);
 
-  const redirectUrl = workspace?.type === 'COMPANY' && workspace.slug
-    ? `https://${workspace.slug}.infradesk.pl/dashboard`
-    : '/dashboard';
+  const redirectUrl = '/dashboard';
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>

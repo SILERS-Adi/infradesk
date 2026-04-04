@@ -114,12 +114,7 @@ export default function RegisterPage() {
       }
 
       toast.success('Konto utworzone! Witamy w InfraDesk.');
-      // Redirect: companies → subdomain, personal → main domain
-      if (result.workspace.type === 'COMPANY' && result.workspace.slug) {
-        window.location.href = `https://${result.workspace.slug}.infradesk.pl/dashboard`;
-      } else {
-        window.location.href = '/dashboard';
-      }
+      window.location.href = '/dashboard';
     } catch (err: any) {
       toast.error(err?.response?.data?.error || err?.message || 'Błąd rejestracji');
     } finally {

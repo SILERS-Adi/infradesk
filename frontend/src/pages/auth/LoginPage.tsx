@@ -267,18 +267,6 @@ export function LoginPage() {
         return;
       }
 
-      // Check for company workspace → redirect to subdomain
-      const workspaces = response.workspaces as { id: string; slug: string; type: string; isDefault: boolean }[] | undefined;
-      const defaultWs = workspaces?.find(w => w.isDefault) || workspaces?.[0];
-      if (defaultWs?.type === 'COMPANY' && defaultWs.slug && window.location.hostname === 'infradesk.pl') {
-        // Determine correct landing page based on role
-        const wsMatch = myWorkspaces.find((w: any) => w.workspaceId === defaultWs.id) || myWorkspaces[0];
-        const landingRole = wsMatch?.role;
-        const landingPath = (landingRole === 'MEMBER' || landingRole === 'VIEWER') ? '/portal' : '/dashboard';
-        window.location.href = `https://${defaultWs.slug}.infradesk.pl${landingPath}`;
-        return;
-      }
-
       // Determine correct route based on workspace role
       const currentWs = myWorkspaces.find((w: any) => w.isDefault) || myWorkspaces[0];
       const userRole = currentWs?.role;
