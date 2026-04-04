@@ -37,7 +37,7 @@ export interface EffectiveItem {
  * New system items not in user's layout are auto-appended to their default group.
  */
 export function useEffectiveMenu(): EffectiveGroup[] {
-  const { isAdmin, hasModule } = useWorkspaceContext();
+  const { isAdmin, hasModule, organizationType } = useWorkspaceContext();
   const { user } = useAuth();
   const isSuperAdmin = !!user?.isSuperAdmin;
 
@@ -55,6 +55,7 @@ export function useEffectiveMenu(): EffectiveGroup[] {
       const sg = GROUPS_BY_ID.get(groupId);
       if (!sg) return true; // custom group — always visible
       if (sg.superadminOnly) return isSuperAdmin;
+      if (sg.orgTypes && !sg.orgTypes.includes(organizationType)) return false;
       if (sg.permanent) return true; // permanent sections always visible
       if (sg.module && !hasModule(sg.module)) return false;
       if (sg.adminOnly) return isAdmin;
@@ -64,6 +65,7 @@ export function useEffectiveMenu(): EffectiveGroup[] {
     const canSeeItem = (itemId: string): boolean => {
       const si = ITEMS_BY_ID.get(itemId);
       if (!si) return false; // unknown item — skip
+      if (si.orgTypes && !si.orgTypes.includes(organizationType)) return false;
       if (si.module && !hasModule(si.module)) return false;
       if (si.adminOnly) return isAdmin;
       return true;
@@ -166,5 +168,5 @@ export function useEffectiveMenu(): EffectiveGroup[] {
     }
 
     return result;
-  }, [layout, isAdmin, isSuperAdmin, hasModule, isEditMode, editLayout, savedLayout]);
+  }, [layout, isAdmin, isSuperAdmin, hasModule, organizationType, isEditMode, editLayout, savedLayout]);
 }

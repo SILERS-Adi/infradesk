@@ -1,5 +1,6 @@
 import { useWorkspace } from '../store/workspaceStore';
 import type { MemberRole } from '../types';
+import type { OrgType } from '../config/menuRegistry';
 
 /**
  * Hook providing workspace-aware context for UI components.
@@ -33,6 +34,9 @@ export function useWorkspaceContext() {
   const canManageUsers = !isPreview && (isOwner || role === 'ADMIN');
   const canManageSettings = !isPreview && (isOwner || role === 'ADMIN');
 
+  // Organization type
+  const organizationType = (current?.organizationType ?? 'internal_it') as OrgType;
+
   // Module access — workspace-level enabledModules (with migration support)
   const enabledModules = current?.enabledModules ?? ['infrastructure', 'service-desk'];
   const hasModule = (mod: string) => {
@@ -46,6 +50,7 @@ export function useWorkspaceContext() {
 
   return {
     workspace: current,
+    organizationType,
     role,
     scopeType,
     isScoped,

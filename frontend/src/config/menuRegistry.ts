@@ -10,10 +10,12 @@ import {
   Receipt, Plane, Users, CalendarDays, Share2,
   Shield, Activity, Sparkles, Lock,
   FileText, Package, Warehouse, CreditCard, BarChart3, Upload, Car, ClipboardCheck,
-  Truck, Layers, Waves, Star,
+  Truck, Layers, Waves, Star, Headphones, Bell, Wrench,
 } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────
+
+export type OrgType = 'client_external_it' | 'internal_it' | 'it_operator';
 
 export interface SystemMenuItem {
   id: string;
@@ -27,6 +29,7 @@ export interface SystemMenuItem {
   adminOnly?: boolean;
   badgeKey?: 'ticketQueue' | 'activeTasks';
   end?: boolean;
+  orgTypes?: OrgType[];  // if set, item only visible for these org types
 }
 
 export interface SystemMenuGroup {
@@ -37,6 +40,7 @@ export interface SystemMenuGroup {
   permanent?: boolean;       // always visible regardless of modules
   adminOnly?: boolean;       // entire group only for Administrators
   superadminOnly?: boolean;  // only for platform superadmin
+  orgTypes?: OrgType[];      // if set, group only visible for these org types
 }
 
 // ── Groups ─────────────────────────────────────────────────────
@@ -44,6 +48,9 @@ export interface SystemMenuGroup {
 export const SYSTEM_GROUPS: SystemMenuGroup[] = [
   // Dashboard (always first)
   { id: 'main',            label: '',                   defaultOrder: 0,  permanent: true },
+
+  // Operations center (IT Operator only)
+  { id: 'operations-center', label: 'CENTRUM OPERACYJNE', defaultOrder: 0.5, orgTypes: ['it_operator'] },
 
   // Modules (activated per workspace)
   { id: 'infrastructure',  label: 'INFRASTRUKTURA IT',  defaultOrder: 1,  module: 'infrastructure' },
@@ -72,6 +79,16 @@ export const SYSTEM_ITEMS: SystemMenuItem[] = [
   // ── DASHBOARD (main) ──
   { id: 'dashboard',          to: '/dashboard',            label: 'Dashboard',         icon: LayoutDashboard, groupId: 'main',           defaultOrder: 0 },
 
+  // ── CENTRUM OPERACYJNE (IT Operator only) ──
+  { id: 'op-dashboard',       to: '/operator/dashboard',   label: 'Dashboard',          icon: LayoutDashboard, groupId: 'operations-center', defaultOrder: 0, orgTypes: ['it_operator'] },
+  { id: 'op-clients',         to: '/operator/clients',     label: 'Klienci',            icon: Building2,       groupId: 'operations-center', defaultOrder: 1, orgTypes: ['it_operator'] },
+  { id: 'op-tickets',         to: '/operator/tickets',     label: 'Zgłoszenia',         icon: Ticket,          groupId: 'operations-center', defaultOrder: 2, orgTypes: ['it_operator'], badgeKey: 'ticketQueue' },
+  { id: 'op-tasks',           to: '/operator/tasks',       label: 'Zadania',            icon: ClipboardList,   groupId: 'operations-center', defaultOrder: 3, orgTypes: ['it_operator'] },
+  { id: 'op-calendar',        to: '/operator/calendar',    label: 'Kalendarz',          icon: CalendarDays,    groupId: 'operations-center', defaultOrder: 4, orgTypes: ['it_operator'] },
+  { id: 'op-alerts',          to: '/operator/alerts',      label: 'Alerty i asystenci', icon: Bell,            groupId: 'operations-center', defaultOrder: 5, orgTypes: ['it_operator'] },
+  { id: 'op-sessions',        to: '/operator/sessions',    label: 'Sesje pracy',        icon: Timer,           groupId: 'operations-center', defaultOrder: 6, orgTypes: ['it_operator'] },
+  { id: 'op-billing',         to: '/operator/billing',     label: 'Rozliczenia',        icon: Receipt,         groupId: 'operations-center', defaultOrder: 7, orgTypes: ['it_operator'] },
+
   // ── INFRASTRUKTURA IT ──
   { id: 'devices',            to: '/devices',              label: 'Urządzenia',        icon: Monitor,         groupId: 'infrastructure', defaultOrder: 0, module: 'infrastructure' },
   { id: 'agents',             to: '/agents',               label: 'Agenty',            icon: Bot,             groupId: 'infrastructure', defaultOrder: 1, module: 'infrastructure' },
@@ -88,6 +105,8 @@ export const SYSTEM_ITEMS: SystemMenuItem[] = [
   { id: 'crm',                to: '/crm',                  label: 'CRM',                icon: MessageSquare,   groupId: 'service-desk',   defaultOrder: 5, module: 'service-desk' },
   { id: 'sessions',           to: '/sessions',             label: 'Sesje pracy',        icon: Timer,           groupId: 'service-desk',   defaultOrder: 6, module: 'service-desk' },
   { id: 'billing',            to: '/billing',              label: 'Rozliczenia',        icon: Receipt,         groupId: 'service-desk',   defaultOrder: 7, module: 'service-desk' },
+  { id: 'it-support',         to: '/it-support',           label: 'Obsługa IT',         icon: Headphones,      groupId: 'service-desk',   defaultOrder: 8, module: 'service-desk', orgTypes: ['client_external_it'] },
+  { id: 'helpdesk-settings',  to: '/helpdesk-settings',    label: 'Ustawienia Help Desk', icon: Wrench,        groupId: 'service-desk',   defaultOrder: 9, module: 'service-desk', adminOnly: true },
 
   // ── FINANSE ──
   { id: 'inv-dashboard',      to: '/invoicing',            label: 'Dashboard',          icon: LayoutDashboard, groupId: 'invoicing',      defaultOrder: 0, module: 'invoicing' },
