@@ -21,6 +21,9 @@ const OperatorAlerts = React.lazy(() => import('./pages/operator/OperatorAlerts'
 const OperatorSessions = React.lazy(() => import('./pages/operator/OperatorSessions'));
 const OperatorBilling = React.lazy(() => import('./pages/operator/OperatorBilling'));
 
+// Helpdesk Settings
+const HelpdeskSettingsPage = React.lazy(() => import('./pages/admin/HelpdeskSettingsPage'));
+
 // Public
 const PublicTicketForm = React.lazy(() => import('./pages/public/PublicTicketForm'));
 
@@ -405,6 +408,9 @@ export default function App() {
             {/* Redirects — architecture migration */}
             <Route path="/credentials" element={<Navigate to="/vault" replace />} />
             <Route path="/workspace-members" element={<Navigate to="/users" replace />} />
+
+            {/* Helpdesk Settings */}
+            <Route path="/helpdesk-settings" element={<React.Suspense fallback={null}><HelpdeskSettingsPage /></React.Suspense>} />
 
             {/* Onboarding wizard */}
             <Route path="/onboarding" element={<OnboardingWizard />} />
