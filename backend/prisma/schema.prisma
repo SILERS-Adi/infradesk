@@ -192,7 +192,7 @@ model Workspace {
 
   maxAgents      Int      @default(10)
   maxUsers       Int      @default(5)
-  enabledModules String[] @default(["helpdesk"])
+  enabledModules String[] @default(["infrastructure", "service-desk"])
 
   // Subscription
   subscriptionStatus String    @default("TRIAL") // TRIAL | ACTIVE | EXPIRED | PAUSED

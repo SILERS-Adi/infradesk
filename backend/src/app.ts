@@ -214,6 +214,22 @@ app.use('/api/service/inspections', serviceInspectionsRouter);
 app.get('/api/agent/contact', getContactHandler);
 app.get('/api/agent/faq',     getFaqHandler);
 
+/** Migrate old module keys to new ones */
+function migrateModuleKeys(modules: string[]): string[] {
+  const result = new Set<string>();
+  for (const m of modules) {
+    if (m === 'helpdesk') {
+      result.add('infrastructure');
+      result.add('service-desk');
+    } else if (m === 'service') {
+      result.add('skp');
+    } else {
+      result.add(m);
+    }
+  }
+  return Array.from(result);
+}
+
 // Workspace endpoints (Etap 2)
 app.get('/api/workspaces/my', authenticate, async (req, res, next) => {
   try {
@@ -255,7 +271,7 @@ app.get('/api/workspaces/my', authenticate, async (req, res, next) => {
       source: m.source,
       isDefault: m.isDefault,
       allowedModules: m.allowedModules,
-      enabledModules: m.workspace.enabledModules ?? ['helpdesk'],
+      enabledModules: migrateModuleKeys(m.workspace.enabledModules ?? ['helpdesk']),
       managedBy: (m.workspace.managedBy as any)?.[0]?.mspWorkspace?.name ?? null,
       subscriptionStatus: m.workspace.subscriptionStatus,
       trialEndDate: m.workspace.trialEndDate,

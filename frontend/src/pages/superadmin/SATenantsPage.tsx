@@ -172,7 +172,7 @@ export default function SATenantsPage() {
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t)' }}>{deleteTarget.name}</div>
               <div style={{ fontSize: 11, color: 'var(--td)' }}>{deleteTarget.slug} · {deleteTarget.type} · {deleteTarget.plan}</div>
               <div style={{ fontSize: 10, color: '#F87171', marginTop: 6 }}>
-                Usunięte zostaną: urządzenia, lokalizacje, tickety, credentials, sesje, asystenci i wszystkie inne dane tego workspace.
+                Usunięte zostaną: urządzenia, lokalizacje, zgłoszenia, sejf haseł, sesje, agenty i wszystkie inne dane tego workspace.
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>

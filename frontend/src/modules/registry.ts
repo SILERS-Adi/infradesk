@@ -125,20 +125,26 @@ export const invoicingModule: ModuleDefinition = {
 export const serviceModule: ModuleDefinition = {
   id: 'service',
   label: 'Serwis',
-  basePath: '/service',
-  featureFlag: 'service',
-  sidebarLabel: 'SERWIS SKP',
+  basePath: '/skp',
+  featureFlag: 'skp',
+  sidebarLabel: 'SKP',
   navItems: [
-    { to: '/service', label: 'Dashboard', icon: null },
-    { to: '/service/inspections', label: 'Przeglądy', icon: null },
-    { to: '/service/vehicles', label: 'Pojazdy', icon: null },
+    { to: '/skp', label: 'Dashboard', icon: null },
+    { to: '/skp/inspections', label: 'Przeglądy', icon: null },
+    { to: '/skp/vehicles', label: 'Pojazdy', icon: null },
   ],
   routeTitles: {
-    '/service': 'Serwis',
-    '/service/inspections': 'Serwis — Przeglądy',
-    '/service/inspections/new': 'Serwis — Nowy przegląd',
-    '/service/vehicles': 'Serwis — Pojazdy',
-    '/service/vehicles/new': 'Serwis — Nowy pojazd',
+    '/skp': 'SKP',
+    '/skp/inspections': 'SKP — Przeglądy',
+    '/skp/inspections/new': 'SKP — Nowy przegląd',
+    '/skp/vehicles': 'SKP — Pojazdy',
+    '/skp/vehicles/new': 'SKP — Nowy pojazd',
+    // Legacy paths
+    '/service': 'SKP',
+    '/service/inspections': 'SKP — Przeglądy',
+    '/service/inspections/new': 'SKP — Nowy przegląd',
+    '/service/vehicles': 'SKP — Pojazdy',
+    '/service/vehicles/new': 'SKP — Nowy pojazd',
   },
 };
 
