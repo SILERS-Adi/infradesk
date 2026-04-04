@@ -19,7 +19,7 @@ const ROUTE_TITLES: Record<string, string> = {
   '/calendar': 'Kalendarz',
   '/orders': 'Zamówienia',
   '/delegations': 'Delegacje',
-  '/agents': 'Agenty',
+  '/agents': 'Asystenci',
   '/monitoring': 'Audyt & Sieć',
   '/backups': 'Kopie zapasowe',
   '/activity-logs': 'Logi aktywności',

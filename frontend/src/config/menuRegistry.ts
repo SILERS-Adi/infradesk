@@ -75,7 +75,7 @@ export const SYSTEM_ITEMS: SystemMenuItem[] = [
   { id: 'sharing',            to: '/sharing',              label: 'Udostępnianie',   icon: Share2,          groupId: 'service',        defaultOrder: 6 },
 
   // ── MONITORING ──
-  { id: 'agents',             to: '/agents',               label: 'Agenty',          icon: Bot,             groupId: 'monitoring',     defaultOrder: 0 },
+  { id: 'agents',             to: '/agents',               label: 'Asystenci',       icon: Bot,             groupId: 'monitoring',     defaultOrder: 0 },
   { id: 'audit-network',      to: '/monitoring',           label: 'Audyt & Sieć',   icon: Shield,          groupId: 'monitoring',     defaultOrder: 1, feature: 'security_audit' },
   { id: 'backups',            to: '/backups',              label: 'Kopie zapasowe',  icon: HardDrive,       groupId: 'monitoring',     defaultOrder: 2, feature: 'backup' },
   { id: 'activity-logs',      to: '/activity-logs',        label: 'Logi aktywności', icon: Activity,        groupId: 'monitoring',     defaultOrder: 3, role: 'ADMIN' },

@@ -744,7 +744,7 @@ export function WaitingRoomPage() {
     <div className="space-y-6 max-w-3xl mx-auto">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold" style={{ color: 'var(--t)' }}>Agenty systemowe</h1>
+        <h1 className="text-2xl font-bold" style={{ color: 'var(--t)' }}>Asystenci systemowi</h1>
         <div className="flex items-center gap-3 mt-1">
           <p className="text-sm" style={{ color: 'var(--tm)' }}>
             {registrations.length} {registrations.length === 1 ? 'agent' : 'agentow'} zarejestrowanych
