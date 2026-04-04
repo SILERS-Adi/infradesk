@@ -21,6 +21,9 @@ const OperatorAlerts = React.lazy(() => import('./pages/operator/OperatorAlerts'
 const OperatorSessions = React.lazy(() => import('./pages/operator/OperatorSessions'));
 const OperatorBilling = React.lazy(() => import('./pages/operator/OperatorBilling'));
 const OperatorPartners = React.lazy(() => import('./pages/operator/OperatorPartners'));
+const OperatorContacts = React.lazy(() => import('./pages/operator/OperatorContacts'));
+const OperatorLocations = React.lazy(() => import('./pages/operator/OperatorLocations'));
+const OperatorSharing = React.lazy(() => import('./pages/operator/OperatorSharing'));
 
 // Helpdesk Settings
 const PortalSettingsPage = React.lazy(() => import('./pages/admin/PortalSettingsPage'));
@@ -256,6 +259,9 @@ function AdminRoutes() {
         <Route path="operator/sessions" element={<React.Suspense fallback={null}><OperatorSessions /></React.Suspense>} />
         <Route path="operator/billing" element={<React.Suspense fallback={null}><OperatorBilling /></React.Suspense>} />
         <Route path="operator/partners" element={<React.Suspense fallback={null}><OperatorPartners /></React.Suspense>} />
+        <Route path="operator/contacts" element={<React.Suspense fallback={null}><OperatorContacts /></React.Suspense>} />
+        <Route path="operator/locations" element={<React.Suspense fallback={null}><OperatorLocations /></React.Suspense>} />
+        <Route path="operator/sharing" element={<React.Suspense fallback={null}><OperatorSharing /></React.Suspense>} />
         <Route path="superadmin" element={<RequireSuperAdmin><SADashboardPage /></RequireSuperAdmin>} />
         <Route path="superadmin/tenants" element={<RequireSuperAdmin><SATenantsPage /></RequireSuperAdmin>} />
         <Route path="superadmin/users" element={<RequireSuperAdmin><SAUsersPage /></RequireSuperAdmin>} />
