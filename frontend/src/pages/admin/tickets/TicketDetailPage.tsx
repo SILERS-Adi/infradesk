@@ -38,7 +38,7 @@ function Section({ title, children, action }: { title: string; children: React.R
   return (
     <div className="rounded-[16px] overflow-hidden" style={glass()}>
       <div className="px-5 py-3.5 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border)' }}>
-        <h3 className="text-[13px] font-semibold text-white/70">{title}</h3>
+        <h3 className="text-[13px] font-semibold text-[var(--tm)]">{title}</h3>
         {action}
       </div>
       <div className="p-5">{children}</div>
@@ -72,7 +72,7 @@ function CommentBubble({ c, isAdmin, onEdit, onDelete }: {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1 flex-wrap">
-          <span className="text-[13px] font-semibold text-white/85">{c.user ? `${c.user.firstName} ${c.user.lastName}` : 'Użytkownik'}</span>
+          <span className="text-[13px] font-semibold text-[var(--t)]">{c.user ? `${c.user.firstName} ${c.user.lastName}` : 'Użytkownik'}</span>
           {c.isInternal && (
             <span className="flex items-center gap-0.5 text-[10px] font-semibold" style={{ color: '#FBBF24' }}>
               <Lock className="h-3 w-3" /> Wewnętrzne
@@ -82,11 +82,11 @@ function CommentBubble({ c, isAdmin, onEdit, onDelete }: {
           {isAdmin && !editing && (
             <div className="flex items-center gap-1 ml-auto">
               <button onClick={() => { setEditText(c.comment); setEditing(true); }}
-                className="p-1 rounded-lg transition-colors hover:bg-white/[0.06]" title="Edytuj">
+                className="p-1 rounded-lg transition-colors hover:bg-[var(--hover-bg)]" title="Edytuj">
                 <Pencil className="h-3 w-3" style={{ color: 'var(--td)' }} />
               </button>
               <button onClick={() => { if (confirm('Usunąć komentarz?')) onDelete(c.id); }}
-                className="p-1 rounded-lg transition-colors hover:bg-white/[0.06]" title="Usuń">
+                className="p-1 rounded-lg transition-colors hover:bg-[var(--hover-bg)]" title="Usuń">
                 <Trash2 className="h-3 w-3" style={{ color: 'var(--td)' }} />
               </button>
             </div>
@@ -95,7 +95,7 @@ function CommentBubble({ c, isAdmin, onEdit, onDelete }: {
         {editing ? (
           <div className="space-y-2">
             <textarea value={editText} onChange={e => setEditText(e.target.value)} rows={3}
-              className="w-full rounded-xl px-3 py-2 text-[13px] resize-none focus:outline-none placeholder:text-white/20"
+              className="w-full rounded-xl px-3 py-2 text-[13px] resize-none focus:outline-none placeholder:text-[var(--td)]"
               style={{ background: 'var(--hover-bg)', border: '1px solid rgba(139,92,246,0.3)', color: 'var(--t)' }} />
             <div className="flex gap-2">
               <button onClick={save} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white transition-all active:scale-[0.97]"
@@ -226,7 +226,7 @@ export function TicketDetailPage() {
             {/* Nowa wiadomość */}
             <div className="pt-4" style={{ borderTop: '1px solid var(--border)' }}>
               <textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Napisz wiadomość..." rows={3}
-                className="w-full rounded-xl px-4 py-3 text-[13px] resize-none focus:outline-none transition-all placeholder:text-white/20"
+                className="w-full rounded-xl px-4 py-3 text-[13px] resize-none focus:outline-none transition-all placeholder:text-[var(--td)]"
                 style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}
                 onFocus={e => { e.currentTarget.style.borderColor = 'var(--accent)'; }}
                 onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
@@ -306,7 +306,7 @@ export function TicketDetailPage() {
               ].map(({ label, value }) => value ? (
                 <div key={label} className="flex items-start gap-2 py-2.5" style={{ borderBottom: '1px solid var(--border)' }}>
                   <span className="text-[11px] font-medium w-24 flex-shrink-0 pt-0.5" style={{ color: 'var(--tm)' }}>{label}</span>
-                  <span className="text-[13px] text-white/75">{value}</span>
+                  <span className="text-[13px] text-[var(--ts)]">{value}</span>
                 </div>
               ) : null)}
             </div>

@@ -80,7 +80,7 @@ function SortTh({ label, sortKey, currentKey, currentDir, onSort, align }: {
   return (
     <th className={`${align === 'center' ? 'text-center' : 'text-left'} px-4 py-3 select-none cursor-pointer group`}
       onClick={() => onSort(sortKey)}>
-      <div className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${isActive ? '' : 'group-hover:text-white/50'}`}
+      <div className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${isActive ? '' : 'group-hover:text-[var(--tm)]'}`}
         style={{ color: isActive ? '#A78BFA' : 'var(--tm)' }}>
         {label}
         {isActive ? (
@@ -321,7 +321,7 @@ export function TicketsListPage() {
       key: 'title', label: 'Tytuł', group: 'Podstawowe', defaultVisible: true,
       render: (t: Ticket) => (
         <div className="max-w-xs">
-          <div className="text-[13px] font-semibold text-white/85 truncate">{t.title}</div>
+          <div className="text-[13px] font-semibold text-[var(--t)] truncate">{t.title}</div>
           {t.description && (
             <div
               className="text-[11px] mt-0.5 leading-snug"
@@ -701,18 +701,18 @@ function ColumnEditorPanel({ allColumns, visibleKeys, setVisibleKeys, groups, on
         <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex items-center gap-2">
             <Settings2 className="h-4 w-4 text-violet-400" />
-            <span className="text-sm font-semibold text-white/80">Edycja kolumn</span>
-            <span className="text-xs text-white/30">({visibleKeys.length} widocznych)</span>
+            <span className="text-sm font-semibold text-[var(--t)]">Edycja kolumn</span>
+            <span className="text-xs text-[var(--td)]">({visibleKeys.length} widocznych)</span>
           </div>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/5 text-white/40 hover:text-white/70">
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-[var(--hover-bg)] text-[var(--td)] hover:text-[var(--tm)]">
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Horizontal drag strip — live column order */}
         <div className="px-4 py-3 flex items-center gap-2 overflow-x-auto" style={{ borderTop: '1px solid var(--border)', background: 'var(--hover-bg)' }}>
-          <span className="text-[9px] font-bold uppercase tracking-wider text-white/20 flex-shrink-0 mr-1">Kolejność:</span>
-          <GripVertical className="h-3 w-3 text-white/15 flex-shrink-0" />
+          <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--td)] flex-shrink-0 mr-1">Kolejność:</span>
+          <GripVertical className="h-3 w-3 text-[var(--td)] flex-shrink-0" />
           {orderedVisible.map((col, idx) => (
             <div
               key={col.key}
@@ -729,27 +729,27 @@ function ColumnEditorPanel({ allColumns, visibleKeys, setVisibleKeys, groups, on
                 opacity: dragIdx === idx ? 0.35 : 1,
                 transform: overIdx === idx ? 'scale(1.08)' : 'scale(1)',
               }}>
-              <GripVertical className="h-3 w-3 text-white/25" />
+              <GripVertical className="h-3 w-3 text-[var(--td)]" />
               {col.label}
             </div>
           ))}
-          <span className="text-[9px] text-white/15 flex-shrink-0 ml-2">← przeciągnij aby zmienić →</span>
+          <span className="text-[9px] text-[var(--td)] flex-shrink-0 ml-2">← przeciągnij aby zmienić →</span>
         </div>
 
         <div className="flex gap-0 flex-1 overflow-hidden" style={{ borderTop: '1px solid var(--border)' }}>
           {/* LEFT: Toggle columns by group */}
           <div className="flex-1 p-4 overflow-y-auto" style={{ borderRight: '1px solid var(--border)' }}>
-            <p className="text-[9px] font-bold uppercase tracking-wider text-white/20 mb-3">Włącz / wyłącz kolumny</p>
+            <p className="text-[9px] font-bold uppercase tracking-wider text-[var(--td)] mb-3">Włącz / wyłącz kolumny</p>
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
               {groups.map(group => (
                 <div key={group}>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-white/25 mb-1.5">{group}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--td)] mb-1.5">{group}</p>
                   <div className="space-y-0.5">
                     {allColumns.filter(c => c.group === group).map(col => {
                       const visible = visibleKeys.includes(col.key);
                       return (
                         <button key={col.key} onClick={() => toggleColumn(col.key)}
-                          className="flex items-center gap-2 w-full py-1.5 px-2 rounded-lg text-xs font-medium transition-all hover:bg-white/[0.03]"
+                          className="flex items-center gap-2 w-full py-1.5 px-2 rounded-lg text-xs font-medium transition-all hover:bg-[var(--hover-bg)]"
                           style={{
                             background: visible ? 'rgba(139,92,246,0.1)' : 'transparent',
                             color: visible ? '#A78BFA' : 'var(--tm)',

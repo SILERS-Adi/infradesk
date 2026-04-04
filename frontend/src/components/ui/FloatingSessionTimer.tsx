@@ -49,7 +49,7 @@ export function FloatingSessionTimer({ session, hostname, onEnded }: Props) {
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
-      <div className="bg-gray-900 text-white rounded-2xl shadow-2xl overflow-hidden w-72">
+      <div className="rounded-2xl shadow-2xl overflow-hidden w-72" style={{ background: 'var(--bg-card)', color: 'var(--t)', border: '1px solid var(--border)' }}>
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-3 bg-indigo-600">
           <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
@@ -65,7 +65,7 @@ export function FloatingSessionTimer({ session, hostname, onEnded }: Props) {
         {/* Timer */}
         <div className="px-4 pt-3 pb-2 text-center">
           <p className="text-3xl font-mono font-bold tracking-wider">{fmt(elapsed)}</p>
-          <p className="text-xs text-gray-400 mt-0.5">czas połączenia</p>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--tm)' }}>czas połączenia</p>
         </div>
 
         {/* Notes section */}
@@ -76,12 +76,14 @@ export function FloatingSessionTimer({ session, hostname, onEnded }: Props) {
               onChange={e => setNotes(e.target.value)}
               placeholder="Co zrobiłeś w tej sesji?"
               rows={3}
-              className="w-full text-xs bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-white placeholder-gray-500 resize-none focus:outline-none focus:border-indigo-400"
+              className="w-full text-xs rounded-xl px-3 py-2 resize-none focus:outline-none"
+              style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}
             />
             <div className="flex gap-2">
               <button
                 onClick={() => setShowNotes(false)}
-                className="flex-1 text-xs py-2 rounded-xl bg-gray-700 hover:bg-gray-600 transition-colors"
+                className="flex-1 text-xs py-2 rounded-xl transition-colors"
+                style={{ background: 'var(--hover-bg)', color: 'var(--ts)' }}
               >
                 Anuluj
               </button>
