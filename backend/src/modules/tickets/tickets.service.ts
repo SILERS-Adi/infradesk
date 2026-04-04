@@ -199,10 +199,24 @@ export async function createTicket(
     dueAt = new Date(Date.now() + hours * 3600000);
   }
 
+  // Auto-resolve ticket provider (multi-tenant routing)
+  let requesterWorkspaceId: string | null = null;
+  let providerWorkspaceId: string | null = null;
+  try {
+    const { resolveTicketProvider } = require('../../utils/ticketRouting');
+    const routing = await resolveTicketProvider(data.workspaceId);
+    if (!routing.isInternal && routing.providerWorkspaceId) {
+      requesterWorkspaceId = data.workspaceId;
+      providerWorkspaceId = routing.providerWorkspaceId;
+    }
+  } catch (_) { /* ticketRouting not available — skip */ }
+
   const ticket = await prisma.ticket.create({
     data: {
       ticketNumber,
       workspaceId: data.workspaceId,
+      requesterWorkspaceId,
+      providerWorkspaceId,
       locationId: data.locationId,
       deviceId: data.deviceId,
       createdByUserId: requestingUser.userId,

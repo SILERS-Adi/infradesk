@@ -233,6 +233,88 @@ app.use('/api/service/inspections', authenticate, requireModule('skp'), serviceI
 app.get('/api/agent/contact', getContactHandler);
 app.get('/api/agent/faq',     getFaqHandler);
 
+// ── Public ticket submission (no auth) ──
+import { resolveTicketProvider } from './utils/ticketRouting';
+import { createTicket as createTicketService } from './modules/tickets/tickets.service';
+
+app.get('/api/public/tickets/:workspaceSlug', async (req, res, next) => {
+  try {
+    const workspace = await prisma.workspace.findUnique({
+      where: { slug: req.params.workspaceSlug },
+      select: { id: true, name: true, slug: true, organizationType: true, logoUrl: true, primaryColor: true },
+    });
+    if (!workspace || !workspace) { res.status(404).json({ error: 'Workspace nie znaleziony' }); return; }
+
+    // Get locations for the form
+    const locations = await prisma.location.findMany({
+      where: { workspaceId: workspace.id },
+      select: { id: true, name: true, type: true },
+      orderBy: { name: 'asc' },
+    });
+
+    // If deviceId in query — get device info
+    let device = null;
+    if (req.query.deviceId) {
+      device = await prisma.device.findFirst({
+        where: { id: req.query.deviceId as string, workspaceId: workspace.id },
+        select: { id: true, name: true, hostname: true, type: true },
+      });
+    }
+
+    res.json({ workspace, locations, device });
+  } catch (err) { next(err); }
+});
+
+app.post('/api/public/tickets/:workspaceSlug', async (req, res, next) => {
+  try {
+    const workspace = await prisma.workspace.findUnique({
+      where: { slug: req.params.workspaceSlug },
+      select: { id: true, name: true },
+    });
+    if (!workspace) { res.status(404).json({ error: 'Workspace nie znaleziony' }); return; }
+
+    const { title, description, priority, type, locationId, deviceId, reporterName, reporterPhone } = req.body;
+    if (!title || !description) { res.status(400).json({ error: 'Tytuł i opis są wymagane' }); return; }
+
+    // Resolve provider
+    const routing = await resolveTicketProvider(workspace.id);
+
+    // Find or create a system user for public submissions
+    let systemUser = await prisma.user.findFirst({ where: { email: 'system@infradesk.local' } });
+    if (!systemUser) {
+      systemUser = await prisma.user.create({
+        data: { email: 'system@infradesk.local', firstName: 'System', lastName: 'InfraDesk', passwordHash: '', isActive: true },
+      });
+    }
+
+    const ticket = await createTicketService({
+      workspaceId: workspace.id,
+      title,
+      description,
+      priority: priority || 'MEDIUM',
+      type: type || 'INCIDENT',
+      source: deviceId ? 'QR_SCAN' : 'CLIENT_PORTAL',
+      locationId: locationId || undefined,
+      deviceId: deviceId || undefined,
+      reporterName: reporterName || undefined,
+      reporterPhone: reporterPhone || undefined,
+    }, { userId: systemUser.id });
+
+    // Set provider on ticket if routing resolved
+    if (routing.providerWorkspaceId) {
+      await prisma.ticket.update({
+        where: { id: ticket.id },
+        data: {
+          requesterWorkspaceId: workspace.id,
+          providerWorkspaceId: routing.providerWorkspaceId,
+        },
+      });
+    }
+
+    res.status(201).json({ success: true, ticketNumber: ticket.ticketNumber });
+  } catch (err) { next(err); }
+});
+
 /** Migrate old module keys to new ones */
 function migrateModuleKeys(modules: string[]): string[] {
   const result = new Set<string>();

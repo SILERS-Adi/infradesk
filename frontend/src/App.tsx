@@ -16,6 +16,9 @@ const OperatorClients = React.lazy(() => import('./pages/operator/OperatorClient
 const OperatorTickets = React.lazy(() => import('./pages/operator/OperatorTickets'));
 const OperatorDevices = React.lazy(() => import('./pages/operator/OperatorDevices'));
 
+// Public
+const PublicTicketForm = React.lazy(() => import('./pages/public/PublicTicketForm'));
+
 // Layouts
 import { OperationsLayout } from './components/layout/OperationsLayout';
 import { PortalLayout } from './components/layout/PortalLayout';
@@ -377,6 +380,7 @@ export default function App() {
             <Route path="/rodo" element={<LegalPage />} />
             <Route path="/kontakt" element={<ContactPage />} />
             <Route path="/pobieranie" element={<PublicDownloadsPage />} />
+            <Route path="/zgloszenie/:workspaceSlug" element={<React.Suspense fallback={null}><PublicTicketForm /></React.Suspense>} />
             <Route path="/ai-panel" element={<AiPanelPage />} />
             <Route path="/konfigurator" element={<ConfiguratorPage />} />
             <Route path="/wznowienie" element={<RenewalPage />} />
