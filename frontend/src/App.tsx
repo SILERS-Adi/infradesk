@@ -10,6 +10,12 @@ import { authApi } from './api/auth';
 // Onboarding
 import OnboardingWizard from './pages/onboarding/OnboardingWizard';
 
+// Operator (Centrum Operacyjne)
+const OperatorDashboard = React.lazy(() => import('./pages/operator/OperatorDashboard'));
+const OperatorClients = React.lazy(() => import('./pages/operator/OperatorClients'));
+const OperatorTickets = React.lazy(() => import('./pages/operator/OperatorTickets'));
+const OperatorDevices = React.lazy(() => import('./pages/operator/OperatorDevices'));
+
 // Layouts
 import { OperationsLayout } from './components/layout/OperationsLayout';
 import { PortalLayout } from './components/layout/PortalLayout';
@@ -393,6 +399,12 @@ export default function App() {
 
             {/* Onboarding wizard */}
             <Route path="/onboarding" element={<OnboardingWizard />} />
+
+            {/* Operator (Centrum Operacyjne) */}
+            <Route path="/operator/dashboard" element={<React.Suspense fallback={null}><OperatorDashboard /></React.Suspense>} />
+            <Route path="/operator/clients" element={<React.Suspense fallback={null}><OperatorClients /></React.Suspense>} />
+            <Route path="/operator/tickets" element={<React.Suspense fallback={null}><OperatorTickets /></React.Suspense>} />
+            <Route path="/operator/devices" element={<React.Suspense fallback={null}><OperatorDevices /></React.Suspense>} />
 
             {/* Portal (CLIENT) */}
             <Route path="/portal/*" element={<PortalRoutes />} />
