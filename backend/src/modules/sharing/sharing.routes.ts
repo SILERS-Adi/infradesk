@@ -14,16 +14,28 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const wsId = req.workspaceId;
     if (!wsId) { res.status(400).json({ error: 'Workspace context required' }); return; }
 
-    // Companies I manage (as MSP)
+    // Companies I manage (as MSP) — include users with access
     const managing = await prisma.workspaceManagement.findMany({
       where: { mspWorkspaceId: wsId, status: { not: 'DETACHED' } },
-      include: { companyWorkspace: { select: { id: true, name: true, slug: true, type: true, email: true } } },
+      include: {
+        companyWorkspace: { select: { id: true, name: true, slug: true, type: true, email: true } },
+        memberships: {
+          where: { status: 'ACTIVE' },
+          select: { id: true, role: true, scopeType: true, user: { select: { id: true, firstName: true, lastName: true, email: true } } },
+        },
+      },
     });
 
-    // MSPs that manage me
+    // MSPs that manage me — include MSP users who have access to my workspace
     const managedBy = await prisma.workspaceManagement.findMany({
       where: { companyWorkspaceId: wsId, status: { not: 'DETACHED' } },
-      include: { mspWorkspace: { select: { id: true, name: true, slug: true, type: true, email: true } } },
+      include: {
+        mspWorkspace: { select: { id: true, name: true, slug: true, type: true, email: true } },
+        memberships: {
+          where: { status: 'ACTIVE' },
+          select: { id: true, role: true, scopeType: true, user: { select: { id: true, firstName: true, lastName: true, email: true } } },
+        },
+      },
     });
 
     // Pending invitations sent by me

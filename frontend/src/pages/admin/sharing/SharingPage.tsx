@@ -4,7 +4,7 @@ import { apiClient } from '../../../api/client';
 import { useWorkspaceContext } from '../../../hooks/useWorkspaceContext';
 import toast from 'react-hot-toast';
 import {
-  Share2, Send, UserPlus, Shield, Monitor, MapPin, ChevronRight, X, Check, Loader2, Link2Off, Building2,
+  Share2, Send, UserPlus, Shield, Monitor, MapPin, ChevronRight, X, Check, Loader2, Link2Off, Building2, User, Mail,
 } from 'lucide-react';
 import { devicesApi } from '../../../api/devices';
 import { locationsApi } from '../../../api/locations';
@@ -116,13 +116,18 @@ export default function SharingPage() {
           {/* Companies I manage */}
           {managing.length > 0 && (
             <div style={{ marginBottom: 28 }}>
-              <h3 style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--tm)', marginBottom: 12 }}>Zarządzam firmami</h3>
+              <h3 style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--tm)', marginBottom: 12 }}>Udostępniam dostęp do</h3>
               {managing.map((m: any) => (
                 <div key={m.id} style={cardStyle}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--t)' }}>{m.companyWorkspace.name}</div>
-                      <div style={{ fontSize: 13, color: 'var(--ts)', marginTop: 2 }}>{accessLabels[m.accessLevel] || m.accessLevel} · {m.status}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: m.memberships?.length > 0 ? 14 : 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--accent-g, rgba(79,140,255,0.1))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Building2 size={18} color="var(--accent)" />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--t)' }}>{m.companyWorkspace.name}</div>
+                        <div style={{ fontSize: 12, color: 'var(--ts)', marginTop: 1 }}>{accessLabels[m.accessLevel] || m.accessLevel} · {m.status === 'ACTIVE' ? 'Aktywne' : m.status}</div>
+                      </div>
                     </div>
                     {isAdmin && (
                       <button onClick={() => { if (confirm('Cofnąć dostęp?')) revokeMutation.mutate(m.id); }}
@@ -131,6 +136,29 @@ export default function SharingPage() {
                       </button>
                     )}
                   </div>
+                  {m.memberships?.length > 0 && (
+                    <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--td)', marginBottom: 8 }}>Użytkownicy z dostępem ({m.memberships.length})</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {m.memberships.map((mb: any) => (
+                          <div key={mb.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, background: 'var(--bg)' }}>
+                            <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(139,92,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <User size={13} color="#8B5CF6" />
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t)' }}>{mb.user.firstName} {mb.user.lastName}</div>
+                              <div style={{ fontSize: 11, color: 'var(--tm)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <Mail size={10} /> {mb.user.email}
+                              </div>
+                            </div>
+                            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--tm)', padding: '3px 8px', borderRadius: 6, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                              {mb.role} · {mb.scopeType === 'SCOPED' ? 'Ograniczony' : 'Pełny'}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -139,13 +167,18 @@ export default function SharingPage() {
           {/* MSPs that manage me */}
           {managedBy.length > 0 && (
             <div style={{ marginBottom: 28 }}>
-              <h3 style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--tm)', marginBottom: 12 }}>Zarządzane przez</h3>
+              <h3 style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--tm)', marginBottom: 12 }}>Mają dostęp do moich zasobów</h3>
               {managedBy.map((m: any) => (
                 <div key={m.id} style={cardStyle}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--t)' }}>{m.mspWorkspace.name}</div>
-                      <div style={{ fontSize: 13, color: 'var(--ts)', marginTop: 2 }}>{accessLabels[m.accessLevel] || m.accessLevel}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: m.memberships?.length > 0 ? 14 : 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(251,146,60,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Shield size={18} color="#fb923c" />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--t)' }}>{m.mspWorkspace.name}</div>
+                        <div style={{ fontSize: 12, color: 'var(--ts)', marginTop: 1 }}>{accessLabels[m.accessLevel] || m.accessLevel}</div>
+                      </div>
                     </div>
                     {isAdmin && (
                       <button onClick={() => { if (confirm('Cofnąć dostęp tej firmie?')) revokeMutation.mutate(m.id); }}
@@ -154,6 +187,29 @@ export default function SharingPage() {
                       </button>
                     )}
                   </div>
+                  {m.memberships?.length > 0 && (
+                    <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--td)', marginBottom: 8 }}>Osoby z dostępem ({m.memberships.length})</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {m.memberships.map((mb: any) => (
+                          <div key={mb.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, background: 'var(--bg)' }}>
+                            <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(251,146,60,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <User size={13} color="#fb923c" />
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t)' }}>{mb.user.firstName} {mb.user.lastName}</div>
+                              <div style={{ fontSize: 11, color: 'var(--tm)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <Mail size={10} /> {mb.user.email}
+                              </div>
+                            </div>
+                            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--tm)', padding: '3px 8px', borderRadius: 6, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                              {mb.role} · {mb.scopeType === 'SCOPED' ? 'Ograniczony' : 'Pe��ny'}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
