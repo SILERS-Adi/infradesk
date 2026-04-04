@@ -1,13 +1,20 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Building2, Monitor, Ticket, Plus, X, Loader2, AlertTriangle, Link2 } from 'lucide-react';
+import { Building2, Monitor, Ticket, Plus, X, Loader2, AlertTriangle, Link2, Send, Circle } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { operatorApi, type CreateClientPayload } from '../../api/operator';
+import { operatorApi, operatorClientApi, type CreateClientPayload } from '../../api/operator';
 import { apiClient } from '../../api/client';
+import { usersApi } from '../../api/users';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import type { OperatorClient } from '../../api/operator';
+
+const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  draft:   { label: 'Robocza',    color: '#94A3B8', bg: 'rgba(148,163,184,0.1)' },
+  invited: { label: 'Zaproszona', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)' },
+  active:  { label: 'Aktywna',    color: '#22C55E', bg: 'rgba(34,197,94,0.1)' },
+};
 
 export default function OperatorClients() {
   const queryClient = useQueryClient();
@@ -17,6 +24,12 @@ export default function OperatorClients() {
   const { data: clients, isLoading, isError } = useQuery({
     queryKey: ['operator', 'clients'],
     queryFn: operatorApi.getClients,
+  });
+
+  const activateMut = useMutation({
+    mutationFn: (clientWsId: string) => operatorClientApi.activate(clientWsId),
+    onSuccess: () => { toast.success('Portal aktywowany'); queryClient.invalidateQueries({ queryKey: ['operator'] }); },
+    onError: () => toast.error('Błąd aktywacji'),
   });
 
   const columns: Column<OperatorClient>[] = [
@@ -31,6 +44,10 @@ export default function OperatorClients() {
         </div>
       </div>
     )},
+    { key: 'status', header: 'Status', render: (r) => {
+      const sc = STATUS_CONFIG[r.clientStatus] ?? STATUS_CONFIG.active;
+      return <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 6, background: sc.bg, color: sc.color }}>{sc.label}</span>;
+    }},
     { key: 'ticketCount', header: 'Zgłoszenia', render: (r) => (
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <Ticket size={14} color="var(--tm)" />
@@ -49,7 +66,17 @@ export default function OperatorClients() {
         {r.phone && <div style={{ color: 'var(--td)' }}>{r.phone}</div>}
       </div>
     )},
-    { key: 'taxId', header: 'NIP', render: (r) => r.taxId || '—' },
+    { key: 'actions', header: '', render: (r) => (
+      r.clientStatus === 'draft' ? (
+        <button
+          onClick={(e) => { e.stopPropagation(); activateMut.mutate(r.id); }}
+          disabled={activateMut.isPending}
+          style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}
+        >
+          <Send size={12} /> Wyślij dostęp
+        </button>
+      ) : null
+    )},
   ];
 
   if (isLoading) return <LoadingSpinner />;
@@ -61,7 +88,6 @@ export default function OperatorClients() {
         <div className="page-card" style={{ padding: 32, textAlign: 'center' }}>
           <AlertTriangle size={32} color="#EF4444" style={{ marginBottom: 12 }} />
           <p style={{ fontSize: 14, color: 'var(--t)', fontWeight: 600 }}>Nie udało się załadować klientów</p>
-          <p style={{ fontSize: 12, color: 'var(--tm)' }}>Sprawdź czy Twój workspace jest skonfigurowany jako Centrum Obsługi IT</p>
         </div>
       </div>
     );
@@ -78,30 +104,18 @@ export default function OperatorClients() {
               <Link2 size={16} /> Podepnij firmę
             </button>
             <button className="btn-primary" onClick={() => setShowForm(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Plus size={16} /> Nowy klient
+              <Plus size={16} /> Dodaj firmę klienta
             </button>
           </div>
         }
       />
 
       {showLink && (
-        <LinkExistingForm
-          onClose={() => setShowLink(false)}
-          onSuccess={() => {
-            setShowLink(false);
-            queryClient.invalidateQueries({ queryKey: ['operator'] });
-          }}
-        />
+        <LinkExistingForm onClose={() => setShowLink(false)} onSuccess={() => { setShowLink(false); queryClient.invalidateQueries({ queryKey: ['operator'] }); }} />
       )}
 
       {showForm && (
-        <AddClientForm
-          onClose={() => setShowForm(false)}
-          onSuccess={() => {
-            setShowForm(false);
-            queryClient.invalidateQueries({ queryKey: ['operator'] });
-          }}
-        />
+        <AddClientForm onClose={() => setShowForm(false)} onSuccess={() => { setShowForm(false); queryClient.invalidateQueries({ queryKey: ['operator'] }); }} />
       )}
 
       <DataTable
@@ -113,7 +127,7 @@ export default function OperatorClients() {
         emptyDescription="Dodaj pierwszego klienta, aby rozpocząć obsługę"
         emptyAction={
           <button className="btn-primary" onClick={() => setShowForm(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Plus size={16} /> Dodaj klienta
+            <Plus size={16} /> Dodaj firmę klienta
           </button>
         }
       />
@@ -121,14 +135,22 @@ export default function OperatorClients() {
   );
 }
 
+// ── Add Client Form ──────────────────────────────────────────
+
 function AddClientForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [form, setForm] = useState<CreateClientPayload>({
     name: '', legalName: '', taxId: '', email: '', phone: '', contactPerson: '', city: '',
+    locationName: '', activatePortal: false,
+  });
+
+  const { data: users } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => usersApi.getAll(),
   });
 
   const mutation = useMutation({
     mutationFn: operatorApi.createClient,
-    onSuccess: () => { toast.success('Klient dodany pomyślnie'); onSuccess(); },
+    onSuccess: () => { toast.success('Klient dodany — od razu widoczny na liście'); onSuccess(); },
     onError: (err: any) => { toast.error(err?.response?.data?.error ?? 'Błąd przy dodawaniu klienta'); },
   });
 
@@ -143,37 +165,70 @@ function AddClientForm({ onClose, onSuccess }: { onClose: () => void; onSuccess:
       <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--tm)' }}>
         {label} {required && <span style={{ color: '#EF4444' }}>*</span>}
       </label>
-      <input className="input" type={type} value={form[key] ?? ''} onChange={(e) => setForm(prev => ({ ...prev, [key]: e.target.value }))} required={required} />
+      <input className="input" type={type} value={(form[key] as string) ?? ''} onChange={(e) => setForm(prev => ({ ...prev, [key]: e.target.value }))} required={required} />
     </div>
   );
 
   return (
     <div className="page-card" style={{ padding: 24, marginBottom: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--t)', margin: 0 }}>Nowy klient</h3>
+        <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--t)', margin: 0 }}>Dodaj firmę klienta</h3>
         <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--tm)', padding: 4 }}><X size={18} /></button>
       </div>
       <form onSubmit={handleSubmit}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 16, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 16, marginBottom: 16 }}>
           {field('Nazwa firmy', 'name', 'text', true)}
-          {field('Nazwa prawna', 'legalName')}
           {field('NIP', 'taxId')}
-          {field('Email', 'email', 'email')}
+          {field('Email kontaktowy', 'email', 'email')}
           {field('Telefon', 'phone', 'tel')}
           {field('Osoba kontaktowa', 'contactPerson')}
           {field('Miasto', 'city')}
+          {field('Lokalizacja główna', 'locationName')}
         </div>
+
+        {/* Opiekun MSP */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--tm)' }}>Opiekun po stronie MSP</label>
+            <select className="input" value={form.assignedUserId ?? ''} onChange={e => setForm(prev => ({ ...prev, assignedUserId: e.target.value || undefined }))}>
+              <option value="">— Brak —</option>
+              {(users ?? []).map((u: any) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
+            </select>
+          </div>
+
+          {/* Aktywuj portal */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--tm)' }}>Portal klienta</label>
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 10,
+              border: '1px solid var(--border)', cursor: 'pointer', fontSize: 13, color: 'var(--t)',
+            }}>
+              <input type="checkbox" checked={form.activatePortal ?? false} onChange={e => setForm(prev => ({ ...prev, activatePortal: e.target.checked }))}
+                style={{ accentColor: 'var(--accent)' }} />
+              Wyślij dostęp po utworzeniu
+            </label>
+          </div>
+        </div>
+
+        {!form.activatePortal && (
+          <div style={{ padding: '10px 14px', borderRadius: 10, marginBottom: 16, background: 'rgba(148,163,184,0.06)', border: '1px solid rgba(148,163,184,0.12)', fontSize: 12, color: 'var(--tm)' }}>
+            Klient zostanie utworzony w statusie <strong style={{ color: 'var(--t)' }}>Robocza</strong> — możesz wysłać dostęp do portalu później.
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <button type="button" className="btn-secondary" onClick={onClose}>Anuluj</button>
           <button type="submit" className="btn-primary" disabled={mutation.isPending} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {mutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-            Dodaj klienta
+            Dodaj firmę klienta
           </button>
         </div>
       </form>
     </div>
   );
 }
+
+// ── Link Existing ────────────────────────────────────────────
 
 function LinkExistingForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const { data: available, isLoading } = useQuery({
@@ -202,33 +257,18 @@ function LinkExistingForm({ onClose, onSuccess }: { onClose: () => void; onSucce
       {isLoading ? (
         <div style={{ padding: 20, textAlign: 'center', color: 'var(--tm)', fontSize: 13 }}>Ładowanie...</div>
       ) : !available || available.length === 0 ? (
-        <div style={{ padding: 20, textAlign: 'center', color: 'var(--tm)', fontSize: 13 }}>
-          Wszystkie firmy w systemie są już podpięte jako Twoi klienci.
-        </div>
+        <div style={{ padding: 20, textAlign: 'center', color: 'var(--tm)', fontSize: 13 }}>Wszystkie firmy są już podpięte.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <p style={{ fontSize: 12, color: 'var(--tm)', margin: '0 0 8px' }}>
-            Wybierz firmę, którą chcesz obsługiwać. Zostanie podpięta jako Twój klient z pełnymi uprawnieniami.
-          </p>
           {available.map((ws: any) => (
-            <div key={ws.id} style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '12px 16px', borderRadius: 10, border: '1px solid var(--border)',
-            }}>
+            <div key={ws.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: 10, border: '1px solid var(--border)' }}>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t)' }}>{ws.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--td)' }}>
-                  {[ws.city, ws.taxId, ws.email].filter(Boolean).join(' · ') || ws.slug}
-                </div>
+                <div style={{ fontSize: 11, color: 'var(--td)' }}>{[ws.city, ws.taxId, ws.email].filter(Boolean).join(' · ') || ws.slug}</div>
               </div>
-              <button
-                className="btn-primary"
-                onClick={() => linkMutation.mutate(ws.id)}
-                disabled={linkMutation.isPending}
-                style={{ fontSize: 12, padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 4 }}
-              >
-                {linkMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}
-                Podepnij
+              <button className="btn-primary" onClick={() => linkMutation.mutate(ws.id)} disabled={linkMutation.isPending}
+                style={{ fontSize: 12, padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                {linkMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />} Podepnij
               </button>
             </div>
           ))}

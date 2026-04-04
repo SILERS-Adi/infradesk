@@ -55,11 +55,14 @@ async function uniqueSlug(base: string): Promise<string> {
 router.post('/clients', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), requireOperator, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const operatorWsId = req.workspaceId!;
-    const { name, legalName, taxId, email, phone, contactPerson, city } = req.body;
+    const { name, legalName, taxId, email, phone, contactPerson, city, locationName, activatePortal, assignedUserId } = req.body;
 
     if (!name || !name.trim()) { res.status(400).json({ error: 'Nazwa firmy jest wymagana' }); return; }
 
     const slug = await uniqueSlug(name);
+
+    // clientStatus: draft (no portal) | invited (portal pending) | active (portal active)
+    const clientStatus = activatePortal ? 'invited' : 'draft';
 
     // Create client workspace
     const workspace = await prisma.workspace.create({
@@ -78,7 +81,21 @@ router.post('/clients', withWorkspaceMembership, authorizeWorkspace('OWNER', 'AD
       },
     });
 
-    // Create workspace relation (operator → client)
+    // Create default location if provided
+    if (locationName?.trim()) {
+      await prisma.location.create({
+        data: {
+          workspaceId: workspace.id,
+          name: locationName.trim(),
+          type: 'OFFICE',
+          addressLine1: city?.trim() || '-',
+          postalCode: '',
+          city: city?.trim() || '',
+        },
+      });
+    }
+
+    // Create workspace relation (operator → client) — immediate, no approval needed
     const relation = await prisma.workspaceRelation.create({
       data: {
         clientWorkspaceId: workspace.id,
@@ -90,7 +107,7 @@ router.post('/clients', withWorkspaceMembership, authorizeWorkspace('OWNER', 'AD
         canCreateTicketsOnBehalf: true,
         canAccessAlerts: true,
         isDefaultHelpdeskProvider: true,
-        status: 'ACTIVE',
+        status: clientStatus === 'draft' ? 'ACTIVE' : 'ACTIVE', // relation always active
       },
     });
 
@@ -103,7 +120,34 @@ router.post('/clients', withWorkspaceMembership, authorizeWorkspace('OWNER', 'AD
       },
     });
 
-    res.status(201).json({ workspace, relation });
+    // Store client status + assigned user in workspace settings
+    await prisma.workspaceSetting.createMany({
+      data: [
+        { workspaceId: workspace.id, key: 'client_status', value: clientStatus },
+        ...(assignedUserId ? [{ workspaceId: workspace.id, key: 'assigned_msp_user', value: assignedUserId }] : []),
+      ],
+      skipDuplicates: true,
+    });
+
+    res.status(201).json({ workspace, relation, clientStatus });
+  } catch (err) { next(err); }
+});
+
+// POST /api/operator/clients/:id/activate — send portal access / change status
+router.post('/clients/:id/activate', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), requireOperator, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const clientWsId = req.params.id;
+
+    // Update status to 'active'
+    await prisma.workspaceSetting.upsert({
+      where: { workspaceId_key: { workspaceId: clientWsId, key: 'client_status' } },
+      create: { workspaceId: clientWsId, key: 'client_status', value: 'active' },
+      update: { value: 'active' },
+    });
+
+    // TODO: send email with portal access link to client.email
+
+    res.json({ success: true, status: 'active' });
   } catch (err) { next(err); }
 });
 
@@ -229,17 +273,19 @@ router.get('/clients', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADM
       },
     });
 
-    // Enrich with stats
+    // Enrich with stats + client status
     const clients = await Promise.all(relations.map(async r => {
-      const [deviceCount, ticketCount, activeTickets] = await Promise.all([
+      const [deviceCount, ticketCount, activeTickets, statusSetting] = await Promise.all([
         prisma.device.count({ where: { workspaceId: r.clientWorkspaceId } }),
         prisma.ticket.count({ where: { workspaceId: r.clientWorkspaceId } }),
         prisma.ticket.count({ where: { workspaceId: r.clientWorkspaceId, status: { in: ['NEW', 'PENDING', 'ASSIGNED', 'IN_PROGRESS'] } } }),
+        prisma.workspaceSetting.findUnique({ where: { workspaceId_key: { workspaceId: r.clientWorkspaceId, key: 'client_status' } } }),
       ]);
 
       return {
         relationId: r.id,
         workspace: r.clientWorkspace,
+        clientStatus: statusSetting?.value ?? 'active', // default active for legacy clients
         permissions: {
           canViewDevices: r.canViewDevices,
           canViewUsers: r.canViewUsers,

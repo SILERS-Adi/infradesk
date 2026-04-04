@@ -15,6 +15,7 @@ export interface OperatorClientRaw {
     city?: string;
     isActive: boolean;
   };
+  clientStatus?: string; // draft | invited | active
   permissions: Record<string, boolean>;
   isDefaultHelpdeskProvider: boolean;
   stats: {
@@ -38,6 +39,7 @@ export interface OperatorClient {
   activeTickets: number;
   deviceCount: number;
   isDefault: boolean;
+  clientStatus: string; // draft | invited | active
   createdAt?: string;
 }
 
@@ -70,7 +72,15 @@ export interface CreateClientPayload {
   phone?: string;
   contactPerson?: string;
   city?: string;
+  locationName?: string;
+  activatePortal?: boolean;
+  assignedUserId?: string;
 }
+
+export const operatorClientApi = {
+  activate: (clientWsId: string) =>
+    apiClient.post(`/operator/clients/${clientWsId}/activate`).then(r => r.data),
+};
 
 function flattenClient(raw: OperatorClientRaw): OperatorClient {
   return {
@@ -86,6 +96,7 @@ function flattenClient(raw: OperatorClientRaw): OperatorClient {
     activeTickets: raw.stats.activeTickets,
     deviceCount: raw.stats.deviceCount,
     isDefault: raw.isDefaultHelpdeskProvider,
+    clientStatus: raw.clientStatus ?? 'active',
   };
 }
 
