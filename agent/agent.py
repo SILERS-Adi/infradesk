@@ -17,10 +17,26 @@ from PIL import Image, ImageGrab, ImageDraw
 APP_NAME    = "Asystent Home"
 APP_NAME_HOME = "Asystent Home"
 APP_VERSION = "6.0.0"
-INSTALL_DIR = os.path.join(os.environ.get("APPDATA", ""), "InfraDesk")
-INSTALL_EXE = os.path.join(INSTALL_DIR, "InfraDesk.exe")
+_OLD_INSTALL_DIR = os.path.join(os.environ.get("APPDATA", ""), "InfraDesk")
+INSTALL_DIR = os.path.join(os.environ.get("APPDATA", ""), "SILERS", "Asystent Home")
+INSTALL_EXE = os.path.join(INSTALL_DIR, "Asystent Home.exe")
 CONFIG_FILE = os.path.join(INSTALL_DIR, "config.json")
 TENANT_FILE = os.path.join(INSTALL_DIR, "tenant.json")
+
+
+def _migrate_old_config():
+    """Migrate config from old %APPDATA%\\InfraDesk to new SILERS\\Asystent Home."""
+    old_cfg = os.path.join(_OLD_INSTALL_DIR, "config.json")
+    if os.path.exists(old_cfg) and not os.path.exists(CONFIG_FILE):
+        import shutil
+        os.makedirs(INSTALL_DIR, exist_ok=True)
+        shutil.copy2(old_cfg, CONFIG_FILE)
+        old_tenant = os.path.join(_OLD_INSTALL_DIR, "tenant.json")
+        if os.path.exists(old_tenant):
+            shutil.copy2(old_tenant, TENANT_FILE)
+
+
+_migrate_old_config()
 API_BASE     = "https://infradesk.pl/api"
 PORTAL_URL   = "https://infradesk.pl/portal"
 WS_BASE      = "wss://infradesk.pl/api/agent/ws"
@@ -48,8 +64,8 @@ def _load_tenant_key() -> str | None:
             return arg.split("=", 1)[1]
     return None
 
-os.makedirs(os.path.join(os.environ.get("APPDATA", ""), "InfraDesk"), exist_ok=True)
-_log_file = os.path.join(os.environ.get("APPDATA", ""), "InfraDesk", "agent.log")
+os.makedirs(INSTALL_DIR, exist_ok=True)
+_log_file = os.path.join(INSTALL_DIR, "agent.log")
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",

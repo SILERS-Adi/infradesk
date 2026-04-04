@@ -17,10 +17,25 @@ from PIL import Image, ImageGrab, ImageDraw
 
 APP_NAME    = "Asystent Business"
 APP_VERSION = "1.0.0"
-INSTALL_DIR = os.path.join(os.environ.get("APPDATA", ""), "InfraDesk")
+_OLD_INSTALL_DIR = os.path.join(os.environ.get("APPDATA", ""), "InfraDesk")
+INSTALL_DIR = os.path.join(os.environ.get("APPDATA", ""), "SILERS", "Asystent Business")
 INSTALL_EXE = os.path.join(INSTALL_DIR, "Asystent Business.exe")
 CONFIG_FILE = os.path.join(INSTALL_DIR, "config.json")
 TENANT_FILE = os.path.join(INSTALL_DIR, "tenant.json")
+
+
+def _migrate_old_config():
+    old_cfg = os.path.join(_OLD_INSTALL_DIR, "config.json")
+    if os.path.exists(old_cfg) and not os.path.exists(CONFIG_FILE):
+        import shutil
+        os.makedirs(INSTALL_DIR, exist_ok=True)
+        shutil.copy2(old_cfg, CONFIG_FILE)
+        old_tenant = os.path.join(_OLD_INSTALL_DIR, "tenant.json")
+        if os.path.exists(old_tenant):
+            shutil.copy2(old_tenant, TENANT_FILE)
+
+
+_migrate_old_config()
 API_BASE    = "https://infradesk.pl/api"
 PORTAL_URL  = "https://infradesk.pl/portal"
 WS_BASE     = "wss://infradesk.pl/api/agent/ws"
@@ -1042,7 +1057,7 @@ def security_audit():
     # Backup
     has_bk = load_config().get("backupMode", False)
     total_weight += WEIGHTS["high"]
-    checks.append({"id": "backup_status", "name": "Backup InfraDesk", "severity": "high",
+    checks.append({"id": "backup_status", "name": "Backup Asystent", "severity": "high",
         "status": "pass" if has_bk else "fail", "detail": "Aktywny" if has_bk else "Brak konfiguracji"})
 
     # RDP
@@ -1768,7 +1783,7 @@ class _BackgroundServices:
         elif mtype == "system_reboot":
             delay = msg.get("delay", 60)
             threading.Thread(target=lambda: subprocess.run(
-                ["shutdown", "/r", "/t", str(delay), "/c", "InfraDesk: restart serwera"],
+                ["shutdown", "/r", "/t", str(delay), "/c", "Asystent: restart serwera"],
                 capture_output=True, creationflags=_NO_WINDOW), daemon=True).start()
 
     def _run_windows_update(self, schedule_time=None):
@@ -1787,8 +1802,8 @@ class _BackgroundServices:
                 capture_output=True, text=True, timeout=7200, creationflags=_NO_WINDOW)
             log.info("Windows Update result: %s", (result.stdout or "")[-500:])
             if schedule_time:
-                subprocess.run(["schtasks", "/create", "/tn", "InfraDesk_WinUpdate_Restart",
-                    "/tr", 'shutdown /r /t 60 /c "InfraDesk: restart po aktualizacji"',
+                subprocess.run(["schtasks", "/create", "/tn", "AsystentBusiness_WinUpdate_Restart",
+                    "/tr", 'shutdown /r /t 60 /c "Asystent: restart po aktualizacji"',
                     "/sc", "once", "/st", schedule_time, "/f"],
                     capture_output=True, timeout=30, creationflags=_NO_WINDOW)
         except Exception as e:
@@ -1817,7 +1832,7 @@ class _BackgroundServices:
             menu = pystray.Menu(
                 pystray.MenuItem(f"  {APP_NAME} v{APP_VERSION}", None, enabled=False),
                 pystray.Menu.SEPARATOR,
-                pystray.MenuItem("  Otworz InfraDesk", lambda i, it: webbrowser.open(PORTAL_URL), default=True),
+                pystray.MenuItem("  Otworz Asystent Business", lambda i, it: webbrowser.open(PORTAL_URL), default=True),
                 pystray.MenuItem("  Zamknij", lambda i, it: (i.stop(), os._exit(0))),
             )
             self._tray = pystray.Icon(APP_NAME, icon_img, APP_NAME, menu)
@@ -1879,8 +1894,8 @@ class ServerServiceLoop:
                 capture_output=True, text=True, timeout=7200, creationflags=_NO_WINDOW)
             log.info("Windows Update result: %s", (result.stdout or "")[-500:])
             if schedule_time:
-                subprocess.run(["schtasks", "/create", "/tn", "InfraDesk_WinUpdate_Restart",
-                    "/tr", 'shutdown /r /t 60 /c "InfraDesk: restart po aktualizacji"',
+                subprocess.run(["schtasks", "/create", "/tn", "AsystentBusiness_WinUpdate_Restart",
+                    "/tr", 'shutdown /r /t 60 /c "Asystent: restart po aktualizacji"',
                     "/sc", "once", "/st", schedule_time, "/f"],
                     capture_output=True, timeout=30, creationflags=_NO_WINDOW)
         except Exception as e:
@@ -1899,7 +1914,7 @@ class ServerServiceLoop:
     def _schedule_reboot(self, delay_seconds):
         try:
             log.info("Scheduling system reboot in %ds", delay_seconds)
-            subprocess.run(["shutdown", "/r", "/t", str(delay_seconds), "/c", "InfraDesk: zaplanowany restart"],
+            subprocess.run(["shutdown", "/r", "/t", str(delay_seconds), "/c", "Asystent: zaplanowany restart"],
                 capture_output=True, timeout=10, creationflags=_NO_WINDOW)
         except Exception as e:
             log.error("Reboot schedule error: %s", e)
@@ -1966,7 +1981,7 @@ class ServerServiceLoop:
 
 _SERVICE_NAME = "AsystentBusiness"
 _SERVICE_DISPLAY = "Asystent Business"
-_SERVICE_DESC = "InfraDesk business agent — monitoring, backup, diagnostics"
+_SERVICE_DESC = "Asystent Business — monitoring, backup, diagnostics"
 
 try:
     import win32serviceutil
