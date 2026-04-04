@@ -53,11 +53,11 @@ export const SYSTEM_GROUPS: SystemMenuGroup[] = [
   { id: 'operations-center', label: 'CENTRUM OPERACYJNE', defaultOrder: 0.5, orgTypes: ['it_operator'] },
 
   // Modules (activated per workspace)
-  { id: 'infrastructure',  label: 'INFRASTRUKTURA IT',  defaultOrder: 1,  module: 'infrastructure' },
+  { id: 'infrastructure',  label: 'INFRASTRUKTURA IT',  defaultOrder: 1,  module: 'infrastructure', orgTypes: ['internal_it', 'it_operator'] },
   { id: 'service-desk',    label: 'SERWIS I OBSŁUGA IT', defaultOrder: 2,  module: 'service-desk' },
-  { id: 'invoicing',       label: 'FINANSE',            defaultOrder: 3,  module: 'invoicing' },
-  { id: 'packaging',       label: 'PAKOWANIE',          defaultOrder: 4,  module: 'packaging' },
-  { id: 'skp',             label: 'SKP',                defaultOrder: 5,  module: 'skp' },
+  { id: 'invoicing',       label: 'FINANSE',            defaultOrder: 3,  module: 'invoicing', orgTypes: ['internal_it', 'it_operator'] },
+  { id: 'packaging',       label: 'PAKOWANIE',          defaultOrder: 4,  module: 'packaging', orgTypes: ['internal_it', 'it_operator'] },
+  { id: 'skp',             label: 'SKP',                defaultOrder: 5,  module: 'skp', orgTypes: ['internal_it', 'it_operator'] },
 
   // Client management (IT Operator only)
   { id: 'client-mgmt',    label: 'OBSŁUGA KLIENTÓW',    defaultOrder: 5.5, orgTypes: ['it_operator'] },
@@ -101,15 +101,15 @@ export const SYSTEM_ITEMS: SystemMenuItem[] = [
 
   // ── SERWIS I OBSŁUGA IT ──
   { id: 'tickets',            to: '/tickets',              label: 'Zgłoszenia',         icon: Ticket,          groupId: 'service-desk',   defaultOrder: 0, module: 'service-desk', badgeKey: 'ticketQueue', end: true },
-  { id: 'tasks',              to: '/tasks',                label: 'Zadania',            icon: ClipboardList,   groupId: 'service-desk',   defaultOrder: 1, module: 'service-desk', badgeKey: 'activeTasks' },
-  { id: 'calendar',           to: '/calendar',             label: 'Kalendarz',          icon: CalendarDays,    groupId: 'service-desk',   defaultOrder: 2, module: 'service-desk' },
+  { id: 'tasks',              to: '/tasks',                label: 'Zadania',            icon: ClipboardList,   groupId: 'service-desk',   defaultOrder: 1, module: 'service-desk', badgeKey: 'activeTasks', orgTypes: ['internal_it', 'it_operator'] },
+  { id: 'calendar',           to: '/calendar',             label: 'Kalendarz',          icon: CalendarDays,    groupId: 'service-desk',   defaultOrder: 2, module: 'service-desk', orgTypes: ['internal_it', 'it_operator'] },
   { id: 'orders',             to: '/orders',               label: 'Zamówienia',         icon: ShoppingCart,    groupId: 'service-desk',   defaultOrder: 3, module: 'service-desk' },
-  { id: 'delegations',        to: '/delegations',          label: 'Delegacje',          icon: Plane,           groupId: 'service-desk',   defaultOrder: 4, module: 'service-desk' },
-  { id: 'crm',                to: '/crm',                  label: 'CRM',                icon: MessageSquare,   groupId: 'service-desk',   defaultOrder: 5, module: 'service-desk' },
-  { id: 'sessions',           to: '/sessions',             label: 'Sesje pracy',        icon: Timer,           groupId: 'service-desk',   defaultOrder: 6, module: 'service-desk' },
-  { id: 'billing',            to: '/billing',              label: 'Rozliczenia',        icon: Receipt,         groupId: 'service-desk',   defaultOrder: 7, module: 'service-desk' },
+  { id: 'delegations',        to: '/delegations',          label: 'Delegacje',          icon: Plane,           groupId: 'service-desk',   defaultOrder: 4, module: 'service-desk', orgTypes: ['internal_it', 'it_operator'] },
+  { id: 'crm',                to: '/crm',                  label: 'CRM',                icon: MessageSquare,   groupId: 'service-desk',   defaultOrder: 5, module: 'service-desk', orgTypes: ['internal_it', 'it_operator'] },
+  { id: 'sessions',           to: '/sessions',             label: 'Sesje pracy',        icon: Timer,           groupId: 'service-desk',   defaultOrder: 6, module: 'service-desk', orgTypes: ['internal_it', 'it_operator'] },
+  { id: 'billing',            to: '/billing',              label: 'Rozliczenia',        icon: Receipt,         groupId: 'service-desk',   defaultOrder: 7, module: 'service-desk', orgTypes: ['internal_it', 'it_operator'] },
   { id: 'it-support',         to: '/it-support',           label: 'Obsługa IT',         icon: Headphones,      groupId: 'service-desk',   defaultOrder: 8, module: 'service-desk', orgTypes: ['client_external_it'] },
-  { id: 'helpdesk-settings',  to: '/helpdesk-settings',    label: 'Ustawienia Help Desk', icon: Wrench,        groupId: 'service-desk',   defaultOrder: 9, module: 'service-desk', adminOnly: true },
+  { id: 'portal-settings',   to: '/portal-settings',      label: 'Portal i obsługa',   icon: Settings,        groupId: 'service-desk',   defaultOrder: 9, module: 'service-desk', adminOnly: true },
 
   // ── OBSŁUGA KLIENTÓW (IT Operator only) ──
   { id: 'cm-companies',       to: '/operator/clients',     label: 'Firmy klientów',     icon: Building2,       groupId: 'client-mgmt', defaultOrder: 0, orgTypes: ['it_operator'] },
@@ -157,7 +157,6 @@ export const SYSTEM_ITEMS: SystemMenuItem[] = [
   { id: 'locations',          to: '/locations',            label: 'Lokalizacje',        icon: MapPin,          groupId: 'company',        defaultOrder: 1 },
   { id: 'company-users',      to: '/users',               label: 'Użytkownicy',        icon: Users,           groupId: 'company',        defaultOrder: 2, adminOnly: true },
   { id: 'company-settings',   to: '/settings',            label: 'Ustawienia',         icon: Settings,        groupId: 'company',        defaultOrder: 3, adminOnly: true },
-  { id: 'company-sharing',    to: '/sharing',             label: 'Udostępnianie',      icon: Share2,          groupId: 'company',        defaultOrder: 4, adminOnly: true },
 
   // ── PLATFORMA (superadmin) ──
   { id: 'sa-dashboard',       to: '/superadmin',           label: 'Dashboard SA',       icon: Activity,        groupId: 'platform',       defaultOrder: 0, end: true },

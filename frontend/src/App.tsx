@@ -22,7 +22,7 @@ const OperatorSessions = React.lazy(() => import('./pages/operator/OperatorSessi
 const OperatorBilling = React.lazy(() => import('./pages/operator/OperatorBilling'));
 
 // Helpdesk Settings
-const HelpdeskSettingsPage = React.lazy(() => import('./pages/admin/HelpdeskSettingsPage'));
+const PortalSettingsPage = React.lazy(() => import('./pages/admin/PortalSettingsPage'));
 
 // Public
 const PublicTicketForm = React.lazy(() => import('./pages/public/PublicTicketForm'));
@@ -240,7 +240,8 @@ function AdminRoutes() {
         <Route path="service/inspections" element={<Navigate to="/skp/inspections" replace />} />
         <Route path="service/vehicles" element={<Navigate to="/skp/vehicles" replace />} />
         {/* Helpdesk Settings */}
-        <Route path="helpdesk-settings" element={<React.Suspense fallback={null}><HelpdeskSettingsPage /></React.Suspense>} />
+        <Route path="portal-settings" element={<React.Suspense fallback={null}><PortalSettingsPage /></React.Suspense>} />
+        <Route path="helpdesk-settings" element={<Navigate to="/portal-settings" replace />} />
         {/* Operator (Centrum Operacyjne) */}
         <Route path="operator/dashboard" element={<React.Suspense fallback={null}><OperatorDashboard /></React.Suspense>} />
         <Route path="operator/clients" element={<React.Suspense fallback={null}><OperatorClients /></React.Suspense>} />
