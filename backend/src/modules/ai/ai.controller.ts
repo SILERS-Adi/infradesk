@@ -113,6 +113,78 @@ Zwróć TYLKO JSON (bez markdown, bez wyjaśnień) z polami:
   }
 }
 
+/* ───────── AI auto-ticket — detect problem and auto-create ticket ───────── */
+
+export async function autoCreateTicket(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { description, deviceId, source } = req.body as {
+      description: string; deviceId?: string; source?: string;
+    };
+    const workspaceId = req.workspaceId;
+    if (!workspaceId) { res.status(400).json({ error: 'Workspace context required' }); return; }
+    if (!description?.trim()) { res.status(400).json({ error: 'description required' }); return; }
+
+    // AI analyzes the problem and generates ticket data
+    const message = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 400,
+      system: `Jesteś asystentem IT. Na podstawie opisu problemu wygeneruj dane zgłoszenia.
+Zwróć TYLKO JSON:
+- title: string (krótki tytuł zgłoszenia, max 100 znaków)
+- priority: "LOW"|"MEDIUM"|"HIGH"|"CRITICAL"
+- type: "INCIDENT"|"REQUEST"|"MAINTENANCE"|"OTHER"
+- description: string (sformatowany opis problemu)`,
+      messages: [{ role: 'user', content: description }],
+    });
+
+    let text = message.content[0].type === 'text' ? message.content[0].text : '{}';
+    text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+    let ticketData;
+    try { ticketData = JSON.parse(text); } catch {
+      ticketData = { title: description.slice(0, 100), priority: 'MEDIUM', type: 'INCIDENT', description };
+    }
+
+    // Resolve provider using multi-tenant routing
+    const { resolveTicketProvider } = require('../../utils/ticketRouting');
+    const routing = await resolveTicketProvider(workspaceId);
+
+    // Create the ticket
+    const { createTicket } = require('../tickets/tickets.service');
+    const ticket = await createTicket({
+      workspaceId,
+      title: ticketData.title,
+      description: ticketData.description || description,
+      priority: ticketData.priority || 'MEDIUM',
+      type: ticketData.type || 'INCIDENT',
+      source: source || 'AGENT',
+      deviceId: deviceId || undefined,
+    }, { userId: req.user!.userId });
+
+    // Set provider if routing resolved
+    if (routing.providerWorkspaceId) {
+      const prisma = require('../../lib/prisma').default;
+      await prisma.ticket.update({
+        where: { id: ticket.id },
+        data: {
+          requesterWorkspaceId: workspaceId,
+          providerWorkspaceId: routing.providerWorkspaceId,
+        },
+      });
+    }
+
+    res.status(201).json({
+      ticket,
+      routing: {
+        isInternal: routing.isInternal,
+        providerWorkspaceId: routing.providerWorkspaceId,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function suggestSolution(req: Request, res: Response, next: NextFunction) {
   try {
     const { title, description, source, deviceInfo } = req.body as {

@@ -15,6 +15,11 @@ const OperatorDashboard = React.lazy(() => import('./pages/operator/OperatorDash
 const OperatorClients = React.lazy(() => import('./pages/operator/OperatorClients'));
 const OperatorTickets = React.lazy(() => import('./pages/operator/OperatorTickets'));
 const OperatorDevices = React.lazy(() => import('./pages/operator/OperatorDevices'));
+const OperatorTasks = React.lazy(() => import('./pages/operator/OperatorTasks'));
+const OperatorCalendar = React.lazy(() => import('./pages/operator/OperatorCalendar'));
+const OperatorAlerts = React.lazy(() => import('./pages/operator/OperatorAlerts'));
+const OperatorSessions = React.lazy(() => import('./pages/operator/OperatorSessions'));
+const OperatorBilling = React.lazy(() => import('./pages/operator/OperatorBilling'));
 
 // Public
 const PublicTicketForm = React.lazy(() => import('./pages/public/PublicTicketForm'));
@@ -409,6 +414,11 @@ export default function App() {
             <Route path="/operator/clients" element={<React.Suspense fallback={null}><OperatorClients /></React.Suspense>} />
             <Route path="/operator/tickets" element={<React.Suspense fallback={null}><OperatorTickets /></React.Suspense>} />
             <Route path="/operator/devices" element={<React.Suspense fallback={null}><OperatorDevices /></React.Suspense>} />
+            <Route path="/operator/tasks" element={<React.Suspense fallback={null}><OperatorTasks /></React.Suspense>} />
+            <Route path="/operator/calendar" element={<React.Suspense fallback={null}><OperatorCalendar /></React.Suspense>} />
+            <Route path="/operator/alerts" element={<React.Suspense fallback={null}><OperatorAlerts /></React.Suspense>} />
+            <Route path="/operator/sessions" element={<React.Suspense fallback={null}><OperatorSessions /></React.Suspense>} />
+            <Route path="/operator/billing" element={<React.Suspense fallback={null}><OperatorBilling /></React.Suspense>} />
 
             {/* Portal (CLIENT) */}
             <Route path="/portal/*" element={<PortalRoutes />} />

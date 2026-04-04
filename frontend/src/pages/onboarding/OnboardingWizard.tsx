@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Shield, Headphones, ChevronRight, ChevronLeft, Send, Loader2, Check } from 'lucide-react';
+import { Building2, Shield, Headphones, ChevronRight, ChevronLeft, Loader2, Check, Users, Monitor, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiClient } from '../../api/client';
 import { useAuth } from '../../store/authStore';
@@ -51,13 +51,17 @@ export default function OnboardingWizard() {
   const [providerEmail, setProviderEmail] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const totalSteps = orgType === 'internal_it' ? 2 : 3;
+  // Step 4 state
+  const [inviteEmails, setInviteEmails] = useState('');
+
+  // Steps: 1=org, 2=routing (skip for internal_it), 3=provider/operator, 4=users/devices/agent
+  const totalSteps = orgType === 'internal_it' ? 3 : 4;
 
   const handleFinish = async () => {
     if (!orgType) return;
     setSaving(true);
     try {
-      await apiClient.put('/workspaces/onboarding', {
+      await apiClient.put('/api/workspaces/onboarding', {
         organizationType: orgType,
         ticketRoutingMode: routingMode,
       });
@@ -65,9 +69,20 @@ export default function OnboardingWizard() {
       // If client with external IT and email provided, send invitation request
       if (orgType === 'client_external_it' && providerEmail) {
         try {
-          await apiClient.post('/sharing/request', { email: providerEmail, scope: 'ALL' });
+          await apiClient.post('/api/sharing/request', { email: providerEmail, scope: 'ALL' });
           toast.success('Prośba o obsługę wysłana do ' + providerEmail);
         } catch { /* ignore — not critical */ }
+      }
+
+      // Invite users if emails provided
+      if (inviteEmails.trim()) {
+        const emails = inviteEmails.split(/[,;\n]+/).map(e => e.trim()).filter(Boolean);
+        for (const email of emails) {
+          try {
+            await apiClient.post('/api/users/invite', { email, role: 'MEMBER' });
+          } catch { /* ignore individual failures */ }
+        }
+        if (emails.length > 0) toast.success(`Zaproszono ${emails.length} użytkowników`);
       }
 
       toast.success('Konfiguracja zapisana!');
@@ -81,15 +96,15 @@ export default function OnboardingWizard() {
 
   const canProceed = () => {
     if (step === 1) return !!orgType;
-    if (step === 2) return true;
-    if (step === 3) return true;
-    return false;
+    return true;
   };
 
   const handleNext = () => {
     if (step === 1 && orgType === 'internal_it') {
-      // Internal IT skips step 2 (routing), goes to finish
       setRoutingMode('internal_only');
+      // Skip step 2 (routing), go to step 3 (which is "users/devices" for internal_it)
+      setStep(3);
+      return;
     }
     if (step === 1 && orgType === 'client_external_it') {
       setRoutingMode('send_to_default_provider');
@@ -104,6 +119,18 @@ export default function OnboardingWizard() {
       setStep(s => s + 1);
     }
   };
+
+  const handleBack = () => {
+    if (step === 3 && orgType === 'internal_it') {
+      setStep(1); // skip back over step 2
+      return;
+    }
+    setStep(s => s - 1);
+  };
+
+  // For internal_it: step 3 = users/devices (what is normally step 4)
+  const isOnUsersStep = orgType === 'internal_it' ? step === 3 : step === 4;
+  const isOnProviderStep = orgType !== 'internal_it' && step === 3;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6" style={{ background: 'var(--bg)' }}>
@@ -212,10 +239,8 @@ export default function OnboardingWizard() {
             </div>
           )}
 
-          {/* Step 2 for internal_it — skip directly (handled by totalSteps) */}
-
-          {/* Step 3: Provider email (client) or first client (operator) */}
-          {step === 3 && orgType === 'client_external_it' && (
+          {/* Step 3: Provider email (client) or first client info (operator) */}
+          {isOnProviderStep && orgType === 'client_external_it' && (
             <div>
               <h2 className="text-lg font-bold mb-1" style={{ color: 'var(--t)' }}>Połącz z firmą IT</h2>
               <p className="text-sm mb-6" style={{ color: 'var(--tm)' }}>
@@ -237,7 +262,7 @@ export default function OnboardingWizard() {
             </div>
           )}
 
-          {step === 3 && orgType === 'it_operator' && (
+          {isOnProviderStep && orgType === 'it_operator' && (
             <div>
               <h2 className="text-lg font-bold mb-1" style={{ color: 'var(--t)' }}>Centrum Obsługi IT</h2>
               <p className="text-sm mb-6" style={{ color: 'var(--tm)' }}>
@@ -258,12 +283,70 @@ export default function OnboardingWizard() {
               </div>
             </div>
           )}
+
+          {/* Step 4 (or 3 for internal_it): Users, devices, agent */}
+          {isOnUsersStep && (
+            <div>
+              <h2 className="text-lg font-bold mb-1" style={{ color: 'var(--t)' }}>Dodaj zespół i urządzenia</h2>
+              <p className="text-sm mb-6" style={{ color: 'var(--tm)' }}>
+                Zaproś współpracowników i skonfiguruj monitorowanie. Możesz to zrobić później.
+              </p>
+
+              {/* Invite users */}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <Users style={{ width: 18, height: 18, color: 'var(--accent)' }} />
+                  <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--t)' }}>Zaproś użytkowników</span>
+                </div>
+                <textarea
+                  value={inviteEmails}
+                  onChange={e => setInviteEmails(e.target.value)}
+                  placeholder="jan@firma.pl, anna@firma.pl&#10;(oddziel emaile przecinkami lub nową linią)"
+                  rows={3}
+                  style={{
+                    width: '100%', padding: '12px 16px', borderRadius: 12, fontSize: 13,
+                    border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--t)',
+                    resize: 'vertical',
+                  }}
+                />
+                <p className="text-xs mt-1" style={{ color: 'var(--td)' }}>
+                  Zaproszeni otrzymają email z linkiem do dołączenia.
+                </p>
+              </div>
+
+              {/* Devices & Agent */}
+              <div style={{
+                display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12,
+              }}>
+                <div style={{
+                  padding: '16px 18px', borderRadius: 12, border: '1px solid var(--border)',
+                  cursor: 'pointer',
+                }}
+                onClick={() => { handleFinish().then(() => navigate('/devices')); }}
+                >
+                  <Monitor style={{ width: 20, height: 20, color: '#22C55E', marginBottom: 8 }} />
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t)' }}>Dodaj urządzenia</div>
+                  <div style={{ fontSize: 11, color: 'var(--tm)', marginTop: 2 }}>Ręcznie lub przez import</div>
+                </div>
+                <div style={{
+                  padding: '16px 18px', borderRadius: 12, border: '1px solid var(--border)',
+                  cursor: 'pointer',
+                }}
+                onClick={() => { handleFinish().then(() => navigate('/agents')); }}
+                >
+                  <Download style={{ width: 20, height: 20, color: '#6366F1', marginBottom: 8 }} />
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t)' }}>Zainstaluj agenta</div>
+                  <div style={{ fontSize: 11, color: 'var(--tm)', marginTop: 2 }}>Automatyczny monitoring</div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Navigation */}
         <div className="flex items-center justify-between mt-6">
           {step > 1 ? (
-            <button onClick={() => setStep(s => s - 1)}
+            <button onClick={handleBack}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6, padding: '10px 20px',
                 borderRadius: 10, border: '1px solid var(--border)', background: 'none',

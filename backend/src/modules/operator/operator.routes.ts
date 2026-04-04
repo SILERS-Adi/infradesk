@@ -107,6 +107,45 @@ router.post('/clients', withWorkspaceMembership, authorizeWorkspace('OWNER', 'AD
   } catch (err) { next(err); }
 });
 
+// POST /api/operator/clients/invite — send invitation to a client
+router.post('/clients/invite', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), requireOperator, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const operatorWsId = req.workspaceId!;
+    const { email, companyName } = req.body;
+
+    if (!email?.trim()) { res.status(400).json({ error: 'Email jest wymagany' }); return; }
+
+    const operator = await prisma.workspace.findUnique({ where: { id: operatorWsId }, select: { name: true, slug: true } });
+
+    // Create invitation token
+    const token = require('crypto').randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 3600000); // 7 days
+
+    // Store invitation in SharingInvitation table
+    await prisma.sharingInvitation.create({
+      data: {
+        fromWorkspaceId: operatorWsId,
+        toEmail: email.trim(),
+        type: 'MANAGE_OFFER',
+        scope: 'ALL',
+        status: 'PENDING',
+        token,
+        expiresAt,
+      },
+    });
+
+    // In production: send email with invitation link
+    // For now: return the invitation link
+    const inviteUrl = `https://infradesk.silers.pl/invite/${token}`;
+
+    res.status(201).json({
+      success: true,
+      inviteUrl,
+      message: `Zaproszenie wysłane do ${email}`,
+    });
+  } catch (err) { next(err); }
+});
+
 // GET /api/operator/clients — list all client companies
 router.get('/clients', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), requireOperator, async (req: Request, res: Response, next: NextFunction) => {
   try {

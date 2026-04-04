@@ -10,7 +10,7 @@ import {
   Receipt, Plane, Users, CalendarDays, Share2,
   Shield, Activity, Sparkles, Lock,
   FileText, Package, Warehouse, CreditCard, BarChart3, Upload, Car, ClipboardCheck,
-  Truck, Layers, Waves, Star, Headphones, Bell, Wrench,
+  Truck, Layers, Waves, Star, Headphones, Bell, Wrench, Contact, Link2,
 } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────
@@ -58,6 +58,9 @@ export const SYSTEM_GROUPS: SystemMenuGroup[] = [
   { id: 'invoicing',       label: 'FINANSE',            defaultOrder: 3,  module: 'invoicing' },
   { id: 'packaging',       label: 'PAKOWANIE',          defaultOrder: 4,  module: 'packaging' },
   { id: 'skp',             label: 'SKP',                defaultOrder: 5,  module: 'skp' },
+
+  // Client management (IT Operator only)
+  { id: 'client-mgmt',    label: 'OBSŁUGA KLIENTÓW',    defaultOrder: 5.5, orgTypes: ['it_operator'] },
 
   // Permanent sections (always visible)
   { id: 'vault',           label: 'SEJF HASEŁ',         defaultOrder: 6,  permanent: true },
@@ -107,6 +110,13 @@ export const SYSTEM_ITEMS: SystemMenuItem[] = [
   { id: 'billing',            to: '/billing',              label: 'Rozliczenia',        icon: Receipt,         groupId: 'service-desk',   defaultOrder: 7, module: 'service-desk' },
   { id: 'it-support',         to: '/it-support',           label: 'Obsługa IT',         icon: Headphones,      groupId: 'service-desk',   defaultOrder: 8, module: 'service-desk', orgTypes: ['client_external_it'] },
   { id: 'helpdesk-settings',  to: '/helpdesk-settings',    label: 'Ustawienia Help Desk', icon: Wrench,        groupId: 'service-desk',   defaultOrder: 9, module: 'service-desk', adminOnly: true },
+
+  // ── OBSŁUGA KLIENTÓW (IT Operator only) ──
+  { id: 'cm-companies',       to: '/operator/clients',     label: 'Firmy klientów',     icon: Building2,       groupId: 'client-mgmt', defaultOrder: 0, orgTypes: ['it_operator'] },
+  { id: 'cm-contacts',        to: '/operator/contacts',    label: 'Kontakty',           icon: Contact,         groupId: 'client-mgmt', defaultOrder: 1, orgTypes: ['it_operator'] },
+  { id: 'cm-locations',       to: '/operator/locations',   label: 'Lokalizacje',        icon: MapPin,          groupId: 'client-mgmt', defaultOrder: 2, orgTypes: ['it_operator'] },
+  { id: 'cm-partners',        to: '/operator/partners',    label: 'Partnerzy IT',       icon: Link2,           groupId: 'client-mgmt', defaultOrder: 3, orgTypes: ['it_operator'] },
+  { id: 'cm-sharing',         to: '/operator/sharing',     label: 'Udostępnianie',      icon: Share2,          groupId: 'client-mgmt', defaultOrder: 4, orgTypes: ['it_operator'] },
 
   // ── FINANSE ──
   { id: 'inv-dashboard',      to: '/invoicing',            label: 'Dashboard',          icon: LayoutDashboard, groupId: 'invoicing',      defaultOrder: 0, module: 'invoicing' },
