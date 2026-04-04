@@ -125,7 +125,15 @@ def save_config(data: dict):
 def is_frozen(): return getattr(sys, "frozen", False)
 def is_installed():
     if not is_frozen(): return True
-    return os.path.abspath(sys.executable).lower() == INSTALL_EXE.lower()
+    exe_path = os.path.abspath(sys.executable).lower()
+    # Installed if running from APPDATA\InfraDesk or Program Files
+    if exe_path == INSTALL_EXE.lower():
+        return True
+    prog_dirs = [os.environ.get("PROGRAMFILES", ""), os.environ.get("PROGRAMFILES(X86)", "")]
+    for d in prog_dirs:
+        if d and exe_path.startswith(d.lower()):
+            return True
+    return False
 
 
 def _set_autostart(enable: bool):
