@@ -1,19 +1,18 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
-import { Building2, Monitor, Ticket, Plus, X, Loader2 } from 'lucide-react';
+import { Building2, Monitor, Ticket, Plus, X, Loader2, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { operatorApi, type CreateClientPayload } from '../../api/operator';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { DataTable, type Column } from '../../components/ui/DataTable';
+import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import type { OperatorClient } from '../../api/operator';
 
 export default function OperatorClients() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
 
-  const { data: clients, isLoading } = useQuery({
+  const { data: clients, isLoading, isError } = useQuery({
     queryKey: ['operator', 'clients'],
     queryFn: operatorApi.getClients,
   });
@@ -34,7 +33,7 @@ export default function OperatorClients() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <Ticket size={14} color="var(--tm)" />
         <span>{r.ticketCount}</span>
-        {r.activeTickets > 0 && <span style={{ fontSize: 11, color: '#F59E0B', fontWeight: 600 }}>({r.activeTickets} aktywnych)</span>}
+        {r.activeTickets > 0 && <span style={{ fontSize: 11, color: '#F59E0B', fontWeight: 600 }}>({r.activeTickets})</span>}
       </div>
     )},
     { key: 'deviceCount', header: 'Urządzenia', render: (r) => (
@@ -50,6 +49,21 @@ export default function OperatorClients() {
     )},
     { key: 'taxId', header: 'NIP', render: (r) => r.taxId || '—' },
   ];
+
+  if (isLoading) return <LoadingSpinner />;
+
+  if (isError) {
+    return (
+      <div style={{ padding: '0 0 40px' }}>
+        <PageHeader title="Klienci" subtitle="Firmy obsługiwane przez Twoje Centrum IT" />
+        <div className="page-card" style={{ padding: 32, textAlign: 'center' }}>
+          <AlertTriangle size={32} color="#EF4444" style={{ marginBottom: 12 }} />
+          <p style={{ fontSize: 14, color: 'var(--t)', fontWeight: 600 }}>Nie udało się załadować klientów</p>
+          <p style={{ fontSize: 12, color: 'var(--tm)' }}>Sprawdź czy Twój workspace jest skonfigurowany jako Centrum Obsługi IT</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: '0 0 40px' }}>
@@ -76,37 +90,29 @@ export default function OperatorClients() {
       <DataTable
         columns={columns}
         data={clients ?? []}
-        loading={isLoading}
+        loading={false}
         keyExtractor={(r) => r.id}
         emptyTitle="Brak klientów"
         emptyDescription="Dodaj pierwszego klienta, aby rozpocząć obsługę"
+        emptyAction={
+          <button className="btn-primary" onClick={() => setShowForm(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Plus size={16} /> Dodaj klienta
+          </button>
+        }
       />
     </div>
   );
 }
 
-// ── Add Client Form ──────────────────────────────────────────
-
 function AddClientForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [form, setForm] = useState<CreateClientPayload>({
-    name: '',
-    legalName: '',
-    taxId: '',
-    email: '',
-    phone: '',
-    contactPerson: '',
-    city: '',
+    name: '', legalName: '', taxId: '', email: '', phone: '', contactPerson: '', city: '',
   });
 
   const mutation = useMutation({
     mutationFn: operatorApi.createClient,
-    onSuccess: () => {
-      toast.success('Klient dodany pomyślnie');
-      onSuccess();
-    },
-    onError: (err: any) => {
-      toast.error(err?.response?.data?.error ?? 'Błąd przy dodawaniu klienta');
-    },
+    onSuccess: () => { toast.success('Klient dodany pomyślnie'); onSuccess(); },
+    onError: (err: any) => { toast.error(err?.response?.data?.error ?? 'Błąd przy dodawaniu klienta'); },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -120,13 +126,7 @@ function AddClientForm({ onClose, onSuccess }: { onClose: () => void; onSuccess:
       <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--tm)' }}>
         {label} {required && <span style={{ color: '#EF4444' }}>*</span>}
       </label>
-      <input
-        className="input"
-        type={type}
-        value={form[key] ?? ''}
-        onChange={(e) => setForm(prev => ({ ...prev, [key]: e.target.value }))}
-        required={required}
-      />
+      <input className="input" type={type} value={form[key] ?? ''} onChange={(e) => setForm(prev => ({ ...prev, [key]: e.target.value }))} required={required} />
     </div>
   );
 
@@ -134,9 +134,7 @@ function AddClientForm({ onClose, onSuccess }: { onClose: () => void; onSuccess:
     <div className="page-card" style={{ padding: 24, marginBottom: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--t)', margin: 0 }}>Nowy klient</h3>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--tm)', padding: 4 }}>
-          <X size={18} />
-        </button>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--tm)', padding: 4 }}><X size={18} /></button>
       </div>
       <form onSubmit={handleSubmit}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 16, marginBottom: 20 }}>

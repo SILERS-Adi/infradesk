@@ -1,5 +1,3 @@
-import { useQuery } from '@tanstack/react-query';
-import { Bell, AlertTriangle } from 'lucide-react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { EmptyState } from '../../components/ui/EmptyState';
 

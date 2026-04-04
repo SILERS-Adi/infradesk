@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Ticket, Monitor, Bot, Clock } from 'lucide-react';
+import { Building2, Ticket, Monitor, Bot, Clock, AlertTriangle } from 'lucide-react';
 import { operatorApi } from '../../api/operator';
 import { KpiCard } from '../../components/ui/KpiCard';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { TicketStatusBadge } from '../../components/ui/StatusBadge';
 import { PriorityBadge } from '../../components/ui/PriorityBadge';
@@ -14,7 +15,7 @@ import type { OperatorTicket } from '../../api/operator';
 export default function OperatorDashboard() {
   const navigate = useNavigate();
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading, isError: statsError } = useQuery({
     queryKey: ['operator', 'stats'],
     queryFn: operatorApi.getStats,
     refetchInterval: 30_000,
@@ -45,6 +46,19 @@ export default function OperatorDashboard() {
   ];
 
   if (statsLoading) return <LoadingSpinner />;
+
+  if (statsError) {
+    return (
+      <div style={{ padding: '0 0 40px' }}>
+        <PageHeader title="Centrum Operacyjne" subtitle="Przegląd wszystkich klientów i zgłoszeń" />
+        <div className="page-card" style={{ padding: 32, textAlign: 'center' }}>
+          <AlertTriangle size={32} color="#EF4444" style={{ marginBottom: 12 }} />
+          <p style={{ fontSize: 14, color: 'var(--t)', fontWeight: 600 }}>Nie udało się załadować danych</p>
+          <p style={{ fontSize: 12, color: 'var(--tm)' }}>Sprawdź czy Twój workspace jest skonfigurowany jako Centrum Obsługi IT</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: '0 0 40px' }}>
@@ -107,11 +121,19 @@ export default function OperatorDashboard() {
       </div>
 
       {/* Client Summary */}
-      {!clientsLoading && clients && clients.length > 0 && (
-        <div>
-          <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--t)', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Building2 size={16} /> Klienci
-          </h3>
+      <div>
+        <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--t)', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Building2 size={16} /> Klienci
+        </h3>
+        {clientsLoading ? (
+          <LoadingSpinner />
+        ) : !clients || clients.length === 0 ? (
+          <EmptyState
+            title="Brak klientów"
+            description="Dodaj pierwszego klienta w sekcji Klienci"
+            action={<button className="btn-primary" onClick={() => navigate('/operator/clients')}>Dodaj klienta</button>}
+          />
+        ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
             {clients.map(c => (
               <div
@@ -129,8 +151,8 @@ export default function OperatorDashboard() {
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

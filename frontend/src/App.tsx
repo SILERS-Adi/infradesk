@@ -239,6 +239,18 @@ function AdminRoutes() {
         <Route path="service" element={<Navigate to="/skp" replace />} />
         <Route path="service/inspections" element={<Navigate to="/skp/inspections" replace />} />
         <Route path="service/vehicles" element={<Navigate to="/skp/vehicles" replace />} />
+        {/* Helpdesk Settings */}
+        <Route path="helpdesk-settings" element={<React.Suspense fallback={null}><HelpdeskSettingsPage /></React.Suspense>} />
+        {/* Operator (Centrum Operacyjne) */}
+        <Route path="operator/dashboard" element={<React.Suspense fallback={null}><OperatorDashboard /></React.Suspense>} />
+        <Route path="operator/clients" element={<React.Suspense fallback={null}><OperatorClients /></React.Suspense>} />
+        <Route path="operator/tickets" element={<React.Suspense fallback={null}><OperatorTickets /></React.Suspense>} />
+        <Route path="operator/devices" element={<React.Suspense fallback={null}><OperatorDevices /></React.Suspense>} />
+        <Route path="operator/tasks" element={<React.Suspense fallback={null}><OperatorTasks /></React.Suspense>} />
+        <Route path="operator/calendar" element={<React.Suspense fallback={null}><OperatorCalendar /></React.Suspense>} />
+        <Route path="operator/alerts" element={<React.Suspense fallback={null}><OperatorAlerts /></React.Suspense>} />
+        <Route path="operator/sessions" element={<React.Suspense fallback={null}><OperatorSessions /></React.Suspense>} />
+        <Route path="operator/billing" element={<React.Suspense fallback={null}><OperatorBilling /></React.Suspense>} />
         <Route path="superadmin" element={<RequireSuperAdmin><SADashboardPage /></RequireSuperAdmin>} />
         <Route path="superadmin/tenants" element={<RequireSuperAdmin><SATenantsPage /></RequireSuperAdmin>} />
         <Route path="superadmin/users" element={<RequireSuperAdmin><SAUsersPage /></RequireSuperAdmin>} />
@@ -409,22 +421,8 @@ export default function App() {
             <Route path="/credentials" element={<Navigate to="/vault" replace />} />
             <Route path="/workspace-members" element={<Navigate to="/users" replace />} />
 
-            {/* Helpdesk Settings */}
-            <Route path="/helpdesk-settings" element={<React.Suspense fallback={null}><HelpdeskSettingsPage /></React.Suspense>} />
-
-            {/* Onboarding wizard */}
+            {/* Onboarding wizard (no layout needed) */}
             <Route path="/onboarding" element={<OnboardingWizard />} />
-
-            {/* Operator (Centrum Operacyjne) */}
-            <Route path="/operator/dashboard" element={<React.Suspense fallback={null}><OperatorDashboard /></React.Suspense>} />
-            <Route path="/operator/clients" element={<React.Suspense fallback={null}><OperatorClients /></React.Suspense>} />
-            <Route path="/operator/tickets" element={<React.Suspense fallback={null}><OperatorTickets /></React.Suspense>} />
-            <Route path="/operator/devices" element={<React.Suspense fallback={null}><OperatorDevices /></React.Suspense>} />
-            <Route path="/operator/tasks" element={<React.Suspense fallback={null}><OperatorTasks /></React.Suspense>} />
-            <Route path="/operator/calendar" element={<React.Suspense fallback={null}><OperatorCalendar /></React.Suspense>} />
-            <Route path="/operator/alerts" element={<React.Suspense fallback={null}><OperatorAlerts /></React.Suspense>} />
-            <Route path="/operator/sessions" element={<React.Suspense fallback={null}><OperatorSessions /></React.Suspense>} />
-            <Route path="/operator/billing" element={<React.Suspense fallback={null}><OperatorBilling /></React.Suspense>} />
 
             {/* Portal (CLIENT) */}
             <Route path="/portal/*" element={<PortalRoutes />} />

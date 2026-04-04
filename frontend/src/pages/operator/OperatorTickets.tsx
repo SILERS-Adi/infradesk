@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { AlertTriangle } from 'lucide-react';
 import { operatorApi } from '../../api/operator';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { DataTable, type Column } from '../../components/ui/DataTable';
+import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { TicketStatusBadge } from '../../components/ui/StatusBadge';
 import { PriorityBadge } from '../../components/ui/PriorityBadge';
 import type { TicketStatus, TicketPriority } from '../../types';
@@ -11,8 +13,8 @@ import type { OperatorTicket } from '../../api/operator';
 
 export default function OperatorTickets() {
   const navigate = useNavigate();
-  const [clientFilter, setClientFilter] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [clientFilter, setClientFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const perPage = 25;
 
@@ -21,7 +23,7 @@ export default function OperatorTickets() {
     queryFn: operatorApi.getClients,
   });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['operator', 'tickets', clientFilter, statusFilter, page],
     queryFn: () => operatorApi.getTickets({
       clientWorkspaceId: clientFilter || undefined,
@@ -35,46 +37,37 @@ export default function OperatorTickets() {
   const totalPages = Math.ceil((data?.pagination?.total ?? 0) / perPage);
 
   const columns: Column<OperatorTicket>[] = [
-    { key: 'ticketNumber', header: 'Numer', render: (r) => (
-      <span style={{ fontWeight: 600, color: 'var(--t)', whiteSpace: 'nowrap' }}>{r.ticketNumber}</span>
-    )},
-    { key: 'title', header: 'Tytuł', render: (r) => (
-      <span style={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{r.title}</span>
-    )},
-    { key: 'client', header: 'Klient', render: (r) => (
-      <span style={{ fontSize: 12, color: 'var(--tm)' }}>{r.workspace?.name ?? '—'}</span>
-    )},
+    { key: 'ticketNumber', header: 'Numer', render: (r) => <span style={{ fontWeight: 600, color: 'var(--t)', whiteSpace: 'nowrap' }}>{r.ticketNumber}</span> },
+    { key: 'title', header: 'Tytuł', render: (r) => <span style={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{r.title}</span> },
+    { key: 'client', header: 'Klient', render: (r) => <span style={{ fontSize: 12, color: 'var(--tm)' }}>{r.workspace?.name ?? '—'}</span> },
     { key: 'status', header: 'Status', render: (r) => <TicketStatusBadge status={r.status as TicketStatus} /> },
     { key: 'priority', header: 'Priorytet', render: (r) => <PriorityBadge priority={r.priority as TicketPriority} /> },
-    { key: 'assignedTo', header: 'Przypisany', render: (r) =>
-      r.assignedTo ? `${r.assignedTo.firstName} ${r.assignedTo.lastName}` : '—'
-    },
+    { key: 'assignedTo', header: 'Przypisany', render: (r) => r.assignedTo ? `${r.assignedTo.firstName} ${r.assignedTo.lastName}` : '—' },
     { key: 'createdAt', header: 'Data', render: (r) => new Date(r.createdAt).toLocaleDateString('pl') },
   ];
+
+  if (isError) {
+    return (
+      <div style={{ padding: '0 0 40px' }}>
+        <PageHeader title="Zgłoszenia" subtitle="Wszystkie zgłoszenia od klientów" />
+        <div className="page-card" style={{ padding: 32, textAlign: 'center' }}>
+          <AlertTriangle size={32} color="#EF4444" style={{ marginBottom: 12 }} />
+          <p style={{ fontSize: 14, color: 'var(--t)', fontWeight: 600 }}>Nie udało się załadować zgłoszeń</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: '0 0 40px' }}>
       <PageHeader title="Zgłoszenia" subtitle="Wszystkie zgłoszenia od klientów" />
 
-      {/* Filters */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-        <select
-          value={clientFilter}
-          onChange={(e) => { setClientFilter(e.target.value); setPage(1); }}
-          className="input"
-          style={{ minWidth: 200 }}
-        >
+        <select value={clientFilter} onChange={(e) => { setClientFilter(e.target.value); setPage(1); }} className="input" style={{ minWidth: 200 }}>
           <option value="">Wszyscy klienci</option>
-          {clients?.map(c => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
+          {clients?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          className="input"
-          style={{ minWidth: 160 }}
-        >
+        <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className="input" style={{ minWidth: 160 }}>
           <option value="">Wszystkie statusy</option>
           <option value="PENDING">Oczekujące</option>
           <option value="ASSIGNED">Przypisane</option>
@@ -93,18 +86,11 @@ export default function OperatorTickets() {
         emptyDescription={clientFilter ? 'Brak zgłoszeń dla wybranego klienta' : 'Nie ma jeszcze żadnych zgłoszeń'}
       />
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 16 }}>
-          <button className="btn-secondary" disabled={page <= 1} onClick={() => setPage(p => p - 1)} style={{ fontSize: 12 }}>
-            Poprzednia
-          </button>
-          <span style={{ fontSize: 12, color: 'var(--tm)', padding: '6px 12px' }}>
-            {page} / {totalPages}
-          </span>
-          <button className="btn-secondary" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} style={{ fontSize: 12 }}>
-            Następna
-          </button>
+          <button className="btn-secondary" disabled={page <= 1} onClick={() => setPage(p => p - 1)} style={{ fontSize: 12 }}>Poprzednia</button>
+          <span style={{ fontSize: 12, color: 'var(--tm)', padding: '6px 12px' }}>{page} / {totalPages}</span>
+          <button className="btn-secondary" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} style={{ fontSize: 12 }}>Następna</button>
         </div>
       )}
     </div>

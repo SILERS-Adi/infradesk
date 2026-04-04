@@ -191,6 +191,37 @@ router.get('/clients', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADM
   } catch (err) { next(err); }
 });
 
+// GET /api/operator/tasks — tasks from all clients
+router.get('/tasks', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), requireOperator, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const wsId = req.workspaceId!;
+    const { clientWorkspaceId, status, page = '1', per_page = '50' } = req.query as Record<string, string>;
+
+    const clientIds = await getClientWorkspaceIds(wsId, clientWorkspaceId);
+    if (clientIds.length === 0) { res.json({ data: [], pagination: { total: 0, page: 1, per_page: 50 } }); return; }
+
+    const where: any = { workspaceId: { in: clientIds } };
+    if (status) where.status = status;
+
+    const [tasks, total] = await Promise.all([
+      prisma.task.findMany({
+        where,
+        include: {
+          workspace: { select: { id: true, name: true } },
+          assignedTo: { select: { id: true, firstName: true, lastName: true } },
+          ticket: { select: { id: true, ticketNumber: true, title: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (parseInt(page) - 1) * parseInt(per_page),
+        take: parseInt(per_page),
+      }),
+      prisma.task.count({ where }),
+    ]);
+
+    res.json({ data: tasks, pagination: { total, page: parseInt(page), per_page: parseInt(per_page) } });
+  } catch (err) { next(err); }
+});
+
 // GET /api/operator/tickets — tickets from all clients
 router.get('/tickets', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), requireOperator, async (req: Request, res: Response, next: NextFunction) => {
   try {
