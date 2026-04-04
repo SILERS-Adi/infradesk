@@ -2,11 +2,10 @@ import { useForm } from 'react-hook-form';
 import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { MapPin } from 'lucide-react';
 import { locationsApi } from '../../api/locations';
-import { clientsApi } from '../../api/clients';
 import { Input } from '../ui/Input';
 import { CityInput } from '../ui/CityInput';
 import { Select } from '../ui/Select';
@@ -18,7 +17,6 @@ import type { Location } from '../../types';
 const LOCATION_TYPES = ['OFFICE', 'WAREHOUSE', 'SHOP', 'SERVER_ROOM', 'BRANCH', 'SCHOOL', 'FACTORY', 'OTHER'];
 
 const schema = z.object({
-  clientId: z.string().min(1, 'Wybierz klienta'),
   name: z.string().min(1, 'Nazwa jest wymagana'),
   type: z.string().min(1, 'Typ jest wymagany'),
   addressLine1: z.string().optional(),
@@ -36,17 +34,15 @@ type FormData = z.infer<typeof schema>;
 
 interface Props {
   location?: Location;
-  defaultClientId?: string;
   onSuccess: () => void;
   onCancel: () => void;
 }
 
-export function LocationForm({ location, defaultClientId, onSuccess, onCancel }: Props) {
+export function LocationForm({ location, onSuccess, onCancel }: Props) {
   const [cityValue, setCityValue] = useState(location?.city ?? '');
   const { register, handleSubmit, setValue, getValues, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      clientId: location?.clientId ?? defaultClientId ?? '',
       name: location?.name ?? '',
       type: location?.type ?? 'OFFICE',
       addressLine1: location?.addressLine1 ?? '',
@@ -94,11 +90,6 @@ export function LocationForm({ location, defaultClientId, onSuccess, onCancel }:
     }
   };
 
-  const { data: clients = [] } = useQuery({
-    queryKey: ['clients'],
-    queryFn: () => clientsApi.getAll(),
-  });
-
   const mutation = useMutation({
     mutationFn: (data: FormData) => {
       // Clean empty strings to undefined so backend validation passes
@@ -114,21 +105,8 @@ export function LocationForm({ location, defaultClientId, onSuccess, onCancel }:
     onError: (err) => toast.error(getErrorMessage(err)),
   });
 
-  const hasClient = !!defaultClientId;
-
   return (
     <form onSubmit={handleSubmit(d => mutation.mutate(d))} className="space-y-5">
-      {/* Klient — tylko gdy nie ma defaultClientId */}
-      {!hasClient && (
-        <Select
-          label="Klient *"
-          placeholder="Wybierz klienta"
-          options={clients.map(c => ({ value: c.id, label: c.name }))}
-          {...register('clientId')}
-          error={errors.clientId?.message}
-        />
-      )}
-
       {/* Podstawowe */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Input label="Nazwa lokalizacji *" placeholder="np. Siedziba główna" {...register('name')} error={errors.name?.message} />

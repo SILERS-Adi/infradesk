@@ -16,6 +16,7 @@ import { ITEMS_BY_ID } from '../../../config/menuRegistry';
 import { SidebarGroup } from './SidebarGroup';
 import { SidebarEditToggle } from './SidebarEditToggle';
 import { SidebarEditToolbar } from './SidebarEditToolbar';
+import { SidebarAddMenu } from './SidebarAddMenu';
 
 interface Props {
   collapsed: boolean;
@@ -170,16 +171,18 @@ export function SidebarNav({ collapsed, mobile, onMobileClose }: Props) {
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={groupIds} strategy={verticalListSortingStrategy}>
-          {groups.map(group => (
-            <SidebarGroup
-              key={group.id}
-              group={group}
-              collapsed={collapsed}
-              mobile={mobile}
-              onMobileClose={onMobileClose}
-              isEditMode={true}
-              badges={badges}
-            />
+          {groups.map((group, idx) => (
+            <div key={group.id}>
+              <SidebarGroup
+                group={group}
+                collapsed={collapsed}
+                mobile={mobile}
+                onMobileClose={onMobileClose}
+                isEditMode={true}
+                badges={badges}
+              />
+              <SidebarAddMenu afterIndex={idx} />
+            </div>
           ))}
         </SortableContext>
 

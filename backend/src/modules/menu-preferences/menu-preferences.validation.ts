@@ -14,4 +14,5 @@ export const menuLayoutSchema = z.object({
   groups: z.array(menuGroupSchema).max(50),
   hiddenItems: z.array(z.string().max(100)).max(200),
   collapsedGroups: z.array(z.string().max(100)).max(50),
+  favoriteItems: z.array(z.string().max(100)).max(50).optional().default([]),
 });

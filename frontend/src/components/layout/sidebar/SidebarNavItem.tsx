@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Eye, EyeOff } from 'lucide-react';
+import { GripVertical, Eye, EyeOff, Star } from 'lucide-react';
 import type { EffectiveItem } from '../../../hooks/useEffectiveMenu';
 import { useMenuStore } from '../../../store/menuStore';
 
@@ -23,6 +23,7 @@ export function SidebarNavItem({
   dragHandleProps, style,
 }: Props) {
   const toggleVisibility = useMenuStore(s => s.toggleItemVisibility);
+  const toggleFavorite = useMenuStore(s => s.toggleFavorite);
   const Icon = item.icon;
 
   if (isEditMode) {
@@ -47,17 +48,30 @@ export function SidebarNavItem({
           </span>
         )}
         {!collapsed && (
-          <button
-            onClick={(e) => { e.stopPropagation(); toggleVisibility(item.id); }}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer', padding: 2,
-              display: 'flex', color: item.hidden ? 'var(--td)' : 'var(--tm)',
-              transition: 'color 0.15s',
-            }}
-            title={item.hidden ? 'Pokaż' : 'Ukryj'}
-          >
-            {item.hidden ? <EyeOff style={{ width: 13, height: 13 }} /> : <Eye style={{ width: 13, height: 13 }} />}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleFavorite(item.id); }}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+                display: 'flex', color: item.isFavorite ? '#F59E0B' : 'var(--td)',
+                transition: 'color 0.15s',
+              }}
+              title={item.isFavorite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
+            >
+              <Star style={{ width: 12, height: 12, fill: item.isFavorite ? '#F59E0B' : 'none' }} />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleVisibility(item.id); }}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+                display: 'flex', color: item.hidden ? 'var(--td)' : 'var(--tm)',
+                transition: 'color 0.15s',
+              }}
+              title={item.hidden ? 'Pokaż' : 'Ukryj'}
+            >
+              {item.hidden ? <EyeOff style={{ width: 12, height: 12 }} /> : <Eye style={{ width: 12, height: 12 }} />}
+            </button>
+          </div>
         )}
       </div>
     );

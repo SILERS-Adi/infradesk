@@ -1,7 +1,8 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical } from 'lucide-react';
+import { GripVertical, X, Star, Trash2 } from 'lucide-react';
+import { useMenuStore } from '../../../store/menuStore';
 import type { EffectiveGroup } from '../../../hooks/useEffectiveMenu';
 import { SortableNavItem } from './SidebarNavItem';
 import { SidebarNavItem } from './SidebarNavItem';
@@ -30,10 +31,26 @@ export function SidebarGroup({ group, collapsed, mobile, onMobileClose, isEditMo
     opacity: isDragging ? 0.4 : 1,
   };
 
+  const removeSeparator = useMenuStore(s => s.removeSeparator);
+  const removeCustomGroup = useMenuStore(s => s.removeCustomGroup);
+
   if (group.isSeparator) {
     return (
       <div ref={setNodeRef} style={style} {...attributes}>
-        <div style={{ height: 1, background: 'var(--border)', margin: '6px 10px' }} />
+        <div style={{ display: 'flex', alignItems: 'center', margin: '4px 10px', gap: 4 }}>
+          <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+          {isEditMode && (
+            <button
+              onClick={() => removeSeparator(group.id)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--td)', display: 'flex', padding: 1, transition: 'color 0.15s' }}
+              onMouseEnter={e => e.currentTarget.style.color = '#EF4444'}
+              onMouseLeave={e => e.currentTarget.style.color = 'var(--td)'}
+              title="Usuń separator"
+            >
+              <X style={{ width: 10, height: 10 }} />
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -54,17 +71,31 @@ export function SidebarGroup({ group, collapsed, mobile, onMobileClose, isEditMo
           <GripVertical style={{ width: 12, height: 12 }} />
         </span>
       )}
-      {group.color && (
+      {group.isFavorites && (
+        <Star style={{ width: 9, height: 9, color: '#F59E0B', fill: '#F59E0B', flexShrink: 0 }} />
+      )}
+      {group.color && !group.isFavorites && (
         <span style={{
           width: 6, height: 6, borderRadius: '50%', background: group.color, flexShrink: 0,
         }} />
       )}
       <p style={{
-        fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0,
-        color: group.isPlatform ? 'rgba(248,113,113,0.5)' : group.color ?? 'var(--td)',
+        fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0, flex: 1,
+        color: group.isFavorites ? '#F59E0B' : group.isPlatform ? 'rgba(248,113,113,0.5)' : group.color ?? 'var(--td)',
       }}>
         {group.label}
       </p>
+      {isEditMode && group.isCustom && (
+        <button
+          onClick={() => removeCustomGroup(group.id)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--td)', display: 'flex', padding: 1, transition: 'color 0.15s' }}
+          onMouseEnter={e => e.currentTarget.style.color = '#EF4444'}
+          onMouseLeave={e => e.currentTarget.style.color = 'var(--td)'}
+          title="Usuń sekcję"
+        >
+          <Trash2 style={{ width: 10, height: 10 }} />
+        </button>
+      )}
     </div>
   ) : null;
 

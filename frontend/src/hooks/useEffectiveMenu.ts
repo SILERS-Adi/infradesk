@@ -15,6 +15,7 @@ export interface EffectiveGroup {
   isCustom: boolean;
   isSeparator: boolean;
   isPlatform: boolean;
+  isFavorites: boolean;
   isCollapsed: boolean;
   systemGroup: SystemMenuGroup | null;
   items: EffectiveItem[];
@@ -28,6 +29,7 @@ export interface EffectiveItem {
   end?: boolean;
   badgeKey?: string;
   hidden: boolean;
+  isFavorite: boolean;
 }
 
 /**
@@ -100,6 +102,7 @@ export function useEffectiveMenu(): EffectiveGroup[] {
 
     const hiddenSet = new Set(effective.hiddenItems);
     const collapsedSet = new Set(effective.collapsedGroups);
+    const favoriteSet = new Set(effective.favoriteItems ?? []);
 
     // Build effective groups
     const result: EffectiveGroup[] = [];
@@ -113,6 +116,7 @@ export function useEffectiveMenu(): EffectiveGroup[] {
           isCustom: false,
           isSeparator: true,
           isPlatform: false,
+          isFavorites: false,
           isCollapsed: false,
           systemGroup: null,
           items: [],
@@ -121,9 +125,10 @@ export function useEffectiveMenu(): EffectiveGroup[] {
       }
 
       // Permission check on group level (skip module/role-gated groups user can't see)
-      if (!gc.isCustom && !canSeeGroup(gc.id)) continue;
+      if (!gc.isCustom && gc.id !== 'favorites' && !canSeeGroup(gc.id)) continue;
 
       const sysGroup = GROUPS_BY_ID.get(gc.id) ?? null;
+      const isFavoritesGroup = gc.id === 'favorites';
 
       const items: EffectiveItem[] = [];
       for (const itemId of gc.items) {
@@ -138,13 +143,15 @@ export function useEffectiveMenu(): EffectiveGroup[] {
           end: si.end,
           badgeKey: si.badgeKey,
           hidden: hiddenSet.has(si.id),
+          isFavorite: favoriteSet.has(si.id),
         });
       }
 
-      // In normal mode, skip groups with no visible (non-hidden) items
-      if (!isEditMode && items.filter(i => !i.hidden).length === 0) continue;
-      // In edit mode, skip groups with no items at all (unless custom)
-      if (isEditMode && items.length === 0 && !gc.isCustom) continue;
+      // In normal mode: skip empty favorites, skip groups with no visible items
+      if (!isEditMode && isFavoritesGroup && items.filter(i => !i.hidden).length === 0) continue;
+      if (!isEditMode && !isFavoritesGroup && items.filter(i => !i.hidden).length === 0) continue;
+      // In edit mode: skip groups with no items (unless custom or favorites)
+      if (isEditMode && items.length === 0 && !gc.isCustom && !isFavoritesGroup) continue;
 
       result.push({
         id: gc.id,
@@ -153,6 +160,7 @@ export function useEffectiveMenu(): EffectiveGroup[] {
         isCustom: !!gc.isCustom,
         isSeparator: false,
         isPlatform: sysGroup?.role === 'SUPERADMIN',
+        isFavorites: isFavoritesGroup,
         isCollapsed: collapsedSet.has(gc.id),
         systemGroup: sysGroup,
         items,

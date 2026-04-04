@@ -1,26 +1,25 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
-  Search, ChevronRight, ChevronLeft, X, CheckCircle2,
+  ChevronLeft, ChevronRight, X, CheckCircle2,
   Plus, MapPin, Loader2, Monitor
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { devicesApi } from '../../api/devices';
-import { clientsApi } from '../../api/clients';
-import { useClientSearch } from '../../hooks/useClientSearch';
 import { locationsApi } from '../../api/locations';
 import { usersApi } from '../../api/users';
+import { useWorkspaceContext } from '../../hooks/useWorkspaceContext';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { getErrorMessage } from '../../utils/helpers';
-import type { Client, Device, Location } from '../../types';
+import type { Device, Location } from '../../types';
 
 // ── Step types ────────────────────────────────────────────────────────────────
-type Step = 'client' | 'location' | 'device' | 'technical' | 'done';
+type Step = 'location' | 'device' | 'technical' | 'done';
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 const deviceSchema = z.object({
@@ -81,47 +80,27 @@ const LOCATION_TYPES = [
 // ── Props ─────────────────────────────────────────────────────────────────────
 interface Props {
   device?: Device;
-  defaultClientId?: string;
   onSuccess: () => void;
   onCancel: () => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export function DeviceForm({ device, defaultClientId, onSuccess, onCancel }: Props) {
+export function DeviceForm({ device, onSuccess, onCancel }: Props) {
   const qc = useQueryClient();
+  const { workspace } = useWorkspaceContext();
 
-  const [step, setStep] = useState<Step>(defaultClientId || device ? 'location' : 'client');
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [step, setStep] = useState<Step>('location');
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
-  const [clientSearch, setClientSearch] = useState('');
   const [showNewLocation, setShowNewLocation] = useState(false);
   const [gettingGPS, setGettingGPS] = useState(false);
   const [gpsLat, setGpsLat] = useState<number | undefined>(device?.gpsLat ?? undefined);
   const [gpsLon, setGpsLon] = useState<number | undefined>(device?.gpsLon ?? undefined);
 
-  const activeClientId = selectedClient?.id ?? defaultClientId ?? device?.clientId ?? '';
-
-  // Load default client
-  const { data: defaultClient } = useQuery({
-    queryKey: ['clients', defaultClientId ?? device?.clientId],
-    queryFn: () => clientsApi.getOne((defaultClientId ?? device?.clientId)!),
-    enabled: !!(defaultClientId ?? device?.clientId) && !selectedClient,
-  });
-  useEffect(() => {
-    if (defaultClient && !selectedClient) setSelectedClient(defaultClient);
-  }, [defaultClient]);
-
-  // Clients list — server-side search with debounce
-  const { clients: filteredClients, isLoading: clientsLoading } = useClientSearch(
-    clientSearch,
-    step === 'client',
-  );
-
   // Locations
   const { data: locations = [], refetch: refetchLocations } = useQuery({
-    queryKey: ['locations', { clientId: activeClientId }],
-    queryFn: () => locationsApi.getAll({ clientId: activeClientId }),
-    enabled: !!activeClientId && step === 'location',
+    queryKey: ['locations'],
+    queryFn: () => locationsApi.getAll(),
+    enabled: step === 'location',
   });
 
   // Device types
@@ -181,7 +160,6 @@ export function DeviceForm({ device, defaultClientId, onSuccess, onCancel }: Pro
     mutationFn: (tech: TechForm) => {
       const dv = deviceForm.getValues();
       const payload = {
-        clientId:   activeClientId,
         locationId: selectedLocation?.id ?? device?.locationId ?? '',
         name:       dv.name,
         assetTag:   dv.assetTag || undefined,
@@ -217,7 +195,7 @@ export function DeviceForm({ device, defaultClientId, onSuccess, onCancel }: Pro
   });
 
   const addLocationMutation = useMutation({
-    mutationFn: (d: LocationForm) => locationsApi.create({ ...d, clientId: activeClientId }),
+    mutationFn: (d: LocationForm) => locationsApi.create({ ...d }),
     onSuccess: (loc) => {
       refetchLocations();
       setSelectedLocation(loc as Location);
@@ -239,12 +217,11 @@ export function DeviceForm({ device, defaultClientId, onSuccess, onCancel }: Pro
   };
 
   const goBack = useCallback(() => {
-    if (step === 'location') { if (!defaultClientId && !device) setStep('client'); }
     if (step === 'device')   setStep('location');
     if (step === 'technical') setStep('device');
-  }, [step, defaultClientId, device]);
+  }, [step]);
 
-  const clientName = selectedClient?.name ?? '';
+  const workspaceName = workspace?.name ?? '';
   const locationName = selectedLocation?.name ?? (device ? 'Lokalizacja' : '');
 
   // ── Screens ───────────────────────────────────────────────────────────────
@@ -261,7 +238,7 @@ export function DeviceForm({ device, defaultClientId, onSuccess, onCancel }: Pro
     );
   }
 
-  const showBack = step !== 'client' && !(step === 'location' && (!!defaultClientId || !!device));
+  const showBack = step !== 'location';
 
   return (
     <div className="flex flex-col" style={{ maxHeight: '82vh' }}>
@@ -278,15 +255,14 @@ export function DeviceForm({ device, defaultClientId, onSuccess, onCancel }: Pro
               {device ? 'Edytuj urządzenie' : 'Nowe urządzenie'}
             </h2>
             <p className="text-xs text-gray-400">
-              {clientName}{locationName ? ` · ${locationName}` : ''}
+              {workspaceName}{locationName ? ` · ${locationName}` : ''}
             </p>
           </div>
         </div>
 
         {/* Steps indicator */}
         <div className="flex items-center gap-1.5 mr-6">
-          {(['client','location','device','technical'] as Step[])
-            .filter(s => s !== 'client' || (!defaultClientId && !device))
+          {(['location','device','technical'] as Step[])
             .map((s, i, arr) => (
               <div key={s} className="flex items-center gap-1.5">
                 <div className={clsx(
@@ -305,48 +281,6 @@ export function DeviceForm({ device, defaultClientId, onSuccess, onCancel }: Pro
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-5">
-
-        {/* ── STEP: KLIENT ─────────────────────────────────────────────────── */}
-        {step === 'client' && (
-          <div className="space-y-3">
-            <p className="text-sm font-semibold text-gray-700">Wybierz klienta</p>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                autoFocus
-                placeholder="Szukaj firmy lub NIP..."
-                value={clientSearch}
-                onChange={e => setClientSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-300"
-              />
-            </div>
-            <div className="space-y-1.5 max-h-80 overflow-y-auto">
-              {filteredClients.map(c => (
-                <button
-                  key={c.id}
-                  onClick={() => { setSelectedClient(c); setStep('location'); }}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-brand-300 hover:bg-brand-50 transition-colors text-left"
-                >
-                  {c.logoUrl
-                    ? <img src={c.logoUrl} alt={c.name} className="w-9 h-9 rounded-lg object-contain bg-gray-50 border border-gray-100 flex-shrink-0" />
-                    : <div className="w-9 h-9 rounded-lg bg-brand-100 text-brand-700 font-bold text-sm flex items-center justify-center flex-shrink-0">{c.name.slice(0,2).toUpperCase()}</div>
-                  }
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-900 text-sm truncate">{c.name}</div>
-                    {c.city && <div className="text-xs text-gray-400">{c.city}</div>}
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-gray-300 flex-shrink-0" />
-                </button>
-              ))}
-              {clientsLoading && (
-                <p className="text-sm text-gray-400 text-center py-6">Wyszukiwanie...</p>
-              )}
-              {!clientsLoading && filteredClients.length === 0 && (
-                <p className="text-sm text-gray-400 text-center py-6">Brak wyników</p>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* ── STEP: LOKALIZACJA ─────────────────────────────────────────────── */}
         {step === 'location' && (

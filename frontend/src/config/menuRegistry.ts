@@ -41,6 +41,7 @@ export interface SystemMenuGroup {
 // ── Groups ─────────────────────────────────────────────────────
 
 export const SYSTEM_GROUPS: SystemMenuGroup[] = [
+  { id: 'favorites',       label: 'ULUBIONE',       defaultOrder: -1 },
   { id: 'main',            label: '',               defaultOrder: 0 },
   { id: 'infrastructure',  label: 'INFRASTRUKTURA', defaultOrder: 1 },
   { id: 'service',         label: 'SERWIS',         defaultOrder: 2 },
@@ -145,6 +146,7 @@ export interface MenuLayout {
   groups: MenuGroupConfig[];
   hiddenItems: string[];
   collapsedGroups: string[];
+  favoriteItems: string[];
 }
 
 // ── Default Layout Generator ───────────────────────────────────
@@ -163,6 +165,7 @@ export function buildDefaultLayout(): MenuLayout {
     groups,
     hiddenItems: [],
     collapsedGroups: [],
+    favoriteItems: [],
   };
 }
 

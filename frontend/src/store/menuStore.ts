@@ -40,6 +40,7 @@ interface MenuStore {
   addSeparator: (afterIndex: number) => void;
   removeSeparator: (separatorId: string) => void;
   toggleGroupCollapse: (groupId: string) => void;
+  toggleFavorite: (itemId: string) => void;
 }
 
 function cloneLayout(layout: MenuLayout): MenuLayout {
@@ -205,6 +206,31 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
     const idx = layout.collapsedGroups.indexOf(groupId);
     if (idx >= 0) layout.collapsedGroups.splice(idx, 1);
     else layout.collapsedGroups.push(groupId);
+    return { editLayout: layout };
+  }),
+
+  toggleFavorite: (itemId) => set(s => {
+    if (!s.editLayout) return s;
+    const layout = cloneLayout(s.editLayout);
+    if (!layout.favoriteItems) layout.favoriteItems = [];
+    const idx = layout.favoriteItems.indexOf(itemId);
+    if (idx >= 0) {
+      layout.favoriteItems.splice(idx, 1);
+      // Remove from favorites group if present
+      const favGroup = layout.groups.find(g => g.id === 'favorites');
+      if (favGroup) favGroup.items = favGroup.items.filter(id => id !== itemId);
+    } else {
+      layout.favoriteItems.push(itemId);
+      // Add to favorites group
+      let favGroup = layout.groups.find(g => g.id === 'favorites');
+      if (!favGroup) {
+        favGroup = { id: 'favorites', items: [] };
+        layout.groups.unshift(favGroup);
+      }
+      if (!favGroup.items.includes(itemId)) {
+        favGroup.items.push(itemId);
+      }
+    }
     return { editLayout: layout };
   }),
 }));

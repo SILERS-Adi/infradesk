@@ -1,28 +1,27 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
-  Search, ChevronRight, ChevronLeft, X, CheckCircle2, Plus, Eye, EyeOff,
+  Search, ChevronLeft, X, CheckCircle2, Plus, Eye, EyeOff,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { credentialsApi } from '../../api/credentials';
-import { clientsApi } from '../../api/clients';
 import { locationsApi } from '../../api/locations';
 import { devicesApi } from '../../api/devices';
 import { usersApi } from '../../api/users';
 import { accessTypesApi } from '../../api/accessTypes';
-import { useClientSearch } from '../../hooks/useClientSearch';
+import { useWorkspaceContext } from '../../hooks/useWorkspaceContext';
 import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
 import { Button } from '../ui/Button';
 import { getErrorMessage } from '../../utils/helpers';
-import type { Client, Credential } from '../../types';
+import type { Credential } from '../../types';
 
 // ── Step types ─────────────────────────────────────────────────────────────────
-type Step = 'client' | 'type' | 'details' | 'done';
+type Step = 'type' | 'details' | 'done';
 
 // ── Schemas ────────────────────────────────────────────────────────────────────
 const detailsSchema = z.object({
@@ -43,49 +42,26 @@ type DetailsForm = z.infer<typeof detailsSchema>;
 // ── Props ──────────────────────────────────────────────────────────────────────
 interface Props {
   credential?: Credential;
-  defaultClientId?: string;
   defaultDeviceId?: string;
   onSuccess: () => void;
   onCancel: () => void;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
-export function CredentialForm({ credential, defaultClientId, defaultDeviceId, onSuccess, onCancel }: Props) {
+export function CredentialForm({ credential, defaultDeviceId, onSuccess, onCancel }: Props) {
   const qc = useQueryClient();
+  const { workspace } = useWorkspaceContext();
   const isEdit = !!credential;
 
   // Wizard state
-  const [step, setStep] = useState<Step>(
-    isEdit ? 'details' : (defaultClientId ? 'type' : 'client')
-  );
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [step, setStep] = useState<Step>(isEdit ? 'details' : 'type');
   const [selectedTypeId, setSelectedTypeId] = useState<string>(credential?.accessTypeId ?? '');
-  const [clientSearch, setClientSearch] = useState('');
   const [typeSearch, setTypeSearch]     = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showAddType, setShowAddType]   = useState(false);
   const [newTypeName, setNewTypeName]   = useState('');
   const [newTypeIcon, setNewTypeIcon]   = useState('🔑');
   const [newTypeColor, setNewTypeColor] = useState('#6366f1');
-
-  // Load default client (edit or from props)
-  const defaultClientLoad = defaultClientId ?? credential?.clientId;
-  const { data: loadedClient } = useQuery({
-    queryKey: ['clients', defaultClientLoad],
-    queryFn: () => clientsApi.getOne(defaultClientLoad!),
-    enabled: !!defaultClientLoad && !selectedClient,
-  });
-  useEffect(() => {
-    if (loadedClient && !selectedClient) setSelectedClient(loadedClient);
-  }, [loadedClient]);
-
-  const activeClientId = selectedClient?.id ?? credential?.clientId ?? '';
-
-  // Client search
-  const { clients: filteredClients, isLoading: clientsLoading } = useClientSearch(
-    clientSearch,
-    step === 'client',
-  );
 
   // Access types
   const { data: accessTypes = [], refetch: refetchTypes } = useQuery({
@@ -95,14 +71,14 @@ export function CredentialForm({ credential, defaultClientId, defaultDeviceId, o
 
   // Dependent selects (for details step)
   const { data: locations = [] } = useQuery({
-    queryKey: ['locations', { clientId: activeClientId }],
-    queryFn: () => locationsApi.getAll({ clientId: activeClientId }),
-    enabled: !!activeClientId && step === 'details',
+    queryKey: ['locations'],
+    queryFn: () => locationsApi.getAll(),
+    enabled: step === 'details',
   });
   const { data: devices = [] } = useQuery({
-    queryKey: ['devices', { clientId: activeClientId }],
-    queryFn: () => devicesApi.getAll({ clientId: activeClientId }),
-    enabled: !!activeClientId && step === 'details',
+    queryKey: ['devices'],
+    queryFn: () => devicesApi.getAll(),
+    enabled: step === 'details',
   });
   const { data: allUsers = [] } = useQuery({
     queryKey: ['users'],
@@ -157,7 +133,6 @@ export function CredentialForm({ credential, defaultClientId, defaultDeviceId, o
   const saveMutation = useMutation({
     mutationFn: (d: DetailsForm) => {
       const payload = {
-        clientId:           activeClientId,
         accessTypeId:       selectedTypeId || undefined,
         locationId:         d.locationId   || undefined,
         deviceId:           d.deviceId     || undefined,
@@ -184,7 +159,7 @@ export function CredentialForm({ credential, defaultClientId, defaultDeviceId, o
   });
 
   // ── Step dots ─────────────────────────────────────────────────────────────────
-  const STEPS: Step[] = isEdit ? ['details'] : ['client', 'type', 'details'];
+  const STEPS: Step[] = isEdit ? ['details'] : ['type', 'details'];
   const stepIdx = STEPS.indexOf(step === 'done' ? 'details' : step);
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -194,9 +169,9 @@ export function CredentialForm({ credential, defaultClientId, defaultDeviceId, o
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-gray-100 flex-shrink-0">
         <div className="flex items-center gap-3">
-          {step !== 'client' && step !== 'done' && !isEdit && (
+          {step === 'details' && !isEdit && (
             <button
-              onClick={() => setStep(step === 'details' ? 'type' : 'client')}
+              onClick={() => setStep('type')}
               className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -206,8 +181,8 @@ export function CredentialForm({ credential, defaultClientId, defaultDeviceId, o
             <h2 className="text-base font-semibold text-gray-900">
               {isEdit ? 'Edytuj dane dostępowe' : 'Nowe dane dostępowe'}
             </h2>
-            {selectedClient && step !== 'done' && (
-              <p className="text-xs text-gray-500">{selectedClient.name}</p>
+            {workspace && step !== 'done' && (
+              <p className="text-xs text-gray-500">{workspace.name}</p>
             )}
           </div>
         </div>
@@ -250,49 +225,7 @@ export function CredentialForm({ credential, defaultClientId, defaultDeviceId, o
           </div>
         )}
 
-        {/* ── STEP 1: CLIENT ────────────────────────────────────────────────────── */}
-        {step === 'client' && (
-          <div className="space-y-3">
-            <p className="text-sm font-semibold text-gray-700 mb-3">Dla którego klienta?</p>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                autoFocus
-                placeholder="Szukaj firmy lub NIP..."
-                value={clientSearch}
-                onChange={e => setClientSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-              />
-            </div>
-            <div className="space-y-1.5 max-h-96 overflow-y-auto">
-              {filteredClients.map(c => (
-                <button
-                  key={c.id}
-                  onClick={() => { setSelectedClient(c); setStep('type'); }}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-indigo-300 hover:bg-indigo-50 transition-colors text-left"
-                >
-                  {c.logoUrl
-                    ? <img src={c.logoUrl} alt={c.name} className="w-9 h-9 rounded-lg object-contain bg-gray-50 border border-gray-100 flex-shrink-0" />
-                    : <div className="w-9 h-9 rounded-lg bg-indigo-100 text-indigo-700 font-bold text-sm flex items-center justify-center flex-shrink-0">{c.name.slice(0,2).toUpperCase()}</div>
-                  }
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-900 text-sm truncate">{c.name}</div>
-                    {c.city && <div className="text-xs text-gray-400">{c.city}</div>}
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-gray-300 flex-shrink-0" />
-                </button>
-              ))}
-              {clientsLoading && (
-                <p className="text-sm text-gray-400 text-center py-6">Wyszukiwanie...</p>
-              )}
-              {!clientsLoading && filteredClients.length === 0 && (
-                <p className="text-sm text-gray-400 text-center py-6">Brak wyników</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ── STEP 2: ACCESS TYPE ───────────────────────────────────────────────── */}
+        {/* ── STEP 1: ACCESS TYPE ───────────────────────────────────────────────── */}
         {step === 'type' && (
           <div className="space-y-4">
             <p className="text-sm font-semibold text-gray-700">Typ dostępu</p>

@@ -10,6 +10,7 @@ import {
 import toast from 'react-hot-toast';
 import { dashboardApi } from '../../api/dashboard';
 import { useAuth } from '../../store/authStore';
+import { useWorkspaceContext } from '../../hooks/useWorkspaceContext';
 import { TicketStatusBadge } from '../../components/ui/StatusBadge';
 import { formatDate } from '../../utils/helpers';
 import type { Ticket as ITicket } from '../../types';
@@ -65,6 +66,7 @@ if (typeof document !== 'undefined' && !document.getElementById(styleId)) {
 /* ── Main component ────────────────────────────────────────────────────────── */
 export function PortalDashboardPage() {
   const { user } = useAuth();
+  const { workspace } = useWorkspaceContext();
   const [showChat, setShowChat] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -96,8 +98,8 @@ export function PortalDashboardPage() {
   const openTickets: number = s.openTickets ?? 0;
   const totalDevices: number = s.totalDevices ?? s.myDevices ?? 0;
 
-  // Manager assigned to this client (from dashboard response)
-  const manager = raw.client?.manager ?? null;
+  // Manager assigned to this workspace (from dashboard response)
+  const manager = raw.manager ?? raw.client?.manager ?? null;
   // Company-level contact info (fallback)
   const firmContact = contactInfo?.value ? (() => { try { return JSON.parse(contactInfo.value); } catch { return null; } })() : null;
   // If client has a dedicated manager, use their data; otherwise fallback to company info
@@ -181,7 +183,7 @@ export function PortalDashboardPage() {
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="pd-fade-up pd-fade-up-2">
         <h1 className="text-[22px] md:text-[26px] font-bold text-white/90 tracking-tight">Witaj, {user?.firstName}!</h1>
-        <p className="text-[13px] mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>{(user as any)?.client?.name}</p>
+        <p className="text-[13px] mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>{workspace?.name}</p>
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════════

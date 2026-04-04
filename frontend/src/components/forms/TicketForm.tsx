@@ -4,7 +4,6 @@ import { z } from 'zod';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { ticketsApi } from '../../api/tickets';
-import { clientsApi } from '../../api/clients';
 import { locationsApi } from '../../api/locations';
 import { devicesApi } from '../../api/devices';
 import { usersApi } from '../../api/users';
@@ -18,7 +17,6 @@ import { getErrorMessage } from '../../utils/helpers';
 import type { Ticket } from '../../types';
 
 const schema = z.object({
-  clientId: z.string().min(1, 'Wybierz klienta'),
   locationId: z.string().min(1, 'Wybierz lokalizację'),
   deviceId: z.string().optional(),
   type: z.string(),
@@ -32,13 +30,12 @@ type FormData = z.infer<typeof schema>;
 
 interface Props {
   ticket?: Ticket;
-  defaultClientId?: string;
   defaultDeviceId?: string;
   onSuccess: () => void;
   onCancel: () => void;
 }
 
-export function TicketForm({ ticket, defaultClientId, defaultDeviceId, onSuccess, onCancel }: Props) {
+export function TicketForm({ ticket, defaultDeviceId, onSuccess, onCancel }: Props) {
   const { user } = useAuth();
   const { isAdmin, isTechnician } = useWorkspaceContext();
   const isAdminOrTech = isAdmin || isTechnician;
@@ -46,7 +43,6 @@ export function TicketForm({ ticket, defaultClientId, defaultDeviceId, onSuccess
   const { register, handleSubmit, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      clientId: ticket?.clientId ?? defaultClientId ?? '',
       locationId: ticket?.locationId ?? '',
       deviceId: ticket?.deviceId ?? defaultDeviceId ?? '',
       type: ticket?.type ?? 'INCIDENT',
@@ -58,14 +54,11 @@ export function TicketForm({ ticket, defaultClientId, defaultDeviceId, onSuccess
     },
   });
 
-  const clientId = watch('clientId');
   const locationId = watch('locationId');
 
-  const { data: clients = [] } = useQuery({ queryKey: ['clients'], queryFn: () => clientsApi.getAll(), enabled: isAdminOrTech });
   const { data: locations = [] } = useQuery({
-    queryKey: ['locations', { clientId }],
-    queryFn: () => locationsApi.getAll({ clientId: clientId || undefined }),
-    enabled: !!clientId || !isAdminOrTech,
+    queryKey: ['locations'],
+    queryFn: () => locationsApi.getAll(),
   });
   const { data: devices = [] } = useQuery({
     queryKey: ['devices', { locationId }],
@@ -111,9 +104,6 @@ export function TicketForm({ ticket, defaultClientId, defaultDeviceId, onSuccess
   return (
     <form onSubmit={handleSubmit(d => mutation.mutate(d))} className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {isAdminOrTech && (
-          <Select label="Klient *" placeholder="Wybierz klienta" options={clients.map(c => ({ value: c.id, label: c.name }))} {...register('clientId')} error={errors.clientId?.message} />
-        )}
         <Select label="Lokalizacja *" placeholder="Wybierz lokalizację" options={locations.map(l => ({ value: l.id, label: l.name }))} {...register('locationId')} error={errors.locationId?.message} />
         {devices.length > 0 && (
           <Select label="Urządzenie (opcjonalne)" placeholder="Brak" options={devices.map(d => ({ value: d.id, label: d.name }))} {...register('deviceId')} />

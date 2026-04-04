@@ -31,7 +31,7 @@ export const crmApi = {
     return data;
   },
 
-  create: async (payload: Partial<CrmActivity> & { clientId: string; type: CrmActivityType }): Promise<CrmActivity> => {
+  create: async (payload: Partial<CrmActivity> & { clientId?: string; type: CrmActivityType }): Promise<CrmActivity> => {
     const { data } = await apiClient.post<CrmActivity>('/crm', payload);
     return data;
   },
