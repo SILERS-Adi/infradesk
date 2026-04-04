@@ -5593,6 +5593,14 @@ def _run_home_webview():
                 import webbrowser
                 webbrowser.open(url)
 
+            def logout(self):
+                try:
+                    save_config({})
+                    log.info("User logged out")
+                    os._exit(0)
+                except Exception as e:
+                    return {"error": str(e)}
+
             def get_metrics(self):
                 try:
                     disk = psutil.disk_usage("C:\\")
@@ -6490,21 +6498,8 @@ def _run_auth_webview(cfg, open_ticket_on_start=False):
         log.info("Switching to HOME mode")
         _run_home_webview()
     elif result["action"] == "active":
-        log.info("Auth successful — starting agent")
-        cfg_fresh = load_config()
-        token = cfg_fresh.get("token", "")
-        auto_url = f"{API_BASE}/auth/auto-login?token={token}"
-        if open_ticket_on_start:
-            App(open_ticket_on_start=True)
-        else:
-            ok = _start_webview_app(auto_url, token, cfg_fresh)
-            if not ok:
-                import webbrowser
-                webbrowser.open(auto_url)
-                bg = _BackgroundServices(token, cfg_fresh)
-                bg.start()
-                while True:
-                    time.sleep(60)
+        log.info("Auth successful — starting Asystent Home")
+        _run_home_webview()
     else:
         log.info("Auth webview closed without action — exiting")
 
@@ -6561,7 +6556,9 @@ def main():
         _run_home_webview()
         return
 
-    # Brak configu lub nie aktywny — logowanie (webview auth)
+    # Brak configu lub nie aktywny — od razu logowanie (bez ekranu wyboru)
+    cfg["mode"] = "business"  # skip mode selection
+    save_config(cfg)
     _run_auth_webview(cfg, open_ticket_on_start=open_ticket_on_start)
 
 
