@@ -53,14 +53,7 @@
       <a class="nav-item" data-page="about"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>O programie</a>
     </nav>
     <div class="sidebar-footer">
-      <div class="sidebar-user" id="sidebarUser" style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:6px;border-radius:8px;background:rgba(255,255,255,.02);border:1px solid var(--border,rgba(255,255,255,.05))">
-        <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--accent,#4F8CFF),#8B5CF6);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0" id="userAvatar">?</div>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:10px;font-weight:600;color:var(--t,#EEF2FA);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="userName">--</div>
-          <div style="font-size:8px;color:var(--td,#3D4660)" id="userHost">--</div>
-        </div>
-      </div>
-      <button onclick="doLogout()" style="width:100%;padding:7px;border-radius:8px;border:1px solid rgba(239,68,68,.15);background:rgba(239,68,68,.04);color:#EF4444;font-size:10px;font-weight:500;cursor:pointer;font-family:inherit;transition:all .2s;margin-bottom:8px" onmouseover="this.style.background='rgba(239,68,68,.1)'" onmouseout="this.style.background='rgba(239,68,68,.04)'">Wyloguj</button>
+      <div id="authSection"></div>
       <div class="theme-switcher" id="themeSwitcher">
         <button class="theme-opt" data-theme="auto" title="Automatyczny">&#x2600;/&#x1F319;</button>
         <button class="theme-opt" data-theme="light" title="Jasny">&#x2600;</button>
@@ -175,20 +168,39 @@ function _setUserInfo(info) {
   if (!info) return;
   const user = info.currentUser || 'Użytkownik';
   const host = info.hostname || '';
-  const initials = user.substring(0, 2).toUpperCase();
-  const el = document.getElementById('userName');
-  const av = document.getElementById('userAvatar');
-  const hst = document.getElementById('userHost');
   const title = document.getElementById('contentTitle');
-  if (el) el.textContent = user;
-  if (av) av.textContent = initials;
-  if (hst) hst.textContent = host;
   if (title) title.textContent = 'Witaj, ' + user;
 }
 
-/* Load user info */
+/* Auth section — dynamic login/logout */
+async function _setupAuthSection() {
+  if (typeof py !== 'function') return;
+  const section = document.getElementById('authSection');
+  if (!section) return;
+
+  const loggedIn = await py('is_logged_in');
+  if (loggedIn) {
+    const info = await py('get_system_info');
+    const user = (info && info.currentUser) || 'Użytkownik';
+    const host = (info && info.hostname) || '';
+    const initials = user.substring(0, 2).toUpperCase();
+    section.innerHTML = '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:6px;border-radius:8px;background:rgba(255,255,255,.02);border:1px solid var(--border,rgba(255,255,255,.05))">'
+      + '<div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--accent,#4F8CFF),#8B5CF6);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0">'+initials+'</div>'
+      + '<div style="flex:1;min-width:0"><div style="font-size:10px;font-weight:600;color:var(--t,#EEF2FA);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+user+'</div>'
+      + '<div style="font-size:8px;color:var(--td,#3D4660)">'+host+'</div></div></div>'
+      + '<button onclick="doLogout()" style="width:100%;padding:7px;border-radius:8px;border:1px solid rgba(239,68,68,.15);background:rgba(239,68,68,.04);color:#EF4444;font-size:10px;font-weight:500;cursor:pointer;font-family:inherit;transition:all .2s;margin-bottom:8px" onmouseover="this.style.background=\'rgba(239,68,68,.1)\'" onmouseout="this.style.background=\'rgba(239,68,68,.04)\'">Wyloguj</button>';
+    _setUserInfo(info);
+  } else {
+    section.innerHTML = '<button onclick="doLogin()" style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(79,140,255,.2);background:linear-gradient(135deg,rgba(79,140,255,.08),rgba(99,102,241,.06));color:var(--accent,#4F8CFF);font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s;margin-bottom:8px" onmouseover="this.style.background=\'rgba(79,140,255,.15)\'" onmouseout="this.style.background=\'\'">Zaloguj się</button>';
+    const title = document.getElementById('contentTitle');
+    const info = await py('get_system_info');
+    if (title && info) title.textContent = 'Witaj, ' + (info.currentUser || 'Użytkownik');
+  }
+}
+
+/* Load */
 if (typeof py === 'function') {
-  setTimeout(() => { py('get_system_info').then(_setUserInfo); }, 500);
+  setTimeout(_setupAuthSection, 500);
 }
 
 /* Logout */
@@ -196,6 +208,11 @@ window.doLogout = async function() {
   if (confirm('Na pewno chcesz się wylogować?')) {
     await py('logout');
   }
+};
+
+/* Login — restart app with auth flow */
+window.doLogin = async function() {
+  await py('open_login');
 };
 
 /* ── About page override ── */

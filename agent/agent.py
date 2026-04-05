@@ -5568,6 +5568,38 @@ def _run_home_webview():
         class AsystentAPI:
             """Full Python API for Asystent Home webview."""
 
+            def is_logged_in(self):
+                cfg = load_config()
+                return bool(cfg.get("token") and cfg.get("status") == "ACTIVE")
+
+            def get_ai_usage(self):
+                """Check how many free AI uses remain. Unlimited if logged in."""
+                cfg = load_config()
+                if cfg.get("token") and cfg.get("status") == "ACTIVE":
+                    return {"unlimited": True, "used": 0, "limit": 0}
+                used = cfg.get("aiUsed", 0)
+                return {"unlimited": False, "used": used, "limit": 1}
+
+            def use_ai(self):
+                """Attempt to use AI. Returns ok=True if allowed, or requires_login/requires_payment."""
+                cfg = load_config()
+                if cfg.get("token") and cfg.get("status") == "ACTIVE":
+                    return {"ok": True}
+                used = cfg.get("aiUsed", 0)
+                if used < 1:
+                    cfg["aiUsed"] = used + 1
+                    save_config(cfg)
+                    return {"ok": True, "remaining": 0}
+                return {"ok": False, "reason": "limit", "message": "Darmowy limit AI wyczerpany. Zaloguj się lub wykup dostęp."}
+
+            def open_login(self):
+                """Open auth webview for login/register."""
+                # Save current state and restart with auth flow
+                cfg = load_config()
+                cfg["_pendingAuth"] = True
+                save_config(cfg)
+                os._exit(42)  # Special exit code — main will restart with auth
+
             def get_system_info(self):
                 try:
                     return {
@@ -6561,21 +6593,17 @@ def main():
     log.info("Config file: %s exists=%s", CONFIG_FILE, os.path.exists(CONFIG_FILE))
     log.info("Config: status=%s token=%s keys=%s", cfg.get("status"), "YES" if cfg.get("token") else "NO", list(cfg.keys()))
 
-    if cfg.get("status") == "ACTIVE" and cfg.get("token"):
-        log.info("Agent active — starting Asystent Home webview")
-        _run_home_webview()
+    # Pending auth — user clicked "Zaloguj się" from Home UI
+    if cfg.get("_pendingAuth"):
+        cfg.pop("_pendingAuth", None)
+        cfg["mode"] = "business"
+        save_config(cfg)
+        _run_auth_webview(cfg)
         return
 
-    # HOME mode (no token) — uruchom webview na main thread (bez tkinter)
-    if cfg.get("mode") == "home":
-        log.info("Starting HOME mode — webview UI")
-        _run_home_webview()
-        return
-
-    # Brak configu lub nie aktywny — od razu logowanie (bez ekranu wyboru)
-    cfg["mode"] = "business"  # skip mode selection
-    save_config(cfg)
-    _run_auth_webview(cfg, open_ticket_on_start=open_ticket_on_start)
+    # Asystent Home — zawsze uruchamia się od razu (bez logowania)
+    log.info("Starting Asystent Home webview (logged_in=%s)", bool(cfg.get("token")))
+    _run_home_webview()
 
 
 if __name__ == "__main__":
