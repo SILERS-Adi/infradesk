@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Plus, QrCode, Monitor, ExternalLink,
   ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown,
+  Settings2, Eye, EyeOff, X, GripVertical,
 } from 'lucide-react';
 import { devicesApi } from '../../../api/devices';
 import { PageHeader } from '../../../components/ui/PageHeader';
@@ -123,6 +124,26 @@ const STATUS_OPTIONS = [
   { value: 'IN_SERVICE', label: 'W serwisie' },
 ];
 
+/* ── Column system ──────────────────────────────────────────────────────── */
+
+interface DevColDef {
+  key: string;
+  label: string;
+  group: string;
+  defaultVisible: boolean;
+  align?: 'center';
+  render: (d: Device) => React.ReactNode;
+}
+
+const DEVICE_COL_STORAGE = 'infradesk_device_columns';
+const DEFAULT_DEV_COLS = ['device', 'user', 'login', 'company', 'location', 'ip', 'rustdesk', 'agent', 'status'];
+
+function loadDeviceCols(): string[] {
+  try { const s = localStorage.getItem(DEVICE_COL_STORAGE); if (s) return JSON.parse(s); } catch {}
+  return DEFAULT_DEV_COLS;
+}
+function saveDeviceCols(keys: string[]) { localStorage.setItem(DEVICE_COL_STORAGE, JSON.stringify(keys)); }
+
 /* ════════════════════════════════════════════════════════════════════════════
    PAGE
    ════════════════════════════════════════════════════════════════════════════ */
@@ -136,6 +157,8 @@ export function DevicesListPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [visibleCols, setVisibleCols] = useState(loadDeviceCols);
+  const [showColEditor, setShowColEditor] = useState(false);
   const debouncedSearch = useDebounce(search);
 
   const { data: devices = [], isLoading } = useQuery({
@@ -161,6 +184,81 @@ export function DevicesListPage() {
     if (!sortKey) return devices;
     return sortDevices(devices, sortKey, sortDir);
   }, [devices, sortKey, sortDir]);
+
+  // Column definitions
+  const ALL_COLUMNS: DevColDef[] = useMemo(() => [
+    { key: 'device', label: 'Urządzenie', group: 'Podstawowe', defaultVisible: true,
+      render: (d) => (
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139,92,246,0.1)' }}>
+            {d.deviceType?.icon ? <span className="text-[16px]">{d.deviceType.icon}</span> : <Monitor className="h-4 w-4" style={{ color: '#A78BFA' }} />}
+          </div>
+          <div className="min-w-0">
+            <div className="text-[13px] font-semibold truncate" style={{ color: 'var(--t)' }}>{d.name}</div>
+            <div className="text-[11px] font-mono mt-0.5 truncate" style={{ color: 'var(--td)' }}>{d.hostname ?? d.serialNumber ?? ''}</div>
+          </div>
+        </div>
+      ),
+    },
+    { key: 'user', label: 'Użytkownik', group: 'Podstawowe', defaultVisible: true,
+      render: (d) => d.assignedUser ? <span className="text-[13px]" style={{ color: 'var(--ts)' }}>{d.assignedUser.firstName} {d.assignedUser.lastName}</span> : <span style={{ color: 'var(--td)' }}>—</span>,
+    },
+    { key: 'login', label: 'Login', group: 'Podstawowe', defaultVisible: true,
+      render: (d) => d.agents?.[0]?.currentUser ? <span className="text-[12px] font-mono" style={{ color: 'var(--tm)' }}>{d.agents[0].currentUser}</span> : <span style={{ color: 'var(--td)' }}>—</span>,
+    },
+    { key: 'company', label: 'Firma', group: 'Podstawowe', defaultVisible: true,
+      render: (d) => <span className="text-[12px]" style={{ color: 'var(--tm)' }}>{(d as any).workspace?.name ?? '—'}</span>,
+    },
+    { key: 'location', label: 'Lokalizacja', group: 'Podstawowe', defaultVisible: true,
+      render: (d) => <span className="text-[12px]" style={{ color: 'var(--tm)' }}>{d.location?.name ?? '—'}</span>,
+    },
+    { key: 'ip', label: 'Adres IP', group: 'Sieć', defaultVisible: true,
+      render: (d) => <span className="text-[12px] font-mono" style={{ color: 'var(--tm)' }}>{d.ipAddress ?? '—'}</span>,
+    },
+    { key: 'mac', label: 'MAC', group: 'Sieć', defaultVisible: false,
+      render: (d) => <span className="text-[11px] font-mono" style={{ color: 'var(--td)' }}>{d.macAddress ?? '—'}</span>,
+    },
+    { key: 'os', label: 'System', group: 'Szczegóły', defaultVisible: false,
+      render: (d) => <span className="text-[12px]" style={{ color: 'var(--tm)' }}>{d.operatingSystem ?? '—'}</span>,
+    },
+    { key: 'manufacturer', label: 'Producent', group: 'Szczegóły', defaultVisible: false,
+      render: (d) => <span className="text-[12px]" style={{ color: 'var(--tm)' }}>{d.manufacturer ?? '—'}</span>,
+    },
+    { key: 'model', label: 'Model', group: 'Szczegóły', defaultVisible: false,
+      render: (d) => <span className="text-[12px]" style={{ color: 'var(--tm)' }}>{d.model ?? '—'}</span>,
+    },
+    { key: 'serial', label: 'Nr seryjny', group: 'Szczegóły', defaultVisible: false,
+      render: (d) => <span className="text-[11px] font-mono" style={{ color: 'var(--td)' }}>{d.serialNumber ?? '—'}</span>,
+    },
+    { key: 'rustdesk', label: 'RustDesk', group: 'Zdalne', defaultVisible: true, align: 'center',
+      render: (d) => d.rustdeskId ? (
+        <button onClick={(e) => { e.stopPropagation(); openRustdesk(d.rustdeskId!, e); }}
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all hover:scale-[1.05]"
+          style={{ background: 'rgba(251,146,60,0.1)', color: '#FB923C', border: '1px solid rgba(251,146,60,0.15)' }}>
+          <ExternalLink className="h-3 w-3" />{d.rustdeskId}
+        </button>
+      ) : <span style={{ color: 'var(--td)' }}>—</span>,
+    },
+    { key: 'agent', label: 'Agent', group: 'Zdalne', defaultVisible: true, align: 'center',
+      render: (d) => <AgentBadge agents={d.agents} />,
+    },
+    { key: 'status', label: 'Status', group: 'Status', defaultVisible: true, align: 'center',
+      render: (d) => <DeviceStatusBadge status={d.status} />,
+    },
+    { key: 'criticality', label: 'Krytyczność', group: 'Status', defaultVisible: false,
+      render: (d) => <span className="text-[12px]" style={{ color: 'var(--tm)' }}>{d.criticality ?? '—'}</span>,
+    },
+  ], []);
+
+  const activeColumns = visibleCols.map(k => ALL_COLUMNS.find(c => c.key === k)).filter(Boolean) as DevColDef[];
+
+  const toggleCol = (key: string) => {
+    setVisibleCols(prev => {
+      const next = prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key];
+      saveDeviceCols(next);
+      return next;
+    });
+  };
 
   const handleDownloadQr = async (device: Device, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -204,12 +302,49 @@ export function DevicesListPage() {
         </select>
         {status && (
           <button onClick={() => { setStatus(''); }}
-            className="text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-colors hover:bg-white/[0.06]"
+            className="text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-colors hover:bg-[var(--hover-bg)]"
             style={{ color: 'var(--tm)' }}>
             Wyczyść filtry
           </button>
         )}
+        <div style={{ marginLeft: 'auto' }}>
+          <button onClick={() => setShowColEditor(v => !v)}
+            className="text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-colors hover:bg-[var(--hover-bg)] flex items-center gap-1.5"
+            style={{ color: showColEditor ? 'var(--accent)' : 'var(--tm)' }}>
+            <Settings2 className="h-3.5 w-3.5" /> Kolumny ({visibleCols.length})
+          </button>
+        </div>
       </div>
+
+      {/* Column editor panel */}
+      {showColEditor && (
+        <div className="rounded-lg p-4 mb-0" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderTop: 'none', borderBottom: 'none' }}>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-semibold" style={{ color: 'var(--t)' }}>Włącz / wyłącz kolumny</span>
+            <button onClick={() => { setVisibleCols(DEFAULT_DEV_COLS); saveDeviceCols(DEFAULT_DEV_COLS); }}
+              className="text-[10px]" style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}>
+              Przywróć domyślne
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {ALL_COLUMNS.map(col => {
+              const on = visibleCols.includes(col.key);
+              return (
+                <button key={col.key} onClick={() => toggleCol(col.key)}
+                  className="flex items-center gap-1.5 py-1.5 px-3 rounded-lg text-[11px] font-medium transition-all"
+                  style={{
+                    background: on ? 'rgba(139,92,246,0.1)' : 'var(--hover-bg)',
+                    color: on ? '#A78BFA' : 'var(--tm)',
+                    border: `1px solid ${on ? 'rgba(139,92,246,0.25)' : 'var(--border)'}`,
+                  }}>
+                  {on ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                  {col.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Table ──────────────────────────────────────────────────────── */}
       <div className="rounded-b-[18px] overflow-hidden"
@@ -229,19 +364,16 @@ export function DevicesListPage() {
 
         {!isLoading && sortedDevices.length > 0 && (
           <>
-            {/* Desktop table */}
+            {/* Desktop table — dynamic columns */}
             <div className="hidden lg:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }}>
-                    <SortTh label="Urządzenie" sortKey="name" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
-                    <SortTh label="Użytkownik" sortKey="user" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
-                    <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Login</th>
-                    <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>Firma</th>
-                    <SortTh label="Lokalizacja" sortKey="location" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
-                    <th className="text-center px-4 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--tm)' }}>RustDesk</th>
-                    <SortTh label="Agent" sortKey="agent" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} align="center" />
-                    <SortTh label="Status" sortKey="status" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} align="center" />
+                    {activeColumns.map(col => (
+                      <th key={col.key} className={`${col.align === 'center' ? 'text-center' : 'text-left'} px-4 py-3 text-[10px] font-bold uppercase tracking-wider`} style={{ color: 'var(--tm)' }}>
+                        {col.label}
+                      </th>
+                    ))}
                     <th className="px-3 py-3" />
                   </tr>
                 </thead>
@@ -253,88 +385,15 @@ export function DevicesListPage() {
                       style={{ borderBottom: '1px solid var(--border)' }}
                       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--hover-bg)'; }}
                       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
-
-                      {/* Urządzenie */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                            style={{ background: 'rgba(139,92,246,0.1)' }}>
-                            {device.deviceType?.icon
-                              ? <span className="text-[16px]">{device.deviceType.icon}</span>
-                              : <Monitor className="h-4 w-4" style={{ color: '#A78BFA' }} />}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-[13px] font-semibold text-white/85 truncate">{device.name}</div>
-                            <div className="text-[11px] font-mono mt-0.5 truncate" style={{ color: 'var(--td)' }}>
-                              {device.ipAddress ?? device.hostname ?? device.serialNumber ?? ''}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Użytkownik (assignedUser = kto zalogowany przez agenta) */}
-                      <td className="px-4 py-3">
-                        {device.assignedUser ? (
-                          <span className="text-[13px]" style={{ color: 'var(--ts)' }}>
-                            {device.assignedUser.firstName} {device.assignedUser.lastName}
-                          </span>
-                        ) : (
-                          <span className="text-[11px]" style={{ color: 'var(--td)' }}>—</span>
-                        )}
-                      </td>
-
-                      {/* Login (Windows username z agenta) */}
-                      <td className="px-4 py-3">
-                        {device.agents?.[0]?.currentUser ? (
-                          <span className="text-[12px] font-mono" style={{ color: 'var(--tm)' }}>
-                            {device.agents[0].currentUser}
-                          </span>
-                        ) : (
-                          <span className="text-[11px]" style={{ color: 'var(--td)' }}>—</span>
-                        )}
-                      </td>
-
-                      {/* Firma */}
-                      <td className="px-4 py-3">
-                        <span className="text-[12px]" style={{ color: 'var(--tm)' }}>{(device as any).workspace?.name ?? '—'}</span>
-                      </td>
-
-                      {/* Lokalizacja */}
-                      <td className="px-4 py-3">
-                        <span className="text-[12px]" style={{ color: 'var(--tm)' }}>{device.location?.name ?? '—'}</span>
-                      </td>
-
-                      {/* RustDesk */}
-                      <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
-                        {device.rustdeskId ? (
-                          <button onClick={(e) => openRustdesk(device.rustdeskId!, e)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all duration-200 hover:scale-[1.05] active:scale-[0.97]"
-                            style={{ background: 'rgba(251,146,60,0.1)', color: '#FB923C', border: '1px solid rgba(251,146,60,0.15)' }}
-                            title={`RustDesk: ${device.rustdeskId}`}>
-                            <ExternalLink className="h-3 w-3" />
-                            {device.rustdeskId}
-                          </button>
-                        ) : (
-                          <span className="text-[11px]" style={{ color: 'var(--td)' }}>—</span>
-                        )}
-                      </td>
-
-                      {/* Agent */}
-                      <td className="px-4 py-3 text-center">
-                        <AgentBadge agents={device.agents} />
-                      </td>
-
-                      {/* Status */}
-                      <td className="px-4 py-3 text-center">
-                        <DeviceStatusBadge status={device.status} />
-                      </td>
-
-                      {/* Actions */}
+                      {activeColumns.map(col => (
+                        <td key={col.key} className={`px-4 py-3 ${col.align === 'center' ? 'text-center' : ''}`}
+                          onClick={['rustdesk'].includes(col.key) ? e => e.stopPropagation() : undefined}>
+                          {col.render(device)}
+                        </td>
+                      ))}
                       <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
-                          <button onClick={(e) => handleDownloadQr(device, e)}
-                            className="p-1.5 rounded-lg transition-colors hover:bg-white/[0.06]"
-                            title="Pobierz QR">
+                          <button onClick={(e) => handleDownloadQr(device, e)} className="p-1.5 rounded-lg transition-colors hover:bg-[var(--hover-bg)]" title="Pobierz QR">
                             <QrCode className="h-3.5 w-3.5" style={{ color: 'var(--td)' }} />
                           </button>
                           <ChevronRight className="h-4 w-4" style={{ color: 'var(--td)' }} />
