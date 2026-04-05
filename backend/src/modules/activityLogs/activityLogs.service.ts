@@ -8,12 +8,17 @@ export async function listActivityLogs(params: {
   page?: number;
   limit?: number;
   workspaceId?: string | null;
+  workspaceIds?: string[];
 }) {
-  const { entityType, entityId, performedByUserId, actionType, page = 1, limit = 50, workspaceId } = params;
+  const { entityType, entityId, performedByUserId, actionType, page = 1, limit = 50, workspaceId, workspaceIds } = params;
   const skip = (page - 1) * limit;
 
   const where: Record<string, unknown> = {};
-  if (workspaceId) where.workspaceId = workspaceId;
+  if (workspaceIds && workspaceIds.length > 0) {
+    where.workspaceId = { in: workspaceIds };
+  } else if (workspaceId) {
+    where.workspaceId = workspaceId;
+  }
   if (entityType) where.entityType = entityType;
   if (entityId) where.entityId = entityId;
   if (performedByUserId) where.performedByUserId = performedByUserId;

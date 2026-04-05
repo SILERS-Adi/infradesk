@@ -8,6 +8,7 @@ import {
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
+import { MspCompanyFilter } from '../../components/ui/MspCompanyFilter';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
@@ -371,6 +372,7 @@ export function BackupPage() {
   const [editConfig, setEditConfig] = useState<BackupConfig | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [historyConfig, setHistoryConfig] = useState<{ id: string; name: string } | null>(null);
+  const [companyFilter, setCompanyFilter] = useState('');
 
   const { data: configs = [], isLoading } = useQuery({
     queryKey: ['backup-configs'],
@@ -417,9 +419,12 @@ export function BackupPage() {
         title="Kopie zapasowe"
         subtitle="Zarządzanie konfiguracjami backupów baz danych i folderów"
         actions={
-          <Button icon={<Plus className="h-4 w-4" />} onClick={openCreate}>
-            Dodaj konfigurację
-          </Button>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <MspCompanyFilter value={companyFilter} onChange={setCompanyFilter} />
+            <Button icon={<Plus className="h-4 w-4" />} onClick={openCreate}>
+              Dodaj konfigurację
+            </Button>
+          </div>
         }
       />
 

@@ -183,7 +183,7 @@ export const SYSTEM_ITEMS: SystemMenuItem[] = [
 
   // ── INFRASTRUKTURA IT ──
   { id: 'devices',         to: '/devices',              label: 'Urządzenia',           icon: Monitor,         groupId: 'infrastructure', defaultOrder: 0 },
-  { id: 'agents',          to: '/agents',               label: 'Agenty',               icon: Bot,             groupId: 'infrastructure', defaultOrder: 1 },
+  { id: 'agents',          to: '/agents',               label: 'Asystenci',            icon: Bot,             groupId: 'infrastructure', defaultOrder: 1 },
   { id: 'audit-network',   to: '/monitoring',           label: 'Audyt i sieć',         icon: Shield,          groupId: 'infrastructure', defaultOrder: 2 },
   { id: 'backups',         to: '/backups',              label: 'Kopie zapasowe',       icon: HardDrive,       groupId: 'infrastructure', defaultOrder: 3 },
   { id: 'activity-logs',   to: '/activity-logs',        label: 'Logi aktywności',      icon: Activity,        groupId: 'infrastructure', defaultOrder: 4 },

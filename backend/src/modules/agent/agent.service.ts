@@ -430,12 +430,15 @@ export async function createAgentTicket(token: string, data: AgentTicketInput) {
 
 export async function getAllRegistrations(params: {
   workspaceId?: string | null;
+  workspaceIds?: string[];
   scopeFilter?: Record<string, unknown>;
 }) {
-  const { workspaceId, scopeFilter } = params;
+  const { workspaceId, workspaceIds, scopeFilter } = params;
   const where: Record<string, unknown> = {};
 
-  if (workspaceId) {
+  if (workspaceIds && workspaceIds.length > 0) {
+    where.workspaceId = { in: workspaceIds };
+  } else if (workspaceId) {
     where.workspaceId = workspaceId;
   }
 

@@ -6,6 +6,7 @@ import {
   XCircle, Clock, ChevronDown, ChevronRight, Loader2,
 } from 'lucide-react';
 import { agentsApi, type AgentRegistration } from '../../api/agents';
+import { MspCompanyFilter } from '../../components/ui/MspCompanyFilter';
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
 
@@ -175,6 +176,7 @@ const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
 
 export default function MonitoringPage() {
   const [tab, setTab] = useState<Tab>('audit');
+  const [companyFilter, setCompanyFilter] = useState('');
 
   const { data: agents = [], isLoading } = useQuery<AgentWithMetrics[]>({
     queryKey: ['agents-monitoring'],
@@ -190,6 +192,7 @@ export default function MonitoringPage() {
           <Shield className="h-6 w-6" style={{ color: '#A78BFA' }} />
           Monitoring
         </h1>
+        <div className="mt-2"><MspCompanyFilter value={companyFilter} onChange={setCompanyFilter} /></div>
         <p className="mt-1 text-sm" style={{ color: 'var(--ts)' }}>
           Kompleksowy widok bezpieczeństwa, sieci i zdrowia wszystkich agentów
         </p>

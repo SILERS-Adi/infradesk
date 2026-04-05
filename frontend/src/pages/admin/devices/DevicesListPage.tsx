@@ -16,6 +16,7 @@ import { DeviceForm } from '../../../components/forms/DeviceForm';
 import { useDebounce } from '../../../hooks/useDebounce';
 import type { Device } from '../../../types';
 import { useWorkspaceContext } from '../../../hooks/useWorkspaceContext';
+import { MspCompanyFilter } from '../../../components/ui/MspCompanyFilter';
 import toast from 'react-hot-toast';
 
 /* ── Device status badge ─────────────────────────────────────────────────── */
@@ -131,6 +132,7 @@ export function DevicesListPage() {
   const { canCreate, isScoped } = useWorkspaceContext();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
+  const [companyFilter, setCompanyFilter] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -155,9 +157,13 @@ export function DevicesListPage() {
   };
 
   const sortedDevices = useMemo(() => {
-    if (!sortKey) return devices;
-    return sortDevices(devices, sortKey, sortDir);
-  }, [devices, sortKey, sortDir]);
+    let filtered = devices;
+    if (companyFilter) {
+      filtered = devices.filter((d: any) => d.workspaceId === companyFilter);
+    }
+    if (!sortKey) return filtered;
+    return sortDevices(filtered, sortKey, sortDir);
+  }, [devices, sortKey, sortDir, companyFilter]);
 
   const handleDownloadQr = async (device: Device, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -193,6 +199,7 @@ export function DevicesListPage() {
       <div className="rounded-t-[18px] p-4 flex flex-wrap gap-3 items-center"
         style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
         <SearchInput value={search} onChange={setSearch} placeholder="Szukaj (nazwa, IP, hostname, S/N)..." />
+        <MspCompanyFilter value={companyFilter} onChange={setCompanyFilter} />
         <select value={status} onChange={(e) => setStatus(e.target.value)}
           className="text-sm rounded-xl px-3 py-2.5 focus:outline-none appearance-none pr-8"
           style={selectStyle}>

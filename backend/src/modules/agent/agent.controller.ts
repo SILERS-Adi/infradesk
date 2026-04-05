@@ -52,8 +52,11 @@ export async function postTicket(req: Request, res: Response, next: NextFunction
 export async function getRegistrations(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { agentScopeFilter } = await import('../../middleware/workspace');
+    const { getMspWorkspaceIds } = require('../../utils/mspScope');
+    const wsIds: string[] = req.workspaceId ? await getMspWorkspaceIds(req.workspaceId) : [];
     const regs = await getAllRegistrations({
-      workspaceId: req.workspaceId,
+      workspaceId: wsIds.length > 1 ? undefined : req.workspaceId,
+      workspaceIds: wsIds.length > 1 ? wsIds : undefined,
       scopeFilter: agentScopeFilter(req.membership),
     });
     res.json(regs);

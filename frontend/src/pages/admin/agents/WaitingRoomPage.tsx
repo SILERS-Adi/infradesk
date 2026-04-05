@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { Monitor, Check, Trash2, Wifi, WifiOff, Clock, ChevronDown, ChevronUp, Cpu, HardDrive, Network, Package, RefreshCw, Search, ExternalLink } from 'lucide-react';
 import { agentsApi, AgentRegistration, InstalledSoftware, DiskInfo, NetworkIface } from '../../../api/agents';
 import { devicesApi } from '../../../api/devices';
+import { MspCompanyFilter } from '../../../components/ui/MspCompanyFilter';
 import { Button } from '../../../components/ui/Button';
 import { Select } from '../../../components/ui/Select';
 import { getErrorMessage } from '../../../utils/helpers';
@@ -693,6 +694,7 @@ export function WaitingRoomPage() {
   const qc = useQueryClient();
   const [approveTarget, setApproveTarget] = useState<AgentRegistration | null>(null);
   const [search, setSearch] = useState('');
+  const [companyFilter, setCompanyFilter] = useState('');
   const [bulkUpdating, setBulkUpdating] = useState(false);
   const [agentTypeFilter, setAgentTypeFilter] = useState<'ALL' | 'CLIENT' | 'SERVER'>('ALL');
 
@@ -727,6 +729,7 @@ export function WaitingRoomPage() {
   });
 
   const filtered = registrations.filter(r => {
+    if (companyFilter && (r as any).workspaceId !== companyFilter) return false;
     if (agentTypeFilter !== 'ALL' && (r.agentType || 'CLIENT') !== agentTypeFilter) return false;
     if (search) {
       const q = search.toLowerCase();
@@ -826,6 +829,7 @@ export function WaitingRoomPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-center">
+        <MspCompanyFilter value={companyFilter} onChange={setCompanyFilter} />
         <div className="relative flex-1 min-w-[180px] max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--tm)' }} />
           <input

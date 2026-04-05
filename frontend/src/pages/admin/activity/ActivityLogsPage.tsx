@@ -5,6 +5,7 @@ import { PageHeader } from '../../../components/ui/PageHeader';
 import { Badge } from '../../../components/ui/Badge';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { formatDateTime } from '../../../utils/helpers';
+import { MspCompanyFilter } from '../../../components/ui/MspCompanyFilter';
 
 const ENTITY_COLORS: Record<string, 'blue' | 'indigo' | 'purple' | 'orange' | 'red' | 'green' | 'gray'> = {
   CLIENT: 'blue',
@@ -34,6 +35,7 @@ const ACTION_TYPES = ['CREATE', 'UPDATE', 'DELETE', 'STATUS_CHANGE', 'LOGIN', 'V
 export function ActivityLogsPage() {
   const [entityType, setEntityType] = useState('');
   const [actionType, setActionType] = useState('');
+  const [companyFilter, setCompanyFilter] = useState('');
 
   const { data: logs = [], isLoading } = useQuery({
     queryKey: ['activity-logs', { entityType, actionType }],
@@ -49,7 +51,8 @@ export function ActivityLogsPage() {
       <PageHeader title="Logi aktywności" subtitle={`${logs.length} wpisów`} />
 
       <div className="rounded-lg" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-        <div className="p-4 flex gap-3" style={{ borderBottom: '1px solid var(--border)' }}>
+        <div className="p-4 flex flex-wrap gap-3" style={{ borderBottom: '1px solid var(--border)' }}>
+          <MspCompanyFilter value={companyFilter} onChange={setCompanyFilter} />
           <select
             value={entityType}
             onChange={(e) => setEntityType(e.target.value)}
