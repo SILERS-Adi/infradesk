@@ -15,7 +15,7 @@ from PIL import Image, ImageGrab, ImageDraw
 # ─── Config ──────────────────────────────────────────────────────────────────
 
 APP_NAME    = "InfraDesk Server Agent"
-APP_VERSION = "1.0.0"
+APP_VERSION = "4.3.1"
 INSTALL_DIR = os.path.join(os.environ.get("APPDATA", ""), "InfraDesk Server")
 INSTALL_EXE = os.path.join(INSTALL_DIR, "InfraDesk Server Agent.exe")
 CONFIG_FILE = os.path.join(INSTALL_DIR, "config.json")
@@ -602,7 +602,7 @@ def install_rustdesk(notify_fn=None) -> bool:
         return False
     finally:
         # Próba usunięcia — ignoruj błąd jeśli plik zajęty
-        try: os.remove(exe)
+        try: os.remove(msi)
         except Exception: pass
 
 
@@ -687,7 +687,7 @@ def fetch_contact() -> dict:
 
 def do_login(email, pwd):
     cfg = load_config()
-    body = {"email": email, "password": pwd, **metrics()}
+    body = {"email": email, "password": pwd, "agentType": "SERVER", **metrics()}
     if cfg.get("deviceId"):
         body["deviceId"] = cfg["deviceId"]
     return api_post("/agent/register", body)
@@ -695,7 +695,7 @@ def do_login(email, pwd):
 
 def do_register(form):
     # Filtruj None → Zod nie akceptuje null dla pól optional
-    body = {k: v for k, v in {**form, **full_inventory()}.items() if v is not None}
+    body = {k: v for k, v in {**form, "agentType": "SERVER", **full_inventory()}.items() if v is not None}
     return api_post("/agent/register", body)
 
 
@@ -3410,6 +3410,176 @@ def _remove_service():
         print(f"[BŁĄD] {e}")
 
 
+def _find_ui_dir():
+    """Locate the ui/ folder — checks _MEIPASS, __file__ dir, INSTALL_DIR."""
+    candidates = [
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ui'),
+        os.path.join(INSTALL_DIR, 'ui'),
+    ]
+    meipass = getattr(sys, '_MEIPASS', None)
+    if meipass:
+        candidates.insert(0, os.path.join(meipass, 'ui'))
+    for c in candidates:
+        c = os.path.abspath(c)
+        if os.path.isdir(c):
+            return c
+    return None
+
+
+def _run_auth_webview(cfg, open_ticket_on_start=False):
+    """Webview-based login/register/waiting flow (replaces tkinter App)."""
+    try:
+        import webview
+    except ImportError:
+        log.warning("pywebview not installed — falling back to tkinter App")
+        App(open_ticket_on_start=open_ticket_on_start)
+        return
+
+    ui_dir = _find_ui_dir()
+    if not ui_dir or not os.path.exists(os.path.join(ui_dir, 'auth.html')):
+        log.warning("auth.html not found — falling back to tkinter App")
+        App(open_ticket_on_start=open_ticket_on_start)
+        return
+
+    result = {"action": None}
+
+    class AuthAPI:
+        def get_init_data(self):
+            token = cfg.get("token")
+            status = cfg.get("status")
+            start_page = "auth"  # Server agent — no home mode, go straight to auth
+            if token and status != "ACTIVE":
+                start_page = "waiting"
+            return {
+                "hasHomeMode": False,
+                "appName": APP_NAME,
+                "appVersion": APP_VERSION,
+                "startPage": start_page,
+                "token": token or "",
+            }
+
+        def select_mode(self, mode):
+            pass  # Server agent has no home mode
+
+        def do_login(self, email, pwd):
+            try:
+                r = do_login(email, pwd)
+                cfg["token"] = r["token"]
+                cfg["status"] = r["status"]
+                cfg["allowMonitoring"] = True
+                cfg["allowRustdesk"] = True
+                if r.get("deviceId"):
+                    cfg["deviceId"] = r["deviceId"]
+                save_config(cfg)
+                if r["status"] == "ACTIVE":
+                    result["action"] = "active"
+                    for w in webview.windows:
+                        w.destroy()
+                return {"status": r["status"], "token": r["token"]}
+            except requests.HTTPError as e:
+                msg = "Nieprawidłowy e-mail lub hasło." if e.response.status_code in (400, 401) else f"Błąd serwera: {e.response.status_code}"
+                return {"error": msg}
+            except requests.exceptions.ConnectionError:
+                return {"error": "Brak połączenia z serwerem"}
+            except requests.exceptions.Timeout:
+                return {"error": "Serwer nie odpowiada"}
+            except Exception as e:
+                return {"error": f"Błąd: {e}"}
+
+        def do_register(self, form):
+            try:
+                r = do_register(form)
+                cfg["token"] = r["token"]
+                cfg["status"] = r["status"]
+                cfg["allowRustdesk"] = form.get("allowRustdesk", True)
+                cfg["allowMonitoring"] = form.get("allowMonitoring", True)
+                if form.get("backupMode"):
+                    cfg["backupMode"] = True
+                save_config(cfg)
+                if r["status"] == "ACTIVE":
+                    result["action"] = "active"
+                    for w in webview.windows:
+                        w.destroy()
+                return {"status": r["status"], "token": r["token"]}
+            except requests.HTTPError as e:
+                try:
+                    body = e.response.json()
+                    msg = body.get("error") or body.get("message") or str(e)
+                except Exception:
+                    msg = f"HTTP {e.response.status_code}"
+                return {"error": f"Błąd: {msg}"}
+            except requests.exceptions.ConnectionError:
+                return {"error": "Brak połączenia z serwerem"}
+            except Exception as e:
+                return {"error": f"Błąd: {e}"}
+
+        def check_status(self):
+            try:
+                token = cfg.get("token")
+                if not token:
+                    return None
+                resp = api_get("/agent/status", token)
+                s = resp.get("status") if isinstance(resp, dict) else resp
+                if s == "ACTIVE":
+                    if isinstance(resp, dict) and resp.get("deviceId"):
+                        cfg["deviceId"] = resp["deviceId"]
+                    cfg["status"] = "ACTIVE"
+                    save_config(cfg)
+                    result["action"] = "active"
+                    for w in webview.windows:
+                        w.destroy()
+                return s
+            except Exception:
+                return None
+
+        def cancel_registration(self):
+            save_config({})
+            cfg.clear()
+
+        def check_rustdesk(self):
+            return 'installed' if is_rustdesk_installed() else 'not_installed'
+
+        def install_rustdesk(self):
+            try:
+                return install_rustdesk()
+            except Exception as e:
+                log.error("RustDesk install error: %s", e)
+                return False
+
+    api = AuthAPI()
+    url = f"file:///{os.path.join(ui_dir, 'auth.html').replace(os.sep, '/')}"
+
+    window = webview.create_window(
+        APP_NAME,
+        url=url,
+        width=620, height=560,
+        min_size=(500, 450),
+        js_api=api,
+        background_color='#040810',
+    )
+    webview.start(debug=False)
+
+    # After webview closes — handle result
+    if result["action"] == "active":
+        log.info("Auth successful — starting server agent")
+        cfg_fresh = load_config()
+        token = cfg_fresh.get("token", "")
+        auto_url = f"{API_BASE}/auth/auto-login?token={token}"
+        if open_ticket_on_start:
+            App(open_ticket_on_start=True)
+        else:
+            ok = _start_webview_app(auto_url, token, cfg_fresh)
+            if not ok:
+                import webbrowser
+                webbrowser.open(auto_url)
+                bg = _BackgroundServices(token, cfg_fresh)
+                bg.start()
+                while True:
+                    time.sleep(60)
+    else:
+        log.info("Auth webview closed without action — exiting")
+
+
 def main():
     log.info("InfraDesk Agent %s starting — exe: %s args: %s", APP_VERSION, sys.executable, sys.argv)
     log.info("INSTALL_EXE: %s  is_installed: %s  is_frozen: %s", INSTALL_EXE, is_installed(), is_frozen())
@@ -3475,8 +3645,8 @@ def main():
         while True:
             time.sleep(60)
 
-    # Brak configu lub nie aktywny — logowanie
-    App(open_ticket_on_start=open_ticket_on_start)
+    # Brak configu lub nie aktywny — logowanie (webview auth)
+    _run_auth_webview(cfg, open_ticket_on_start=open_ticket_on_start)
 
 
 if __name__ == "__main__":

@@ -1905,6 +1905,10 @@ class _BackgroundServices:
 
     def _on_ws(self, msg):
         mtype = msg.get("type")
+        if mtype == "remote_command":
+            from remote_commands import handle_remote_command
+            threading.Thread(target=handle_remote_command, args=(msg, self._ws.ws.send), daemon=True).start()
+            return
         if mtype in ("notification", "status_update") and self._tray:
             try: self._tray.notify(msg.get("body", ""), msg.get("title", APP_NAME))
             except Exception: pass
@@ -2007,6 +2011,10 @@ class ServerServiceLoop:
 
     def _on_ws(self, msg):
         mtype = msg.get("type")
+        if mtype == "remote_command":
+            from remote_commands import handle_remote_command
+            threading.Thread(target=handle_remote_command, args=(msg, self._ws.ws.send), daemon=True).start()
+            return
         if mtype in ("notification", "status_update"):
             log.info("WS notification: %s — %s", msg.get("title", ""), msg.get("body", ""))
         elif mtype == "update":

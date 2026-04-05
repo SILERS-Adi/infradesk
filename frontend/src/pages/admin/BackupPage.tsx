@@ -14,6 +14,7 @@ import { Select } from '../../components/ui/Select';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { backupApi, type BackupConfig, type BackupHistory } from '../../api/backup';
 import { formatDateTime } from '../../utils/helpers';
+import BackupWizard from './backup/BackupWizard';
 
 const TYPE_LABELS: Record<string, string> = {
   SQL_MYSQL: 'MySQL',
@@ -369,6 +370,7 @@ function HistoryModal({ open, onClose, configId, configName }: {
 export function BackupPage() {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
   const [editConfig, setEditConfig] = useState<BackupConfig | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [historyConfig, setHistoryConfig] = useState<{ id: string; name: string } | null>(null);
@@ -421,8 +423,11 @@ export function BackupPage() {
         actions={
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <MspCompanyFilter value={companyFilter} onChange={setCompanyFilter} />
+            <Button variant="secondary" icon={<Database className="h-4 w-4" />} onClick={() => setShowWizard(true)}>
+              Wizard
+            </Button>
             <Button icon={<Plus className="h-4 w-4" />} onClick={openCreate}>
-              Dodaj konfigurację
+              Ręcznie
             </Button>
           </div>
         }
@@ -566,6 +571,8 @@ export function BackupPage() {
         confirmLabel="Usuń"
         loading={deleteMutation.isPending}
       />
+
+      <BackupWizard open={showWizard} onClose={() => setShowWizard(false)} />
     </div>
   );
 }

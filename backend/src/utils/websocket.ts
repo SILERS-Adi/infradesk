@@ -38,6 +38,17 @@ export function initWebSocket(server: import('http').Server) {
       data: { lastSeen: new Date() },
     });
 
+    // Handle incoming messages from agent (responses to remote commands)
+    ws.on('message', (raw) => {
+      try {
+        const msg = JSON.parse(raw.toString());
+        if (msg.requestId) {
+          const { handleAgentResponse } = require('./remoteCommand');
+          handleAgentResponse(token, msg);
+        }
+      } catch {}
+    });
+
     ws.on('close', () => {
       agentConnections.delete(token);
       console.log(`Agent disconnected: ${token.slice(0, 8)}`);

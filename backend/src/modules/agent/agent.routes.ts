@@ -80,4 +80,46 @@ router.post('/:id/system-reboot',    authenticate, withWorkspaceMembership, auth
 router.post('/:id/wake',             authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), postWakeDevice);
 router.delete('/:id',               authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), deleteReg);
 
+// ── Secure Remote Commands ──────────────────────────────────────
+import { sendCommand } from '../../utils/remoteCommand';
+import prisma from '../../lib/prisma';
+
+// POST /api/agent/:id/command — send whitelisted command to agent
+router.post('/:id/command', authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { command, payload } = req.body;
+
+    if (!command) { res.status(400).json({ error: 'command is required' }); return; }
+
+    // Get agent token
+    const agent = await prisma.agentRegistration.findUnique({
+      where: { id },
+      select: { agentToken: true, hostname: true },
+    });
+    if (!agent) { res.status(404).json({ error: 'Agent not found' }); return; }
+
+    const result = await sendCommand({
+      agentToken: agent.agentToken,
+      command,
+      payload: payload ?? {},
+      timeoutMs: 30000,
+      userId: req.user!.userId,
+      workspaceId: req.workspaceId ?? undefined,
+    });
+
+    res.json({ success: true, data: result });
+  } catch (err: any) {
+    if (err.message.includes('not connected')) {
+      res.status(503).json({ error: 'Agent jest offline', code: 'AGENT_OFFLINE' });
+    } else if (err.message.includes('timed out')) {
+      res.status(504).json({ error: 'Agent nie odpowiedział w czasie', code: 'TIMEOUT' });
+    } else if (err.message.includes('not allowed')) {
+      res.status(403).json({ error: err.message, code: 'COMMAND_NOT_ALLOWED' });
+    } else {
+      res.status(500).json({ error: err.message });
+    }
+  }
+});
+
 export default router;
