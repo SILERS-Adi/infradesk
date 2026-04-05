@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -157,8 +157,10 @@ export function DevicesListPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>('asc');
-  const [visibleCols, setVisibleCols] = useState(loadDeviceCols);
-  const [showColEditor, setShowColEditor] = useState(false);
+  const [visibleKeys, setVisibleKeys] = useState(loadDeviceCols);
+  const [showColumnEditor, setShowColumnEditor] = useState(false);
+
+  useEffect(() => { saveDeviceCols(visibleKeys); }, [visibleKeys]);
   const debouncedSearch = useDebounce(search);
 
   const { data: devices = [], isLoading } = useQuery({
@@ -250,15 +252,8 @@ export function DevicesListPage() {
     },
   ], []);
 
-  const activeColumns = visibleCols.map(k => ALL_COLUMNS.find(c => c.key === k)).filter(Boolean) as DevColDef[];
-
-  const toggleCol = (key: string) => {
-    setVisibleCols(prev => {
-      const next = prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key];
-      saveDeviceCols(next);
-      return next;
-    });
-  };
+  const visibleCols = visibleKeys.map(k => ALL_COLUMNS.find(c => c.key === k)).filter(Boolean) as DevColDef[];
+  const groups = [...new Set(ALL_COLUMNS.map(c => c.group))];
 
   const handleDownloadQr = async (device: Device, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -283,11 +278,24 @@ export function DevicesListPage() {
       <PageHeader
         title="Urządzenia"
         subtitle={`${devices.length} urządzeń`}
-        actions={canCreate ? (
-          <Button icon={<Plus className="h-4 w-4" />} onClick={() => setShowCreate(true)}>
-            Nowe urządzenie
-          </Button>
-        ) : undefined}
+        actions={
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowColumnEditor(v => !v)}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl transition-all duration-200 active:scale-[0.97]"
+              style={{
+                color: showColumnEditor ? '#A78BFA' : 'var(--ts)',
+                background: showColumnEditor ? 'rgba(139,92,246,0.12)' : 'var(--hover-bg)',
+                border: showColumnEditor ? '1px solid rgba(139,92,246,0.25)' : '1px solid var(--border)',
+              }}>
+              <Settings2 className="h-4 w-4" /> Kolumny
+            </button>
+            {canCreate && (
+              <Button icon={<Plus className="h-4 w-4" />} onClick={() => setShowCreate(true)}>
+                Nowe urządzenie
+              </Button>
+            )}
+          </div>
+        }
       />
 
       {/* ── Filters (IDS) ────────────────────────────────────────────── */}
@@ -307,44 +315,7 @@ export function DevicesListPage() {
             Wyczyść filtry
           </button>
         )}
-        <div style={{ marginLeft: 'auto' }}>
-          <button onClick={() => setShowColEditor(v => !v)}
-            className="text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-colors hover:bg-[var(--hover-bg)] flex items-center gap-1.5"
-            style={{ color: showColEditor ? 'var(--accent)' : 'var(--tm)' }}>
-            <Settings2 className="h-3.5 w-3.5" /> Kolumny ({visibleCols.length})
-          </button>
-        </div>
       </div>
-
-      {/* Column editor panel */}
-      {showColEditor && (
-        <div className="rounded-lg p-4 mb-0" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderTop: 'none', borderBottom: 'none' }}>
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold" style={{ color: 'var(--t)' }}>Włącz / wyłącz kolumny</span>
-            <button onClick={() => { setVisibleCols(DEFAULT_DEV_COLS); saveDeviceCols(DEFAULT_DEV_COLS); }}
-              className="text-[10px]" style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}>
-              Przywróć domyślne
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {ALL_COLUMNS.map(col => {
-              const on = visibleCols.includes(col.key);
-              return (
-                <button key={col.key} onClick={() => toggleCol(col.key)}
-                  className="flex items-center gap-1.5 py-1.5 px-3 rounded-lg text-[11px] font-medium transition-all"
-                  style={{
-                    background: on ? 'rgba(139,92,246,0.1)' : 'var(--hover-bg)',
-                    color: on ? '#A78BFA' : 'var(--tm)',
-                    border: `1px solid ${on ? 'rgba(139,92,246,0.25)' : 'var(--border)'}`,
-                  }}>
-                  {on ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
-                  {col.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* ── Table ──────────────────────────────────────────────────────── */}
       <div className="rounded-b-[18px] overflow-hidden"
@@ -369,7 +340,7 @@ export function DevicesListPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }}>
-                    {activeColumns.map(col => (
+                    {visibleCols.map(col => (
                       <th key={col.key} className={`${col.align === 'center' ? 'text-center' : 'text-left'} px-4 py-3 text-[10px] font-bold uppercase tracking-wider`} style={{ color: 'var(--tm)' }}>
                         {col.label}
                       </th>
@@ -385,7 +356,7 @@ export function DevicesListPage() {
                       style={{ borderBottom: '1px solid var(--border)' }}
                       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--hover-bg)'; }}
                       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
-                      {activeColumns.map(col => (
+                      {visibleCols.map(col => (
                         <td key={col.key} className={`px-4 py-3 ${col.align === 'center' ? 'text-center' : ''}`}
                           onClick={['rustdesk'].includes(col.key) ? e => e.stopPropagation() : undefined}>
                           {col.render(device)}
@@ -443,6 +414,17 @@ export function DevicesListPage() {
       </div>
 
       {/* Modal */}
+      {/* Column Editor — same pattern as TicketsListPage */}
+      {showColumnEditor && (
+        <DeviceColumnEditor
+          allColumns={ALL_COLUMNS}
+          visibleKeys={visibleKeys}
+          setVisibleKeys={setVisibleKeys}
+          groups={groups}
+          onClose={() => setShowColumnEditor(false)}
+        />
+      )}
+
       <Modal open={showCreate} onClose={() => setShowCreate(false)} size="2xl" noPadding>
         <DeviceForm
           onSuccess={() => {
@@ -452,6 +434,110 @@ export function DevicesListPage() {
           onCancel={() => setShowCreate(false)}
         />
       </Modal>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   Column Editor — drag & drop reorder + toggle (same pattern as Tickets)
+   ════════════════════════════════════════════════════════════════════════════ */
+function DeviceColumnEditor({ allColumns, visibleKeys, setVisibleKeys, groups, onClose }: {
+  allColumns: DevColDef[];
+  visibleKeys: string[];
+  setVisibleKeys: React.Dispatch<React.SetStateAction<string[]>>;
+  groups: string[];
+  onClose: () => void;
+}) {
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [overIdx, setOverIdx] = useState<number | null>(null);
+
+  const toggleColumn = (key: string) => {
+    setVisibleKeys(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+  };
+
+  const onDragStart = (idx: number) => (e: React.DragEvent) => {
+    setDragIdx(idx);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(idx));
+  };
+  const onDragOver = (idx: number) => (e: React.DragEvent) => { e.preventDefault(); setOverIdx(idx); };
+  const onDrop = (toIdx: number) => (e: React.DragEvent) => {
+    e.preventDefault();
+    const fromIdx = dragIdx;
+    setDragIdx(null); setOverIdx(null);
+    if (fromIdx === null || fromIdx === toIdx) return;
+    setVisibleKeys(prev => { const next = [...prev]; const [moved] = next.splice(fromIdx, 1); next.splice(toIdx, 0, moved); return next; });
+  };
+  const onDragEnd = () => { setDragIdx(null); setOverIdx(null); };
+
+  const orderedVisible = visibleKeys.map(k => allColumns.find(c => c.key === k)).filter(Boolean) as DevColDef[];
+
+  return (
+    <div className="fixed bottom-0 left-0 right-0 z-40 top-[50%]" style={{ marginLeft: 'var(--sidebar-width, 220px)' }}>
+      <div className="mx-4 mb-4 h-full rounded-t-2xl overflow-hidden flex flex-col" style={{
+        background: 'var(--bg2)',
+        border: '2px solid var(--accent)',
+        backdropFilter: 'blur(24px)',
+        boxShadow: '0 -12px 60px rgba(0,0,0,0.35), 0 0 30px var(--accent-g)',
+      }}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
+          <div className="flex items-center gap-2">
+            <Settings2 className="h-4 w-4 text-violet-400" />
+            <span className="text-sm font-semibold" style={{ color: 'var(--t)' }}>Edycja kolumn</span>
+            <span className="text-xs" style={{ color: 'var(--td)' }}>({visibleKeys.length} widocznych)</span>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-[var(--hover-bg)]" style={{ color: 'var(--td)' }}>
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Drag strip — column order */}
+        <div className="px-4 py-3 flex items-center gap-2 overflow-x-auto" style={{ background: 'var(--hover-bg)' }}>
+          <span className="text-[9px] font-bold uppercase tracking-wider flex-shrink-0 mr-1" style={{ color: 'var(--td)' }}>Kolejność:</span>
+          <GripVertical className="h-3 w-3 flex-shrink-0" style={{ color: 'var(--td)' }} />
+          {orderedVisible.map((col, idx) => (
+            <div key={col.key} draggable onDragStart={onDragStart(idx)} onDragOver={onDragOver(idx)} onDrop={onDrop(idx)} onDragEnd={onDragEnd}
+              className="flex items-center gap-1.5 py-1.5 px-3 rounded-lg text-[11px] font-medium cursor-grab active:cursor-grabbing select-none flex-shrink-0 transition-all"
+              style={{
+                background: overIdx === idx ? 'rgba(139,92,246,0.25)' : dragIdx === idx ? 'rgba(139,92,246,0.1)' : 'var(--hover-bg)',
+                border: overIdx === idx ? '1px solid rgba(139,92,246,0.5)' : '1px solid var(--border)',
+                color: overIdx === idx ? '#C4B5FD' : 'var(--ts)',
+                opacity: dragIdx === idx ? 0.35 : 1,
+                transform: overIdx === idx ? 'scale(1.08)' : 'scale(1)',
+              }}>
+              <GripVertical className="h-3 w-3" style={{ color: 'var(--td)' }} />
+              {col.label}
+            </div>
+          ))}
+          <span className="text-[9px] flex-shrink-0 ml-2" style={{ color: 'var(--td)' }}>← przeciągnij aby zmienić →</span>
+        </div>
+
+        {/* Toggle columns by group */}
+        <div className="flex-1 p-4 overflow-y-auto" style={{ borderTop: '1px solid var(--border)' }}>
+          <p className="text-[9px] font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--td)' }}>Włącz / wyłącz kolumny</p>
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            {groups.map(group => (
+              <div key={group}>
+                <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--td)' }}>{group}</p>
+                <div className="space-y-0.5">
+                  {allColumns.filter(c => c.group === group).map(col => {
+                    const visible = visibleKeys.includes(col.key);
+                    return (
+                      <button key={col.key} onClick={() => toggleColumn(col.key)}
+                        className="flex items-center gap-2 w-full py-1.5 px-2 rounded-lg text-xs font-medium transition-all hover:bg-[var(--hover-bg)]"
+                        style={{ background: visible ? 'rgba(139,92,246,0.1)' : 'transparent', color: visible ? '#A78BFA' : 'var(--tm)' }}>
+                        {visible ? <Eye className="h-3 w-3 flex-shrink-0" /> : <EyeOff className="h-3 w-3 flex-shrink-0" />}
+                        {col.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
