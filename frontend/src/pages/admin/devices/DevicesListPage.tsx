@@ -214,24 +214,44 @@ export function DevicesListPage() {
     { key: 'location', label: 'Lokalizacja', group: 'Podstawowe', defaultVisible: true,
       render: (d) => <span className="text-[12px]" style={{ color: 'var(--tm)' }}>{d.location?.name ?? '—'}</span>,
     },
+    // ── Sieć ──
     { key: 'ip', label: 'Adres IP', group: 'Sieć', defaultVisible: true,
       render: (d) => <span className="text-[12px] font-mono" style={{ color: 'var(--tm)' }}>{d.ipAddress ?? '—'}</span>,
+    },
+    { key: 'hostname', label: 'Hostname', group: 'Sieć', defaultVisible: false,
+      render: (d) => <span className="text-[12px] font-mono" style={{ color: 'var(--tm)' }}>{d.hostname ?? '—'}</span>,
     },
     { key: 'mac', label: 'MAC', group: 'Sieć', defaultVisible: false,
       render: (d) => <span className="text-[11px] font-mono" style={{ color: 'var(--td)' }}>{d.macAddress ?? '—'}</span>,
     },
-    { key: 'os', label: 'System', group: 'Szczegóły', defaultVisible: false,
-      render: (d) => <span className="text-[12px]" style={{ color: 'var(--tm)' }}>{d.operatingSystem ?? '—'}</span>,
+    // ── Sprzęt ──
+    { key: 'type', label: 'Typ urządzenia', group: 'Sprzęt', defaultVisible: false,
+      render: (d) => d.deviceType ? (
+        <span className="text-[12px] flex items-center gap-1.5" style={{ color: 'var(--tm)' }}>
+          {d.deviceType.icon && <span>{d.deviceType.icon}</span>}{d.deviceType.name}
+        </span>
+      ) : <span style={{ color: 'var(--td)' }}>—</span>,
     },
-    { key: 'manufacturer', label: 'Producent', group: 'Szczegóły', defaultVisible: false,
+    { key: 'manufacturer', label: 'Producent', group: 'Sprzęt', defaultVisible: false,
       render: (d) => <span className="text-[12px]" style={{ color: 'var(--tm)' }}>{d.manufacturer ?? '—'}</span>,
     },
-    { key: 'model', label: 'Model', group: 'Szczegóły', defaultVisible: false,
+    { key: 'model', label: 'Model', group: 'Sprzęt', defaultVisible: false,
       render: (d) => <span className="text-[12px]" style={{ color: 'var(--tm)' }}>{d.model ?? '—'}</span>,
     },
-    { key: 'serial', label: 'Nr seryjny', group: 'Szczegóły', defaultVisible: false,
+    { key: 'serial', label: 'Nr seryjny', group: 'Sprzęt', defaultVisible: false,
       render: (d) => <span className="text-[11px] font-mono" style={{ color: 'var(--td)' }}>{d.serialNumber ?? '—'}</span>,
     },
+    { key: 'asset', label: 'Nr inwentarzowy', group: 'Sprzęt', defaultVisible: false,
+      render: (d) => <span className="text-[11px] font-mono" style={{ color: 'var(--td)' }}>{d.assetTag ?? '—'}</span>,
+    },
+    // ── System ──
+    { key: 'os', label: 'System', group: 'System', defaultVisible: false,
+      render: (d) => <span className="text-[12px]" style={{ color: 'var(--tm)' }}>{d.operatingSystem ?? '—'}</span>,
+    },
+    { key: 'osver', label: 'Wersja OS', group: 'System', defaultVisible: false,
+      render: (d) => <span className="text-[11px]" style={{ color: 'var(--td)' }}>{d.osVersion ?? '—'}</span>,
+    },
+    // ── Zdalne ──
     { key: 'rustdesk', label: 'RustDesk', group: 'Zdalne', defaultVisible: true, align: 'center',
       render: (d) => d.rustdeskId ? (
         <button onClick={(e) => { e.stopPropagation(); openRustdesk(d.rustdeskId!, e); }}
@@ -241,14 +261,60 @@ export function DevicesListPage() {
         </button>
       ) : <span style={{ color: 'var(--td)' }}>—</span>,
     },
+    { key: 'anydesk', label: 'AnyDesk', group: 'Zdalne', defaultVisible: false, align: 'center',
+      render: (d) => d.anydeskId ? (
+        <span className="text-[11px] font-mono px-2 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.08)', color: '#F87171' }}>{d.anydeskId}</span>
+      ) : <span style={{ color: 'var(--td)' }}>—</span>,
+    },
+    { key: 'teamviewer', label: 'TeamViewer', group: 'Zdalne', defaultVisible: false, align: 'center',
+      render: (d) => d.teamviewerId ? (
+        <span className="text-[11px] font-mono px-2 py-0.5 rounded" style={{ background: 'rgba(59,130,246,0.08)', color: '#60A5FA' }}>{d.teamviewerId}</span>
+      ) : <span style={{ color: 'var(--td)' }}>—</span>,
+    },
+    { key: 'rdp', label: 'RDP', group: 'Zdalne', defaultVisible: false,
+      render: (d) => d.rdpAddress ? <span className="text-[11px] font-mono" style={{ color: 'var(--tm)' }}>{d.rdpAddress}</span> : <span style={{ color: 'var(--td)' }}>—</span>,
+    },
+    { key: 'ssh', label: 'SSH', group: 'Zdalne', defaultVisible: false,
+      render: (d) => d.sshAddress ? <span className="text-[11px] font-mono" style={{ color: 'var(--tm)' }}>{d.sshAddress}</span> : <span style={{ color: 'var(--td)' }}>—</span>,
+    },
     { key: 'agent', label: 'Agent', group: 'Zdalne', defaultVisible: true, align: 'center',
       render: (d) => <AgentBadge agents={d.agents} />,
     },
+    // ── Status ──
     { key: 'status', label: 'Status', group: 'Status', defaultVisible: true, align: 'center',
       render: (d) => <DeviceStatusBadge status={d.status} />,
     },
     { key: 'criticality', label: 'Krytyczność', group: 'Status', defaultVisible: false,
-      render: (d) => <span className="text-[12px]" style={{ color: 'var(--tm)' }}>{d.criticality ?? '—'}</span>,
+      render: (d) => {
+        const colors: Record<string, { bg: string; color: string }> = {
+          HIGH: { bg: 'rgba(239,68,68,0.1)', color: '#F87171' },
+          MEDIUM: { bg: 'rgba(251,191,36,0.1)', color: '#FBBF24' },
+          LOW: { bg: 'rgba(34,197,94,0.1)', color: '#4ADE80' },
+        };
+        const c = colors[d.criticality ?? ''] ?? { bg: 'var(--hover-bg)', color: 'var(--tm)' };
+        return d.criticality ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: c.bg, color: c.color }}>{d.criticality}</span> : <span style={{ color: 'var(--td)' }}>—</span>;
+      },
+    },
+    // ── Daty ──
+    { key: 'warranty', label: 'Gwarancja do', group: 'Daty', defaultVisible: false,
+      render: (d) => {
+        if (!d.warrantyUntil) return <span style={{ color: 'var(--td)' }}>—</span>;
+        const date = new Date(d.warrantyUntil);
+        const expired = date < new Date();
+        return <span className="text-[11px] font-medium" style={{ color: expired ? '#F87171' : 'var(--tm)' }}>{date.toLocaleDateString('pl')}{expired ? ' ⚠️' : ''}</span>;
+      },
+    },
+    { key: 'purchase', label: 'Data zakupu', group: 'Daty', defaultVisible: false,
+      render: (d) => d.purchaseDate ? <span className="text-[11px]" style={{ color: 'var(--tm)' }}>{new Date(d.purchaseDate).toLocaleDateString('pl')}</span> : <span style={{ color: 'var(--td)' }}>—</span>,
+    },
+    { key: 'install', label: 'Data instalacji', group: 'Daty', defaultVisible: false,
+      render: (d) => d.installationDate ? <span className="text-[11px]" style={{ color: 'var(--tm)' }}>{new Date(d.installationDate).toLocaleDateString('pl')}</span> : <span style={{ color: 'var(--td)' }}>—</span>,
+    },
+    { key: 'updated', label: 'Ostatnia zmiana', group: 'Daty', defaultVisible: false,
+      render: (d) => <span className="text-[11px]" style={{ color: 'var(--td)' }}>{new Date(d.updatedAt).toLocaleDateString('pl')}</span>,
+    },
+    { key: 'created', label: 'Data dodania', group: 'Daty', defaultVisible: false,
+      render: (d) => <span className="text-[11px]" style={{ color: 'var(--td)' }}>{new Date(d.createdAt).toLocaleDateString('pl')}</span>,
     },
   ], []);
 
