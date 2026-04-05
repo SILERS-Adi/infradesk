@@ -11,3 +11,7 @@ android-tv/app/build/
 android-tv/.gradle/
 android-tv/local.properties
 backend/pg-data/
+
+agent/build/
+agent/dist/
+agent/dist_onefile/
