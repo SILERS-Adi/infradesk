@@ -15,13 +15,16 @@ import { ticketScopeFilter, isTicketAccessible } from '../../middleware/workspac
 
 export async function getTickets(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { locationId, deviceId, status, priority, type, assignedToUserId, unassigned, search, page, limit } =
+    const { locationId, deviceId, status, priority, type, assignedToUserId, unassigned, search, page, limit, clientWorkspaceId } =
       req.query as Record<string, string>;
     // MSP scope: include client workspaces
     const { getMspWorkspaceIds } = require('../../utils/mspScope');
-    const wsIds: string[] = req.workspaceId ? await getMspWorkspaceIds(req.workspaceId) : [];
+    let wsIds: string[] = req.workspaceId ? await getMspWorkspaceIds(req.workspaceId) : [];
+    if (clientWorkspaceId && wsIds.includes(clientWorkspaceId)) {
+      wsIds = [clientWorkspaceId];
+    }
     const result = await listTickets({
-      workspaceId: wsIds.length > 1 ? undefined : req.workspaceId,
+      workspaceId: wsIds.length === 1 ? wsIds[0] : undefined,
       workspaceIds: wsIds.length > 1 ? wsIds : undefined,
       locationId,
       deviceId,
@@ -32,7 +35,7 @@ export async function getTickets(req: Request, res: Response, next: NextFunction
       unassigned: unassigned === 'true',
       search,
       page: page ? parseInt(page, 10) : 1,
-      limit: limit ? parseInt(limit, 10) : 20,
+      limit: limit ? parseInt(limit, 10) : (wsIds.length > 1 ? 200 : 20),
       scopeFilter: ticketScopeFilter(req.membership),
       requestingUser: req.user!,
     });

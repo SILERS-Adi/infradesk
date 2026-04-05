@@ -139,10 +139,11 @@ export function DevicesListPage() {
   const debouncedSearch = useDebounce(search);
 
   const { data: devices = [], isLoading } = useQuery({
-    queryKey: ['devices', { status, search: debouncedSearch }],
+    queryKey: ['devices', { status, search: debouncedSearch, companyFilter }],
     queryFn: () => devicesApi.getAll({
       status: status || undefined,
       search: debouncedSearch || undefined,
+      clientWorkspaceId: companyFilter || undefined,
     }),
   });
 
@@ -157,13 +158,9 @@ export function DevicesListPage() {
   };
 
   const sortedDevices = useMemo(() => {
-    let filtered = devices;
-    if (companyFilter) {
-      filtered = devices.filter((d: any) => d.workspaceId === companyFilter);
-    }
-    if (!sortKey) return filtered;
-    return sortDevices(filtered, sortKey, sortDir);
-  }, [devices, sortKey, sortDir, companyFilter]);
+    if (!sortKey) return devices;
+    return sortDevices(devices, sortKey, sortDir);
+  }, [devices, sortKey, sortDir]);
 
   const handleDownloadQr = async (device: Device, e: React.MouseEvent) => {
     e.stopPropagation();

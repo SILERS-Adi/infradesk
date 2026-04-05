@@ -13,19 +13,23 @@ import { deviceScopeFilter, isDeviceAccessible } from '../../middleware/workspac
 
 export async function getDevices(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { locationId, status, criticality, search, page, limit } = req.query as Record<string, string>;
+    const { locationId, status, criticality, search, page, limit, clientWorkspaceId } = req.query as Record<string, string>;
     // MSP scope: include client workspaces
     const { getMspWorkspaceIds } = require('../../utils/mspScope');
-    const wsIds: string[] = req.workspaceId ? await getMspWorkspaceIds(req.workspaceId) : [];
+    let wsIds: string[] = req.workspaceId ? await getMspWorkspaceIds(req.workspaceId) : [];
+    // If clientWorkspaceId filter → narrow to that single workspace
+    if (clientWorkspaceId && wsIds.includes(clientWorkspaceId)) {
+      wsIds = [clientWorkspaceId];
+    }
     const result = await listDevices({
-      workspaceId: wsIds.length > 1 ? undefined : req.workspaceId,
+      workspaceId: wsIds.length === 1 ? wsIds[0] : undefined,
       workspaceIds: wsIds.length > 1 ? wsIds : undefined,
       locationId,
       status: status as DeviceStatus | undefined,
       criticality: criticality as DeviceCriticality | undefined,
       search,
       page: page ? parseInt(page, 10) : 1,
-      limit: limit ? parseInt(limit, 10) : 20,
+      limit: limit ? parseInt(limit, 10) : (wsIds.length > 1 ? 500 : 20),
       scopeFilter: deviceScopeFilter(req.membership),
       requestingUser: req.user!,
     });

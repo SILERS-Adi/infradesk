@@ -8,6 +8,7 @@ export const devicesApi = {
     deviceTypeId?: string;
     status?: string;
     search?: string;
+    clientWorkspaceId?: string;
   }): Promise<Device[]> => {
     const { data } = await apiClient.get<{ data: Device[]; pagination: unknown }>('/devices', { params });
     return data.data;
