@@ -16,7 +16,7 @@ from PIL import Image, ImageGrab, ImageDraw
 # --- Config ---------------------------------------------------------------
 
 APP_NAME    = "Asystent Business"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 _OLD_INSTALL_DIR = os.path.join(os.environ.get("APPDATA", ""), "InfraDesk")
 INSTALL_DIR = os.path.join(os.environ.get("APPDATA", ""), "SILERS", "Asystent Business")
 INSTALL_EXE = os.path.join(INSTALL_DIR, "Asystent Business.exe")
@@ -1780,6 +1780,52 @@ class BusinessAPI:
         except Exception as e:
             log.error("RustDesk install error: %s", e)
             return False
+
+    def get_backup_status(self):
+        """Get backup configurations and recent history."""
+        try:
+            configs = api_get("/agent/backup-configs", self.token)
+            if not configs:
+                configs = []
+
+            # Get recent history for all configs
+            history = []
+            for cfg in configs[:10]:  # limit to 10 configs
+                try:
+                    h = api_get(f"/agent/backup-configs/{cfg['id']}/history?limit=5", self.token)
+                    if h:
+                        for entry in h:
+                            entry["configName"] = cfg.get("name", "Backup")
+                        history.extend(h)
+                except Exception:
+                    pass
+
+            # Sort history by date desc
+            history.sort(key=lambda x: x.get("startedAt", ""), reverse=True)
+
+            # Add friendly schedule labels
+            schedule_labels = {
+                "0 2 * * *": "Codziennie 02:00",
+                "0 */6 * * *": "Co 6h",
+                "0 */12 * * *": "Co 12h",
+                "0 0 * * 0": "Co niedzielę 00:00",
+            }
+            for cfg in configs:
+                cfg["cronLabel"] = schedule_labels.get(cfg.get("cronSchedule", ""), cfg.get("cronSchedule", ""))
+
+            return {"configs": configs, "history": history[:20]}
+        except Exception as e:
+            log.error("Backup status error: %s", e)
+            return {"configs": [], "history": [], "error": str(e)}
+
+    def run_backup_now(self, config_id):
+        """Trigger immediate backup for a config."""
+        try:
+            result = api_post(f"/agent/backup/run-now", {"configId": config_id}, self.token)
+            return {"ok": True, "result": result}
+        except Exception as e:
+            log.error("Run backup error: %s", e)
+            return {"ok": False, "error": str(e)}
 
     def check_update(self):
         try:

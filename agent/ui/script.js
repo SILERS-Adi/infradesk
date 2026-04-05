@@ -222,7 +222,7 @@ async function py(m,...a){
 
 function initNavigation(){document.querySelectorAll('.nav-item').forEach(i=>{i.addEventListener('click',()=>{const p=i.getAttribute('data-page');if(p)navigateTo(p)})});const ms=document.getElementById('modeSwitch');if(ms)ms.addEventListener('click',async()=>{if(confirm('Przełączyć na tryb firmowy?'))await py('switch_to_business')})}
 
-function navigateTo(p){currentPage=p;document.querySelectorAll('.nav-item').forEach(i=>i.classList.toggle('active',i.getAttribute('data-page')===p));const c=document.querySelector('.content');if(!c)return;if(metricsInterval){clearInterval(metricsInterval);metricsInterval=null}c.innerHTML='';({overview:renderOverview,security:renderSecurity,performance:renderPerformance,monitoring:renderMonitoring,network:renderNetwork,autostart:renderAutostart,ai_repair:renderAiRepair,vault:renderVault,feedback:renderFeedback,pro:renderPro,settings:renderSettings,help:renderHelp})[p]?.(c)}
+function navigateTo(p){currentPage=p;document.querySelectorAll('.nav-item').forEach(i=>i.classList.toggle('active',i.getAttribute('data-page')===p));const c=document.querySelector('.content');if(!c)return;if(metricsInterval){clearInterval(metricsInterval);metricsInterval=null}c.innerHTML='';({overview:renderOverview,security:renderSecurity,performance:renderPerformance,monitoring:renderMonitoring,network:renderNetwork,autostart:renderAutostart,ai_repair:renderAiRepair,vault:renderVault,backup:renderBackup,feedback:renderFeedback,pro:renderPro,settings:renderSettings,help:renderHelp})[p]?.(c)}
 
 function h(t,c,html){const e=document.createElement(t);if(c)e.className=c;if(html)e.innerHTML=html;return e}
 function spin(t){return `<div class="live-status"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg><span>${t}</span></div>`}
@@ -1914,5 +1914,120 @@ function drawProgressRing(id,pct,col){const c=document.getElementById(id);if(!c)
 
 /* ══ HERO CANVAS + MAIN RING ══ */
 function drawHeroBackground(){const c=document.getElementById('heroCanvas');if(!c)return;const x=c.getContext('2d');const r=c.parentElement.getBoundingClientRect();c.width=r.width*2;c.height=r.height*2;c.style.width=r.width+'px';c.style.height=r.height+'px';x.scale(2,2);const w=r.width,ht=r.height;const bg=x.createLinearGradient(0,0,w,ht);bg.addColorStop(0,'#0A1230');bg.addColorStop(.5,'#0D1838');bg.addColorStop(1,'#081028');x.fillStyle=bg;x.fillRect(0,0,w,ht);function orb(ox,oy,or,col,a){const g=x.createRadialGradient(ox,oy,0,ox,oy,or);g.addColorStop(0,col.replace(')',`,${a})`).replace('rgb','rgba'));g.addColorStop(.5,col.replace(')',`,${a*.4})`).replace('rgb','rgba'));g.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=g;x.fillRect(ox-or,oy-or,or*2,or*2)}orb(w*.2,ht*.5,w*.4,'rgb(79,140,255)',.12);orb(w*.75,ht*.3,w*.3,'rgb(123,92,255)',.08);orb(w*.5,ht*.7,w*.25,'rgb(34,211,238)',.05);orb(w*.4,ht*.4,w*.2,'rgb(251,146,60)',.04);for(let i=0;i<40;i++){x.beginPath();x.arc(Math.random()*w,Math.random()*ht,Math.random()+.3,0,Math.PI*2);x.fillStyle=`rgba(255,255,255,${Math.random()*.3+.05})`;x.fill()}}
+
+/* ══ BACKUP PAGE ══ */
+function renderBackup(c){
+  c.innerHTML=`
+    <div class="page-card fade-up">
+      <div class="page-card-header">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/></svg>
+        Kopie zapasowe
+      </div>
+      <div class="page-card-body" id="backupContent" style="padding:16px">
+        <div style="text-align:center;padding:20px;color:var(--tm)">
+          <div class="spinner"></div> Pobieranie konfiguracji...
+        </div>
+      </div>
+    </div>
+    <div class="page-card fade-up" style="margin-top:12px">
+      <div class="page-card-header">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Historia backupów
+      </div>
+      <div class="page-card-body" id="backupHistory" style="padding:16px">
+        <div style="text-align:center;padding:20px;color:var(--tm)">
+          <div class="spinner"></div> Ładowanie...
+        </div>
+      </div>
+    </div>`;
+  loadBackupData();
+}
+
+async function loadBackupData(){
+  try{
+    const data=await py('get_backup_status');
+    const el=document.getElementById('backupContent');
+    if(!el)return;
+
+    if(!data||!data.configs||data.configs.length===0){
+      el.innerHTML=`
+        <div style="text-align:center;padding:32px;color:var(--tm)">
+          <div style="font-size:36px;margin-bottom:12px">📦</div>
+          <div style="font-size:14px;font-weight:600;color:var(--t);margin-bottom:4px">Brak konfiguracji backupu</div>
+          <div style="font-size:11px">Skonfiguruj backup w panelu InfraDesk → Kopie zapasowe</div>
+        </div>`;
+      document.getElementById('backupHistory').innerHTML='<div style="text-align:center;padding:20px;color:var(--tm);font-size:12px">Brak historii</div>';
+      return;
+    }
+
+    let html='';
+    data.configs.forEach(cfg=>{
+      const typeIcon=cfg.type.startsWith('SQL')?'🗄️':'📁';
+      const statusDot=cfg.lastStatus==='SUCCESS'?'🟢':cfg.lastStatus==='FAILED'?'🔴':cfg.lastStatus==='RUNNING'?'🔵':'⚪';
+      const lastRun=cfg.lastRunAt?new Date(cfg.lastRunAt).toLocaleString('pl'):'Nigdy';
+      const schedule=cfg.cronLabel||cfg.cronSchedule||'—';
+
+      html+=`
+        <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;border:1px solid var(--border-l,rgba(255,255,255,.08));margin-bottom:8px">
+          <div style="width:38px;height:38px;border-radius:10px;background:rgba(139,92,246,.12);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${typeIcon}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600;color:var(--t,#EEF2FA);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${cfg.name}</div>
+            <div style="font-size:10px;color:var(--tm,#576380);margin-top:2px">${cfg.type} · ${schedule}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-size:11px;font-weight:600">${statusDot} ${cfg.lastStatus||'—'}</div>
+            <div style="font-size:10px;color:var(--td,#3D4660);margin-top:2px">${lastRun}</div>
+          </div>
+          <button onclick="runBackupNow('${cfg.id}')" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border-l,rgba(255,255,255,.08));background:rgba(255,255,255,.03);color:var(--ts,#8B95AD);font-size:10px;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border-l)'">
+            ▶ Uruchom
+          </button>
+        </div>`;
+    });
+    el.innerHTML=html;
+
+    // History
+    const hEl=document.getElementById('backupHistory');
+    if(data.history&&data.history.length>0){
+      let hHtml='';
+      data.history.slice(0,20).forEach(h=>{
+        const st=h.status==='SUCCESS'?'✅':h.status==='FAILED'?'❌':'⏳';
+        const dt=new Date(h.startedAt).toLocaleString('pl');
+        const sz=h.sizeBytes?formatBytes(h.sizeBytes):'—';
+        const dur=h.completedAt?Math.round((new Date(h.completedAt)-new Date(h.startedAt))/1000)+'s':'—';
+        hHtml+=`
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-l,rgba(255,255,255,.05));font-size:11px">
+            <span style="flex-shrink:0">${st}</span>
+            <span style="flex:1;color:var(--t,#EEF2FA);font-weight:500">${h.configName||'Backup'}</span>
+            <span style="color:var(--tm,#576380)">${sz}</span>
+            <span style="color:var(--td,#3D4660)">${dur}</span>
+            <span style="color:var(--td,#3D4660)">${dt}</span>
+          </div>`;
+      });
+      hEl.innerHTML=hHtml;
+    }else{
+      hEl.innerHTML='<div style="text-align:center;padding:20px;color:var(--tm);font-size:12px">Brak historii backupów</div>';
+    }
+  }catch(e){
+    const el=document.getElementById('backupContent');
+    if(el)el.innerHTML=`<div style="text-align:center;padding:20px;color:#F87171;font-size:12px">Błąd: ${e.message||e}</div>`;
+  }
+}
+
+function formatBytes(b){
+  if(b<1024)return b+' B';
+  if(b<1048576)return (b/1024).toFixed(1)+' KB';
+  if(b<1073741824)return (b/1048576).toFixed(1)+' MB';
+  return (b/1073741824).toFixed(2)+' GB';
+}
+
+async function runBackupNow(configId){
+  try{
+    await py('run_backup_now',configId);
+    speakNow('Backup uruchomiony');
+    setTimeout(()=>loadBackupData(),3000);
+  }catch(e){
+    alert('Błąd: '+(e.message||e));
+  }
+}
 
 function animateRing(pct){const c=document.getElementById('ringCanvas'),v=document.getElementById('ringValue'),st=document.getElementById('ringStatus'),dt=document.getElementById('statusDot'),ti=document.getElementById('heroTitle'),tx=document.getElementById('statusText'),gl=document.querySelector('.ring-outer-glow');if(!c)return;const x=c.getContext('2d');const sz=180;c.width=sz*2;c.height=sz*2;x.scale(2,2);const cx=sz/2,cy=sz/2,r=68,lw=12,sa=-Math.PI/2;const il=document.documentElement.getAttribute('data-theme')==='light';let co,s,sc,gc;if(pct>=75){co=[{o:0,c:'#4ADE80'},{o:.35,c:'#22D3EE'},{o:.7,c:'#4F8CFF'},{o:1,c:'#818CF8'}];s='DOBRY';sc='good';gc='radial-gradient(circle,rgba(74,222,128,.12),rgba(34,211,238,.06),transparent 65%)';if(ti)ti.textContent='System działa prawidłowo';if(tx)tx.textContent='Stan systemu: dobry';if(dt)dt.className='hero-status-dot'}else if(pct>=50){co=[{o:0,c:'#FBBF24'},{o:.4,c:'#FB923C'},{o:.7,c:'#EF4444'},{o:1,c:'#DC2626'}];s='OBCIĄŻONY';sc='warn';gc='radial-gradient(circle,rgba(251,146,60,.12),transparent 65%)';if(ti)ti.textContent='System wymaga optymalizacji';if(tx)tx.textContent='Stan systemu: obciążony';if(dt)dt.className='hero-status-dot warn'}else{co=[{o:0,c:'#EF4444'},{o:.5,c:'#DC2626'},{o:1,c:'#991B1B'}];s='KRYTYCZNY';sc='bad';gc='radial-gradient(circle,rgba(239,68,68,.12),transparent 65%)';if(ti)ti.textContent='System wymaga pilnej uwagi';if(tx)tx.textContent='Stan systemu: krytyczny';if(dt)dt.className='hero-status-dot warn'}if(st){st.textContent=s;st.className='ring-status-value '+sc}if(gl)gl.style.background=gc;const dur=2200,t0=performance.now();function fr(now){const el=now-t0,pr=Math.min(el/dur,1),ea=1-Math.pow(1-pr,4),cp=ea*pct,ca=sa+(cp/100)*Math.PI*2;x.clearRect(0,0,sz,sz);x.beginPath();x.arc(cx,cy,r-lw/2-2,0,Math.PI*2);const dg=x.createRadialGradient(cx,cy*.85,0,cx,cy,r);if(il){dg.addColorStop(0,'#FFF');dg.addColorStop(1,'#F0F4FB')}else{dg.addColorStop(0,'#0E1530');dg.addColorStop(1,'#080D1E')}x.fillStyle=dg;x.fill();x.beginPath();x.arc(cx,cy,r-lw/2-2,0,Math.PI*2);const sg=x.createRadialGradient(cx,cy-10,r*.3,cx,cy,r);sg.addColorStop(0,'rgba(0,0,0,0)');sg.addColorStop(1,il?'rgba(0,0,0,.06)':'rgba(0,0,0,.3)');x.fillStyle=sg;x.fill();x.beginPath();x.arc(cx,cy,r,0,Math.PI*2);x.strokeStyle='rgba(255,255,255,.04)';x.lineWidth=lw;x.stroke();if(cp>.5){x.beginPath();x.arc(cx,cy,r,sa,ca);const sw=cp/100,g=x.createConicGradient(sa,cx,cy);co.forEach(c=>{g.addColorStop(Math.min(c.o*sw,.999),c.c)});g.addColorStop(Math.min(sw,.999),co[co.length-1].c);g.addColorStop(1,co[0].c);x.strokeStyle=g;x.lineWidth=lw;x.lineCap='round';x.stroke();x.save();x.filter=il?'blur(4px)':'blur(6px)';x.globalAlpha=il?.25:.4;x.beginPath();x.arc(cx,cy,r,sa,ca);x.strokeStyle=g;x.lineWidth=lw+4;x.lineCap='round';x.stroke();x.restore();const ex=cx+r*Math.cos(ca),ey=cy+r*Math.sin(ca);x.beginPath();x.arc(ex,ey,5,0,Math.PI*2);x.fillStyle='white';x.shadowColor='rgba(255,255,255,.8)';x.shadowBlur=10;x.fill();x.shadowBlur=0}if(v)v.textContent=Math.round(cp)+'%';if(pr<1)requestAnimationFrame(fr)}requestAnimationFrame(fr)}
