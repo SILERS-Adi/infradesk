@@ -340,40 +340,31 @@ function HistoryModal({ open, onClose, configId, configName }: {
             <p className="text-sm">Brak historii</p>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--tm)' }}>Status</th>
-                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--tm)' }}>Start</th>
-                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--tm)' }}>Koniec</th>
-                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--tm)' }}>Rozmiar</th>
-                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--tm)' }}>Plik</th>
-                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--tm)' }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.map(h => (
-                <tr key={h.id} className="hover:bg-white/[0.02] transition-colors" style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td className="px-5 py-3"><StatusBadge status={h.status} /></td>
-                  <td className="px-5 py-3" style={{ color: 'var(--ts)' }}>{formatDateTime(h.startedAt)}</td>
-                  <td className="px-5 py-3" style={{ color: 'var(--ts)' }}>{h.completedAt ? formatDateTime(h.completedAt) : '--'}</td>
-                  <td className="px-5 py-3" style={{ color: 'var(--ts)' }}>{formatSize(h.sizeBytes)}</td>
-                  <td className="px-5 py-3 max-w-[200px] truncate" style={{ color: 'var(--ts)' }}>{h.fileName ?? '--'}</td>
-                  <td className="px-5 py-3">
-                    {h.status === 'SUCCESS' && h.fileName && (
-                      <a
-                        href={`/api/backup/cloud/download/${configId}/${h.fileName}?decrypt=true`}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                        style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.2)' }}
-                      >
-                        <Download className="h-3.5 w-3.5" /> Pobierz
-                      </a>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {history.map(h => (
+              <div key={h.id} className="px-5 py-3 flex items-center gap-3">
+                <StatusBadge status={h.status} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--ts)' }}>
+                    <span>{formatDateTime(h.startedAt)}</span>
+                    {h.completedAt && <span>— {formatDateTime(h.completedAt)}</span>}
+                    {h.sizeBytes ? <span className="font-semibold">{formatSize(h.sizeBytes)}</span> : null}
+                  </div>
+                  {h.fileName && <div className="text-[11px] truncate mt-0.5" style={{ color: 'var(--td)' }}>{h.fileName}</div>}
+                  {h.errorMessage && <div className="text-[11px] mt-0.5" style={{ color: '#F87171' }}>{h.errorMessage}</div>}
+                </div>
+                {h.status === 'SUCCESS' && h.fileName && (
+                  <a
+                    href={`/api/backup/cloud/download/${configId}/${h.fileName}?decrypt=true`}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-all"
+                    style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.2)' }}
+                  >
+                    <Download className="h-3.5 w-3.5" /> Pobierz
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </Modal>
