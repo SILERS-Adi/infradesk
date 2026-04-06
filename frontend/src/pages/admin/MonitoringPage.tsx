@@ -90,13 +90,9 @@ type AgentWithMetrics = AgentRegistration & { serverMetrics?: ServerMetrics };
 
 /* ── Style constants ────────────────────────────────────────────────────── */
 
-const BG      = '#040a16';
-const SURFACE = '#060B1A';
-const BORDER  = '#1E293B';
-
 const card: React.CSSProperties = {
-  background: SURFACE,
-  border: `1px solid ${BORDER}`,
+  background: 'var(--bg-card)',
+  border: '1px solid var(--border)',
   borderRadius: 14,
 };
 
@@ -185,10 +181,10 @@ export default function MonitoringPage() {
   });
 
   return (
-    <div className="min-h-screen px-4 py-6 sm:px-6 lg:px-8" style={{ background: BG, color: '#fff' }}>
+    <div className="min-h-screen px-4 py-6 sm:px-6 lg:px-8" style={{ color: 'var(--t)' }}>
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+        <h1 className="text-2xl font-bold tracking-tight text-[var(--t)] flex items-center gap-2">
           <Shield className="h-6 w-6" style={{ color: '#A78BFA' }} />
           Monitoring
         </h1>
@@ -199,7 +195,7 @@ export default function MonitoringPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 p-1 rounded-xl" style={{ background: 'var(--hover-bg)', border: `1px solid ${BORDER}` }}>
+      <div className="flex gap-1 mb-6 p-1 rounded-xl" style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)' }}>
         {TABS.map(t => (
           <button
             key={t.key}
@@ -301,7 +297,7 @@ function SummaryCard({ label, value, valueColor, icon, bg }: {
   label: string; value: string; valueColor: string; icon: React.ReactNode; bg: string;
 }) {
   return (
-    <div className="p-4 rounded-[14px]" style={{ background: bg, border: `1px solid ${BORDER}` }}>
+    <div className="p-4 rounded-[14px]" style={{ background: bg, border: '1px solid var(--border)' }}>
       <div className="flex items-center gap-2 mb-2" style={{ color: valueColor }}>
         {icon}
         <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--ts)' }}>
@@ -335,7 +331,7 @@ function AuditAgentCard({ agent }: { agent: AgentWithMetrics }) {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-white">{agentLabel(agent)}</span>
+              <span className="font-semibold text-[var(--t)]">{agentLabel(agent)}</span>
               {agent.client?.name && (
                 <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(167,139,250,0.12)', color: '#A78BFA' }}>
                   {agent.client.name}
@@ -361,8 +357,8 @@ function AuditAgentCard({ agent }: { agent: AgentWithMetrics }) {
 
       {/* Checks list */}
       {open && (
-        <div className="border-t" style={{ borderColor: BORDER }}>
-          <div className="divide-y" style={{ borderColor: BORDER }}>
+        <div className="border-t" style={{ borderColor: 'var(--border)' }}>
+          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
             {audit.checks.map((c, i) => (
               <div key={c.id ?? i} className="flex items-center gap-3 px-4 py-2.5 text-sm">
                 {c.status === 'pass'
@@ -370,7 +366,7 @@ function AuditAgentCard({ agent }: { agent: AgentWithMetrics }) {
                   : c.status === 'fail'
                     ? <XCircle className="h-4 w-4 shrink-0" style={{ color: '#F87171' }} />
                     : <AlertTriangle className="h-4 w-4 shrink-0" style={{ color: '#FBBF24' }} />}
-                <span className="flex-1 text-white/80">{c.name}</span>
+                <span className="flex-1 text-[var(--tm)]">{c.name}</span>
                 {severityBadge(c.severity)}
                 <span className="text-xs max-w-[300px] truncate" style={{ color: 'var(--tm)' }}>
                   {c.detail}
@@ -418,7 +414,7 @@ function NetworkAgentCard({ agent }: { agent: AgentWithMetrics }) {
             <Globe className="h-5 w-5" style={{ color: '#60A5FA' }} />
           </div>
           <div>
-            <span className="font-semibold text-white">{agentLabel(agent)}</span>
+            <span className="font-semibold text-[var(--t)]">{agentLabel(agent)}</span>
             {agent.client?.name && (
               <span className="ml-2 text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(167,139,250,0.12)', color: '#A78BFA' }}>
                 {agent.client.name}
@@ -436,7 +432,7 @@ function NetworkAgentCard({ agent }: { agent: AgentWithMetrics }) {
       </button>
 
       {expanded && (
-        <div className="border-t" style={{ borderColor: BORDER }}>
+        <div className="border-t" style={{ borderColor: 'var(--border)' }}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -448,7 +444,7 @@ function NetworkAgentCard({ agent }: { agent: AgentWithMetrics }) {
                   <th className="text-left px-4 py-2 font-medium text-xs uppercase tracking-wide" style={{ color: 'var(--ts)' }}>Otwarte porty</th>
                 </tr>
               </thead>
-              <tbody className="divide-y" style={{ borderColor: BORDER }}>
+              <tbody className="divide-y" style={{ borderColor: 'var(--border)' }}>
                 {scan.devices.map((d, i) => (
                   <tr key={i} className="hover:bg-white/[0.02] transition-colors">
                     <td className="px-4 py-2.5">
@@ -457,9 +453,9 @@ function NetworkAgentCard({ agent }: { agent: AgentWithMetrics }) {
                         <span className="text-xs capitalize" style={{ color: 'var(--ts)' }}>{d.type}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-2.5 font-mono text-white/80">{d.ip}</td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-white/50">{d.mac}</td>
-                    <td className="px-4 py-2.5 text-white/70">{d.hostname || '—'}</td>
+                    <td className="px-4 py-2.5 font-mono text-[var(--tm)]">{d.ip}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-[var(--td)]">{d.mac}</td>
+                    <td className="px-4 py-2.5 text-[var(--td)]">{d.hostname || '—'}</td>
                     <td className="px-4 py-2.5">
                       <div className="flex flex-wrap gap-1">
                         {d.ports.length > 0
@@ -525,7 +521,7 @@ function HealthAgentCard({ agent }: { agent: AgentWithMetrics }) {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-white">{agentLabel(agent)}</span>
+              <span className="font-semibold text-[var(--t)]">{agentLabel(agent)}</span>
               {agent.client?.name && (
                 <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(167,139,250,0.12)', color: '#A78BFA' }}>
                   {agent.client.name}
@@ -542,7 +538,7 @@ function HealthAgentCard({ agent }: { agent: AgentWithMetrics }) {
         </div>
       </div>
 
-      <div className="border-t" style={{ borderColor: BORDER }}>
+      <div className="border-t" style={{ borderColor: 'var(--border)' }}>
         {/* S.M.A.R.T. */}
         {m.smartDisks && m.smartDisks.length > 0 && (
           <CollapsibleSection
@@ -565,7 +561,7 @@ function HealthAgentCard({ agent }: { agent: AgentWithMetrics }) {
                     }}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium text-sm text-white/90">{d.name}</span>
+                      <span className="font-medium text-sm text-[var(--t)]">{d.name}</span>
                       <span
                         className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded"
                         style={{
@@ -604,7 +600,7 @@ function HealthAgentCard({ agent }: { agent: AgentWithMetrics }) {
                     <th className="text-left px-4 py-2 font-medium text-xs uppercase tracking-wide" style={{ color: 'var(--ts)' }}>Nazwa wyświetlana</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y" style={{ borderColor: BORDER }}>
+                <tbody className="divide-y" style={{ borderColor: 'var(--border)' }}>
                   {m.services.map(s => (
                     <tr key={s.name} className="hover:bg-white/[0.02] transition-colors">
                       <td className="px-4 py-2">
@@ -618,8 +614,8 @@ function HealthAgentCard({ agent }: { agent: AgentWithMetrics }) {
                           </span>
                         </span>
                       </td>
-                      <td className="px-4 py-2 font-mono text-xs text-white/70">{s.name}</td>
-                      <td className="px-4 py-2 text-white/80">{s.displayName}</td>
+                      <td className="px-4 py-2 font-mono text-xs text-[var(--td)]">{s.name}</td>
+                      <td className="px-4 py-2 text-[var(--tm)]">{s.displayName}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -637,7 +633,7 @@ function HealthAgentCard({ agent }: { agent: AgentWithMetrics }) {
             onToggle={() => toggle('events')}
             count={m.criticalEvents.length}
           >
-            <div className="divide-y" style={{ borderColor: BORDER }}>
+            <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
               {m.criticalEvents.map((ev, i) => (
                 <div key={i} className="px-4 py-3 flex gap-3">
                   <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" style={{ color: ev.level === 'Error' ? '#F87171' : '#FBBF24' }} />
@@ -651,7 +647,7 @@ function HealthAgentCard({ agent }: { agent: AgentWithMetrics }) {
                         <Clock className="h-3 w-3" />{fmtDate(ev.time)}
                       </span>
                     </div>
-                    <p className="text-sm text-white/70 break-words">{ev.message}</p>
+                    <p className="text-sm text-[var(--td)] break-words">{ev.message}</p>
                   </div>
                 </div>
               ))}
@@ -678,15 +674,15 @@ function HealthAgentCard({ agent }: { agent: AgentWithMetrics }) {
                     <th className="text-right px-4 py-2 font-medium text-xs uppercase tracking-wide" style={{ color: 'var(--ts)' }}>RAM MB</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y" style={{ borderColor: BORDER }}>
+                <tbody className="divide-y" style={{ borderColor: 'var(--border)' }}>
                   {m.topProcesses.map(p => (
                     <tr key={p.pid} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="px-4 py-2 font-mono text-xs text-white/50">{p.pid}</td>
-                      <td className="px-4 py-2 text-white/80">{p.name}</td>
+                      <td className="px-4 py-2 font-mono text-xs text-[var(--td)]">{p.pid}</td>
+                      <td className="px-4 py-2 text-[var(--tm)]">{p.name}</td>
                       <td className="px-4 py-2 text-right font-mono text-xs" style={{ color: p.cpu > 50 ? '#F87171' : p.cpu > 20 ? '#FBBF24' : '#4ADE80' }}>
                         {p.cpu.toFixed(1)}
                       </td>
-                      <td className="px-4 py-2 text-right font-mono text-xs text-white/60">
+                      <td className="px-4 py-2 text-right font-mono text-xs text-[var(--td)]">
                         {p.ram.toFixed(0)}
                       </td>
                     </tr>
@@ -739,12 +735,12 @@ function HealthAgentCard({ agent }: { agent: AgentWithMetrics }) {
                     <th className="text-right px-4 py-2 font-medium text-xs uppercase tracking-wide" style={{ color: 'var(--ts)' }}>RAM MB</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y" style={{ borderColor: BORDER }}>
+                <tbody className="divide-y" style={{ borderColor: 'var(--border)' }}>
                   {m.hyperVMs.map(vm => {
                     const running = vm.state?.toLowerCase() === 'running';
                     return (
                       <tr key={vm.name} className="hover:bg-white/[0.02] transition-colors">
-                        <td className="px-4 py-2 text-white/90 font-medium">{vm.name}</td>
+                        <td className="px-4 py-2 text-[var(--t)] font-medium">{vm.name}</td>
                         <td className="px-4 py-2">
                           <span className="flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full" style={{ background: running ? '#4ADE80' : '#F87171' }} />
@@ -753,8 +749,8 @@ function HealthAgentCard({ agent }: { agent: AgentWithMetrics }) {
                             </span>
                           </span>
                         </td>
-                        <td className="px-4 py-2 text-right font-mono text-xs text-white/60">{vm.cpuUsage.toFixed(1)}</td>
-                        <td className="px-4 py-2 text-right font-mono text-xs text-white/60">{vm.memoryMb.toFixed(0)}</td>
+                        <td className="px-4 py-2 text-right font-mono text-xs text-[var(--td)]">{vm.cpuUsage.toFixed(1)}</td>
+                        <td className="px-4 py-2 text-right font-mono text-xs text-[var(--td)]">{vm.memoryMb.toFixed(0)}</td>
                       </tr>
                     );
                   })}
@@ -779,14 +775,14 @@ function CollapsibleSection({ title, icon, open, onToggle, count, children }: {
   children: React.ReactNode;
 }) {
   return (
-    <div className="border-t" style={{ borderColor: BORDER }}>
+    <div className="border-t" style={{ borderColor: 'var(--border)' }}>
       <button
         onClick={onToggle}
         className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/[0.02] transition-colors text-left"
       >
         <div className="flex items-center gap-2">
           <span style={{ color: 'var(--ts)' }}>{icon}</span>
-          <span className="text-sm font-medium text-white/80">{title}</span>
+          <span className="text-sm font-medium text-[var(--tm)]">{title}</span>
           {count != null && (
             <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'var(--border)', color: 'var(--ts)' }}>
               {count}
