@@ -46,9 +46,9 @@ export async function listBackupConfigs(params: { workspaceId?: string | null; a
   }));
 }
 
-export async function getBackupConfig(id: string) {
-  const config = await prisma.backupConfig.findUnique({
-    where: { id },
+export async function getBackupConfig(id: string, workspaceId?: string) {
+  const config = await prisma.backupConfig.findFirst({
+    where: workspaceId ? { id, workspaceId } : { id },
     include: {
       agent: { select: { id: true, hostname: true, deviceId: true, device: { select: { locationId: true } } } },
     },
@@ -93,8 +93,8 @@ export async function createBackupConfig(data: CreateBackupConfigInput, performe
   return config;
 }
 
-export async function updateBackupConfig(id: string, data: UpdateBackupConfigInput, performedByUserId?: string) {
-  const existing = await prisma.backupConfig.findUnique({ where: { id } });
+export async function updateBackupConfig(id: string, data: UpdateBackupConfigInput, performedByUserId?: string, workspaceId?: string) {
+  const existing = await prisma.backupConfig.findFirst({ where: workspaceId ? { id, workspaceId } : { id } });
   if (!existing) throw new AppError('Backup config not found', 404);
 
   let sqlPassEnc = data.sqlPassEnc;
@@ -118,8 +118,8 @@ export async function updateBackupConfig(id: string, data: UpdateBackupConfigInp
   return updated;
 }
 
-export async function deleteBackupConfig(id: string, performedByUserId?: string) {
-  const existing = await prisma.backupConfig.findUnique({ where: { id } });
+export async function deleteBackupConfig(id: string, performedByUserId?: string, workspaceId?: string) {
+  const existing = await prisma.backupConfig.findFirst({ where: workspaceId ? { id, workspaceId } : { id } });
   if (!existing) throw new AppError('Backup config not found', 404);
 
   await prisma.backupConfig.delete({ where: { id } });
@@ -133,7 +133,12 @@ export async function deleteBackupConfig(id: string, performedByUserId?: string)
   }
 }
 
-export async function getBackupHistory(configId: string, limit = 50) {
+export async function getBackupHistory(configId: string, workspaceId?: string, limit = 50) {
+  // Verify config belongs to workspace before returning history
+  if (workspaceId) {
+    const config = await prisma.backupConfig.findFirst({ where: { id: configId, workspaceId } });
+    if (!config) throw new AppError('Backup config not found', 404);
+  }
   return prisma.backupHistory.findMany({
     where: { backupConfigId: configId },
     orderBy: { startedAt: 'desc' },
@@ -144,10 +149,11 @@ export async function getBackupHistory(configId: string, limit = 50) {
 // ── Agent reporting ──────────────────────────────────────────────────────────
 
 export async function getAgentBackupConfigs(agentToken: string) {
+  const { decrypt } = require('../../utils/crypto');
   const reg = await prisma.agentRegistration.findUnique({ where: { agentToken } });
   if (!reg) throw new AppError('Agent not found', 404);
 
-  return prisma.backupConfig.findMany({
+  const configs = await prisma.backupConfig.findMany({
     where: { agentRegId: reg.id, enabled: true },
     select: {
       id: true,
@@ -159,7 +165,16 @@ export async function getAgentBackupConfigs(agentToken: string) {
       sqlPassEnc: true,
       sqlDatabases: true,
       folderPath: true,
+      localBackupPath: true,
+      useInfradeskCloud: true,
       googleDriveFolder: true,
+      googleDriveRefreshToken: true,
+      googleDriveEmail: true,
+      ftpHost: true,
+      ftpPort: true,
+      ftpUser: true,
+      ftpPassEnc: true,
+      ftpPath: true,
       cronSchedule: true,
       retentionDays: true,
       encryptBackups: true,
@@ -167,6 +182,15 @@ export async function getAgentBackupConfigs(agentToken: string) {
       lastRunAt: true,
     },
   });
+
+  // Decrypt passwords before sending to agent
+  return configs.map(c => ({
+    ...c,
+    sqlPassword: c.sqlPassEnc ? (() => { try { return decrypt(c.sqlPassEnc); } catch { return c.sqlPassEnc; } })() : null,
+    ftpPassword: c.ftpPassEnc ? (() => { try { return decrypt(c.ftpPassEnc); } catch { return c.ftpPassEnc; } })() : null,
+    sqlPassEnc: undefined,
+    ftpPassEnc: undefined,
+  }));
 }
 
 export async function reportBackupStart(configId: string) {
