@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Database, Server, CheckCircle, XCircle, Loader2, Shield, ChevronRight, ChevronLeft,
@@ -224,7 +224,6 @@ export default function BackupWizard({ open, onClose, companyFilter }: { open: b
   const [ftpPath, setFtpPath] = useState('');
   const [gdriveEmail, setGdriveEmail] = useState('');
   const [gdriveRefreshToken, setGdriveRefreshToken] = useState('');
-  const [gdriveAuthCode, setGdriveAuthCode] = useState('');
   const [notifyEmailSuccess, setNotifyEmailSuccess] = useState('');
   const [notifyEmailFailure, setNotifyEmailFailure] = useState('');
   const [keyCopied, setKeyCopied] = useState(false);
@@ -367,11 +366,27 @@ export default function BackupWizard({ open, onClose, companyFilter }: { open: b
     ? STEPS.filter(s => s.key !== 'credentials' && s.key !== 'databases')
     : STEPS;
 
-  // Google Drive auth helper
+  // Google Drive auth — popup flow z postMessage callback
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === 'gdrive_auth') {
+        try {
+          const { email, refreshToken } = JSON.parse(e.data.payload);
+          setGdriveEmail(email);
+          setGdriveRefreshToken(refreshToken);
+          setUseGdrive(true);
+          toast.success(`Połączono z Google Drive jako ${email}`);
+        } catch {}
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
   const handleGdriveAuth = async () => {
     try {
       const { url } = await backupApi.getGoogleAuthUrl();
-      window.open(url, '_blank', 'width=500,height=600');
+      window.open(url, 'gdrive_auth', 'width=500,height=700');
     } catch (err: any) {
       if (err?.response?.status === 400 || err?.response?.data?.error?.includes?.('Google')) {
         window.open('/superadmin/pricing', '_blank');
@@ -379,19 +394,6 @@ export default function BackupWizard({ open, onClose, companyFilter }: { open: b
       } else {
         toast.error(err?.response?.data?.error || 'Błąd połączenia z Google Drive');
       }
-    }
-  };
-
-  const handleGdriveExchange = async () => {
-    if (!gdriveAuthCode.trim()) return;
-    try {
-      const result = await backupApi.exchangeGoogleCode(gdriveAuthCode.trim());
-      setGdriveEmail(result.email);
-      setGdriveRefreshToken(result.refreshToken);
-      setGdriveAuthCode('');
-      toast.success(`Połączono z Google Drive jako ${result.email}`);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Błąd wymiany kodu autoryzacji');
     }
   };
 
@@ -866,21 +868,11 @@ export default function BackupWizard({ open, onClose, companyFilter }: { open: b
                   {useGdrive && !gdriveEmail && (
                     <div>
                       <p style={{ fontSize: 12, color: 'var(--tm)', marginBottom: 10 }}>
-                        Kliknij "Autoryzuj" → zaloguj się do Google → skopiuj kod autoryzacji i wklej poniżej:
+                        Kliknij przycisk — otworzy sie okno logowania Google. Po zalogowaniu autoryzacja wykona sie automatycznie.
                       </p>
-                      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-                        <Button size="sm" onClick={handleGdriveAuth} icon={<Lock size={12} />}>
-                          Autoryzuj Google Drive
-                        </Button>
-                      </div>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <input style={{ ...inputStyle, flex: 1 }} value={gdriveAuthCode}
-                          onChange={e => setGdriveAuthCode(e.target.value)}
-                          placeholder="Wklej kod autoryzacji z Google..." />
-                        <Button size="sm" disabled={!gdriveAuthCode.trim()} onClick={handleGdriveExchange}>
-                          Połącz
-                        </Button>
-                      </div>
+                      <Button size="sm" onClick={handleGdriveAuth} icon={<Cloud size={12} />}>
+                        Zaloguj sie do Google Drive
+                      </Button>
                     </div>
                   )}
 
