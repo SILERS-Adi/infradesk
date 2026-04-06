@@ -45,6 +45,16 @@ export default function SAConfigPage() {
         </div>
       </Card>
 
+      <Card title="Google Drive API (OAuth2 dla backupów)">
+        <p className="text-[11px] mb-3" style={{ color: 'var(--td)' }}>
+          Wymagane do funkcji kopii zapasowych na Google Drive. Utwórz OAuth 2.0 Client ID w Google Cloud Console.
+        </p>
+        <div className="grid grid-cols-2 gap-4">
+          <F label="Client ID" value={form.googleClientId || ''} onChange={v => set('googleClientId', v)} />
+          <F label="Client Secret" value={form.googleClientSecret || ''} onChange={v => set('googleClientSecret', v)} type="password" />
+        </div>
+      </Card>
+
       <Card title="Ogólne">
         <div className="grid grid-cols-3 gap-4">
           <F label="Nazwa platformy" value={form.platformName} onChange={v => set('platformName', v)} />
