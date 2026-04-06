@@ -54,11 +54,14 @@ export async function postResume(req: Request, res: Response, next: NextFunction
 export async function getAll(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { techId, from, to, page, limit } = req.query as Record<string, string>;
+    const { getMspWorkspaceIds } = require('../../utils/mspScope');
+    const wsIds: string[] = req.workspaceId ? await getMspWorkspaceIds(req.workspaceId) : [];
     const result = await listAllSessions({
-      workspaceId: req.workspaceId,
+      workspaceId: wsIds.length === 1 ? wsIds[0] : undefined,
+      workspaceIds: wsIds.length > 1 ? wsIds : undefined,
       techId, from, to,
       page: page ? parseInt(page) : 1,
-      limit: limit ? parseInt(limit) : 50,
+      limit: limit ? parseInt(limit) : 200,
       scopeFilter: sessionScopeFilter(req.membership),
     });
     res.json(result);

@@ -23,6 +23,7 @@ function calcWorkMinutes(entries: { startedAt: Date; endedAt: Date | null }[]): 
 
 export async function listAllSessions(params: {
   workspaceId?: string | null;
+  workspaceIds?: string[];
   techId?: string;
   from?: string;
   to?: string;
@@ -30,10 +31,14 @@ export async function listAllSessions(params: {
   limit?: number;
   scopeFilter?: Record<string, unknown>;
 }) {
-  const { workspaceId, techId, from, to, page = 1, limit = 50, scopeFilter } = params;
+  const { workspaceId, workspaceIds, techId, from, to, page = 1, limit = 50, scopeFilter } = params;
   const skip = (page - 1) * limit;
   const where: Record<string, unknown> = {};
-  if (workspaceId) where.workspaceId = workspaceId;
+  if (workspaceIds && workspaceIds.length > 1) {
+    where.workspaceId = { in: workspaceIds };
+  } else if (workspaceId) {
+    where.workspaceId = workspaceId;
+  }
   if (techId) where.techId = techId;
   if (from || to) {
     where.startedAt = {};
