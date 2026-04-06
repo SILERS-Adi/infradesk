@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
   Plus, Play, Pencil, Trash2, Database, FolderOpen,
-  Clock, CheckCircle2, XCircle, Loader2, History, Power,
+  Clock, CheckCircle2, XCircle, Loader2, History, Power, Download,
 } from 'lucide-react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
@@ -348,6 +348,7 @@ function HistoryModal({ open, onClose, configId, configName }: {
                 <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--tm)' }}>Koniec</th>
                 <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--tm)' }}>Rozmiar</th>
                 <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--tm)' }}>Plik</th>
+                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--tm)' }}></th>
               </tr>
             </thead>
             <tbody>
@@ -358,6 +359,17 @@ function HistoryModal({ open, onClose, configId, configName }: {
                   <td className="px-5 py-3" style={{ color: 'var(--ts)' }}>{h.completedAt ? formatDateTime(h.completedAt) : '--'}</td>
                   <td className="px-5 py-3" style={{ color: 'var(--ts)' }}>{formatSize(h.sizeBytes)}</td>
                   <td className="px-5 py-3 max-w-[200px] truncate" style={{ color: 'var(--ts)' }}>{h.fileName ?? '--'}</td>
+                  <td className="px-5 py-3">
+                    {h.status === 'SUCCESS' && h.fileName && (
+                      <a
+                        href={`/api/backup/cloud/download/${configId}/${h.fileName}?decrypt=true`}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                        style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.2)' }}
+                      >
+                        <Download className="h-3.5 w-3.5" /> Pobierz
+                      </a>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

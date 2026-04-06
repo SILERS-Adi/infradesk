@@ -277,7 +277,48 @@ router.get('/cloud/download/:configId/:fileName', authorizeWorkspace('OWNER', 'A
     if (!config) { res.status(404).json({ error: 'Config not found' }); return; }
     const filePath = path.join(INFRADESK_STORAGE_PATH, config.workspaceId, config.id, req.params.fileName);
     if (!fs.existsSync(filePath)) { res.status(404).json({ error: 'File not found' }); return; }
-    res.setHeader('Content-Disposition', `attachment; filename="${req.params.fileName}"`);
+
+    const decrypt = req.query.decrypt === 'true';
+    const isEncrypted = req.params.fileName.endsWith('.enc');
+
+    if (decrypt && isEncrypted && config.encryptionKey) {
+      try {
+        const crypto = require('crypto');
+        const fileData = fs.readFileSync(filePath);
+
+        // Fernet format: Version(1) + Timestamp(8) + IV(16) + Ciphertext(N) + HMAC(32)
+        // Key: SHA256 of user key → first 16 bytes = signing key, last 16 bytes = encryption key
+        const rawKey = crypto.createHash('sha256').update(config.encryptionKey).digest();
+        const encKey = rawKey.slice(16, 32); // AES-128-CBC key (Fernet uses last 16 bytes)
+        const sigKey = rawKey.slice(0, 16);  // HMAC key (first 16 bytes)
+
+        // But Fernet uses a full 32-byte key split differently:
+        // Fernet key = urlsafe_b64encode(signing_key[16] + encryption_key[16])
+        // Since agent uses sha256 → base64url as Fernet key, the actual Fernet key bytes are the sha256 output
+        const fernetKeyBytes = rawKey; // 32 bytes
+        const signingKey = fernetKeyBytes.slice(0, 16);
+        const encryptionKey = fernetKeyBytes.slice(16, 32);
+
+        const version = fileData[0]; // should be 0x80
+        const iv = fileData.slice(9, 25); // 16 bytes IV
+        const ciphertext = fileData.slice(25, fileData.length - 32); // everything except HMAC
+
+        const decipher = crypto.createDecipheriv('aes-128-cbc', encryptionKey, iv);
+        const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+
+        const outName = req.params.fileName.replace('.enc', '');
+        res.setHeader('Content-Disposition', `attachment; filename="${outName}"`);
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.send(decrypted);
+        return;
+      } catch (decErr: any) {
+        res.status(500).json({ error: `Decryption failed: ${decErr.message}` });
+        return;
+      }
+    }
+
+    const outName = decrypt ? req.params.fileName.replace('.enc', '') : req.params.fileName;
+    res.setHeader('Content-Disposition', `attachment; filename="${outName}"`);
     res.sendFile(filePath);
   } catch (err) { next(err); }
 });
