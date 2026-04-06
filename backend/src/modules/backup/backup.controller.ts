@@ -23,7 +23,7 @@ export async function getConfigs(req: Request, res: Response, next: NextFunction
 
 export async function getConfig(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const config = await getBackupConfig(req.params.id);
+    const config = await getBackupConfig(req.params.id, req.workspaceId!);
 
     if (req.membership && !isBackupAccessible(req.membership, {
       agentDeviceId: (config.agent as any)?.deviceId ?? null,
@@ -47,29 +47,29 @@ export async function postConfig(req: Request, res: Response, next: NextFunction
 
 export async function patchConfig(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const config = await updateBackupConfig(req.params.id, req.body, req.user?.userId);
+    const config = await updateBackupConfig(req.params.id, req.body, req.user?.userId, req.workspaceId!);
     res.json(config);
   } catch (err) { next(err); }
 }
 
 export async function removeConfig(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    await deleteBackupConfig(req.params.id, req.user?.userId);
+    await deleteBackupConfig(req.params.id, req.user?.userId, req.workspaceId!);
     res.status(204).send();
   } catch (err) { next(err); }
 }
 
 export async function getHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const history = await getBackupHistory(req.params.id);
-    res.json(history);
+    const history = await getBackupHistory(req.params.id, req.workspaceId!);
+    res.json(JSON.parse(JSON.stringify(history, (_, v) => typeof v === 'bigint' ? Number(v) : v)));
   } catch (err) { next(err); }
 }
 
 export async function runNow(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     // Just trigger via WebSocket to the agent
-    const config = await getBackupConfig(req.params.id);
+    const config = await getBackupConfig(req.params.id, req.workspaceId!);
     const { notifyAgent } = await import('../../utils/websocket');
     const reg = await import('../../lib/prisma').then(m => m.default.agentRegistration.findUnique({ where: { id: config.agentRegId } }));
     if (reg) {
@@ -100,8 +100,8 @@ export async function agentReportStart(req: Request, res: Response, next: NextFu
 export async function agentReportComplete(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { historyId, sizeBytes, fileName, googleDriveId } = req.body;
-    const history = await reportBackupComplete(historyId, { sizeBytes, fileName, googleDriveId });
-    res.json(history);
+    const history = await reportBackupComplete(historyId, { sizeBytes: sizeBytes ? Number(sizeBytes) : undefined, fileName, googleDriveId });
+    res.json(JSON.parse(JSON.stringify(history, (_, v) => typeof v === 'bigint' ? Number(v) : v)));
   } catch (err) { next(err); }
 }
 
@@ -109,6 +109,6 @@ export async function agentReportFailed(req: Request, res: Response, next: NextF
   try {
     const { configId, error } = req.body;
     const history = await reportBackupFailed(configId, error);
-    res.json(history);
+    res.json(JSON.parse(JSON.stringify(history, (_, v) => typeof v === 'bigint' ? Number(v) : v)));
   } catch (err) { next(err); }
 }
