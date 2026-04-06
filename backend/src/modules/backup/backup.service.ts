@@ -35,9 +35,10 @@ export async function listBackupConfigs(params: { workspaceId?: string | null; a
     orderBy: { createdAt: 'desc' },
   });
 
-  // Map agent workspace info to client field for frontend
+  // Map agent workspace info to client field + fix BigInt serialization
   return configs.map(c => ({
     ...c,
+    history: c.history?.map(h => ({ ...h, sizeBytes: h.sizeBytes ? Number(h.sizeBytes) : null })),
     client: c.agent?.workspace
       ? { id: c.agent.workspace.id, name: c.agent.companyName || c.agent.workspace.name }
       : c.agent?.companyName
