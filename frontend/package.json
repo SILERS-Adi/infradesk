@@ -29,6 +29,7 @@
     "react-hook-form": "^7.49.3",
     "react-hot-toast": "^2.4.1",
     "react-router-dom": "^6.21.3",
+    "recharts": "^3.8.1",
     "zod": "^3.22.4",
     "zustand": "^5.0.12"
   },

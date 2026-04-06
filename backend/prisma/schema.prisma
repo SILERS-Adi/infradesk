@@ -229,6 +229,7 @@ model Workspace {
   crmActivities      CrmActivity[]         @relation("CrmWorkspace")
   backupConfigs      BackupConfig[]        @relation("BackupWorkspace")
   activityLogs       ActivityLog[]         @relation("ActivityLogWorkspace")
+  monitoringAlerts   MonitoringAlert[]     @relation("AlertWorkspace")
   sharingInvitations SharingInvitation[]
 
   // PakOps relations
@@ -880,7 +881,9 @@ model AgentRegistration {
   device        Device?        @relation(fields: [deviceId], references: [id])
   assignedUser  User?          @relation("AgentUser", fields: [assignedUserId], references: [id])
   manager       User?          @relation("DeviceManager", fields: [managerId], references: [id])
-  backupConfigs BackupConfig[]
+  backupConfigs    BackupConfig[]
+  metricsSnapshots MetricsSnapshot[]
+  monitoringAlerts MonitoringAlert[] @relation("AlertAgent")
 
   @@index([workspaceId])
 }
@@ -1797,4 +1800,35 @@ enum ServiceInspectionResult {
   POSITIVE
   NEGATIVE
   CONDITIONAL
+}
+
+// ── Monitoring ──────────────────────────────────────────────────────
+
+model MetricsSnapshot {
+  id         String   @id @default(uuid())
+  agentRegId String
+  type       String   // "audit" | "network" | "health"
+  data       Json
+  score      Int?
+  createdAt  DateTime @default(now())
+
+  agent AgentRegistration @relation(fields: [agentRegId], references: [id], onDelete: Cascade)
+
+  @@index([agentRegId, type, createdAt])
+}
+
+model MonitoringAlert {
+  id          String   @id @default(uuid())
+  workspaceId String
+  agentRegId  String
+  type        String   // "score_drop" | "critical_fail" | "disk_failing" | "service_down"
+  severity    String   // "critical" | "high" | "medium"
+  message     String
+  resolved    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  workspace Workspace         @relation("AlertWorkspace", fields: [workspaceId], references: [id])
+  agent     AgentRegistration @relation("AlertAgent", fields: [agentRegId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, resolved, createdAt])
 }

@@ -3,10 +3,14 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Shield, Globe, Server, Monitor, Printer,
   Terminal, Wifi, HardDrive, Cpu, Activity, AlertTriangle, CheckCircle,
-  XCircle, Clock, ChevronDown, ChevronRight, Loader2,
+  XCircle, Clock, ChevronDown, ChevronRight, Loader2, FileText,
 } from 'lucide-react';
 import { agentsApi, type AgentRegistration } from '../../api/agents';
 import { MspCompanyFilter } from '../../components/ui/MspCompanyFilter';
+import MonitoringDashboard from './monitoring/MonitoringDashboard';
+import NetworkMap from './monitoring/NetworkMap';
+import { AlertsPanel, AuditRecommendations, ExtraHealthSections } from './monitoring/MonitoringExtras';
+import { apiClient } from '../../api/client';
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
 
@@ -180,18 +184,33 @@ export default function MonitoringPage() {
     refetchInterval: 60_000,
   });
 
+  // Filter agents by company
+  const filteredAgents = companyFilter
+    ? agents.filter((a: any) => a.workspaceId === companyFilter)
+    : agents;
+
   return (
     <div className="min-h-screen px-4 py-6 sm:px-6 lg:px-8" style={{ color: 'var(--t)' }}>
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight text-[var(--t)] flex items-center gap-2">
-          <Shield className="h-6 w-6" style={{ color: '#A78BFA' }} />
-          Monitoring
-        </h1>
-        <div className="mt-2"><MspCompanyFilter value={companyFilter} onChange={setCompanyFilter} /></div>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <h1 className="text-2xl font-bold tracking-tight text-[var(--t)] flex items-center gap-2">
+            <Shield className="h-6 w-6" style={{ color: '#A78BFA' }} />
+            Monitoring
+          </h1>
+          <MspCompanyFilter value={companyFilter} onChange={setCompanyFilter} />
+        </div>
         <p className="mt-1 text-sm" style={{ color: 'var(--ts)' }}>
-          Kompleksowy widok bezpieczeństwa, sieci i zdrowia wszystkich agentów
+          Kompleksowy widok bezpieczenstwa, sieci i zdrowia wszystkich agentow
         </p>
+      </div>
+
+      {/* Dashboard summary */}
+      <MonitoringDashboard agents={filteredAgents} />
+
+      {/* Alerts */}
+      <div className="mb-6">
+        <AlertsPanel />
       </div>
 
       {/* Tabs */}
@@ -219,9 +238,9 @@ export default function MonitoringPage() {
         </div>
       ) : (
         <>
-          {tab === 'audit'   && <AuditTab agents={agents} />}
-          {tab === 'network' && <NetworkTab agents={agents} />}
-          {tab === 'health'  && <HealthTab agents={agents} />}
+          {tab === 'audit'   && <AuditTab agents={filteredAgents} />}
+          {tab === 'network' && <NetworkTab agents={filteredAgents} />}
+          {tab === 'health'  && <HealthTab agents={filteredAgents} />}
         </>
       )}
     </div>
@@ -373,6 +392,21 @@ function AuditAgentCard({ agent }: { agent: AgentWithMetrics }) {
                 </span>
               </div>
             ))}
+          {/* Recommendations for failed checks */}
+          <AuditRecommendations checks={audit.checks} />
+          {/* PDF report button */}
+          <div className="px-4 py-3 flex justify-end">
+            <button
+              onClick={() => {
+                const url = `/api/monitoring/report/${agent.id}`;
+                window.open(url, '_blank');
+              }}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+              style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--ts)' }}
+            >
+              <FileText className="h-3.5 w-3.5" /> Pobierz raport PDF
+            </button>
+          </div>
           </div>
         </div>
       )}
@@ -392,7 +426,10 @@ function NetworkTab({ agents }: { agents: AgentWithMetrics[] }) {
   return (
     <div className="flex flex-col gap-6">
       {withScan.map(a => (
-        <NetworkAgentCard key={a.id} agent={a} />
+        <div key={a.id} className="flex flex-col gap-4">
+          <NetworkMap agent={a} />
+          <NetworkAgentCard agent={a} />
+        </div>
       ))}
     </div>
   );
@@ -759,6 +796,9 @@ function HealthAgentCard({ agent }: { agent: AgentWithMetrics }) {
             </div>
           </CollapsibleSection>
         )}
+
+        {/* Extra sections: SSL, RAID, Uptime */}
+        <ExtraHealthSections agent={agent} />
       </div>
     </div>
   );

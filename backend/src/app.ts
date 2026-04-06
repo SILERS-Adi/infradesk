@@ -33,6 +33,7 @@ import notificationsRouter from './modules/notifications/notifications.routes';
 import downloadsRouter from './modules/downloads/downloads.routes';
 import geolocationRouter from './modules/geolocation/geolocation.routes';
 import backupRouter from './modules/backup/backup.routes';
+import monitoringRouter from './modules/monitoring/monitoring.routes';
 import { cleanupOldBackups } from './modules/backup/backup.service';
 import pushRouter from './modules/push/push.routes';
 import { initWebPush } from './lib/webpush';
@@ -72,6 +73,7 @@ import { errorHandler } from './middleware/errorHandler';
 import { authenticate } from './middleware/auth';
 import { resolveWorkspace, requireModule } from './middleware/workspace';
 import { requestLogger } from './middleware/requestLogger';
+import { deepHealthCheck, getMetrics, checkAndAlert, recordError } from './utils/monitoring';
 import prisma from './lib/prisma';
 
 // Public device QR lookup (no auth)
@@ -107,9 +109,26 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Serve uploaded files (PDFs, logos)
+// Security note: uploads are served publicly because workspace logos and avatars are
+// referenced in public contexts (login page, public ticket forms). File names use
+// timestamp + random hash making URL guessing infeasible. Sensitive documents should
+// use the /api/downloads endpoint with PIN auth instead.
 const UPLOADS_DIR = process.env.UPLOADS_DIR || '/app/uploads';
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 app.use('/uploads', express.static(UPLOADS_DIR));
+
+// Global rate limit — 200 req/min per IP (protects against DoS, doesn't affect normal use)
+import rateLimit from 'express-rate-limit';
+app.use(rateLimit({
+  windowMs: 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.path === '/health' || req.path === '/metrics',
+  handler: (_req, res) => {
+    res.status(429).json({ error: 'Too many requests', retryAfter: res.getHeader('Retry-After') });
+  },
+}));
 
 // Request logging
 app.use(requestLogger);
@@ -138,7 +157,7 @@ app.use('/api', async (req, _res, next) => {
         const membership = await prisma.workspaceMembership.findFirst({
           where: { userId: payload.userId, status: 'ACTIVE' },
           include: { workspace: { select: { id: true, slug: true, type: true, isActive: true } } },
-          orderBy: { createdAt: 'asc' },
+          orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
         });
         if (membership?.workspace?.isActive) {
           req.workspaceId = membership.workspace.id;
@@ -150,9 +169,24 @@ app.use('/api', async (req, _res, next) => {
   next();
 });
 
-// Health check
+// Health checks
 app.get('/health', (_req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.status(200).json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
+});
+
+app.get('/health/deep', async (_req, res) => {
+  try {
+    const health = await deepHealthCheck();
+    const status = health.status === 'ok' ? 200 : health.status === 'degraded' ? 200 : 503;
+    res.status(status).json(health);
+  } catch (e: any) {
+    res.status(503).json({ status: 'down', error: e.message });
+  }
+});
+
+// Metrics endpoint (lightweight Prometheus-compatible JSON)
+app.get('/metrics', (_req, res) => {
+  res.json(getMetrics());
 });
 
 // Speed test upload endpoint (measures upload speed)
@@ -188,6 +222,7 @@ app.use('/api/devices', authenticate, requireModule('infrastructure'), devicesRo
 app.use('/api/agent', agentRoutes);                        // Agent has mixed public+authenticated
 app.use('/api/activity-logs', authenticate, requireModule('infrastructure'), activityLogsRoutes);
 app.use('/api/backup', authenticate, requireModule('infrastructure'), backupRouter);
+app.use('/api/monitoring', monitoringRouter);
 
 // ── Module: service-desk ──
 app.use('/api/tickets', authenticate, requireModule('service-desk'), ticketsRoutes);
@@ -718,6 +753,9 @@ initWebPush().catch(console.error);
 setInterval(() => cleanupOldBackups().catch(e => console.error('Backup cleanup error:', e)), 6 * 60 * 60 * 1000);
 
 // RustDesk → WorkSession sync every 2 minutes
+// Security note: processes ALL workspaces intentionally — each synced session is assigned
+// to the correct workspace via device.workspaceId from the database (trusted source).
+// User-facing endpoints (GET /rustdesk/active) are workspace-filtered separately.
 setInterval(async () => {
   try {
     const { syncCompletedRustDeskSessions } = await import('./utils/rustdesk');
@@ -740,5 +778,60 @@ initWebSocket(server);
 server.listen(PORT, () => {
   console.log(`InfraDesk API running on port ${PORT} [${config.nodeEnv}]`);
 });
+
+// ── Production monitoring ───────────────────────────────────────────────────
+
+// Alert check every 5 minutes
+setInterval(() => checkAndAlert().catch(e => console.error('Alert check error:', e)), 5 * 60 * 1000);
+
+// ── Uncaught exception / rejection handlers ─────────────────────────────────
+
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] Uncaught exception:', err);
+  recordError(err.message);
+  // Give time to flush logs, then exit
+  setTimeout(() => process.exit(1), 1000);
+});
+
+process.on('unhandledRejection', (reason) => {
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  console.error('[ERROR] Unhandled rejection:', msg);
+  recordError(msg);
+});
+
+// ── Graceful shutdown ───────────────────────────────────────────────────────
+
+function gracefulShutdown(signal: string) {
+  console.log(`[SHUTDOWN] ${signal} received — closing server gracefully...`);
+
+  // Stop accepting new connections
+  server.close(async () => {
+    console.log('[SHUTDOWN] HTTP server closed');
+
+    // Close WebSocket connections
+    const { agentConnections } = await import('./utils/websocket');
+    for (const [, ws] of agentConnections) {
+      ws.close(1001, 'Server shutting down');
+    }
+    console.log('[SHUTDOWN] WebSocket connections closed');
+
+    // Close database connection
+    try {
+      await prisma.$disconnect();
+      console.log('[SHUTDOWN] Database disconnected');
+    } catch {}
+
+    process.exit(0);
+  });
+
+  // Force shutdown after 10s if graceful fails
+  setTimeout(() => {
+    console.error('[SHUTDOWN] Forced exit after timeout');
+    process.exit(1);
+  }, 10_000);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 export default app;

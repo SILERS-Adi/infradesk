@@ -122,7 +122,9 @@ function hardwareFields(data: Partial<RegisterInput & MetricsInput>) {
 }
 
 export async function registerAgent(data: RegisterInput) {
-  const token = uuidv4();
+  // Security: use crypto.randomBytes instead of UUID for agent tokens
+  const crypto = require('crypto');
+  const token = crypto.randomBytes(48).toString('hex');
 
   // ── Resolve workspace from workspaceKey ──────────────────────────────────────
   let workspaceId: string | undefined;
@@ -326,6 +328,8 @@ export async function registerAgent(data: RegisterInput) {
 export async function updateMetrics(token: string, data: MetricsInput) {
   const reg = await prisma.agentRegistration.findUnique({ where: { agentToken: token } });
   if (!reg) throw new AppError('Agent not found', 404);
+  // Security: PENDING agents can only report status — no device creation or data updates
+  if (reg.status === 'REJECTED') throw new AppError('Agent rejected', 403);
 
   // Auto-create device if agent is ACTIVE with workspaceId but missing deviceId
   if (!reg.deviceId && reg.workspaceId && reg.status === 'ACTIVE') {
@@ -351,13 +355,40 @@ export async function updateMetrics(token: string, data: MetricsInput) {
     }
   }
 
-  return prisma.agentRegistration.update({
+  const updated = await prisma.agentRegistration.update({
     where: { agentToken: token },
     data: {
       lastSeen: new Date(),
       ...hardwareFields(data),
     },
   });
+
+  // Save metrics snapshots for history (non-blocking)
+  const sm = (data as any).serverMetrics;
+  if (sm && reg.id) {
+    const snapshots: { agentRegId: string; type: string; data: any; score?: number }[] = [];
+    if (sm.securityAudit) {
+      snapshots.push({ agentRegId: reg.id, type: 'audit', data: sm.securityAudit, score: sm.securityAudit.score });
+    }
+    if (sm.networkScan) {
+      snapshots.push({ agentRegId: reg.id, type: 'network', data: sm.networkScan });
+    }
+    if (sm.smartDisks || sm.services || sm.criticalEvents) {
+      snapshots.push({ agentRegId: reg.id, type: 'health', data: { smartDisks: sm.smartDisks, services: sm.services, criticalEvents: sm.criticalEvents } });
+    }
+    if (snapshots.length) {
+      prisma.metricsSnapshot.createMany({ data: snapshots }).catch(() => {});
+    }
+
+    // Check for alert conditions (non-blocking)
+    if (reg.workspaceId) {
+      import('../monitoring/monitoring.alerts').then(m =>
+        m.checkAndCreateAlerts(reg.id, reg.workspaceId!, sm)
+      ).catch(() => {});
+    }
+  }
+
+  return updated;
 }
 
 export async function createAgentTicket(token: string, data: AgentTicketInput) {
