@@ -15,6 +15,7 @@ export const createBackupConfigSchema = z.object({
   googleDriveFolder:       z.string().optional().nullable(),
   googleDriveRefreshToken: z.string().optional().nullable(),
   googleDriveEmail:        z.string().optional().nullable(),
+  useInfradeskCloud:       z.boolean().optional().default(false),
   localBackupPath:         z.string().optional().nullable(),
   ftpHost:                 z.string().optional().nullable(),
   ftpPort:                 z.number().int().optional().nullable(),

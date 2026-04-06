@@ -908,6 +908,7 @@ model BackupConfig {
   googleDriveFolder       String?
   googleDriveRefreshToken String?   // encrypted OAuth2 refresh token
   googleDriveEmail        String?   // authorized Google account email
+  useInfradeskCloud       Boolean   @default(false)
   localBackupPath         String?   // local/network path for backup storage
   ftpHost                 String?
   ftpPort                 Int?

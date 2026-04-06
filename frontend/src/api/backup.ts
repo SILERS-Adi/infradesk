@@ -16,6 +16,7 @@ export interface BackupConfig {
   googleDriveFolder?: string;
   googleDriveRefreshToken?: string;
   googleDriveEmail?: string;
+  useInfradeskCloud?: boolean;
   localBackupPath?: string;
   ftpHost?: string;
   ftpPort?: number;

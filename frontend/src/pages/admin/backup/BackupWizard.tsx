@@ -214,6 +214,7 @@ export default function BackupWizard({ open, onClose, companyFilter }: { open: b
   const [encrypt, setEncrypt] = useState(true);
   const [encryptionKey, setEncryptionKey] = useState('');
   const [localPath, setLocalPath] = useState('');
+  const [useInfradeskCloud, setUseInfradeskCloud] = useState(false);
   const [useGdrive, setUseGdrive] = useState(false);
   const [gdriveFolder, setGdriveFolder] = useState('');
   const [useFtp, setUseFtp] = useState(false);
@@ -291,6 +292,7 @@ export default function BackupWizard({ open, onClose, companyFilter }: { open: b
         sqlPassEnc: isFolder ? undefined : (authMode === 'windows' ? undefined : creds.password),
         sqlDatabases: isFolder ? undefined : selectedDbs.join(', '),
         folderPath: isFolder ? folderPath : undefined,
+        useInfradeskCloud: useInfradeskCloud || undefined,
         localBackupPath: localPath || undefined,
         googleDriveFolder: useGdrive ? gdriveFolder : undefined,
         googleDriveRefreshToken: useGdrive ? gdriveRefreshToken : undefined,
@@ -353,6 +355,7 @@ export default function BackupWizard({ open, onClose, companyFilter }: { open: b
     setEncrypt(true);
     setEncryptionKey('');
     setLocalPath('');
+    setUseInfradeskCloud(false);
     setUseGdrive(false);
     setGdriveFolder('');
     setUseFtp(false);
@@ -836,6 +839,41 @@ export default function BackupWizard({ open, onClose, companyFilter }: { open: b
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
+                {/* ── 0. InfraDesk Cloud ── */}
+                <div style={{
+                  padding: 16, borderRadius: 14,
+                  border: useInfradeskCloud ? '2px solid #6366F1' : '1px solid var(--border)',
+                  background: useInfradeskCloud ? 'linear-gradient(135deg, rgba(99,102,241,0.04) 0%, rgba(139,92,246,0.04) 100%)' : 'transparent',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{
+                      width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(139,92,246,0.15) 100%)',
+                    }}>
+                      <Shield size={16} color="#6366F1" />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t)' }}>
+                        InfraDesk Cloud
+                        <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, marginLeft: 8, background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', color: '#fff', verticalAlign: 'middle' }}>
+                          ZALECANE
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 10, color: 'var(--td)' }}>Bezpieczne przechowywanie na serwerach InfraDesk — bez konfiguracji</div>
+                    </div>
+                    <Toggle value={useInfradeskCloud} onChange={setUseInfradeskCloud} label="" />
+                  </div>
+                  {useInfradeskCloud && (
+                    <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 10, background: 'rgba(99,102,241,0.06)' }}>
+                      <div style={{ display: 'flex', gap: 16, fontSize: 11, color: 'var(--tm)' }}>
+                        <span>Szyfrowanie AES-256</span>
+                        <span>Automatyczna retencja</span>
+                        <span>Przywracanie 1-klik</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* ── 1. Local / Network ── */}
                 <div style={{ padding: 16, borderRadius: 14, border: '1px solid var(--border)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: localPath ? 10 : 0 }}>
@@ -1091,6 +1129,7 @@ export default function BackupWizard({ open, onClose, companyFilter }: { open: b
                 <SumRow icon={<Clock size={14} />} label="Harmonogram" value={scheduleLabel} />
                 <SumRow icon={<Calendar size={14} />} label="Retencja" value={`${retentionDays} dni`} />
                 <SumRow icon={<Lock size={14} />} label="Szyfrowanie" value={encrypt ? 'AES-256 ✓' : 'Wyłączone'} />
+                {useInfradeskCloud && <SumRow icon={<Shield size={14} />} label="InfraDesk Cloud" value="Serwery InfraDesk — szyfrowane" />}
                 {localPath && <SumRow icon={<HardDrive size={14} />} label="Folder zapisu" value={localPath} />}
                 {useGdrive && <SumRow icon={<Cloud size={14} />} label="Google Drive" value={gdriveEmail ? `${gdriveEmail} · ${gdriveFolder || 'główny folder'}` : gdriveFolder || '—'} />}
                 {useFtp && <SumRow icon={<Server size={14} />} label="FTP/SFTP" value={`${ftpHost}:${ftpPort || '21'} → ${ftpPath || '/'}`} />}

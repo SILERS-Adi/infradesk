@@ -172,4 +172,95 @@ router.delete('/configs/:id', authorizeWorkspace('OWNER', 'ADMIN'), removeConfig
 router.get('/configs/:id/history', authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), getHistory);
 router.post('/configs/:id/run-now', authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), runNow);
 
+// ── InfraDesk Cloud: Agent upload ─────────────────────────────────
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+
+const INFRADESK_STORAGE_PATH = process.env.INFRADESK_BACKUP_PATH || '/var/backups/infradesk';
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      const dir = INFRADESK_STORAGE_PATH;
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename: (_req, file, cb) => {
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      cb(null, `${ts}_${file.originalname}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 * 1024 }, // 5 GB max
+});
+
+// Agent uploads backup file to InfraDesk Cloud
+router.post('/cloud/upload', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Agent auth via token header
+    const token = req.headers['x-agent-token'] as string;
+    if (!token) { res.status(401).json({ error: 'Agent token required' }); return; }
+
+    const agent = await prisma.agentRegistration.findUnique({ where: { agentToken: token } });
+    if (!agent) { res.status(401).json({ error: 'Invalid agent token' }); return; }
+
+    const configId = req.headers['x-backup-config-id'] as string;
+    if (!configId) { res.status(400).json({ error: 'Backup config ID required' }); return; }
+
+    const config = await prisma.backupConfig.findUnique({ where: { id: configId } });
+    if (!config || !config.useInfradeskCloud) {
+      res.status(400).json({ error: 'InfraDesk Cloud not enabled for this config' }); return;
+    }
+
+    // Create workspace subdirectory
+    const wsDir = path.join(INFRADESK_STORAGE_PATH, config.workspaceId, configId);
+    fs.mkdirSync(wsDir, { recursive: true });
+
+    // Handle upload
+    const uploadHandler = multer({
+      storage: multer.diskStorage({
+        destination: (_r, _f, cb) => cb(null, wsDir),
+        filename: (_r, file, cb) => {
+          const ts = new Date().toISOString().replace(/[:.]/g, '-');
+          cb(null, `${ts}_${file.originalname}`);
+        },
+      }),
+      limits: { fileSize: 5 * 1024 * 1024 * 1024 },
+    }).single('backup');
+
+    uploadHandler(req, res, async (err) => {
+      if (err) { res.status(400).json({ error: err.message }); return; }
+      if (!req.file) { res.status(400).json({ error: 'No file uploaded' }); return; }
+
+      res.json({
+        ok: true,
+        fileName: req.file.filename,
+        sizeBytes: req.file.size,
+        path: req.file.path,
+      });
+    });
+  } catch (err) { next(err); }
+});
+
+// Get storage usage for workspace
+router.get('/cloud/usage', authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const wsDir = path.join(INFRADESK_STORAGE_PATH, req.workspace!.id);
+    let totalBytes = 0;
+    let fileCount = 0;
+
+    const walk = (dir: string) => {
+      if (!fs.existsSync(dir)) return;
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else { totalBytes += fs.statSync(full).size; fileCount++; }
+      }
+    };
+    walk(wsDir);
+
+    res.json({ totalBytes, fileCount, totalMB: Math.round(totalBytes / 1024 / 1024) });
+  } catch (err) { next(err); }
+});
+
 export default router;
