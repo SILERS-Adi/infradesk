@@ -45,14 +45,60 @@ export default function SAConfigPage() {
         </div>
       </Card>
 
-      <Card title="Google Drive API (OAuth2 dla backupów)">
-        <p className="text-[11px] mb-3" style={{ color: 'var(--td)' }}>
-          Wymagane do funkcji kopii zapasowych na Google Drive. Utwórz OAuth 2.0 Client ID w Google Cloud Console.
-        </p>
+      <Card title="Google Drive — kopie zapasowe w chmurze">
+        <div className="rounded-xl p-4 mb-4" style={{ background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.12)' }}>
+          <p className="text-xs font-semibold mb-2" style={{ color: '#60A5FA' }}>Jak uzyskac klucze? (jednorazowa konfiguracja, 5 minut)</p>
+          <ol className="text-[11px] space-y-1.5" style={{ color: 'var(--tm)', paddingLeft: 16, listStyleType: 'decimal' }}>
+            <li>
+              Otworz{' '}
+              <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener noreferrer"
+                className="font-semibold underline" style={{ color: '#60A5FA' }}>
+                Google Cloud Console — nowy projekt
+              </a>
+              {' '}i nadaj mu nazwe np. "InfraDesk Backup"
+            </li>
+            <li>
+              Wlacz Google Drive API:{' '}
+              <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noopener noreferrer"
+                className="font-semibold underline" style={{ color: '#60A5FA' }}>
+                Kliknij tutaj i nacisnij "Wlacz"
+              </a>
+            </li>
+            <li>
+              Przejdz do{' '}
+              <a href="https://console.cloud.google.com/apis/credentials/consent" target="_blank" rel="noopener noreferrer"
+                className="font-semibold underline" style={{ color: '#60A5FA' }}>
+                Ekran zgody OAuth
+              </a>
+              {' '}— wybierz typ "Zewnetrzny", wpisz nazwe aplikacji i swoj email, reszta domyslna, zapisz
+            </li>
+            <li>
+              Przejdz do{' '}
+              <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer"
+                className="font-semibold underline" style={{ color: '#60A5FA' }}>
+                Dane logowania
+              </a>
+              {' '}— kliknij "+ Utworz dane logowania" → "Identyfikator klienta OAuth"
+            </li>
+            <li>Typ aplikacji: <strong>Aplikacja internetowa</strong></li>
+            <li>
+              W "Autoryzowane identyfikatory URI przekierowania" dodaj:<br />
+              <code className="text-[10px] px-2 py-0.5 rounded" style={{ background: 'var(--hover-bg)', color: '#60A5FA', userSelect: 'all' }}>
+                https://infradesk.pl/api/backup/google/callback
+              </code>
+            </li>
+            <li>Kliknij "Utworz" — skopiuj <strong>Client ID</strong> i <strong>Client Secret</strong> i wklej ponizej</li>
+          </ol>
+        </div>
         <div className="grid grid-cols-2 gap-4">
           <F label="Client ID" value={form.googleClientId || ''} onChange={v => set('googleClientId', v)} />
           <F label="Client Secret" value={form.googleClientSecret || ''} onChange={v => set('googleClientSecret', v)} type="password" />
         </div>
+        {form.googleClientId && form.googleClientSecret && (
+          <div className="mt-3 flex items-center gap-2 text-xs font-semibold" style={{ color: '#4ADE80' }}>
+            <div className="w-2 h-2 rounded-full bg-emerald-400" /> Skonfigurowano — klienci moga uzywac Google Drive w kopii zapasowej
+          </div>
+        )}
       </Card>
 
       <Card title="Ogólne">
