@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../../middleware/auth';
-import { withWorkspaceMembership, authorizeWorkspace, requireWorkspace } from '../../middleware/workspace';
+import { withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
 import { validate } from '../../middleware/validate';
 import { createBackupConfigSchema, updateBackupConfigSchema } from './backup.validation';
 import {
@@ -162,7 +162,7 @@ router.post('/google/exchange', authenticate, async (req: Request, res: Response
 
 // ── Backup CRUD ────────────────────────────────────────────────────
 
-router.use(requireWorkspace, withWorkspaceMembership, requireFeature('backup'));
+router.use(withWorkspaceMembership, requireFeature('backup'));
 
 router.get('/configs', authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), getConfigs);
 router.get('/configs/:id', authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), getConfig);
