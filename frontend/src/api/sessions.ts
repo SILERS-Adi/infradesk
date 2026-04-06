@@ -58,8 +58,8 @@ export const sessionsApi = {
   end: (id: string, notes?: string): Promise<WorkSession> =>
     api.patch(`/sessions/${id}/end`, { notes }).then(r => r.data),
 
-  getByClient: (clientId: string): Promise<WorkSession[]> =>
-    api.get(`/sessions/client/${clientId}`).then(r => r.data),
+  getByClient: (_clientId?: string): Promise<WorkSession[]> =>
+    api.get('/sessions/client').then(r => r.data),
 
   startMobile: (data: { clientId: string; ticketId?: string; locationId?: string; deviceId?: string }) =>
     api.post('/sessions/mobile', data).then(r => r.data),

@@ -23,14 +23,16 @@ export async function patchEnd(req: Request, res: Response, next: NextFunction):
 
 export async function getByClient(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const sessions = await getSessionsByClient(req.params.workspaceId);
+    // Always use workspace from auth context — never from URL params
+    const sessions = await getSessionsByClient(req.workspaceId!);
     res.json(sessions);
   } catch (err) { next(err); }
 }
 
 export async function postStartMobile(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const session = await startMobileSession(req.user!.userId, req.body);
+    // Override workspaceId from auth context — never trust client-provided value
+    const session = await startMobileSession(req.user!.userId, { ...req.body, workspaceId: req.workspaceId! });
     res.status(201).json(session);
   } catch (err) { next(err); }
 }
@@ -65,14 +67,14 @@ export async function getAll(req: Request, res: Response, next: NextFunction): P
 
 export async function patchSession(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const session = await updateSession(req.params.id, req.body);
+    const session = await updateSession(req.params.id, req.body, req.workspaceId!);
     res.json(session);
   } catch (err) { next(err); }
 }
 
 export async function removeSession(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    await deleteSession(req.params.id);
+    await deleteSession(req.params.id, req.workspaceId!);
     res.status(204).send();
   } catch (err) { next(err); }
 }

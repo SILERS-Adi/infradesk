@@ -63,8 +63,8 @@ export async function listAllSessions(params: {
 
 // ── Edit session (admin manual time correction) ─────────────────────────────
 
-export async function updateSession(id: string, data: { startedAt?: string; endedAt?: string; durationMin?: number; notes?: string }) {
-  const session = await prisma.workSession.findUnique({ where: { id } });
+export async function updateSession(id: string, data: { startedAt?: string; endedAt?: string; durationMin?: number; notes?: string }, workspaceId: string) {
+  const session = await prisma.workSession.findFirst({ where: { id, workspaceId } });
   if (!session) throw new AppError('Session not found', 404);
 
   const updateData: Record<string, unknown> = {};
@@ -89,8 +89,8 @@ export async function updateSession(id: string, data: { startedAt?: string; ende
   });
 }
 
-export async function deleteSession(id: string) {
-  const session = await prisma.workSession.findUnique({ where: { id } });
+export async function deleteSession(id: string, workspaceId: string) {
+  const session = await prisma.workSession.findFirst({ where: { id, workspaceId } });
   if (!session) throw new AppError('Session not found', 404);
   await prisma.sessionTimeEntry.deleteMany({ where: { workSessionId: id } });
   await prisma.workSession.delete({ where: { id } });
