@@ -4,7 +4,6 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { authenticate } from '../../middleware/auth';
-import { requireWorkspace } from '../../middleware/workspace';
 
 const UPLOADS_DIR = process.env.UPLOADS_DIR || '/app/uploads';
 
@@ -58,7 +57,7 @@ export default router;
 // Separate authenticated file download handler — mounted at /api/files in app.ts
 export function secureFileDownload(uploadsDir: string) {
   const fileRouter = Router();
-  fileRouter.get('/:filename', authenticate, requireWorkspace, (req: Request, res: Response) => {
+  fileRouter.get('/:filename', authenticate, (req: Request, res: Response) => {
     const filename = path.basename(req.params.filename); // prevent path traversal
     const filePath = path.join(uploadsDir, filename);
 
