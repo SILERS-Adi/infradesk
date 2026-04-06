@@ -38,6 +38,16 @@ export function initWebSocket(server: import('http').Server) {
       data: { lastSeen: new Date() },
     });
 
+    // Periodic lastSeen update (every 60s while connected)
+    const heartbeatInterval = setInterval(async () => {
+      if (ws.readyState === WebSocket.OPEN) {
+        await prisma.agentRegistration.update({
+          where: { agentToken: token },
+          data: { lastSeen: new Date() },
+        }).catch(() => {});
+      }
+    }, 60_000);
+
     // Handle incoming messages from agent (responses to remote commands)
     ws.on('message', (raw) => {
       try {
@@ -51,11 +61,15 @@ export function initWebSocket(server: import('http').Server) {
     });
 
     ws.on('close', () => {
+      clearInterval(heartbeatInterval);
       agentConnections.delete(token);
       console.log(`Agent disconnected: ${token.slice(0, 8)}`);
     });
 
-    ws.on('error', () => agentConnections.delete(token));
+    ws.on('error', () => {
+      clearInterval(heartbeatInterval);
+      agentConnections.delete(token);
+    });
 
     // Send welcome
     ws.send(JSON.stringify({ type: 'connected', message: 'InfraDesk Agent connected' }));
