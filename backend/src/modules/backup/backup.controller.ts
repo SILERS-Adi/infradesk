@@ -10,10 +10,11 @@ import { backupScopeFilter, isBackupAccessible } from '../../middleware/workspac
 
 export async function getConfigs(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { agentRegId } = req.query as Record<string, string>;
+    const { agentRegId, clientId } = req.query as Record<string, string>;
     const configs = await listBackupConfigs({
       workspaceId: req.workspaceId,
       agentRegId,
+      clientId: clientId || undefined,
       scopeFilter: backupScopeFilter(req.membership),
     });
     res.json(configs);

@@ -377,8 +377,8 @@ export function BackupPage() {
   const [companyFilter, setCompanyFilter] = useState('');
 
   const { data: configs = [], isLoading } = useQuery({
-    queryKey: ['backup-configs'],
-    queryFn: () => backupApi.getConfigs(),
+    queryKey: ['backup-configs', companyFilter],
+    queryFn: () => backupApi.getConfigs({ clientId: companyFilter || undefined }),
   });
 
   const deleteMutation = useMutation({
@@ -572,7 +572,7 @@ export function BackupPage() {
         loading={deleteMutation.isPending}
       />
 
-      <BackupWizard open={showWizard} onClose={() => setShowWizard(false)} />
+      <BackupWizard open={showWizard} onClose={() => setShowWizard(false)} companyFilter={companyFilter} />
     </div>
   );
 }

@@ -7,23 +7,43 @@ import { encrypt } from '../../utils/crypto';
 
 // ── Config CRUD ──────────────────────────────────────────────────────────────
 
-export async function listBackupConfigs(params: { workspaceId?: string | null; agentRegId?: string; scopeFilter?: Record<string, unknown> }) {
+export async function listBackupConfigs(params: { workspaceId?: string | null; agentRegId?: string; clientId?: string; scopeFilter?: Record<string, unknown> }) {
   const where: Record<string, unknown> = {};
   if (params.workspaceId) where.workspaceId = params.workspaceId;
   if (params.agentRegId) where.agentRegId = params.agentRegId;
+  // MSP company filter — narrow by agent's workspace (not backup config's)
+  if (params.clientId) {
+    where.agent = { ...((where.agent as any) || {}), workspaceId: params.clientId };
+  }
 
   if (params.scopeFilter && Object.keys(params.scopeFilter).length > 0) {
     where.AND = [...((where.AND as any[]) || []), params.scopeFilter];
   }
 
-  return prisma.backupConfig.findMany({
+  const configs = await prisma.backupConfig.findMany({
     where,
     include: {
-      agent: { select: { id: true, hostname: true, deviceId: true, device: { select: { locationId: true } } } },
+      agent: {
+        select: {
+          id: true, hostname: true, deviceId: true, workspaceId: true, companyName: true,
+          device: { select: { locationId: true } },
+          workspace: { select: { id: true, name: true } },
+        },
+      },
       history: { orderBy: { startedAt: 'desc' }, take: 1 },
     },
     orderBy: { createdAt: 'desc' },
   });
+
+  // Map agent workspace info to client field for frontend
+  return configs.map(c => ({
+    ...c,
+    client: c.agent?.workspace
+      ? { id: c.agent.workspace.id, name: c.agent.companyName || c.agent.workspace.name }
+      : c.agent?.companyName
+        ? { id: '', name: c.agent.companyName }
+        : undefined,
+  }));
 }
 
 export async function getBackupConfig(id: string) {
