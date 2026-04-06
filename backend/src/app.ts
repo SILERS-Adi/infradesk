@@ -658,6 +658,33 @@ app.delete('/api/workspaces/members/:membershipId', authenticate, withWorkspaceM
   } catch (err) { next(err); }
 });
 
+// ── Workspace Settings: Google Drive ────────────────────────────────
+app.get('/api/workspaces/settings/google-drive', authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), async (req, res, next) => {
+  try {
+    const settings = await prisma.workspaceSetting.findMany({
+      where: { workspaceId: req.workspace!.id, key: { in: ['google_client_id', 'google_client_secret'] } },
+    });
+    const result: Record<string, string> = {};
+    settings.forEach(s => { result[s.key] = s.value; });
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
+app.put('/api/workspaces/settings/google-drive', authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), async (req, res, next) => {
+  try {
+    const { google_client_id, google_client_secret } = req.body;
+    const wsId = req.workspace!.id;
+    for (const [key, value] of Object.entries({ google_client_id, google_client_secret }) as [string, string][]) {
+      await prisma.workspaceSetting.upsert({
+        where: { workspaceId_key: { workspaceId: wsId, key } },
+        update: { value: value || '' },
+        create: { workspaceId: wsId, key, value: value || '' },
+      });
+    }
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
 // Device types (simple lookup + create)
 app.get('/api/device-types', authenticate, async (_req, res, next) => {
   try {

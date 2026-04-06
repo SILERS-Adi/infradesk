@@ -12,21 +12,38 @@ import prisma from '../../lib/prisma';
 
 const router = Router();
 
+// Helper: pobierz Google credentials — workspace settings → fallback PlatformConfig
+async function getGoogleCredentials(workspaceId?: string | null) {
+  if (workspaceId) {
+    const settings = await prisma.workspaceSetting.findMany({
+      where: { workspaceId, key: { in: ['google_client_id', 'google_client_secret'] } },
+    });
+    const clientId = settings.find(s => s.key === 'google_client_id')?.value;
+    const clientSecret = settings.find(s => s.key === 'google_client_secret')?.value;
+    if (clientId && clientSecret) return { clientId, clientSecret };
+  }
+  const config = await prisma.platformConfig.findUnique({ where: { id: 'global' } });
+  if (config?.googleClientId && config?.googleClientSecret) {
+    return { clientId: config.googleClientId, clientSecret: config.googleClientSecret };
+  }
+  return null;
+}
+
 // ── Google Drive OAuth ─────────────────────────────────────────────
 
 router.get('/google/auth-url', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const config = await prisma.platformConfig.findUnique({ where: { id: 'global' } });
-    if (!config?.googleClientId) {
-      res.status(400).json({ error: 'Google API nie skonfigurowane. Ustaw Client ID w Ustawieniach platformy (SuperAdmin).' });
+    const creds = await getGoogleCredentials(req.workspaceId);
+    if (!creds) {
+      res.status(400).json({ error: 'Google API nie skonfigurowane. Ustaw Client ID w Ustawieniach.' });
       return;
     }
     const host = req.get('host') || 'infradesk.pl';
     const protocol = req.get('x-forwarded-proto') || req.protocol || 'https';
     const redirectUri = `${protocol}://${host}/api/backup/google/callback`;
     const scope = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email';
-    const state = Buffer.from(JSON.stringify({ userId: req.user?.userId })).toString('base64');
-    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(config.googleClientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent&state=${encodeURIComponent(state)}`;
+    const state = Buffer.from(JSON.stringify({ userId: req.user?.userId, workspaceId: req.workspaceId })).toString('base64');
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(creds.clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent&state=${encodeURIComponent(state)}`;
     res.json({ url });
   } catch (err) { next(err); }
 });
@@ -41,10 +58,14 @@ router.get('/google/callback', async (req: Request, res: Response, next: NextFun
     }
     if (!code) { res.redirect('/?gdrive_error=no_code'); return; }
 
-    const config = await prisma.platformConfig.findUnique({ where: { id: 'global' } });
-    if (!config?.googleClientId || !config?.googleClientSecret) {
-      res.redirect('/?gdrive_error=not_configured'); return;
-    }
+    // Callback nie ma req.workspaceId (brak auth), szukamy w state lub fallback na platform
+    let wsId: string | undefined;
+    try {
+      const { state } = req.query as Record<string, string>;
+      if (state) { const s = JSON.parse(Buffer.from(state, 'base64').toString()); wsId = s.workspaceId; }
+    } catch {}
+    const creds = await getGoogleCredentials(wsId);
+    if (!creds) { res.redirect('/?gdrive_error=not_configured'); return; }
 
     const host = req.get('host') || 'infradesk.pl';
     const protocol = req.get('x-forwarded-proto') || req.protocol || 'https';
@@ -55,8 +76,8 @@ router.get('/google/callback', async (req: Request, res: Response, next: NextFun
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         code,
-        client_id: config.googleClientId,
-        client_secret: config.googleClientSecret,
+        client_id: creds.clientId,
+        client_secret: creds.clientSecret,
         redirect_uri: redirectUri,
         grant_type: 'authorization_code',
       }),
@@ -90,8 +111,8 @@ router.post('/google/exchange', authenticate, async (req: Request, res: Response
     const { code } = req.body;
     if (!code) { res.status(400).json({ error: 'Authorization code is required' }); return; }
 
-    const config = await prisma.platformConfig.findUnique({ where: { id: 'global' } });
-    if (!config?.googleClientId || !config?.googleClientSecret) {
+    const creds = await getGoogleCredentials(req.workspaceId);
+    if (!creds) {
       res.status(400).json({ error: 'Google API credentials not configured' }); return;
     }
 
@@ -105,8 +126,8 @@ router.post('/google/exchange', authenticate, async (req: Request, res: Response
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         code,
-        client_id: config.googleClientId,
-        client_secret: config.googleClientSecret,
+        client_id: creds.clientId,
+        client_secret: creds.clientSecret,
         redirect_uri: redirectUri,
         grant_type: 'authorization_code',
       }),

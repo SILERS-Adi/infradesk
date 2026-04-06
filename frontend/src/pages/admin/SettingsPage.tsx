@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Mail, Send, History, Building2, Shield, Headphones, Check, Loader2 } from 'lucide-react';
+import { Mail, Send, History, Building2, Shield, Headphones, Check, Loader2, Cloud, Save } from 'lucide-react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -257,7 +257,70 @@ function PinRequestsCard() {
   );
 }
 
+function GoogleDriveCard() {
+  const [clientId, setClientId] = useState('');
+  const [clientSecret, setClientSecret] = useState('');
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    apiClient.get('/workspaces/settings/google-drive').then(r => {
+      setClientId(r.data.google_client_id || '');
+      setClientSecret(r.data.google_client_secret || '');
+      setLoaded(true);
+    }).catch(() => setLoaded(true));
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await apiClient.put('/workspaces/settings/google-drive', { google_client_id: clientId, google_client_secret: clientSecret });
+      toast.success('Zapisano klucze Google Drive');
+    } catch { toast.error('Blad zapisu'); }
+    setSaving(false);
+  };
+
+  if (!loaded) return null;
+
+  const inputCls = "w-full px-3 py-2 text-sm rounded-xl focus:outline-none";
+  const inputStyle = { background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' };
+
+  return (
+    <Card title="Google Drive — kopie zapasowe w chmurze">
+      <div className="rounded-xl p-4 mb-4" style={{ background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.12)' }}>
+        <p className="text-xs font-semibold mb-2" style={{ color: '#60A5FA' }}>Jak uzyskac klucze? (jednorazowo, 5 minut)</p>
+        <ol className="text-[11px] space-y-1.5" style={{ color: 'var(--tm)', paddingLeft: 16, listStyleType: 'decimal' }}>
+          <li>Otworz <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener noreferrer" className="font-semibold underline" style={{ color: '#60A5FA' }}>Google Cloud Console — nowy projekt</a> i nadaj nazwe np. "Backup"</li>
+          <li>Wlacz <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noopener noreferrer" className="font-semibold underline" style={{ color: '#60A5FA' }}>Google Drive API</a></li>
+          <li>Utworz <a href="https://console.cloud.google.com/apis/credentials/consent" target="_blank" rel="noopener noreferrer" className="font-semibold underline" style={{ color: '#60A5FA' }}>Ekran zgody OAuth</a> — typ "Zewnetrzny", wpisz nazwe i email</li>
+          <li>Przejdz do <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="font-semibold underline" style={{ color: '#60A5FA' }}>Dane logowania</a> → "+ Utworz dane logowania" → "Identyfikator klienta OAuth"</li>
+          <li>Typ: <strong>Aplikacja internetowa</strong></li>
+          <li>URI przekierowania: <code className="text-[10px] px-2 py-0.5 rounded" style={{ background: 'var(--hover-bg)', color: '#60A5FA', userSelect: 'all' }}>https://infradesk.pl/api/backup/google/callback</code></li>
+          <li>Skopiuj <strong>Client ID</strong> i <strong>Client Secret</strong> i wklej ponizej</li>
+        </ol>
+      </div>
+      <div className="grid grid-cols-2 gap-4 mb-3">
+        <div>
+          <label className="text-[10px] font-bold uppercase tracking-wider block mb-1" style={{ color: 'var(--tm)' }}>Client ID</label>
+          <input className={inputCls} style={inputStyle} value={clientId} onChange={e => setClientId(e.target.value)} placeholder="xxx.apps.googleusercontent.com" />
+        </div>
+        <div>
+          <label className="text-[10px] font-bold uppercase tracking-wider block mb-1" style={{ color: 'var(--tm)' }}>Client Secret</label>
+          <input className={inputCls} style={inputStyle} type="password" value={clientSecret} onChange={e => setClientSecret(e.target.value)} placeholder="GOCSPX-..." />
+        </div>
+      </div>
+      {clientId && clientSecret && (
+        <div className="flex items-center gap-2 text-xs font-semibold mb-3" style={{ color: '#4ADE80' }}>
+          <div className="w-2 h-2 rounded-full bg-emerald-400" /> Klucze ustawione — klienci moga uzywac Google Drive w backupach
+        </div>
+      )}
+      <Button size="sm" onClick={save} loading={saving} icon={<Save className="h-3.5 w-3.5" />}>Zapisz</Button>
+    </Card>
+  );
+}
+
 export function SettingsPage() {
+  const { features } = useWorkspaceContext();
   return (
     <div className="space-y-6 max-w-4xl">
       <PageHeader
@@ -265,6 +328,7 @@ export function SettingsPage() {
         subtitle="Konfiguracja systemu InfraDesk"
       />
       <OrganizationTypeCard />
+      <GoogleDriveCard />
       <SmtpSettingsCard />
       <PinRequestsCard />
     </div>
