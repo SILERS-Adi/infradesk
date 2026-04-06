@@ -1,12 +1,11 @@
 /**
- * Workspace middleware — Etap 1A (read-only, non-blocking)
+ * Workspace middleware — Multi-tenant security layer
  *
- * resolveWorkspace():  Establishes req.workspaceId from subdomain or header.
- * resolveMembership(): Loads WorkspaceMembership for the authenticated user.
- *
- * Neither middleware blocks requests. They enrich the request context
- * so that downstream handlers can optionally use workspace-aware logic.
- * authorizeWorkspace() is the active gatekeeper.
+ * resolveWorkspace():     Establishes req.workspaceId from subdomain or header (non-blocking).
+ * resolveMembership():    Loads WorkspaceMembership for the authenticated user.
+ * requireWorkspace():     BLOCKING — requires valid workspace + active membership.
+ *                         Logs security violations on unauthorized access attempts.
+ * authorizeWorkspace():   Role-based gatekeeper.
  */
 
 import { Request, Response, NextFunction } from 'express';
@@ -292,6 +291,136 @@ export function authorizeWorkspace(...allowedRoles: MemberRole[]) {
 
     res.status(403).json({ error: 'No workspace membership' });
   };
+}
+
+
+// ══════════════════════════════════════════════════════════════════════
+//  requireWorkspace — BLOCKING tenant isolation guard
+//
+//  Ensures:
+//  1. req.workspaceId is set
+//  2. Authenticated user has ACTIVE membership in that workspace
+//
+//  MUST run AFTER authenticate() + resolveWorkspace()
+//  Replaces the non-blocking pattern for all tenant-scoped routes.
+// ══════════════════════════════════════════════════════════════════════
+
+export async function requireWorkspace(req: Request, res: Response, next: NextFunction): Promise<void> {
+  // SuperAdmin bypass — has access to all workspaces
+  if (req.user?.isSuperAdmin) {
+    if (!req.workspaceId) {
+      res.status(400).json({ error: 'Workspace context required (X-Workspace-Id header)' });
+      return;
+    }
+    next();
+    return;
+  }
+
+  if (!req.workspaceId) {
+    res.status(400).json({ error: 'Workspace context required' });
+    return;
+  }
+
+  if (!req.user?.userId) {
+    res.status(401).json({ error: 'Authentication required' });
+    return;
+  }
+
+  // Verify active membership in the requested workspace
+  const membership = await prisma.workspaceMembership.findUnique({
+    where: {
+      userId_workspaceId: {
+        userId: req.user.userId,
+        workspaceId: req.workspaceId,
+      },
+    },
+    select: { status: true },
+  });
+
+  if (!membership || membership.status !== 'ACTIVE') {
+    // ⚠️ SECURITY: Log unauthorized workspace access attempt
+    logSecurityViolation(req, 'WORKSPACE_ACCESS_DENIED', {
+      attemptedWorkspaceId: req.workspaceId,
+    });
+    res.status(403).json({ error: 'No access to this workspace' });
+    return;
+  }
+
+  next();
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  assertWorkspaceOwnership — verify a record belongs to req.workspaceId
+//
+//  Usage in services:
+//    assertWorkspaceOwnership(record.workspaceId, req.workspaceId, req)
+// ══════════════════════════════════════════════════════════════════════
+
+export function assertWorkspaceOwnership(
+  recordWorkspaceId: string | null | undefined,
+  requestWorkspaceId: string | null | undefined,
+  req?: Request,
+): void {
+  if (!requestWorkspaceId) {
+    throw new TenantIsolationError('Workspace context required');
+  }
+  if (recordWorkspaceId !== requestWorkspaceId) {
+    if (req) {
+      logSecurityViolation(req, 'CROSS_TENANT_ACCESS', {
+        recordWorkspaceId,
+        requestWorkspaceId,
+      });
+    }
+    throw new TenantIsolationError('Access denied — resource belongs to another workspace');
+  }
+}
+
+/**
+ * Custom error class for tenant isolation violations.
+ * Returns 403 status code.
+ */
+export class TenantIsolationError extends Error {
+  statusCode = 403;
+  constructor(message: string) {
+    super(message);
+    this.name = 'TenantIsolationError';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  Security violation logging
+// ══════════════════════════════════════════════════════════════════════
+
+function logSecurityViolation(
+  req: Request,
+  type: string,
+  details: Record<string, unknown>,
+): void {
+  const entry = {
+    timestamp: new Date().toISOString(),
+    type,
+    userId: req.user?.userId ?? 'anonymous',
+    email: req.user?.email ?? 'unknown',
+    ip: req.ip || req.socket?.remoteAddress,
+    method: req.method,
+    path: req.originalUrl,
+    workspaceId: req.workspaceId,
+    ...details,
+  };
+  console.warn('[SECURITY]', JSON.stringify(entry));
+
+  // Async: persist to DB (fire-and-forget)
+  prisma.activityLog.create({
+    data: {
+      entityType: 'Security',
+      entityId: entry.userId,
+      actionType: 'SECURITY_VIOLATION',
+      description: `${type}: ${req.method} ${req.path}`,
+      performedByUserId: req.user?.userId,
+      workspaceId: req.workspaceId ?? undefined,
+      metadata: details as any,
+    },
+  }).catch(() => { /* silent — logging must never break the request */ });
 }
 
 
