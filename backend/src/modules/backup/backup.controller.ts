@@ -39,7 +39,8 @@ export async function getConfig(req: Request, res: Response, next: NextFunction)
 
 export async function postConfig(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const config = await createBackupConfig(req.body, req.user?.userId);
+    const data = { ...req.body, workspaceId: req.workspaceId };
+    const config = await createBackupConfig(data, req.user?.userId);
     res.status(201).json(config);
   } catch (err) { next(err); }
 }
