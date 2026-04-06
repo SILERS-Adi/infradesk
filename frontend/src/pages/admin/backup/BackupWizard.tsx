@@ -374,7 +374,7 @@ export default function BackupWizard({ open, onClose, companyFilter }: { open: b
       window.open(url, '_blank', 'width=500,height=600');
     } catch (err: any) {
       if (err?.response?.status === 400 || err?.response?.data?.error?.includes?.('Google')) {
-        window.open('/superadmin/config', '_blank');
+        window.open('/superadmin/pricing', '_blank');
         toast.error('Google Drive API nie skonfigurowane — otwieram ustawienia');
       } else {
         toast.error(err?.response?.data?.error || 'Błąd połączenia z Google Drive');
