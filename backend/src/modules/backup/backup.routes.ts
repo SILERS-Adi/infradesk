@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../../middleware/auth';
-import { withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
+import { withWorkspaceMembership, authorizeWorkspace, requireWorkspace } from '../../middleware/workspace';
 import { validate } from '../../middleware/validate';
 import { createBackupConfigSchema, updateBackupConfigSchema } from './backup.validation';
 import {
@@ -162,7 +162,7 @@ router.post('/google/exchange', authenticate, async (req: Request, res: Response
 
 // ── Backup CRUD ────────────────────────────────────────────────────
 
-router.use(withWorkspaceMembership, requireFeature('backup'));
+router.use(requireWorkspace, withWorkspaceMembership, requireFeature('backup'));
 
 router.get('/configs', authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), getConfigs);
 router.get('/configs/:id', authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), getConfig);
@@ -260,6 +260,33 @@ router.get('/cloud/usage', authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), a
     walk(wsDir);
 
     res.json({ totalBytes, fileCount, totalMB: Math.round(totalBytes / 1024 / 1024) });
+  } catch (err) { next(err); }
+});
+
+// List backup files for a config
+router.get('/cloud/files/:configId', authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const config = await prisma.backupConfig.findFirst({ where: { id: req.params.configId, workspaceId: req.workspace!.id } });
+    if (!config) { res.status(404).json({ error: 'Config not found' }); return; }
+    const dir = path.join(INFRADESK_STORAGE_PATH, config.workspaceId, config.id);
+    if (!fs.existsSync(dir)) { res.json([]); return; }
+    const files = fs.readdirSync(dir).map(name => {
+      const stat = fs.statSync(path.join(dir, name));
+      return { name, sizeBytes: stat.size, createdAt: stat.mtime.toISOString() };
+    }).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    res.json(files);
+  } catch (err) { next(err); }
+});
+
+// Download backup file
+router.get('/cloud/download/:configId/:fileName', authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const config = await prisma.backupConfig.findFirst({ where: { id: req.params.configId, workspaceId: req.workspace!.id } });
+    if (!config) { res.status(404).json({ error: 'Config not found' }); return; }
+    const filePath = path.join(INFRADESK_STORAGE_PATH, config.workspaceId, config.id, req.params.fileName);
+    if (!fs.existsSync(filePath)) { res.status(404).json({ error: 'File not found' }); return; }
+    res.setHeader('Content-Disposition', `attachment; filename="${req.params.fileName}"`);
+    res.sendFile(filePath);
   } catch (err) { next(err); }
 });
 

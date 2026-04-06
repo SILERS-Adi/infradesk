@@ -100,21 +100,52 @@ def res(name: str) -> str:
     return name
 
 
-# --- Config I/O -----------------------------------------------------------
+# --- Config I/O (with DPAPI token encryption on Windows) ------------------
+
+def _dpapi_encrypt(plaintext: str) -> str:
+    try:
+        import win32crypt, base64
+        blob = win32crypt.CryptProtectData(
+            plaintext.encode("utf-8"), "InfraDesk Agent Token", None, None, None, 0)
+        return "dpapi:" + base64.b64encode(blob).decode("ascii")
+    except Exception:
+        return plaintext
+
+def _dpapi_decrypt(encrypted: str) -> str:
+    if not encrypted.startswith("dpapi:"):
+        return encrypted
+    try:
+        import win32crypt, base64
+        blob = base64.b64decode(encrypted[6:])
+        _, data = win32crypt.CryptUnprotectData(blob, None, None, None, 0)
+        return data.decode("utf-8")
+    except Exception as e:
+        log.warning("DPAPI decrypt failed: %s", e)
+        return encrypted
 
 def load_config() -> dict:
     try:
         with open(CONFIG_FILE, encoding="utf-8") as f:
-            return json.load(f)
+            cfg = json.load(f)
+        if cfg.get("token"):
+            cfg["token"] = _dpapi_decrypt(cfg["token"])
+        if cfg.get("token") and not cfg.get("_encrypted"):
+            cfg["_encrypted"] = True
+            save_config(cfg)
+        return cfg
     except Exception:
         return {}
 
 
 def save_config(data: dict):
     os.makedirs(INSTALL_DIR, exist_ok=True)
+    to_save = dict(data)
+    if to_save.get("token") and not to_save.get("token", "").startswith("dpapi:"):
+        to_save["token"] = _dpapi_encrypt(to_save["token"])
+    to_save["_encrypted"] = True
     tmp = CONFIG_FILE + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+        json.dump(to_save, f, indent=2)
         f.flush()
         os.fsync(f.fileno())
     try:
@@ -126,7 +157,7 @@ def save_config(data: dict):
         shutil.copy2(tmp, CONFIG_FILE)
         try: os.remove(tmp)
         except Exception: pass
-    log.info("Config SAVED: %s (keys=%s)", CONFIG_FILE, list(data.keys()))
+    log.info("Config SAVED: %s (keys=%s)", CONFIG_FILE, list(to_save.keys()))
 
 
 # --- Instalacja -----------------------------------------------------------
@@ -635,8 +666,6 @@ def install_rustdesk(notify_fn=None) -> bool:
         _notify("Pobieranie SILERS...")
         import ssl
         ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
         with urllib.request.urlopen(SILERS_MSI_URL, context=ctx, timeout=120) as resp:
             with open(msi, "wb") as f:
                 f.write(resp.read())
@@ -670,8 +699,6 @@ def check_for_update():
     try:
         import ssl
         ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
         with urllib.request.urlopen(VERSION_URL, context=ctx, timeout=10) as r:
             data = json.loads(r.read())
         remote = data.get("version", "0.0.0")
@@ -694,8 +721,6 @@ def do_self_update(download_url, notify_fn=None):
         _notify("Pobieranie aktualizacji...")
         import ssl, shutil
         ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
         with urllib.request.urlopen(download_url, context=ctx, timeout=120) as resp:
             with open(tmp_exe, "wb") as f:
                 f.write(resp.read())
@@ -838,7 +863,8 @@ class WS:
     def _run(self):
         while True:
             try:
-                app = websocket.WebSocketApp(f"{WS_BASE}?token={self.token}",
+                app = websocket.WebSocketApp(WS_BASE,
+                    header=[f"Authorization: Bearer {self.token}"],
                     on_open=lambda ws: setattr(self, '_sock', ws),
                     on_message=lambda ws, m: self._on(m),
                     on_close=lambda ws, *a: setattr(self, '_sock', None))
@@ -1492,6 +1518,25 @@ class BackupScheduler:
             if drive_folder:
                 drive_id = self._upload_gdrive(path, drive_folder)
 
+            # Upload to InfraDesk Cloud if enabled
+            if cfg.get("useInfradeskCloud"):
+                try:
+                    self._upload_infradesk_cloud(path, cfg.get("id", ""))
+                    log.info("Uploaded to InfraDesk Cloud: %s", os.path.basename(path))
+                except Exception as ue:
+                    log.error("InfraDesk Cloud upload failed: %s", ue)
+
+            # Copy to local/network path if configured
+            local_path = cfg.get("localBackupPath")
+            if local_path:
+                try:
+                    os.makedirs(local_path, exist_ok=True)
+                    import shutil
+                    shutil.copy2(path, os.path.join(local_path, os.path.basename(path)))
+                    log.info("Copied to local path: %s", local_path)
+                except Exception as le:
+                    log.error("Local copy failed: %s", le)
+
             file_size = os.path.getsize(path) if os.path.exists(path) else 0
 
             api_post("/agent/backup/complete", {
@@ -1600,6 +1645,23 @@ class BackupScheduler:
         except ImportError:
             log.warning("cryptography not installed, skipping encryption")
             return path
+
+    def _upload_infradesk_cloud(self, path, config_id):
+        """Upload backup file to InfraDesk Cloud storage."""
+        url = f"{API_BASE}/backup/cloud/upload"
+        with open(path, "rb") as f:
+            resp = requests.post(
+                url,
+                files={"backup": (os.path.basename(path), f)},
+                headers={
+                    "x-agent-token": self.token,
+                    "x-backup-config-id": config_id,
+                },
+                timeout=1800,
+            )
+        if resp.status_code != 200:
+            raise RuntimeError(f"InfraDesk Cloud upload error {resp.status_code}: {resp.text[:200]}")
+        return resp.json()
 
     def _upload_gdrive(self, path, folder_id):
         try:
@@ -1808,25 +1870,14 @@ class BusinessAPI:
                    r"C:\Program Files (x86)\RustDesk\rustdesk.exe"]:
             if os.path.exists(p):
                 rd_exe = p; break
-        rd_password = None
-        try:
-            # RustDesk password from config
-            rd_cfg_path = os.path.join(os.environ.get("APPDATA", ""), "RustDesk", "config", "RustDesk2.toml")
-            if not os.path.exists(rd_cfg_path):
-                rd_cfg_path = os.path.join(os.environ.get("APPDATA", ""), "SILERS", "config", "SILERS2.toml")
-            if os.path.exists(rd_cfg_path):
-                with open(rd_cfg_path, encoding="utf-8") as f:
-                    for line in f:
-                        if line.strip().startswith("password"):
-                            rd_password = line.split("=", 1)[1].strip().strip("'\"")
-                            break
-        except Exception: pass
+        # Security: RustDesk password extraction removed — passwords are managed via
+        # one-time connect passwords generated server-side through the API.
         programs.append({
             "name": "RustDesk",
             "installed": rd_installed,
             "exe": rd_exe,
             "id": rd_id,
-            "password": rd_password,
+            "password": None,
             "canInstall": True,
         })
 
