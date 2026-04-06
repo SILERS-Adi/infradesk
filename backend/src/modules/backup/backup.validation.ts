@@ -22,7 +22,7 @@ export const createBackupConfigSchema = z.object({
   ftpUser:                 z.string().optional().nullable(),
   ftpPassEnc:              z.string().optional().nullable(),
   ftpPath:                 z.string().optional().nullable(),
-  notifyEmail:             z.string().email().optional().nullable(),
+  notifyEmail:             z.string().optional().nullable(),
   cronSchedule:            z.string().default('0 2 * * *'),
   retentionDays:   z.number().int().min(1).max(365).default(30),
   encryptBackups:  z.boolean().default(true),
