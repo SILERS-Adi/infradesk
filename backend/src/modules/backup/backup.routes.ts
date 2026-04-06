@@ -160,6 +160,46 @@ router.post('/google/exchange', authenticate, async (req: Request, res: Response
   } catch (err) { next(err); }
 });
 
+// ── Agent cloud upload (before workspace auth — agent uses token auth) ──
+
+router.post('/cloud/upload', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = req.headers['x-agent-token'] as string;
+    if (!token) { res.status(401).json({ error: 'Agent token required' }); return; }
+
+    const agent = await prisma.agentRegistration.findUnique({ where: { agentToken: token } });
+    if (!agent) { res.status(401).json({ error: 'Invalid agent token' }); return; }
+
+    const configId = req.headers['x-backup-config-id'] as string;
+    if (!configId) { res.status(400).json({ error: 'Backup config ID required' }); return; }
+
+    const config = await prisma.backupConfig.findUnique({ where: { id: configId } });
+    if (!config || !config.useInfradeskCloud) {
+      res.status(400).json({ error: 'InfraDesk Cloud not enabled for this config' }); return;
+    }
+
+    const wsDir = path.join(INFRADESK_STORAGE_PATH, config.workspaceId, configId);
+    fs.mkdirSync(wsDir, { recursive: true });
+
+    const uploadHandler = multer({
+      storage: multer.diskStorage({
+        destination: (_r, _f, cb) => cb(null, wsDir),
+        filename: (_r, file, cb) => {
+          const ts = new Date().toISOString().replace(/[:.]/g, '-');
+          cb(null, `${ts}_${file.originalname}`);
+        },
+      }),
+      limits: { fileSize: 5 * 1024 * 1024 * 1024 },
+    }).single('backup');
+
+    uploadHandler(req, res, async (err) => {
+      if (err) { res.status(400).json({ error: err.message }); return; }
+      if (!req.file) { res.status(400).json({ error: 'No file uploaded' }); return; }
+      res.json({ ok: true, fileName: req.file.filename, sizeBytes: req.file.size });
+    });
+  } catch (err) { next(err); }
+});
+
 // ── Backup CRUD ────────────────────────────────────────────────────
 
 router.use(withWorkspaceMembership, requireFeature('backup'));
@@ -192,54 +232,6 @@ const upload = multer({
     },
   }),
   limits: { fileSize: 5 * 1024 * 1024 * 1024 }, // 5 GB max
-});
-
-// Agent uploads backup file to InfraDesk Cloud
-router.post('/cloud/upload', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    // Agent auth via token header
-    const token = req.headers['x-agent-token'] as string;
-    if (!token) { res.status(401).json({ error: 'Agent token required' }); return; }
-
-    const agent = await prisma.agentRegistration.findUnique({ where: { agentToken: token } });
-    if (!agent) { res.status(401).json({ error: 'Invalid agent token' }); return; }
-
-    const configId = req.headers['x-backup-config-id'] as string;
-    if (!configId) { res.status(400).json({ error: 'Backup config ID required' }); return; }
-
-    const config = await prisma.backupConfig.findUnique({ where: { id: configId } });
-    if (!config || !config.useInfradeskCloud) {
-      res.status(400).json({ error: 'InfraDesk Cloud not enabled for this config' }); return;
-    }
-
-    // Create workspace subdirectory
-    const wsDir = path.join(INFRADESK_STORAGE_PATH, config.workspaceId, configId);
-    fs.mkdirSync(wsDir, { recursive: true });
-
-    // Handle upload
-    const uploadHandler = multer({
-      storage: multer.diskStorage({
-        destination: (_r, _f, cb) => cb(null, wsDir),
-        filename: (_r, file, cb) => {
-          const ts = new Date().toISOString().replace(/[:.]/g, '-');
-          cb(null, `${ts}_${file.originalname}`);
-        },
-      }),
-      limits: { fileSize: 5 * 1024 * 1024 * 1024 },
-    }).single('backup');
-
-    uploadHandler(req, res, async (err) => {
-      if (err) { res.status(400).json({ error: err.message }); return; }
-      if (!req.file) { res.status(400).json({ error: 'No file uploaded' }); return; }
-
-      res.json({
-        ok: true,
-        fileName: req.file.filename,
-        sizeBytes: req.file.size,
-        path: req.file.path,
-      });
-    });
-  } catch (err) { next(err); }
 });
 
 // Get storage usage for workspace
