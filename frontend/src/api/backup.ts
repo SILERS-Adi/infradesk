@@ -14,6 +14,15 @@ export interface BackupConfig {
   sqlDatabases?: string;
   folderPath?: string;
   googleDriveFolder?: string;
+  googleDriveRefreshToken?: string;
+  googleDriveEmail?: string;
+  localBackupPath?: string;
+  ftpHost?: string;
+  ftpPort?: number;
+  ftpUser?: string;
+  ftpPassEnc?: string;
+  ftpPath?: string;
+  notifyEmail?: string;
   cronSchedule: string;
   retentionDays: number;
   encryptBackups: boolean;
@@ -58,4 +67,11 @@ export const backupApi = {
 
   runNow: (configId: string) =>
     api.post(`/backup/configs/${configId}/run-now`).then(r => r.data),
+
+  // Google Drive OAuth
+  getGoogleAuthUrl: () =>
+    api.get('/backup/google/auth-url').then(r => r.data as { url: string }),
+
+  exchangeGoogleCode: (code: string) =>
+    api.post('/backup/google/exchange', { code }).then(r => r.data as { email: string; refreshToken: string }),
 };

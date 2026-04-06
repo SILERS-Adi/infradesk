@@ -119,28 +119,82 @@ router.delete('/tenants/:id', async (req: Request, res: Response, next: NextFunc
   res.status(204).send();
 });
 
+// ── Workspaces list (for selects) ───────────────────────────────────
+
+router.get('/workspaces-list', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const workspaces = await prisma.workspace.findMany({
+      select: { id: true, name: true, type: true },
+      orderBy: { name: 'asc' },
+    });
+    res.json(workspaces);
+  } catch (err) { next(err); }
+});
+
 // ── All Users (global) ──────────────────────────────────────────────
 
 router.get('/users', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const users = await prisma.user.findMany({
       select: {
-        id: true, firstName: true, lastName: true, email: true,
+        id: true, firstName: true, lastName: true, email: true, phone: true,
         isActive: true, isSuperAdmin: true, lastLoginAt: true, createdAt: true,
+        workspaceMemberships: {
+          select: {
+            id: true, role: true, scopeType: true, source: true, workspaceId: true,
+            workspace: { select: { id: true, name: true, type: true } },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
-      take: 200,
+      take: 500,
     });
     res.json(users);
   } catch (err) { next(err); }
 });
 
+router.post('/users', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { firstName, lastName, email, password, phone, workspaceId, role } = req.body;
+    if (!firstName || !lastName || !email || !password) {
+      res.status(400).json({ error: 'firstName, lastName, email, password are required' }); return;
+    }
+    if (password.length < 6) { res.status(400).json({ error: 'Password must be at least 6 characters' }); return; }
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) { res.status(409).json({ error: 'Email already in use' }); return; }
+
+    const bcrypt = require('bcrypt');
+    const passwordHash = await bcrypt.hash(password, 12);
+    const user = await prisma.user.create({
+      data: { firstName, lastName, email, phone: phone || null, passwordHash },
+      select: { id: true, firstName: true, lastName: true, email: true },
+    });
+
+    if (workspaceId) {
+      await prisma.workspaceMembership.create({
+        data: { userId: user.id, workspaceId, role: role || 'MEMBER', scopeType: 'FULL', source: 'DIRECT' },
+      }).catch(() => {});
+    }
+
+    res.status(201).json(user);
+  } catch (err) { next(err); }
+});
+
 router.patch('/users/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const allowed = ['firstName', 'lastName', 'email', 'phone', 'isActive', 'isSuperAdmin'] as const;
+    const data: Record<string, any> = {};
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) data[key] = req.body[key];
+    }
+    if (data.email) {
+      const taken = await prisma.user.findFirst({ where: { email: data.email, NOT: { id: req.params.id } } });
+      if (taken) { res.status(409).json({ error: 'Email already in use' }); return; }
+    }
     const user = await prisma.user.update({
       where: { id: req.params.id },
-      data: req.body,
-      select: { id: true, email: true, isSuperAdmin: true, isActive: true },
+      data,
+      select: { id: true, firstName: true, lastName: true, email: true, phone: true, isActive: true, isSuperAdmin: true },
     });
     res.json(user);
   } catch (err) { next(err); }
@@ -159,6 +213,52 @@ router.post('/users/:id/reset-password', async (req: Request, res: Response, nex
     const passwordHash = await bcrypt.hash(password, 12);
     await prisma.user.update({ where: { id: req.params.id }, data: { passwordHash } });
     res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// ── Workspace memberships (SuperAdmin) ──────────────────────────────
+
+router.post('/users/:id/memberships', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { workspaceId, role, scopeType } = req.body;
+    if (!workspaceId) { res.status(400).json({ error: 'workspaceId is required' }); return; }
+    const existing = await prisma.workspaceMembership.findUnique({
+      where: { userId_workspaceId: { userId: req.params.id, workspaceId } },
+    });
+    if (existing) { res.status(409).json({ error: 'User is already a member of this workspace' }); return; }
+    const membership = await prisma.workspaceMembership.create({
+      data: {
+        userId: req.params.id, workspaceId,
+        role: role || 'MEMBER', scopeType: scopeType || 'FULL',
+        source: 'DIRECT',
+      },
+      include: { workspace: { select: { id: true, name: true, type: true } } },
+    });
+    res.status(201).json(membership);
+  } catch (err) { next(err); }
+});
+
+router.patch('/users/:id/memberships/:membershipId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { role, scopeType } = req.body;
+    const data: Record<string, any> = {};
+    if (role) data.role = role;
+    if (scopeType) data.scopeType = scopeType;
+    const membership = await prisma.workspaceMembership.update({
+      where: { id: req.params.membershipId },
+      data,
+      include: { workspace: { select: { id: true, name: true, type: true } } },
+    });
+    res.json(membership);
+  } catch (err) { next(err); }
+});
+
+router.delete('/users/:id/memberships/:membershipId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await prisma.accessGrant.deleteMany({ where: { membershipId: req.params.membershipId } });
+    await prisma.userPermissionOverride.deleteMany({ where: { membershipId: req.params.membershipId } });
+    await prisma.workspaceMembership.delete({ where: { id: req.params.membershipId } });
+    res.status(204).send();
   } catch (err) { next(err); }
 });
 

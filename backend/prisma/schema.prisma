@@ -162,6 +162,9 @@ model PlatformConfig {
   alertSmtpPass        String?
   alertSmtpFrom        String?
   alertSmtpFromName    String?  @default("InfraDesk Alert")
+  // Google Drive API (OAuth2 for backups)
+  googleClientId       String?
+  googleClientSecret   String?
   // Ogólne
   platformName         String   @default("InfraDesk")
   supportEmail         String?
@@ -902,13 +905,22 @@ model BackupConfig {
   sqlPassEnc        String?
   sqlDatabases      String?
   folderPath        String?
-  googleDriveFolder String?
-  cronSchedule      String    @default("0 2 * * *")
-  retentionDays     Int       @default(30)
-  encryptBackups    Boolean   @default(true)
-  encryptionKey     String?
-  lastRunAt         DateTime?
-  lastStatus        String? // SUCCESS | FAILED | RUNNING
+  googleDriveFolder       String?
+  googleDriveRefreshToken String?   // encrypted OAuth2 refresh token
+  googleDriveEmail        String?   // authorized Google account email
+  localBackupPath         String?   // local/network path for backup storage
+  ftpHost                 String?
+  ftpPort                 Int?
+  ftpUser                 String?
+  ftpPassEnc              String?   // encrypted FTP password
+  ftpPath                 String?
+  notifyEmail             String?   // email for success/failure notifications
+  cronSchedule            String    @default("0 2 * * *")
+  retentionDays           Int       @default(30)
+  encryptBackups          Boolean   @default(true)
+  encryptionKey           String?
+  lastRunAt               DateTime?
+  lastStatus              String?   // SUCCESS | FAILED | RUNNING
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 

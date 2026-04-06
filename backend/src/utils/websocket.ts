@@ -42,6 +42,7 @@ export function initWebSocket(server: import('http').Server) {
     ws.on('message', (raw) => {
       try {
         const msg = JSON.parse(raw.toString());
+        console.log(`[WS MSG] from ${reg.hostname}:`, JSON.stringify(msg).slice(0, 200));
         if (msg.requestId) {
           const { handleAgentResponse } = require('./remoteCommand');
           handleAgentResponse(token, msg);
