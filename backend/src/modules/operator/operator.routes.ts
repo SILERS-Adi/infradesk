@@ -1,10 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../../middleware/auth';
-import { withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
+import { withWorkspaceMembership, authorizeWorkspace, requireWorkspace } from '../../middleware/workspace';
 import prisma from '../../lib/prisma';
 
 const router = Router();
-router.use(authenticate);
+// Security: operator routes are workspace-scoped to the MSP workspace. Cross-workspace client access is validated per-endpoint via WorkspaceManagement relations.
+router.use(authenticate, requireWorkspace);
 
 /**
  * Middleware: require organization_type = it_operator
@@ -164,13 +165,19 @@ router.get('/clients/available', withWorkspaceMembership, authorizeWorkspace('OW
     const linkedIds = new Set(linked.map(r => r.clientWorkspaceId));
     linkedIds.add(wsId); // exclude self
 
+    // Security: only return workspaces with client/internal_it type (not other MSPs),
+    // and minimize data exposure — no email or taxId in listing.
     const available = await prisma.workspace.findMany({
-      where: { isActive: true },
-      select: { id: true, name: true, slug: true, organizationType: true, city: true, taxId: true, email: true },
+      where: {
+        isActive: true,
+        id: { notIn: Array.from(linkedIds) },
+        organizationType: { in: ['client', 'internal_it', 'client_external_it'] },
+      },
+      select: { id: true, name: true, slug: true, organizationType: true, city: true },
       orderBy: { name: 'asc' },
     });
 
-    res.json(available.filter(w => !linkedIds.has(w.id)));
+    res.json(available);
   } catch (err) { next(err); }
 });
 
@@ -300,6 +307,61 @@ router.get('/clients', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADM
     }));
 
     res.json(clients);
+  } catch (err) { next(err); }
+});
+
+// GET /api/operator/billing — billing data for all clients with sessions
+router.get('/billing', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), requireOperator, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const wsId = req.workspaceId!;
+    const { from, to } = req.query as Record<string, string>;
+
+    const relations = await prisma.workspaceRelation.findMany({
+      where: { providerWorkspaceId: wsId, status: 'ACTIVE' },
+      include: { clientWorkspace: { select: { id: true, name: true, slug: true } } },
+    });
+
+    const clientIds = relations.map(r => r.clientWorkspaceId);
+
+    const where: any = { workspaceId: { in: clientIds } };
+    if (from || to) {
+      where.startedAt = {};
+      if (from) where.startedAt.gte = new Date(from);
+      if (to) where.startedAt.lte = new Date(to);
+    }
+
+    const sessions = await prisma.workSession.findMany({
+      where,
+      include: {
+        tech: { select: { id: true, firstName: true, lastName: true } },
+        ticket: { select: { id: true, ticketNumber: true, title: true } },
+        workspace: { select: { id: true, name: true } },
+      },
+      orderBy: { startedAt: 'desc' },
+    });
+
+    // Group sessions by workspace
+    const sessionsByWs = new Map<string, typeof sessions>();
+    for (const s of sessions) {
+      const arr = sessionsByWs.get(s.workspaceId) ?? [];
+      arr.push(s);
+      sessionsByWs.set(s.workspaceId, arr);
+    }
+
+    const result = relations.map(r => ({
+      relationId: r.id,
+      client: r.clientWorkspace,
+      billingType: r.billingType,
+      subscriptionMonthlyNet: r.subscriptionMonthlyNet,
+      subscriptionHours: r.subscriptionHours,
+      overageRate: r.overageRate,
+      hourlyRate: r.hourlyRate,
+      billingIncrementMin: r.billingIncrementMin,
+      billingPeriod: (r as any).billingPeriod ?? 'monthly',
+      sessions: sessionsByWs.get(r.clientWorkspaceId) ?? [],
+    }));
+
+    res.json(result);
   } catch (err) { next(err); }
 });
 

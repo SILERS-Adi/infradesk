@@ -112,7 +112,7 @@ router.patch('/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN
       canViewDevices, canViewUsers, canViewLocations, canReceiveTickets,
       canCreateTicketsOnBehalf, canAccessAlerts, isDefaultHelpdeskProvider,
       billingType, subscriptionMonthlyNet, subscriptionHours, overageRate,
-      hourlyRate, billingIncrementMin, contractFileUrl,
+      hourlyRate, billingIncrementMin, billingPeriod, contractFileUrl,
     } = req.body;
 
     const updated = await prisma.workspaceRelation.update({
@@ -131,6 +131,7 @@ router.patch('/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN
         overageRate: overageRate !== undefined ? Number(overageRate) || null : undefined,
         hourlyRate: hourlyRate !== undefined ? Number(hourlyRate) || null : undefined,
         billingIncrementMin: billingIncrementMin !== undefined ? Number(billingIncrementMin) : undefined,
+        billingPeriod: billingPeriod ?? undefined,
         contractFileUrl: contractFileUrl ?? undefined,
       },
     });

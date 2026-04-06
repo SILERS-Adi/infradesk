@@ -15,8 +15,11 @@ interface ClientBillingModalProps {
 
 type BillingType = 'subscription' | 'hourly';
 
+type BillingPeriod = 'monthly' | 'quarterly' | 'yearly';
+
 interface BillingForm {
   billingType: BillingType;
+  billingPeriod: BillingPeriod;
   subscriptionAmount: number | '';
   includedHours: number | '';
   overageRate: number | '';
@@ -26,6 +29,11 @@ interface BillingForm {
 }
 
 const INCREMENT_OPTIONS = [1, 5, 10, 15, 30, 60];
+const PERIOD_OPTIONS: { value: BillingPeriod; label: string }[] = [
+  { value: 'monthly', label: 'Miesiecznie' },
+  { value: 'quarterly', label: 'Kwartalnie' },
+  { value: 'yearly', label: 'Rocznie' },
+];
 
 const cardStyle = (selected: boolean): React.CSSProperties => ({
   flex: 1,
@@ -60,6 +68,7 @@ export default function ClientBillingModal({ open, onClose, relationId, clientNa
 
   const [form, setForm] = useState<BillingForm>({
     billingType: 'subscription',
+    billingPeriod: 'monthly',
     subscriptionAmount: '',
     includedHours: '',
     overageRate: '',
@@ -80,11 +89,12 @@ export default function ClientBillingModal({ open, onClose, relationId, clientNa
     if (!data) return;
     setForm({
       billingType: data.billingType === 'hourly' ? 'hourly' : 'subscription',
-      subscriptionAmount: data.subscriptionAmount ?? '',
-      includedHours: data.includedHours ?? '',
+      billingPeriod: data.billingPeriod ?? 'monthly',
+      subscriptionAmount: data.subscriptionMonthlyNet ?? '',
+      includedHours: data.subscriptionHours ?? '',
       overageRate: data.overageRate ?? '',
       hourlyRate: data.hourlyRate ?? '',
-      billingIncrement: data.billingIncrement ?? 15,
+      billingIncrement: data.billingIncrementMin ?? 15,
       contractFileUrl: data.contractFileUrl ?? '',
     });
   }, [data]);
@@ -106,19 +116,20 @@ export default function ClientBillingModal({ open, onClose, relationId, clientNa
   const handleSave = () => {
     const payload: Record<string, unknown> = {
       billingType: form.billingType,
-      billingIncrement: form.billingIncrement,
+      billingPeriod: form.billingPeriod,
+      billingIncrementMin: form.billingIncrement,
       contractFileUrl: form.contractFileUrl || null,
     };
 
     if (form.billingType === 'subscription') {
-      payload.subscriptionAmount = form.subscriptionAmount === '' ? null : Number(form.subscriptionAmount);
-      payload.includedHours = form.includedHours === '' ? null : Number(form.includedHours);
+      payload.subscriptionMonthlyNet = form.subscriptionAmount === '' ? null : Number(form.subscriptionAmount);
+      payload.subscriptionHours = form.includedHours === '' ? null : Number(form.includedHours);
       payload.overageRate = form.overageRate === '' ? null : Number(form.overageRate);
       payload.hourlyRate = null;
     } else {
       payload.hourlyRate = form.hourlyRate === '' ? null : Number(form.hourlyRate);
-      payload.subscriptionAmount = null;
-      payload.includedHours = null;
+      payload.subscriptionMonthlyNet = null;
+      payload.subscriptionHours = null;
       payload.overageRate = null;
     }
 
@@ -208,6 +219,12 @@ export default function ClientBillingModal({ open, onClose, relationId, clientNa
               {numField('Kwota netto / msc', form.subscriptionAmount, v => setForm(p => ({ ...p, subscriptionAmount: v })), 'PLN')}
               {numField('Godziny w abonamencie', form.includedHours, v => setForm(p => ({ ...p, includedHours: v })), 'h')}
               {numField('Stawka po przekroczeniu', form.overageRate, v => setForm(p => ({ ...p, overageRate: v })), 'zł/h')}
+              <div style={inputWrapStyle}>
+                <label style={labelStyle}>Okres rozliczenia</label>
+                <select className="input" value={form.billingPeriod} onChange={e => setForm(p => ({ ...p, billingPeriod: e.target.value as BillingPeriod }))}>
+                  {PERIOD_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
               <div style={inputWrapStyle}>
                 <label style={labelStyle}>Naliczanie co</label>
                 <select

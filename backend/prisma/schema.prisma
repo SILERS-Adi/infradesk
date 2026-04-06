@@ -275,6 +275,7 @@ model WorkspaceRelation {
   overageRate              Float?   // stawka/h po przekroczeniu limitu
   hourlyRate               Float?   // stawka/h (bez abonamentu)
   billingIncrementMin      Int      @default(15) // naliczanie co ile minut
+  billingPeriod            String   @default("monthly") // "monthly" | "quarterly" | "yearly"
   contractFileUrl          String?  // URL skanu umowy (upload)
 
   status    String   @default("ACTIVE")
