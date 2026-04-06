@@ -6,6 +6,7 @@ const sessionInclude = {
   ticket: { select: { id: true, ticketNumber: true, title: true } },
   location: { select: { id: true, name: true } },
   device: { select: { id: true, name: true } },
+  workspace: { select: { id: true, name: true } },
   timeEntries: { orderBy: { startedAt: 'asc' as const } },
 };
 

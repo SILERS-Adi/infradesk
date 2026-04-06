@@ -58,7 +58,12 @@ const ALL_COLUMNS: ColDef[] = [
   },
   {
     key: 'client', label: 'Klient', group: 'Podstawowe', defaultVisible: true,
-    render: s => <span className="text-[13px]" style={{ color: 'var(--ts)' }}>{s.location?.name ?? '—'}</span>,
+    render: s => (
+      <div>
+        <span className="text-[13px]" style={{ color: 'var(--ts)' }}>{(s as any).workspace?.name ?? '—'}</span>
+        {s.location?.name && <span className="text-[10px] ml-1" style={{ color: 'var(--td)' }}>{s.location.name}</span>}
+      </div>
+    ),
   },
   {
     key: 'ticket', label: 'Ticket', group: 'Podstawowe', defaultVisible: true,
