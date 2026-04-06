@@ -1,10 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../../middleware/auth';
-import { withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
+import { withWorkspaceMembership, authorizeWorkspace, requireWorkspace } from '../../middleware/workspace';
 import prisma from '../../lib/prisma';
 
 const router = Router();
-router.use(authenticate);
+// Security: workspace-relations routes are workspace-scoped to the caller's primary workspace. Cross-workspace relation access (client ↔ provider) is validated per-endpoint by checking relation ownership.
+router.use(authenticate, requireWorkspace);
 
 // GET /api/workspace-relations — list relations for current workspace (as client or provider)
 router.get('/', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
@@ -24,6 +25,24 @@ router.get('/', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), a
     ]);
 
     res.json({ asClient, asProvider });
+  } catch (err) { next(err); }
+});
+
+// GET /api/workspace-relations/:id — single relation with billing data
+router.get('/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const relation = await prisma.workspaceRelation.findUnique({
+      where: { id: req.params.id },
+      include: {
+        clientWorkspace: { select: { id: true, name: true } },
+        providerWorkspace: { select: { id: true, name: true } },
+      },
+    });
+    if (!relation) { res.status(404).json({ error: 'Not found' }); return; }
+    if (relation.clientWorkspaceId !== req.workspaceId && relation.providerWorkspaceId !== req.workspaceId) {
+      res.status(403).json({ error: 'No access' }); return;
+    }
+    res.json(relation);
   } catch (err) { next(err); }
 });
 
@@ -89,7 +108,12 @@ router.patch('/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN
       res.status(403).json({ error: 'No access to this relation' }); return;
     }
 
-    const { canViewDevices, canViewUsers, canViewLocations, canReceiveTickets, canCreateTicketsOnBehalf, canAccessAlerts, isDefaultHelpdeskProvider } = req.body;
+    const {
+      canViewDevices, canViewUsers, canViewLocations, canReceiveTickets,
+      canCreateTicketsOnBehalf, canAccessAlerts, isDefaultHelpdeskProvider,
+      billingType, subscriptionMonthlyNet, subscriptionHours, overageRate,
+      hourlyRate, billingIncrementMin, contractFileUrl,
+    } = req.body;
 
     const updated = await prisma.workspaceRelation.update({
       where: { id },
@@ -101,6 +125,13 @@ router.patch('/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN
         canCreateTicketsOnBehalf: canCreateTicketsOnBehalf ?? undefined,
         canAccessAlerts: canAccessAlerts ?? undefined,
         isDefaultHelpdeskProvider: isDefaultHelpdeskProvider ?? undefined,
+        billingType: billingType ?? undefined,
+        subscriptionMonthlyNet: subscriptionMonthlyNet !== undefined ? Number(subscriptionMonthlyNet) || null : undefined,
+        subscriptionHours: subscriptionHours !== undefined ? Number(subscriptionHours) || null : undefined,
+        overageRate: overageRate !== undefined ? Number(overageRate) || null : undefined,
+        hourlyRate: hourlyRate !== undefined ? Number(hourlyRate) || null : undefined,
+        billingIncrementMin: billingIncrementMin !== undefined ? Number(billingIncrementMin) : undefined,
+        contractFileUrl: contractFileUrl ?? undefined,
       },
     });
 

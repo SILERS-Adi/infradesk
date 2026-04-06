@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Building2, Monitor, Ticket, Plus, X, Loader2, AlertTriangle, Link2, Send, Circle } from 'lucide-react';
+import { Building2, Monitor, Ticket, Plus, X, Loader2, AlertTriangle, Link2, Send, Circle, Receipt } from 'lucide-react';
+import ClientBillingModal from './ClientBillingModal';
 import toast from 'react-hot-toast';
 import { operatorApi, operatorClientApi, type CreateClientPayload } from '../../api/operator';
 import { apiClient } from '../../api/client';
@@ -20,6 +21,7 @@ export default function OperatorClients() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [showLink, setShowLink] = useState(false);
+  const [billingClient, setBillingClient] = useState<{ relationId: string; name: string } | null>(null);
 
   const { data: clients, isLoading, isError } = useQuery({
     queryKey: ['operator', 'clients'],
@@ -67,15 +69,23 @@ export default function OperatorClients() {
       </div>
     )},
     { key: 'actions', header: '', render: (r) => (
-      r.clientStatus === 'draft' ? (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <button
-          onClick={(e) => { e.stopPropagation(); activateMut.mutate(r.id); }}
-          disabled={activateMut.isPending}
-          style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}
+          onClick={(e) => { e.stopPropagation(); setBillingClient({ relationId: r.relationId, name: r.name }); }}
+          style={{ fontSize: 11, fontWeight: 600, color: '#818CF8', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}
         >
-          <Send size={12} /> Wyślij dostęp
+          <Receipt size={12} /> Rozliczenia
         </button>
-      ) : null
+        {r.clientStatus === 'draft' && (
+          <button
+            onClick={(e) => { e.stopPropagation(); activateMut.mutate(r.id); }}
+            disabled={activateMut.isPending}
+            style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}
+          >
+            <Send size={12} /> Wyślij dostęp
+          </button>
+        )}
+      </div>
     )},
   ];
 
@@ -131,6 +141,15 @@ export default function OperatorClients() {
           </button>
         }
       />
+
+      {billingClient && (
+        <ClientBillingModal
+          open={!!billingClient}
+          onClose={() => setBillingClient(null)}
+          relationId={billingClient.relationId}
+          clientName={billingClient.name}
+        />
+      )}
     </div>
   );
 }
