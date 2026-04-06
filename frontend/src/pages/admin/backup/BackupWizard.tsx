@@ -237,7 +237,7 @@ export default function BackupWizard({ open, onClose, companyFilter }: { open: b
   });
 
   const activeAgents = agents.filter((a: any) =>
-    a.status === 'ACTIVE' && (!companyFilter || a.client?.id === companyFilter)
+    a.status === 'ACTIVE' && (!companyFilter || a.workspaceId === companyFilter)
   );
   const isOnline = (a: any) => {
     const ls = a.lastSeen ? Date.now() - new Date(a.lastSeen).getTime() : Infinity;

@@ -70,6 +70,7 @@ export interface AgentRegistration {
   installedSoftware?: InstalledSoftware[];
   appVersion?: string;
   lastSeen?: string;
+  workspaceId?: string;
   createdAt: string;
   client?: { id: string; name: string } | null;
   device?: { id: string; name: string } | null;
