@@ -16,7 +16,7 @@ from PIL import Image, ImageGrab, ImageDraw
 # --- Config ---------------------------------------------------------------
 
 APP_NAME    = "Asystent Business"
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.1.5"
 _OLD_INSTALL_DIR = os.path.join(os.environ.get("APPDATA", ""), "InfraDesk")
 INSTALL_DIR = os.path.join(os.environ.get("APPDATA", ""), "SILERS", "Asystent Business")
 INSTALL_EXE = os.path.join(INSTALL_DIR, "Asystent Business.exe")
@@ -690,20 +690,45 @@ def do_self_update(download_url, notify_fn=None):
             except Exception: pass
 
     try:
-        new_exe = os.path.join(tempfile.gettempdir(), "ab_update.exe")
+        tmp_exe = os.path.join(tempfile.gettempdir(), "ab_update.exe")
         _notify("Pobieranie aktualizacji...")
-        import ssl
+        import ssl, shutil
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
         with urllib.request.urlopen(download_url, context=ctx, timeout=120) as resp:
-            with open(new_exe, "wb") as f:
+            with open(tmp_exe, "wb") as f:
                 f.write(resp.read())
-        log.info("Update downloaded: %d bytes", os.path.getsize(new_exe))
+        log.info("Update downloaded: %d bytes", os.path.getsize(tmp_exe))
+
+        # Copy new EXE to install dir (replacing current)
+        os.makedirs(INSTALL_DIR, exist_ok=True)
+        target = INSTALL_EXE
+        try:
+            # On Windows, can't replace running EXE directly — rename old first
+            bak = target + ".bak"
+            if os.path.exists(bak):
+                os.remove(bak)
+            if os.path.exists(target):
+                os.rename(target, bak)
+            shutil.copy2(tmp_exe, target)
+            log.info("Updated EXE installed to %s", target)
+        except Exception as e:
+            log.warning("Install to %s failed (%s), launching from temp", target, e)
+            target = tmp_exe
 
         _notify("Restartuje...")
-        subprocess.Popen([new_exe], close_fds=True, creationflags=_NO_WINDOW)
-        os._exit(0)
+        # Preserve original args (e.g. --service)
+        args = [a for a in sys.argv[1:] if a not in ("--update",)]
+        proc = subprocess.Popen([target] + args, close_fds=True, creationflags=_NO_WINDOW)
+        # Verify new process started before exiting
+        time.sleep(2)
+        if proc.poll() is None:
+            log.info("New process started (PID %d), exiting old", proc.pid)
+            os._exit(0)
+        else:
+            log.error("New process exited immediately (rc=%s), NOT exiting old process", proc.returncode)
+            # Don't exit — keep running old version rather than dying completely
     except Exception as e:
         log.error("Self-update error: %s", e)
 
@@ -798,16 +823,28 @@ def _send_wol(mac: str):
 
 class WS:
     def __init__(self, token, on_msg):
-        self.token = token; self.cb = on_msg
+        self.token = token; self.cb = on_msg; self._sock = None
     def start(self):
         threading.Thread(target=self._run, daemon=True).start()
+    def send(self, data):
+        """Send data back to server (thread-safe via raw socket)."""
+        try:
+            s = self._sock
+            if s:
+                from websocket import ABNF
+                s.send(data, ABNF.OPCODE_TEXT)
+        except Exception as e:
+            log.error("WS send error: %s", e)
     def _run(self):
         while True:
             try:
-                ws = websocket.WebSocketApp(f"{WS_BASE}?token={self.token}",
-                    on_message=lambda _ws, m: self._on(m))
-                ws.run_forever(ping_interval=30)
+                app = websocket.WebSocketApp(f"{WS_BASE}?token={self.token}",
+                    on_open=lambda ws: setattr(self, '_sock', ws),
+                    on_message=lambda ws, m: self._on(m),
+                    on_close=lambda ws, *a: setattr(self, '_sock', None))
+                app.run_forever(ping_interval=30)
             except Exception: pass
+            self._sock = None
             time.sleep(10)
     def _on(self, raw):
         try: self.cb(json.loads(raw))
@@ -1234,6 +1271,160 @@ class AutoDiagnostics:
 
 # --- Backup Scheduler -----------------------------------------------------
 
+# ── Remote Command Handler (inline — no external module needed) ──────────
+
+def _handle_remote_command(msg, ws_send_fn):
+    """Handle remote_command from panel. Send result back via WebSocket."""
+    request_id = msg.get("requestId")
+    command = msg.get("command")
+    payload = msg.get("payload", {})
+    if not request_id or not command:
+        return
+    try:
+        result = _exec_remote(command, payload)
+        ws_send_fn(json.dumps({"requestId": request_id, "data": result}))
+    except Exception as e:
+        log.error("Remote command '%s' failed: %s", command, e)
+        ws_send_fn(json.dumps({"requestId": request_id, "error": str(e)}))
+
+
+def _exec_remote(command, payload):
+    if command == "scan_databases":
+        return _remote_scan_databases()
+    elif command == "test_db_connection":
+        return _remote_test_db(payload)
+    elif command == "scan_system":
+        return {
+            "hostname": socket.gethostname(), "os": platform.system(),
+            "os_version": platform.version(), "cpu_count": os.cpu_count(),
+            "ram_total_gb": round(psutil.virtual_memory().total / (1024**3), 1),
+        }
+    elif command == "get_services":
+        svcs = []
+        for s in psutil.win_service_iter():
+            try:
+                i = s.as_dict()
+                svcs.append({"name": i["name"], "display_name": i["display_name"], "status": i["status"]})
+            except Exception:
+                pass
+        return {"services": svcs, "count": len(svcs)}
+    else:
+        raise ValueError(f"Unknown command: {command}")
+
+
+def _remote_scan_databases():
+    results = []
+    # Standard port scan
+    for port, name in [(3306,"MySQL"),(5432,"PostgreSQL"),(1433,"MSSQL"),(27017,"MongoDB")]:
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(2)
+            if s.connect_ex(("127.0.0.1", port)) == 0:
+                results.append({"type": name, "port": port, "host": "127.0.0.1", "status": "running"})
+            s.close()
+        except Exception:
+            pass
+
+    # Detect named MSSQL instances via SQL Browser (UDP 1434)
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.settimeout(3)
+        sock.sendto(b'\x02', ("127.0.0.1", 1434))
+        data, _ = sock.recvfrom(4096)
+        sock.close()
+        # Parse response: "ServerName;HOST;InstanceName;NAME;IsClustered;No;Version;VER;tcp;PORT;;"
+        for inst_str in data.decode("ascii", errors="ignore").split(";;"):
+            if not inst_str.strip():
+                continue
+            parts = inst_str.strip("\x00").split(";")
+            info = {}
+            for i in range(0, len(parts) - 1, 2):
+                info[parts[i].lower()] = parts[i + 1]
+            inst_name = info.get("instancename", "")
+            tcp_port = info.get("tcp", "")
+            if inst_name:
+                # Check if already found via port scan
+                if tcp_port and not any(r["port"] == int(tcp_port) for r in results):
+                    results.append({
+                        "type": "MSSQL", "port": int(tcp_port) if tcp_port else None,
+                        "host": "127.0.0.1", "status": "running",
+                        "instance": inst_name,
+                    })
+                elif not tcp_port:
+                    results.append({
+                        "type": "MSSQL", "port": None,
+                        "host": "127.0.0.1", "status": "running",
+                        "instance": inst_name, "note": "named_pipes_only",
+                    })
+    except Exception:
+        pass
+
+    # Scan Windows services for DB engines
+    services = []
+    try:
+        for svc in psutil.win_service_iter():
+            try:
+                i = svc.as_dict()
+                nm = i["name"].lower()
+                db_kw = ["mysql", "postgres", "pgsql", "mssql", "sqlserver", "mongodb", "mariadb"]
+                if any(k in nm for k in db_kw):
+                    services.append({"name": i["name"], "display_name": i["display_name"],
+                                     "running": i["status"] == "running"})
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return {"databases": results, "services": services, "hostname": socket.gethostname()}
+
+
+def _remote_test_db(p):
+    db_type = (p.get("type") or "").upper().replace("SQL_", "")
+    host = p.get("host", "127.0.0.1")
+    port = int(p.get("port") or 0)
+    instance = p.get("instance", "")
+    user = p.get("user", "")
+    pw = p.get("password", "")
+    auth_mode = p.get("authMode", "sql")  # "sql" or "windows"
+    if auth_mode != "windows" and not user:
+        raise ValueError("user is required")
+    if "MYSQL" in db_type:
+        cmd = ["mysql", f"--host={host}", f"--port={port or 3306}", f"--user={user}"]
+        if pw: cmd.append(f"--password={pw}")
+        cmd.extend(["-e", "SHOW DATABASES"])
+    elif "POSTGRES" in db_type:
+        os.environ["PGPASSWORD"] = pw
+        cmd = ["psql", f"-h{host}", f"-p{port or 5432}", f"-U{user}", "-c",
+               "SELECT datname FROM pg_database WHERE datistemplate = false", "postgres"]
+    elif "MSSQL" in db_type:
+        # Named instance: SERVER\INSTANCE, otherwise SERVER,PORT
+        if instance:
+            server = f"{host}\\{instance}"
+        elif port:
+            server = f"{host},{port}"
+        else:
+            server = f"{host},1433"
+        if auth_mode == "windows":
+            # Windows Authentication (Trusted Connection)
+            cmd = ["sqlcmd", f"-S{server}", "-E"]
+        else:
+            cmd = ["sqlcmd", f"-S{server}", f"-U{user}"]
+            if pw: cmd.append(f"-P{pw}")
+        cmd.extend(["-Q", "SELECT name FROM sys.databases WHERE name NOT IN ('master','tempdb','model','msdb')"])
+    else:
+        raise ValueError(f"Unsupported: {db_type}")
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=10, creationflags=_NO_WINDOW)
+        if r.returncode != 0:
+            return {"success": False, "error": r.stderr.strip()[:200]}
+        dbs = [l.strip() for l in r.stdout.strip().split("\n")[1:] if l.strip() and not l.startswith("-") and not l.startswith("(")]
+        dbs = [d for d in dbs if d not in ("information_schema", "performance_schema", "sys", "")]
+        return {"success": True, "databases": dbs, "type": db_type}
+    except FileNotFoundError:
+        return {"success": False, "error": f"Client ({db_type.lower()}) not installed"}
+    except Exception as e:
+        return {"success": False, "error": str(e)[:200]}
+
+
 class BackupScheduler:
     """Pobiera konfiguracje backupu z API i wykonuje je wg harmonogramu."""
 
@@ -1326,8 +1517,8 @@ class BackupScheduler:
         btype = cfg["type"]
         host = cfg.get("sqlHost", "localhost")
         port = cfg.get("sqlPort", 3306)
-        user = cfg.get("sqlUser", "root")
-        pwd = cfg.get("sqlPassEnc", "")
+        user = cfg.get("sqlUser", "")
+        pwd = cfg.get("sqlPassword", "") or cfg.get("sqlPassEnc", "")
         dbs = cfg.get("sqlDatabases", "").split(",")
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         results = []
@@ -1343,7 +1534,10 @@ class BackupScheduler:
                 os.environ["PGPASSWORD"] = pwd
                 cmd = f'pg_dump -h {host} -p {port} -U {user} {db}'
             elif btype == "SQL_MSSQL":
-                cmd = f'sqlcmd -S {host},{port} -U {user} -P {pwd} -Q "BACKUP DATABASE [{db}] TO DISK=\'{output}.bak\' WITH FORMAT"'
+                if user and pwd:
+                    cmd = f'sqlcmd -S {host},{port} -U {user} -P {pwd} -Q "BACKUP DATABASE [{db}] TO DISK=\'{output}.bak\' WITH FORMAT"'
+                else:
+                    cmd = f'sqlcmd -S {host},{port} -E -Q "BACKUP DATABASE [{db}] TO DISK=\'{output}.bak\' WITH FORMAT"'
                 try:
                     subprocess.run(cmd, shell=True, check=True, capture_output=True, timeout=3600)
                     results.append(f"{output}.bak")
@@ -1883,8 +2077,8 @@ class _BackgroundServices:
         if self.cfg.get("backupMode") or self.cfg.get("allowMonitoring"):
             self._backup_scheduler = BackupScheduler(self.token)
             threading.Thread(target=self._backup_loop, daemon=True).start()
-        ws = WS(self.token, self._on_ws)
-        ws.start()
+        self._ws = WS(self.token, self._on_ws)
+        self._ws.start()
         threading.Thread(target=self._start_tray, daemon=True).start()
 
     def _diagnostics_loop(self):
@@ -1952,8 +2146,7 @@ class _BackgroundServices:
     def _on_ws(self, msg):
         mtype = msg.get("type")
         if mtype == "remote_command":
-            from remote_commands import handle_remote_command
-            threading.Thread(target=handle_remote_command, args=(msg, self._ws.ws.send), daemon=True).start()
+            threading.Thread(target=_handle_remote_command, args=(msg, self._ws.send), daemon=True).start()
             return
         if mtype in ("notification", "status_update") and self._tray:
             try: self._tray.notify(msg.get("body", ""), msg.get("title", APP_NAME))
@@ -2058,8 +2251,7 @@ class ServerServiceLoop:
     def _on_ws(self, msg):
         mtype = msg.get("type")
         if mtype == "remote_command":
-            from remote_commands import handle_remote_command
-            threading.Thread(target=handle_remote_command, args=(msg, self._ws.ws.send), daemon=True).start()
+            threading.Thread(target=_handle_remote_command, args=(msg, self._ws.send), daemon=True).start()
             return
         if mtype in ("notification", "status_update"):
             log.info("WS notification: %s — %s", msg.get("title", ""), msg.get("body", ""))
@@ -2130,8 +2322,8 @@ class ServerServiceLoop:
     def start(self):
         log.info("ServerServiceLoop starting (token=%s...)", self.token[:8])
 
-        ws = WS(self.token, self._on_ws)
-        ws.start()
+        self._ws = WS(self.token, self._on_ws)
+        self._ws.start()
 
         self._backup = None
         try:
@@ -2170,6 +2362,17 @@ class ServerServiceLoop:
                 if cycle % 5 == 0:
                     try: self._backup.sync_configs()
                     except Exception: pass
+
+            # Auto-update check every 30 min
+            if cycle % 30 == 0:
+                try:
+                    info = check_for_update()
+                    if info:
+                        ver, url = info
+                        log.info("Update available: %s — auto-updating", ver)
+                        do_self_update(url)
+                except Exception as e:
+                    log.warning("Auto-update check failed: %s", e)
 
             time.sleep(60)
             cycle += 1
