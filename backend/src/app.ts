@@ -16,7 +16,7 @@ import credentialsRoutes from './modules/credentials/credentials.routes';
 import ticketsRoutes from './modules/tickets/tickets.routes';
 import activityLogsRoutes from './modules/activityLogs/activityLogs.routes';
 import dashboardRoutes from './modules/dashboard/dashboard.routes';
-import uploadRoutes from './modules/upload/upload.routes';
+import uploadRoutes, { secureFileDownload } from './modules/upload/upload.routes';
 import crmRoutes from './modules/crm/crm.routes';
 import accessTypesRoutes from './modules/accessTypes/accessTypes.routes';
 import { seedAccessTypes } from './modules/accessTypes/accessTypes.service';
@@ -83,16 +83,33 @@ import cookieParser from 'cookie-parser';
 
 const app = express();
 
-// CORS — allow subdomains
+// CORS — strict origin whitelist
 const baseDomain = process.env.BASE_DOMAIN || 'infradesk.pl';
+const CORS_WHITELIST = new Set([
+  `https://${baseDomain}`,
+  `https://www.${baseDomain}`,
+  `https://app.${baseDomain}`,
+  // Dev origins (only active when NODE_ENV !== production)
+  ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173'] : []),
+]);
+// Add any workspace subdomains dynamically from env
+if (process.env.CORS_EXTRA_ORIGINS) {
+  process.env.CORS_EXTRA_ORIGINS.split(',').forEach(o => CORS_WHITELIST.add(o.trim()));
+}
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow: no origin (server-to-server), main domain, any subdomain, localhost
-      if (!origin || origin.endsWith(baseDomain) || origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      // Allow: no origin (server-to-server / same-origin), or exact whitelist match,
+      // or valid subdomain pattern (*.infradesk.pl)
+      if (!origin) {
+        callback(null, true);
+      } else if (CORS_WHITELIST.has(origin)) {
+        callback(null, true);
+      } else if (origin.match(new RegExp(`^https://[a-z0-9-]+\\.${baseDomain.replace('.', '\\.')}$`))) {
+        // Dynamic workspace subdomains (e.g. https://firma-xyz.infradesk.pl)
         callback(null, true);
       } else {
-        callback(null, process.env.CORS_ORIGIN === '*');
+        callback(null, false);
       }
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -204,6 +221,7 @@ app.use('/api/auth', authRoutes);
 // ── Core (no module guard — always available) ──
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/files', secureFileDownload(UPLOADS_DIR)); // Authenticated file download for sensitive attachments
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/push', pushRouter);
 app.use('/api/access-types', accessTypesRoutes);
@@ -221,6 +239,38 @@ app.use('/api/downloads', downloadsRouter);                // Moja firma: Pobier
 app.use('/api/devices', authenticate, requireModule('infrastructure'), devicesRoutes);
 app.use('/api/agent', agentRoutes);                        // Agent has mixed public+authenticated
 app.use('/api/activity-logs', authenticate, requireModule('infrastructure'), activityLogsRoutes);
+// Agent cloud upload — uses agent token, no JWT required (must be before authenticated backup routes)
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+const INFRADESK_BACKUP_PATH = process.env.INFRADESK_BACKUP_PATH || '/var/backups/infradesk';
+app.post('/api/backup/cloud/upload', async (req, res, next) => {
+  try {
+    const token = req.headers['x-agent-token'] as string;
+    if (!token) { res.status(401).json({ error: 'Agent token required' }); return; }
+    const agent = await prisma.agentRegistration.findUnique({ where: { agentToken: token } });
+    if (!agent) { res.status(401).json({ error: 'Invalid agent token' }); return; }
+    const configId = req.headers['x-backup-config-id'] as string;
+    if (!configId) { res.status(400).json({ error: 'Config ID required' }); return; }
+    const config = await prisma.backupConfig.findUnique({ where: { id: configId } });
+    if (!config?.useInfradeskCloud) { res.status(400).json({ error: 'Cloud not enabled' }); return; }
+    const wsDir = path.join(INFRADESK_BACKUP_PATH, config.workspaceId, configId);
+    fs.mkdirSync(wsDir, { recursive: true });
+    const upload = multer({
+      storage: multer.diskStorage({
+        destination: (_r: any, _f: any, cb: any) => cb(null, wsDir),
+        filename: (_r: any, file: any, cb: any) => cb(null, `${new Date().toISOString().replace(/[:.]/g, '-')}_${file.originalname}`),
+      }),
+      limits: { fileSize: 5 * 1024 * 1024 * 1024 },
+    }).single('backup');
+    upload(req as any, res as any, (err: any) => {
+      if (err) { res.status(400).json({ error: err.message }); return; }
+      if (!(req as any).file) { res.status(400).json({ error: 'No file' }); return; }
+      console.log(`[CLOUD] Backup uploaded: ${(req as any).file.filename} (${(req as any).file.size} bytes)`);
+      res.json({ ok: true, fileName: (req as any).file.filename, sizeBytes: (req as any).file.size });
+    });
+  } catch (err) { next(err); }
+});
 app.use('/api/backup', authenticate, requireModule('infrastructure'), backupRouter);
 app.use('/api/monitoring', monitoringRouter);
 
