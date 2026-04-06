@@ -15,6 +15,7 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { backupApi, type BackupConfig, type BackupHistory } from '../../api/backup';
 import { formatDateTime } from '../../utils/helpers';
 import BackupWizard from './backup/BackupWizard';
+import { BackupStorageGauge, BackupTimeline, BackupStatusRing } from './backup/BackupVisualizations';
 
 const TYPE_LABELS: Record<string, string> = {
   SQL_MYSQL: 'MySQL',
@@ -432,6 +433,15 @@ export function BackupPage() {
           </div>
         }
       />
+
+      {/* Visualizations */}
+      {configs.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <BackupStorageGauge />
+          <BackupStatusRing configs={configs} />
+          <BackupTimeline configs={configs} />
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
