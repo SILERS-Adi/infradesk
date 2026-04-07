@@ -152,7 +152,7 @@ function TaskRow({ task, agents, activeSessions, onStatus, onStartSession, onPau
   const rustdeskId = task.ticket?.device?.rustdeskId;
   const [expanded, setExpanded] = useState(false);
 
-  const company = task.ticket?.client?.name ?? task.ticket?.workspace?.name ?? '—';
+  const company = task.ticket?.workspace?.name ?? '—';
   const reporter = task.ticket?.reporterName || (task.ticket?.createdBy ? `${task.ticket.createdBy.firstName} ${task.ticket.createdBy.lastName}` : '—');
   const device = task.ticket?.device?.name ?? '—';
   const deviceId = task.ticket?.device?.id;
