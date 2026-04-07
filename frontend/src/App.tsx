@@ -197,7 +197,7 @@ function AdminRoutes() {
         <Route path="agents" element={<WaitingRoomPage />} />
         <Route path="monitoring" element={<MonitoringPage />} />
         <Route path="settings" element={<SettingsPage />} />
-        <Route path="workspace/plan-and-modules" element={<React.Suspense fallback={null}><PlanAndModulesPage /></React.Suspense>} />
+        <Route path="plan-and-modules" element={<React.Suspense fallback={null}><PlanAndModulesPage /></React.Suspense>} />
         <Route path="my-company" element={<MyCompanyPage />} />
         <Route path="my-company/employees" element={<EmployeesPage />} />
         <Route path="backups" element={<BackupPage />} />
