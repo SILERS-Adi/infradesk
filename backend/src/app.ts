@@ -67,6 +67,7 @@ import permissionsRouter from './modules/permissions/permissions.routes';
 import workspaceRelationsRouter from './modules/workspace-relations/workspace-relations.routes';
 import helpdeskSettingsRouter from './modules/helpdesk-settings/helpdesk-settings.routes';
 import operatorRouter from './modules/operator/operator.routes';
+import workspaceConfigRouter from './modules/workspace-config/workspace-config.routes';
 
 // Middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -113,13 +114,17 @@ app.use(
       }
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Workspace-Id'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Workspace-Id', 'X-CSRF-Token'],
     credentials: true,
   })
 );
 
 // Cookie parser
 app.use(cookieParser());
+
+// CSRF protection (Double Submit Cookie — validates X-CSRF-Token header on state-changing requests)
+import { csrfProtection } from './middleware/csrf';
+app.use(csrfProtection);
 
 // Body parsers
 app.use(express.json({ limit: '10mb' }));
@@ -312,6 +317,7 @@ app.use('/api/permissions', permissionsRouter);
 app.use('/api/workspace-relations', workspaceRelationsRouter);
 app.use('/api/helpdesk-settings', helpdeskSettingsRouter);
 app.use('/api/operator', operatorRouter);
+app.use('/api/workspace-config', workspaceConfigRouter);
 app.use('/api/service/vehicles', authenticate, requireModule('skp'), serviceVehiclesRouter);
 app.use('/api/service/inspections', authenticate, requireModule('skp'), serviceInspectionsRouter);
 // Public agent endpoints (no auth)
@@ -432,6 +438,8 @@ app.get('/api/workspaces/my', authenticate, async (req, res, next) => {
           select: {
             id: true, name: true, slug: true, type: true, plan: true,
             logoUrl: true, primaryColor: true, isActive: true, enabledModules: true, organizationType: true,
+            orgType: true, platformBillingMode: true, accountManagedBy: true,
+            modules: { select: { moduleKey: true, state: true, activatedAt: true, expiresAt: true } },
             subscriptionStatus: true, trialEndDate: true, billingCycle: true, monthlyPrice: true, lastConfig: true, paidUntil: true,
             managedBy: {
               where: { status: 'ACTIVE' },
@@ -459,6 +467,10 @@ app.get('/api/workspaces/my', authenticate, async (req, res, next) => {
       allowedModules: m.allowedModules,
       enabledModules: migrateModuleKeys(m.workspace.enabledModules ?? ['helpdesk']),
       organizationType: m.workspace.organizationType ?? 'internal_it',
+      orgType: m.workspace.orgType,
+      platformBillingMode: m.workspace.platformBillingMode,
+      accountManagedBy: m.workspace.accountManagedBy,
+      modules: m.workspace.modules,
       managedBy: (m.workspace.managedBy as any)?.[0]?.mspWorkspace?.name ?? null,
       subscriptionStatus: m.workspace.subscriptionStatus,
       trialEndDate: m.workspace.trialEndDate,
@@ -489,7 +501,19 @@ app.put('/api/workspaces/onboarding', authenticate, async (req, res, next) => {
     const { organizationType, ticketRoutingMode, defaultProviderWorkspaceId } = req.body;
 
     if (organizationType && ['client', 'internal_it', 'msp', 'client_external_it', 'it_operator'].includes(organizationType)) {
-      await prisma.workspace.update({ where: { id: wsId }, data: { organizationType } });
+      // Write to both legacy (organizationType) and canonical (orgType)
+      const orgTypeMap: Record<string, string> = {
+        msp: 'MSP', it_operator: 'MSP',
+        client: 'CLIENT', client_external_it: 'CLIENT',
+        internal_it: 'INTERNAL_IT',
+      };
+      await prisma.workspace.update({
+        where: { id: wsId },
+        data: {
+          organizationType,
+          orgType: (orgTypeMap[organizationType] ?? 'INTERNAL_IT') as any,
+        },
+      });
     }
 
     if (ticketRoutingMode) {

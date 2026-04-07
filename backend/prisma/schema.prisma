@@ -135,6 +135,52 @@ enum GrantResourceType {
   DEVICE
 }
 
+// ── Canonical workspace configuration enums ─────────────────────────
+
+/// Canonical source of truth for workspace type. Replaces organizationType string.
+enum OrganizationType {
+  CLIENT
+  INTERNAL_IT
+  MSP
+}
+
+/// Closed catalog of available modules. Used as enum to prevent typos.
+enum ModuleKey {
+  INFRASTRUCTURE
+  SERVICE_DESK
+  INVOICING
+  PACKAGING
+  SKP
+  AI
+}
+
+/// Real system states only. PLANNED_ENABLE / PLANNED_DISABLE are frontend/preview-only.
+enum ModuleState {
+  ACTIVE
+  TRIAL
+  INACTIVE
+  LIMITED
+  READONLY
+  MANAGED_BY_PROVIDER
+  EXPIRED
+}
+
+enum PlatformBillingMode {
+  SELF
+  PROVIDER
+}
+
+enum AccountManagedBy {
+  SELF
+  PROVIDER
+}
+
+enum DetachPolicy {
+  ALLOWED
+  APPROVAL_REQUIRED
+  BLOCKED
+}
+
 // ── SuperAdmin global config ────────────────────────────────────────
 model PlatformConfig {
   id                   String   @id @default("global")
@@ -206,7 +252,17 @@ model Workspace {
   paidUntil          DateTime?
 
   // Multi-tenant organization type
-  organizationType String @default("internal_it") // client_external_it | internal_it | it_operator
+  organizationType String @default("internal_it") // LEGACY — kept in sync by syncLegacyFields()
+
+  // ── Canonical config (new) ──
+  /// Canonical source of truth for org type. organizationType (String) is legacy — kept in sync.
+  orgType             OrganizationType   @default(INTERNAL_IT)
+  /// Billing & management — dotyczą domyślnej relacji helpdeskowej / domyślnego providera.
+  /// UWAGA ARCHITEKTONICZNA: w przyszłości przy wielu providerach mogą
+  /// przenieść się do WorkspaceRelation. Na razie prościej na Workspace.
+  platformBillingMode PlatformBillingMode @default(SELF)
+  accountManagedBy    AccountManagedBy   @default(SELF)
+  detachPolicy        DetachPolicy       @default(ALLOWED)
 
   workspaceKey String   @unique @default(uuid())
   isActive     Boolean  @default(true)
@@ -249,6 +305,9 @@ model Workspace {
   clientRelations      WorkspaceRelation[]   @relation("RelationClient")
   providerRelations    WorkspaceRelation[]   @relation("RelationProvider")
   helpdeskSettings     WorkspaceHelpdeskSettings?
+
+  /// Canonical module activation — replaces enabledModules[] flat array.
+  modules              WorkspaceModule[]
 
   @@index([type])
   @@index([isActive])
@@ -304,6 +363,24 @@ model WorkspaceHelpdeskSettings {
   updatedAt DateTime @updatedAt
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+/// Canonical source of truth for module activation per workspace.
+/// Replaces the flat Workspace.enabledModules[] string array.
+model WorkspaceModule {
+  id          String      @id @default(uuid())
+  workspaceId String
+  moduleKey   ModuleKey
+  state       ModuleState @default(ACTIVE)
+  activatedAt DateTime    @default(now())
+  expiresAt   DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, moduleKey])
+  @@index([workspaceId])
 }
 
 model UserMenuPreference {
@@ -394,6 +471,8 @@ model PermissionSchema {
   @@index([workspaceId])
 }
 
+/// @deprecated Legacy MSP management model. Use WorkspaceRelation instead.
+/// Kept for backward compatibility — do NOT add new features here.
 model WorkspaceManagement {
   id                 String @id @default(uuid())
   mspWorkspaceId     String

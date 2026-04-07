@@ -3,6 +3,15 @@ export type WorkspaceType = 'PERSONAL' | 'COMPANY' | 'MSP';
 export type WorkspacePlan = 'FREE' | 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE';
 export type MemberRole = 'OWNER' | 'ADMIN' | 'TECHNICIAN' | 'MEMBER' | 'VIEWER';
 export type ScopeType = 'FULL' | 'SCOPED';
+export type OrganizationType = 'CLIENT' | 'INTERNAL_IT' | 'MSP';
+export type ModuleState = 'ACTIVE' | 'TRIAL' | 'INACTIVE' | 'LIMITED' | 'READONLY' | 'MANAGED_BY_PROVIDER' | 'EXPIRED';
+
+export interface WorkspaceModuleInfo {
+  moduleKey: string;
+  state: ModuleState;
+  activatedAt: string;
+  expiresAt?: string | null;
+}
 
 export interface WorkspaceMembership {
   workspaceId: string;
@@ -18,7 +27,11 @@ export interface WorkspaceMembership {
   isDefault: boolean;
   allowedModules: string[] | null;
   enabledModules: string[];
-  organizationType: string;
+  organizationType: string;          // LEGACY — kept in sync
+  orgType?: OrganizationType;        // CANONICAL source of truth
+  platformBillingMode?: 'SELF' | 'PROVIDER';
+  accountManagedBy?: 'SELF' | 'PROVIDER';
+  modules?: WorkspaceModuleInfo[];   // CANONICAL module state
   managedBy: string | null;
 }
 

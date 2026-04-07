@@ -530,10 +530,20 @@ export function requirePermission(nodeId: string, minLevel: 'VIEW' | 'FULL' | 'D
 //    router.get('/', authenticate, withWorkspaceMembership, requireModule('invoicing'), handler)
 // ══════════════════════════════════════════════════════════════════════
 
-/** Maps old module keys to new ones */
+/** Maps old module keys to new ones (legacy compat) */
 const MODULE_MIGRATION: Record<string, string[]> = {
   'helpdesk': ['infrastructure', 'service-desk'],
   'service': ['skp'],
+};
+
+/** Maps legacy enabledModules string → canonical ModuleKey enum */
+const STRING_TO_MODULE_KEY: Record<string, string> = {
+  'infrastructure': 'INFRASTRUCTURE',
+  'service-desk': 'SERVICE_DESK',
+  'invoicing': 'INVOICING',
+  'packaging': 'PACKAGING',
+  'skp': 'SKP',
+  'ai': 'AI',
 };
 
 function isModuleEnabled(enabledModules: string[], moduleKey: string): boolean {
@@ -544,6 +554,19 @@ function isModuleEnabled(enabledModules: string[], moduleKey: string): boolean {
   return false;
 }
 
+/**
+ * Middleware: check if workspace has a module enabled.
+ *
+ * Checks canonical WorkspaceModule table first, falls back to legacy
+ * enabledModules[] array for backward compatibility.
+ *
+ * Module states:
+ * - ACTIVE, TRIAL → full access
+ * - READONLY → GET only (blocks POST/PUT/PATCH/DELETE)
+ * - MANAGED_BY_PROVIDER → requires provider membership
+ * - LIMITED → passes through (restrictions at feature level, not route)
+ * - INACTIVE, EXPIRED → blocked (403)
+ */
 export function requireModule(moduleKey: string) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     // SuperAdmin bypass
@@ -555,7 +578,63 @@ export function requireModule(moduleKey: string) {
       return;
     }
 
-    // Fetch workspace enabledModules
+    // Resolve canonical ModuleKey from legacy string
+    const canonicalKey = STRING_TO_MODULE_KEY[moduleKey];
+
+    // Try canonical WorkspaceModule table first
+    if (canonicalKey) {
+      const mod = await prisma.workspaceModule.findUnique({
+        where: { workspaceId_moduleKey: { workspaceId: wsId, moduleKey: canonicalKey as any } },
+      });
+
+      if (mod) {
+        switch (mod.state) {
+          case 'ACTIVE':
+          case 'TRIAL':
+            next();
+            return;
+
+          case 'LIMITED':
+            next();
+            return;
+
+          case 'READONLY':
+            if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
+              next();
+              return;
+            }
+            res.status(403).json({
+              error: 'Moduł jest w trybie tylko do odczytu',
+              module: moduleKey,
+              code: 'MODULE_READONLY',
+            });
+            return;
+
+          case 'MANAGED_BY_PROVIDER':
+            // Allow if user has provider membership (source = MSP_ASSIGNED)
+            if (req.membership?.source === 'MSP_ASSIGNED') {
+              next();
+              return;
+            }
+            res.status(403).json({
+              error: 'Moduł jest zarządzany przez firmę IT',
+              module: moduleKey,
+              code: 'MODULE_MANAGED_BY_PROVIDER',
+            });
+            return;
+
+          default: // INACTIVE, EXPIRED
+            res.status(403).json({
+              error: 'Module not enabled for this workspace',
+              module: moduleKey,
+              code: 'MODULE_DISABLED',
+            });
+            return;
+        }
+      }
+    }
+
+    // Fallback: legacy enabledModules[] array (backward compat)
     const ws = await prisma.workspace.findUnique({
       where: { id: wsId },
       select: { enabledModules: true },

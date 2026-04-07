@@ -224,9 +224,10 @@ export const SYSTEM_ITEMS: SystemMenuItem[] = [
 
   // ── MOJA FIRMA ──
   { id: 'company-data',    to: '/my-company',           label: 'Moje dane',            icon: Building2,       groupId: 'company',      defaultOrder: 0 },
-  { id: 'locations',       to: '/locations',            label: 'Lokalizacje',          icon: MapPin,          groupId: 'company',      defaultOrder: 1 },
-  { id: 'company-users',   to: '/users',               label: 'Użytkownicy',          icon: Users,           groupId: 'company',      defaultOrder: 2, adminOnly: true },
-  { id: 'company-settings',to: '/settings',             label: 'Ustawienia',           icon: Settings,        groupId: 'company',      defaultOrder: 3, adminOnly: true },
+  { id: 'plan-modules',    to: '/workspace/plan-and-modules', label: 'Plan i moduły',  icon: Layers,          groupId: 'company',      defaultOrder: 1, adminOnly: true },
+  { id: 'locations',       to: '/locations',            label: 'Lokalizacje',          icon: MapPin,          groupId: 'company',      defaultOrder: 2 },
+  { id: 'company-users',   to: '/users',               label: 'Użytkownicy',          icon: Users,           groupId: 'company',      defaultOrder: 3, adminOnly: true },
+  { id: 'company-settings',to: '/settings',             label: 'Ustawienia',           icon: Settings,        groupId: 'company',      defaultOrder: 4, adminOnly: true },
 
   // ── PLATFORMA (superadmin) ──
   { id: 'sa-dashboard',    to: '/superadmin',           label: 'Dashboard SA',         icon: Activity,        groupId: 'platform',     defaultOrder: 0, end: true },

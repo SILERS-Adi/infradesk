@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
-import { AuthProvider, useAuth, getStoredToken } from './store/authStore';
+import { AuthProvider, useAuth } from './store/authStore';
 import { useWorkspace } from './store/workspaceStore';
 import { workspacesApi } from './api/workspaces';
 import { authApi } from './api/auth';
@@ -89,6 +89,7 @@ import { TvDashboardPage } from './pages/tv/TvDashboardPage';
 // Downloads & Settings
 import { DownloadsPage } from './pages/admin/DownloadsPage';
 import { SettingsPage } from './pages/admin/SettingsPage';
+const PlanAndModulesPage = React.lazy(() => import('./pages/admin/PlanAndModulesPage'));
 import { BackupPage } from './pages/admin/BackupPage';
 import { PublicDownloadsPage } from './pages/public/PublicDownloadsPage';
 import LandingPage from './pages/public/LandingPage';
@@ -196,6 +197,7 @@ function AdminRoutes() {
         <Route path="agents" element={<WaitingRoomPage />} />
         <Route path="monitoring" element={<MonitoringPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="workspace/plan-and-modules" element={<React.Suspense fallback={null}><PlanAndModulesPage /></React.Suspense>} />
         <Route path="my-company" element={<MyCompanyPage />} />
         <Route path="my-company/employees" element={<EmployeesPage />} />
         <Route path="backups" element={<BackupPage />} />
@@ -337,7 +339,9 @@ function UserRefresher() {
   const { setUser } = useAuth();
   const done = React.useRef(false);
   React.useEffect(() => {
-    if (done.current || !getStoredToken()) return;
+    // Check cookie-based session (httpOnly cookie — can't read directly, check logged_in indicator)
+    const isLoggedIn = document.cookie.includes('infradesk_logged_in=1');
+    if (done.current || !isLoggedIn) return;
     done.current = true;
     authApi.me().then(setUser).catch(() => {});
   }, [setUser]);
