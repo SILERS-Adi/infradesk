@@ -7,6 +7,7 @@ import { completeTicket } from '../tickets/tickets.service';
 
 const taskSelect = {
   id: true,
+  workspaceId: true,
   taskNumber: true,
   ticketId: true,
   title: true,
@@ -89,12 +90,17 @@ export async function listTasks(params: {
   assignedToUserId?: string;
   all?: boolean;
   workspaceId?: string | null;
+  workspaceIds?: string[];
 }) {
-  const { requestingUser, status, assignedToUserId, all, workspaceId } = params;
+  const { requestingUser, status, assignedToUserId, all, workspaceId, workspaceIds } = params;
 
   const where: Record<string, unknown> = {};
 
-  if (workspaceId) where.workspaceId = workspaceId;
+  if (workspaceIds && workspaceIds.length > 0) {
+    where.workspaceId = { in: workspaceIds };
+  } else if (workspaceId) {
+    where.workspaceId = workspaceId;
+  }
 
   // Technician sees only their tasks unless admin
   if (requestingUser.role !== 'ADMIN' && !all) {
@@ -114,8 +120,8 @@ export async function listTasks(params: {
   return tasks;
 }
 
-export async function getTaskById(id: string, requestingUser: { id: string; role: string }) {
-  const task = await prisma.task.findUnique({ where: { id }, select: taskSelect });
+export async function getTaskById(id: string, requestingUser: { id: string; role: string }, workspaceId: string) {
+  const task = await prisma.task.findFirst({ where: { id, workspaceId }, select: taskSelect });
   if (!task) throw new AppError('Task not found', 404);
 
   if (requestingUser.role === 'TECHNICIAN' && task.assignedTo.id !== requestingUser.id) {
@@ -128,9 +134,10 @@ export async function getTaskById(id: string, requestingUser: { id: string; role
 export async function changeTaskStatus(
   id: string,
   data: ChangeTaskStatusInput,
-  requestingUser: { id: string; role: string }
+  requestingUser: { id: string; role: string },
+  workspaceId: string,
 ) {
-  const task = await prisma.task.findUnique({ where: { id } });
+  const task = await prisma.task.findFirst({ where: { id, workspaceId } });
   if (!task) throw new AppError('Task not found', 404);
 
   if (requestingUser.role === 'TECHNICIAN' && task.assignedToUserId !== requestingUser.id) {
@@ -170,9 +177,10 @@ export async function changeTaskStatus(
 export async function updateTask(
   id: string,
   data: UpdateTaskInput,
-  requestingUser: { id: string; role: string }
+  requestingUser: { id: string; role: string },
+  workspaceId: string,
 ) {
-  const task = await prisma.task.findUnique({ where: { id } });
+  const task = await prisma.task.findFirst({ where: { id, workspaceId } });
   if (!task) throw new AppError('Task not found', 404);
 
   const updateData: Record<string, unknown> = {};

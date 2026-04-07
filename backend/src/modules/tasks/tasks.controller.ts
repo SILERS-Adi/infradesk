@@ -17,12 +17,16 @@ export async function createTask(req: Request, res: Response, next: NextFunction
 export async function listTasks(req: Request, res: Response, next: NextFunction) {
   try {
     const { status, assignedToUserId, all } = req.query as Record<string, string>;
+    const { getMspWorkspaceIds } = require('../../utils/mspScope');
+    const wsIds: string[] = req.workspaceId ? await getMspWorkspaceIds(req.workspaceId) : [];
+    const isMsp = wsIds.length > 1;
     const tasks = await tasksService.listTasks({
       requestingUser: { id: req.user!.userId, role: 'ADMIN' },
       status: status as TaskStatus | undefined,
       assignedToUserId,
       all: all === 'true',
-      workspaceId: req.workspaceId,
+      workspaceId: isMsp ? undefined : req.workspaceId,
+      workspaceIds: isMsp ? wsIds : undefined,
     });
     res.json(tasks);
   } catch (err) { next(err); }
@@ -33,7 +37,7 @@ export async function getTask(req: Request, res: Response, next: NextFunction) {
     const task = await tasksService.getTaskById(req.params.id, {
       id: req.user!.userId,
       role: 'ADMIN',
-    });
+    }, req.workspaceId!);
     res.json(task);
   } catch (err) { next(err); }
 }
@@ -44,7 +48,7 @@ export async function changeStatus(req: Request, res: Response, next: NextFuncti
     const task = await tasksService.changeTaskStatus(req.params.id, data, {
       id: req.user!.userId,
       role: 'ADMIN',
-    });
+    }, req.workspaceId!);
     res.json(task);
   } catch (err) { next(err); }
 }
@@ -55,7 +59,7 @@ export async function updateTask(req: Request, res: Response, next: NextFunction
     const task = await tasksService.updateTask(req.params.id, data, {
       id: req.user!.userId,
       role: 'ADMIN',
-    });
+    }, req.workspaceId!);
     res.json(task);
   } catch (err) { next(err); }
 }
