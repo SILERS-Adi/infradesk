@@ -548,6 +548,7 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
   const input: React.CSSProperties = {
     width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13,
     background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)', outline: 'none',
+    colorScheme: 'light dark',
   };
   const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--tm)', marginBottom: 4 };
   const tabBtn = (active: boolean): React.CSSProperties => ({
@@ -565,7 +566,7 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
         padding: 24, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto',
       }}>
         {/* Header */}
-        <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--t)', marginBottom: 16 }}>NOWA WERSJA !!!!!</div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--t)', marginBottom: 16 }}>Zatwierdź urządzenie</div>
 
         {/* Agent info */}
         <div style={{ padding: 12, borderRadius: 10, background: 'var(--hover-bg)', border: '1px solid var(--border)', marginBottom: 16 }}>
