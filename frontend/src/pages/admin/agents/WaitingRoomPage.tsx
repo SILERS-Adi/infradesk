@@ -11,6 +11,7 @@ import { MspCompanyFilter } from '../../../components/ui/MspCompanyFilter';
 import { Button } from '../../../components/ui/Button';
 import { getErrorMessage } from '../../../utils/helpers';
 import { clsx } from 'clsx';
+import { useTheme } from '../../../store/themeStore';
 
 /* ── helper: dark glass card ─────────────────────────────── */
 const glass = 'rounded-xl border' as const;
@@ -559,8 +560,9 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
   });
 
   /* ── shared styles ── */
-  // Native <select><option> ignores CSS variables in Chrome — use explicit colors
-  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  // Native <select><option> ignores CSS variables — use explicit colors based on theme
+  const { resolved: themeMode } = useTheme();
+  const isLight = themeMode === 'light';
   const colors = {
     bg: isLight ? '#ffffff' : '#0c1324',
     bgInput: isLight ? '#f3f4f6' : '#1c2536',
