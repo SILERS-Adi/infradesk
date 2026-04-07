@@ -199,11 +199,14 @@ function TaskRow({ task, agents, activeSessions, onStatus, onStartSession, onPau
         {/* RustDesk */}
         <td style={th}>
           {rustdeskId ? (
-            <a href={`rustdesk://id=${rustdeskId}`} onClick={e => e.stopPropagation()}
-              className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg"
-              style={{ background: 'rgba(16,185,129,0.08)', color: '#10B981', border: '1px solid rgba(16,185,129,0.15)' }}>
-              <ExternalLink className="h-3 w-3" /> Połącz
-            </a>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <a href={`rustdesk://id=${rustdeskId}`} onClick={e => e.stopPropagation()}
+                className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg"
+                style={{ background: 'rgba(16,185,129,0.08)', color: '#10B981', border: '1px solid rgba(16,185,129,0.15)' }}>
+                <ExternalLink className="h-3 w-3" /> Połącz
+              </a>
+              <span style={{ fontSize: 10, color: 'var(--tm)', fontFamily: 'monospace' }}>{rustdeskId}</span>
+            </div>
           ) : <span style={{ fontSize: 11, color: 'var(--tm)' }}>—</span>}
         </td>
 
