@@ -26,10 +26,9 @@ function TaskCard({ task, activeSession }: { task: Task; activeSession: any }) {
   const isSessionForThis = activeSession?.ticketId === task.ticketId;
 
   const handleStart = async () => {
-    if (!task.ticket?.client?.id) return;
     setLoading('start');
     try {
-      await sessionsApi.startMobile({ clientId: task.ticket.client.id, ticketId: task.ticketId });
+      await sessionsApi.startMobile({ clientId: task.ticket?.workspace?.id ?? task.ticket?.client?.id ?? '', ticketId: task.ticketId });
       // Zmień status zadania na IN_PROGRESS
       if (task.status === 'NEW') {
         await tasksApi.changeStatus(task.id, 'IN_PROGRESS');

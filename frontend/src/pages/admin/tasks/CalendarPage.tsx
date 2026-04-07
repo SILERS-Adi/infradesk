@@ -154,7 +154,7 @@ export function CalendarPage() {
                       <p className="text-[12px] font-medium truncate" style={{ color: 'var(--t)' }}>{t.title}</p>
                       <div className="flex items-center gap-2 mt-1">
                         {t.ticket?.client && (
-                          <span className="text-[10px] truncate" style={{ color: 'var(--tm)' }}>{t.ticket.client.name}</span>
+                          <span className="text-[10px] truncate" style={{ color: 'var(--tm)' }}>{t.ticket.workspace?.name ?? t.ticket.client?.name ?? '—'}</span>
                         )}
                         {t.estimatedMinutes && (
                           <span className="flex items-center gap-0.5 text-[10px] font-medium" style={{ color: '#A78BFA' }}>
@@ -240,7 +240,7 @@ export function CalendarPage() {
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div><span style={{ color: 'var(--tm)' }}>Status:</span> <span className="ml-1" style={{ color: 'var(--t)' }}>{selectedTask.status === 'NEW' ? 'Nowe' : selectedTask.status === 'IN_PROGRESS' ? 'W trakcie' : 'Zrealizowane'}</span></div>
               {selectedTask.ticket && <div><span style={{ color: 'var(--tm)' }}>Priorytet:</span> <span className="ml-1"><PriorityBadge priority={selectedTask.ticket.priority} /></span></div>}
-              {selectedTask.ticket?.client && <div><span style={{ color: 'var(--tm)' }}>Klient:</span> <span className="ml-1" style={{ color: 'var(--t)' }}>{selectedTask.ticket.client.name}</span></div>}
+              {(selectedTask.ticket?.workspace || selectedTask.ticket?.client) && <div><span style={{ color: 'var(--tm)' }}>Klient:</span> <span className="ml-1" style={{ color: 'var(--t)' }}>{selectedTask.ticket.workspace?.name ?? selectedTask.ticket.client?.name ?? '—'}</span></div>}
               {selectedTask.assignedTo && <div><span style={{ color: 'var(--tm)' }}>Technik:</span> <span className="ml-1" style={{ color: 'var(--t)' }}>{selectedTask.assignedTo.firstName} {selectedTask.assignedTo.lastName}</span></div>}
               {selectedTask.dueAt && <div><span style={{ color: 'var(--tm)' }}>Termin:</span> <span className="ml-1 text-amber-400">{formatDateTime(selectedTask.dueAt)}</span></div>}
               {selectedTask.estimatedMinutes && <div><span style={{ color: 'var(--tm)' }}>Szacowany czas:</span> <span className="ml-1 text-violet-400">{fmtEst(selectedTask.estimatedMinutes)}</span></div>}
