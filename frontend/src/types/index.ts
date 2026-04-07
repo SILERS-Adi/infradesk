@@ -260,6 +260,7 @@ export interface Task {
     serviceMode?: 'REMOTE' | 'ONSITE' | null;
     reporterName?: string;
     reporterPhone?: string;
+    workspace?: { id: string; name: string };
     client?: {
       id: string; name: string;
       hasContract?: boolean; contractHours?: number; contractMonthlyValue?: number;
