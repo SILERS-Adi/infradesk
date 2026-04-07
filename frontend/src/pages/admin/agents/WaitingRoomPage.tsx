@@ -617,17 +617,33 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <label style={label}>Firma (workspace) *</label>
-                <select style={input} {...regExisting('workspaceId', { required: true })}>
-                  <option value="">— wybierz firmę —</option>
-                  {clients.map((c: any) => <option key={c.workspace?.id ?? c.relationId} value={c.workspace?.id}>{c.workspace?.name}</option>)}
-                </select>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 180, overflowY: 'auto', border: `1px solid ${colors.border}`, borderRadius: 8, padding: 4 }}>
+                  {clients.length === 0 && <div style={{ padding: 8, fontSize: 12, color: colors.textMuted }}>Brak firm klientów</div>}
+                  {clients.map((c: any) => {
+                    const wsId = c.workspace?.id;
+                    const wsName = c.workspace?.name ?? '—';
+                    return (
+                      <label key={wsId ?? c.relationId} style={{
+                        display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 6, cursor: 'pointer',
+                        background: 'transparent', fontSize: 13, color: colors.text,
+                      }}
+                        onMouseEnter={e => (e.currentTarget.style.background = colors.bgInput)}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                        <input type="radio" value={wsId} {...regExisting('workspaceId', { required: true })}
+                          style={{ accentColor: colors.accent }} />
+                        <span style={{ fontWeight: 500 }}>{wsName}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
               <div>
                 <label style={label}>Urządzenie (opcjonalne)</label>
-                <select style={input} {...regExisting('deviceId')}>
-                  <option value="">— auto-utwórz nowe urządzenie —</option>
-                  {devices.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                <select style={{ ...input, color: colors.text, backgroundColor: colors.bgInput }}>
+                  <option value="" style={{ color: colors.text, backgroundColor: colors.bg }}>— auto-utwórz nowe urządzenie —</option>
+                  {devices.map((d: any) => <option key={d.id} value={d.id} style={{ color: colors.text, backgroundColor: colors.bg }}>{d.name}</option>)}
                 </select>
+                <input type="hidden" {...regExisting('deviceId')} />
               </div>
             </div>
             {/* Footer */}
