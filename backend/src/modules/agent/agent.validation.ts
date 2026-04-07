@@ -86,9 +86,12 @@ export const agentTicketSchema = z.object({
   dueAt:       z.string().datetime({ offset: true }).optional(),
 });
 
+// Security: workspaceId is intentional here — admin assigns agent to a specific workspace
+// (MSP may approve agents into client workspaces they manage). Authorization is checked
+// in agent.service.approveRegistration via workspace membership validation.
 export const approveSchema = z.object({
-  workspaceId: z.string().uuid().optional(),
-  deviceId: z.string().uuid().optional(),
+  workspaceId: z.string().min(1).optional(),
+  deviceId: z.string().min(1).optional(),
 });
 
 export type RegisterInput    = z.infer<typeof registerSchema>;
