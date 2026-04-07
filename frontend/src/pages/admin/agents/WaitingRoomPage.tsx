@@ -1,7 +1,6 @@
 // @ts-nocheck
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { Monitor, Check, Trash2, Wifi, WifiOff, Clock, ChevronDown, ChevronUp, Cpu, HardDrive, Network, Package, RefreshCw, Search, ExternalLink } from 'lucide-react';
 import { agentsApi, AgentRegistration, InstalledSoftware, DiskInfo, NetworkIface } from '../../../api/agents';
@@ -506,173 +505,159 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
   );
 }
 
-/* ── ApproveModal ─────────────────────────────────────────
- * Theme-aware modal using InfraDesk design tokens.
- * Pattern: same as SATenantsPage modals (var(--bg2), var(--t), var(--border)).
- * No hardcoded dark styles — fully light/dark responsive.
- * ──────────────────────────────────────────────────────── */
-interface ApproveForm { workspaceId: string; deviceId?: string; }
-interface NewClientForm { name: string; taxId?: string; phone?: string; email?: string; addressLine1?: string; postalCode?: string; city?: string; }
+/* ── ApproveModal v3 — od zera, zero useForm, plain useState ── */
 
 function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () => void }) {
   const qc = useQueryClient();
+  const { resolved: themeMode } = useTheme();
+  const isLight = themeMode === 'light';
   const [mode, setMode] = useState<'existing' | 'new'>('existing');
+  const [selectedWsId, setSelectedWsId] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  const { data: clients = [] } = useQuery({
+  // New client form
+  const [newName, setNewName] = useState(reg.companyName ?? '');
+  const [newNip, setNewNip] = useState(reg.nip ?? '');
+  const [newPhone, setNewPhone] = useState(reg.contactPhone ?? '');
+  const [newEmail, setNewEmail] = useState(reg.contactEmail ?? '');
+  const [newCity, setNewCity] = useState('');
+
+  // Load clients
+  const { data: clients = [], isLoading: loadingClients } = useQuery({
     queryKey: ['operator', 'clients'],
     queryFn: () => apiClient.get('/operator/clients').then(r => r.data).catch(() => []),
   });
 
-  // Auto-match workspace by NIP from agent registration
-  const autoMatchedWsId = (() => {
-    if (reg.workspaceId) return reg.workspaceId;
-    if (reg.nip) {
-      const match = clients.find((c: any) => c.workspace?.taxId === reg.nip);
-      if (match) return match.workspace.id;
-    }
-    return '';
-  })();
+  // Auto-match by NIP when clients load
+  useEffect(() => {
+    if (selectedWsId || !reg.nip || clients.length === 0) return;
+    const match = clients.find((c: any) => c.workspace?.taxId === reg.nip);
+    if (match) setSelectedWsId(match.workspace.id);
+  }, [clients, reg.nip, selectedWsId]);
 
-  const { register: regExisting, handleSubmit: handleExisting, reset: resetExisting } = useForm<ApproveForm>({
-    defaultValues: { workspaceId: autoMatchedWsId, deviceId: '' },
-  });
+  const handleApproveExisting = async () => {
+    if (!selectedWsId) { toast.error('Wybierz firmę'); return; }
+    setSaving(true);
+    try {
+      await agentsApi.approve(reg.id, selectedWsId);
+      toast.success('Agent zatwierdzony');
+      qc.invalidateQueries({ queryKey: ['agents'] });
+      onClose();
+    } catch (e) { toast.error(getErrorMessage(e)); }
+    finally { setSaving(false); }
+  };
 
-  // Re-set workspace when clients load and NIP matches
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (autoMatchedWsId) resetExisting({ workspaceId: autoMatchedWsId, deviceId: '' }); }, [autoMatchedWsId]);
+  const handleApproveNew = async () => {
+    if (!newName.trim()) { toast.error('Nazwa firmy jest wymagana'); return; }
+    setSaving(true);
+    try {
+      await agentsApi.approveNewClient(reg.id, { name: newName, taxId: newNip, phone: newPhone, email: newEmail, city: newCity });
+      toast.success('Firma utworzona i agent zatwierdzony');
+      qc.invalidateQueries({ queryKey: ['agents'] });
+      onClose();
+    } catch (e) { toast.error(getErrorMessage(e)); }
+    finally { setSaving(false); }
+  };
 
-  const { register: regNew, handleSubmit: handleNew } = useForm<NewClientForm>({
-    defaultValues: { name: reg.companyName ?? '', taxId: reg.nip ?? '', phone: reg.contactPhone ?? '', email: reg.contactEmail ?? '' },
-  });
-
-  const { data: devices = [] } = useQuery({ queryKey: ['devices'], queryFn: () => devicesApi.getAll({}) });
-
-  const onSuccess = () => { toast.success('Agent zatwierdzony'); qc.invalidateQueries({ queryKey: ['agents'] }); qc.invalidateQueries({ queryKey: ['devices'] }); onClose(); };
-
-  const existingMut = useMutation({
-    mutationFn: (d: ApproveForm) => agentsApi.approve(reg.id, d.workspaceId || undefined, d.deviceId || undefined),
-    onSuccess, onError: (e) => toast.error(getErrorMessage(e)),
-  });
-
-  const newClientMut = useMutation({
-    mutationFn: (d: NewClientForm) => agentsApi.approveNewClient(reg.id, d),
-    onSuccess, onError: (e) => toast.error(getErrorMessage(e)),
-  });
-
-  /* ── shared styles ── */
-  // Native <select><option> ignores CSS variables — use explicit colors based on theme
-  const { resolved: themeMode } = useTheme();
-  const isLight = themeMode === 'light';
-  const colors = {
+  // Explicit colors — no CSS variables (Chrome <option> issue)
+  const c = {
     bg: isLight ? '#ffffff' : '#0c1324',
-    bgInput: isLight ? '#f3f4f6' : '#1c2536',
+    bgAlt: isLight ? '#f3f4f6' : '#1c2536',
     text: isLight ? '#111827' : '#f3f4f6',
-    textMuted: isLight ? '#6b7280' : '#9ca3af',
+    muted: isLight ? '#6b7280' : '#9ca3af',
     border: isLight ? '#e5e7eb' : '#1f2937',
     accent: isLight ? '#6366f1' : '#818cf8',
-    accentBg: isLight ? 'rgba(99,102,241,0.1)' : 'rgba(129,140,248,0.15)',
+    accentBg: isLight ? 'rgba(99,102,241,0.08)' : 'rgba(129,140,248,0.12)',
+    selected: isLight ? '#eef2ff' : 'rgba(99,102,241,0.15)',
   };
-  const input: React.CSSProperties = {
-    width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13,
-    background: colors.bgInput, border: `1px solid ${colors.border}`, color: colors.text, outline: 'none',
-  };
-  const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 4 };
-  const tabBtn = (active: boolean): React.CSSProperties => ({
-    flex: 1, padding: '10px 0', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s',
-    background: active ? colors.accentBg : 'transparent', color: active ? colors.accent : colors.textMuted,
-  });
+  const inputS: React.CSSProperties = { width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, background: c.bgAlt, border: `1px solid ${c.border}`, color: c.text, outline: 'none' };
+  const labelS: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 600, color: c.muted, marginBottom: 4 };
+  const btnSecondary: React.CSSProperties = { padding: '8px 20px', borderRadius: 10, border: `1px solid ${c.border}`, background: 'transparent', color: c.muted, cursor: 'pointer', fontSize: 12, fontWeight: 500 };
+  const btnPrimary: React.CSSProperties = { padding: '8px 20px', borderRadius: 10, border: 'none', background: c.accent, color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600 };
 
   return (
-    /* Overlay */
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
-      onClick={onClose}>
-      {/* Panel */}
-      <div onClick={e => e.stopPropagation()} style={{
-        background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 16,
-        padding: 24, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto',
-      }}>
-        {/* Header */}
-        <div style={{ fontSize: 16, fontWeight: 700, color: colors.text, marginBottom: 16 }}>Zatwierdź urządzenie</div>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{ background: c.bg, border: `1px solid ${c.border}`, borderRadius: 16, padding: 24, width: '100%', maxWidth: 500, maxHeight: '90vh', overflowY: 'auto' }}>
 
-        {/* Agent info */}
-        <div style={{ padding: 12, borderRadius: 10, background: colors.bgInput, border: `1px solid ${colors.border}`, marginBottom: 16 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: '4px 8px', fontSize: 12 }}>
-            {reg.companyName && <><span style={{ color: colors.textMuted }}>Firma</span><span style={{ color: colors.text, fontWeight: 500 }}>{reg.companyName}</span></>}
-            {reg.nip && <><span style={{ color: colors.textMuted }}>NIP</span><span style={{ color: colors.text, fontWeight: 500 }}>{reg.nip}</span></>}
-            {reg.hostname && <><span style={{ color: colors.textMuted }}>Komputer</span><span style={{ color: colors.text, fontWeight: 500 }}>{reg.hostname}</span></>}
-            {reg.ipAddress && <><span style={{ color: colors.textMuted }}>IP</span><span style={{ color: colors.text, fontWeight: 500 }}>{reg.ipAddress}</span></>}
-            {reg.contactEmail && <><span style={{ color: colors.textMuted }}>E-mail</span><span style={{ color: colors.text, fontWeight: 500 }}>{reg.contactEmail}</span></>}
+        <div style={{ fontSize: 16, fontWeight: 700, color: c.text, marginBottom: 16 }}>Zatwierdź urządzenie</div>
+
+        {/* Info */}
+        <div style={{ padding: 12, borderRadius: 10, background: c.bgAlt, border: `1px solid ${c.border}`, marginBottom: 16, fontSize: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: '4px 8px' }}>
+            {reg.companyName && <><span style={{ color: c.muted }}>Firma</span><span style={{ color: c.text, fontWeight: 500 }}>{reg.companyName}</span></>}
+            {reg.nip && <><span style={{ color: c.muted }}>NIP</span><span style={{ color: c.text, fontWeight: 500 }}>{reg.nip}</span></>}
+            {reg.hostname && <><span style={{ color: c.muted }}>Komputer</span><span style={{ color: c.text, fontWeight: 500 }}>{reg.hostname}</span></>}
+            {reg.ipAddress && <><span style={{ color: c.muted }}>IP</span><span style={{ color: c.text, fontWeight: 500 }}>{reg.ipAddress}</span></>}
           </div>
         </div>
 
-        {/* Tab toggle */}
-        <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: `1px solid ${colors.border}`, marginBottom: 16 }}>
-          <button type="button" onClick={() => setMode('existing')} style={tabBtn(mode === 'existing')}>Przypisz do istniejącej firmy</button>
-          <button type="button" onClick={() => setMode('new')} style={tabBtn(mode === 'new')}>Utwórz nową firmę</button>
+        {/* Tabs */}
+        <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: `1px solid ${c.border}`, marginBottom: 16 }}>
+          {(['existing', 'new'] as const).map(m => (
+            <button key={m} type="button" onClick={() => setMode(m)}
+              style={{ flex: 1, padding: '10px 0', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none',
+                background: mode === m ? c.accentBg : 'transparent', color: mode === m ? c.accent : c.muted }}>
+              {m === 'existing' ? 'Istniejąca firma' : 'Nowa firma'}
+            </button>
+          ))}
         </div>
 
-        {/* Content */}
         {mode === 'existing' ? (
-          <form onSubmit={handleExisting(d => existingMut.mutate(d))}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div>
-                <label style={label}>Firma (workspace) *</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 180, overflowY: 'auto', border: `1px solid ${colors.border}`, borderRadius: 8, padding: 4 }}>
-                  {clients.length === 0 && <div style={{ padding: 8, fontSize: 12, color: colors.textMuted }}>Brak firm klientów</div>}
-                  {clients.map((c: any) => {
-                    const wsId = c.workspace?.id;
-                    const wsName = c.workspace?.name ?? '—';
-                    return (
-                      <label key={wsId ?? c.relationId} style={{
-                        display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 6, cursor: 'pointer',
-                        background: 'transparent', fontSize: 13, color: colors.text,
-                      }}
-                        onMouseEnter={e => (e.currentTarget.style.background = colors.bgInput)}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                        <input type="radio" value={wsId} {...regExisting('workspaceId', { required: true })}
-                          style={{ accentColor: colors.accent }} />
-                        <span style={{ fontWeight: 500 }}>{wsName}</span>
-                      </label>
-                    );
-                  })}
-                </div>
+          <>
+            <div style={labelS}>Wybierz firmę *</div>
+            {loadingClients ? (
+              <div style={{ padding: 16, textAlign: 'center', color: c.muted, fontSize: 12 }}>Ładowanie...</div>
+            ) : clients.length === 0 ? (
+              <div style={{ padding: 16, textAlign: 'center', color: c.muted, fontSize: 12 }}>Brak firm — dodaj klienta w sekcji Firmy klientów</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 220, overflowY: 'auto', border: `1px solid ${c.border}`, borderRadius: 8, padding: 4, marginBottom: 16 }}>
+                {clients.map((cl: any) => {
+                  const wsId = cl.workspace?.id;
+                  const wsName = cl.workspace?.name ?? '—';
+                  const wsTaxId = cl.workspace?.taxId;
+                  const isSelected = selectedWsId === wsId;
+                  const isMatch = reg.nip && wsTaxId === reg.nip;
+                  return (
+                    <div key={wsId ?? cl.relationId} onClick={() => setSelectedWsId(wsId)}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 6, cursor: 'pointer',
+                        background: isSelected ? c.selected : 'transparent', border: isSelected ? `2px solid ${c.accent}` : '2px solid transparent',
+                      }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: c.text }}>{wsName}</div>
+                        {wsTaxId && <div style={{ fontSize: 10, color: c.muted }}>NIP: {wsTaxId}</div>}
+                      </div>
+                      {isMatch && <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: 'rgba(34,197,94,0.12)', color: '#22C55E' }}>NIP pasuje</span>}
+                    </div>
+                  );
+                })}
               </div>
-              <div>
-                <label style={label}>Urządzenie (opcjonalne)</label>
-                <select style={{ ...input, color: colors.text, backgroundColor: colors.bgInput }}>
-                  <option value="" style={{ color: colors.text, backgroundColor: colors.bg }}>— auto-utwórz nowe urządzenie —</option>
-                  {devices.map((d: any) => <option key={d.id} value={d.id} style={{ color: colors.text, backgroundColor: colors.bg }}>{d.name}</option>)}
-                </select>
-                <input type="hidden" {...regExisting('deviceId')} />
-              </div>
-            </div>
-            {/* Footer */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
-              <button type="button" onClick={onClose} style={{ padding: '8px 20px', borderRadius: 10, border: `1px solid ${colors.border}`, background: 'transparent', color: colors.textMuted, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>Anuluj</button>
-              <button type="submit" disabled={existingMut.isPending} style={{ padding: '8px 20px', borderRadius: 10, border: 'none', background: colors.accent, color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: existingMut.isPending ? 0.6 : 1 }}>
-                {existingMut.isPending ? 'Zapisuję...' : 'Zatwierdź'}
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button type="button" onClick={onClose} style={btnSecondary}>Anuluj</button>
+              <button type="button" onClick={handleApproveExisting} disabled={saving || !selectedWsId}
+                style={{ ...btnPrimary, opacity: saving || !selectedWsId ? 0.5 : 1 }}>
+                {saving ? 'Zapisuję...' : 'Zatwierdź'}
               </button>
             </div>
-          </form>
+          </>
         ) : (
-          <form onSubmit={handleNew(d => newClientMut.mutate(d))}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <div style={{ gridColumn: 'span 2' }}><label style={label}>Nazwa firmy *</label><input style={input} placeholder="np. ACME Sp. z o.o." {...regNew('name', { required: true })} /></div>
-              <div><label style={label}>NIP</label><input style={input} placeholder="0000000000" {...regNew('taxId')} /></div>
-              <div><label style={label}>Telefon</label><input style={input} placeholder="+48 000 000 000" {...regNew('phone')} /></div>
-              <div style={{ gridColumn: 'span 2' }}><label style={label}>E-mail</label><input style={input} type="email" placeholder="firma@email.pl" {...regNew('email')} /></div>
-              <div style={{ gridColumn: 'span 2' }}><label style={label}>Adres</label><input style={input} placeholder="ul. Przykładowa 1" {...regNew('addressLine1')} /></div>
-              <div><label style={label}>Kod pocztowy</label><input style={input} placeholder="00-000" {...regNew('postalCode')} /></div>
-              <div><label style={label}>Miasto</label><input style={input} placeholder="Warszawa" {...regNew('city')} /></div>
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+              <div style={{ gridColumn: 'span 2' }}><label style={labelS}>Nazwa firmy *</label><input style={inputS} value={newName} onChange={e => setNewName(e.target.value)} /></div>
+              <div><label style={labelS}>NIP</label><input style={inputS} value={newNip} onChange={e => setNewNip(e.target.value)} /></div>
+              <div><label style={labelS}>Telefon</label><input style={inputS} value={newPhone} onChange={e => setNewPhone(e.target.value)} /></div>
+              <div style={{ gridColumn: 'span 2' }}><label style={labelS}>E-mail</label><input style={inputS} type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} /></div>
+              <div style={{ gridColumn: 'span 2' }}><label style={labelS}>Miasto</label><input style={inputS} value={newCity} onChange={e => setNewCity(e.target.value)} /></div>
             </div>
-            {/* Footer */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
-              <button type="button" onClick={onClose} style={{ padding: '8px 20px', borderRadius: 10, border: `1px solid ${colors.border}`, background: 'transparent', color: colors.textMuted, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>Anuluj</button>
-              <button type="submit" disabled={newClientMut.isPending} style={{ padding: '8px 20px', borderRadius: 10, border: 'none', background: colors.accent, color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: newClientMut.isPending ? 0.6 : 1 }}>
-                {newClientMut.isPending ? 'Zapisuję...' : 'Utwórz firmę i zatwierdź'}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button type="button" onClick={onClose} style={btnSecondary}>Anuluj</button>
+              <button type="button" onClick={handleApproveNew} disabled={saving || !newName.trim()}
+                style={{ ...btnPrimary, opacity: saving || !newName.trim() ? 0.5 : 1 }}>
+                {saving ? 'Zapisuję...' : 'Utwórz i zatwierdź'}
               </button>
             </div>
-          </form>
+          </>
         )}
       </div>
     </div>
