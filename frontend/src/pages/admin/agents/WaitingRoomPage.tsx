@@ -558,42 +558,53 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
     onSuccess, onError: (e) => toast.error(getErrorMessage(e)),
   });
 
-  /* ── shared styles using design tokens ── */
+  /* ── shared styles ── */
+  // Native <select><option> ignores CSS variables in Chrome — use explicit colors
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  const colors = {
+    bg: isLight ? '#ffffff' : '#0c1324',
+    bgInput: isLight ? '#f3f4f6' : '#1c2536',
+    text: isLight ? '#111827' : '#f3f4f6',
+    textMuted: isLight ? '#6b7280' : '#9ca3af',
+    border: isLight ? '#e5e7eb' : '#1f2937',
+    accent: isLight ? '#6366f1' : '#818cf8',
+    accentBg: isLight ? 'rgba(99,102,241,0.1)' : 'rgba(129,140,248,0.15)',
+  };
   const input: React.CSSProperties = {
     width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13,
-    background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--t)', outline: 'none',
+    background: colors.bgInput, border: `1px solid ${colors.border}`, color: colors.text, outline: 'none',
   };
-  const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--tm)', marginBottom: 4 };
+  const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 4 };
   const tabBtn = (active: boolean): React.CSSProperties => ({
     flex: 1, padding: '10px 0', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s',
-    background: active ? 'var(--accent-g)' : 'transparent', color: active ? 'var(--accent)' : 'var(--tm)',
+    background: active ? colors.accentBg : 'transparent', color: active ? colors.accent : colors.textMuted,
   });
 
   return (
     /* Overlay */
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
       onClick={onClose}>
-      {/* Panel — var(--bg2) = #fff in light, #0c1324 in dark — opaque, theme-aware */}
+      {/* Panel */}
       <div onClick={e => e.stopPropagation()} style={{
-        background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16,
+        background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 16,
         padding: 24, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto',
       }}>
         {/* Header */}
-        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--t)', marginBottom: 16 }}>Zatwierdź urządzenie</div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: colors.text, marginBottom: 16 }}>Zatwierdź urządzenie</div>
 
         {/* Agent info */}
-        <div style={{ padding: 12, borderRadius: 10, background: 'var(--hover-bg)', border: '1px solid var(--border)', marginBottom: 16 }}>
+        <div style={{ padding: 12, borderRadius: 10, background: colors.bgInput, border: `1px solid ${colors.border}`, marginBottom: 16 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: '4px 8px', fontSize: 12 }}>
-            {reg.companyName && <><span style={{ color: 'var(--tm)' }}>Firma</span><span style={{ color: 'var(--t)', fontWeight: 500 }}>{reg.companyName}</span></>}
-            {reg.nip && <><span style={{ color: 'var(--tm)' }}>NIP</span><span style={{ color: 'var(--t)', fontWeight: 500 }}>{reg.nip}</span></>}
-            {reg.hostname && <><span style={{ color: 'var(--tm)' }}>Komputer</span><span style={{ color: 'var(--t)', fontWeight: 500 }}>{reg.hostname}</span></>}
-            {reg.ipAddress && <><span style={{ color: 'var(--tm)' }}>IP</span><span style={{ color: 'var(--t)', fontWeight: 500 }}>{reg.ipAddress}</span></>}
-            {reg.contactEmail && <><span style={{ color: 'var(--tm)' }}>E-mail</span><span style={{ color: 'var(--t)', fontWeight: 500 }}>{reg.contactEmail}</span></>}
+            {reg.companyName && <><span style={{ color: colors.textMuted }}>Firma</span><span style={{ color: colors.text, fontWeight: 500 }}>{reg.companyName}</span></>}
+            {reg.nip && <><span style={{ color: colors.textMuted }}>NIP</span><span style={{ color: colors.text, fontWeight: 500 }}>{reg.nip}</span></>}
+            {reg.hostname && <><span style={{ color: colors.textMuted }}>Komputer</span><span style={{ color: colors.text, fontWeight: 500 }}>{reg.hostname}</span></>}
+            {reg.ipAddress && <><span style={{ color: colors.textMuted }}>IP</span><span style={{ color: colors.text, fontWeight: 500 }}>{reg.ipAddress}</span></>}
+            {reg.contactEmail && <><span style={{ color: colors.textMuted }}>E-mail</span><span style={{ color: colors.text, fontWeight: 500 }}>{reg.contactEmail}</span></>}
           </div>
         </div>
 
         {/* Tab toggle */}
-        <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)', marginBottom: 16 }}>
+        <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: `1px solid ${colors.border}`, marginBottom: 16 }}>
           <button type="button" onClick={() => setMode('existing')} style={tabBtn(mode === 'existing')}>Przypisz do istniejącej firmy</button>
           <button type="button" onClick={() => setMode('new')} style={tabBtn(mode === 'new')}>Utwórz nową firmę</button>
         </div>
@@ -619,8 +630,8 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
             </div>
             {/* Footer */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
-              <button type="button" onClick={onClose} style={{ padding: '8px 20px', borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', color: 'var(--ts)', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>Anuluj</button>
-              <button type="submit" disabled={existingMut.isPending} style={{ padding: '8px 20px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: existingMut.isPending ? 0.6 : 1 }}>
+              <button type="button" onClick={onClose} style={{ padding: '8px 20px', borderRadius: 10, border: `1px solid ${colors.border}`, background: 'transparent', color: colors.textMuted, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>Anuluj</button>
+              <button type="submit" disabled={existingMut.isPending} style={{ padding: '8px 20px', borderRadius: 10, border: 'none', background: colors.accent, color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: existingMut.isPending ? 0.6 : 1 }}>
                 {existingMut.isPending ? 'Zapisuję...' : 'Zatwierdź'}
               </button>
             </div>
@@ -638,8 +649,8 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
             </div>
             {/* Footer */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
-              <button type="button" onClick={onClose} style={{ padding: '8px 20px', borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', color: 'var(--ts)', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>Anuluj</button>
-              <button type="submit" disabled={newClientMut.isPending} style={{ padding: '8px 20px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: newClientMut.isPending ? 0.6 : 1 }}>
+              <button type="button" onClick={onClose} style={{ padding: '8px 20px', borderRadius: 10, border: `1px solid ${colors.border}`, background: 'transparent', color: colors.textMuted, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>Anuluj</button>
+              <button type="submit" disabled={newClientMut.isPending} style={{ padding: '8px 20px', borderRadius: 10, border: 'none', background: colors.accent, color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: newClientMut.isPending ? 0.6 : 1 }}>
                 {newClientMut.isPending ? 'Zapisuję...' : 'Utwórz firmę i zatwierdź'}
               </button>
             </div>
