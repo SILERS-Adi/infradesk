@@ -9,7 +9,6 @@ import { devicesApi } from '../../../api/devices';
 import { apiClient } from '../../../api/client';
 import { MspCompanyFilter } from '../../../components/ui/MspCompanyFilter';
 import { Button } from '../../../components/ui/Button';
-import { Select } from '../../../components/ui/Select';
 import { getErrorMessage } from '../../../utils/helpers';
 import { clsx } from 'clsx';
 
@@ -506,199 +505,129 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
   );
 }
 
-/* ── ApproveModal (dark glass) ───────────────────────────── */
-interface ApproveForm {
-  workspaceId: string;
-  deviceId?: string;
-}
-
-interface NewClientForm {
-  name: string;
-  taxId?: string;
-  phone?: string;
-  email?: string;
-  addressLine1?: string;
-  postalCode?: string;
-  city?: string;
-}
+/* ── ApproveModal ─────────────────────────────────────────
+ * Theme-aware modal using InfraDesk design tokens.
+ * Pattern: same as SATenantsPage modals (var(--bg2), var(--t), var(--border)).
+ * No hardcoded dark styles — fully light/dark responsive.
+ * ──────────────────────────────────────────────────────── */
+interface ApproveForm { workspaceId: string; deviceId?: string; }
+interface NewClientForm { name: string; taxId?: string; phone?: string; email?: string; addressLine1?: string; postalCode?: string; city?: string; }
 
 function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () => void }) {
   const qc = useQueryClient();
   const [mode, setMode] = useState<'existing' | 'new'>('existing');
 
-  const { register: regExisting, handleSubmit: handleExisting, watch } = useForm<ApproveForm>({
+  const { register: regExisting, handleSubmit: handleExisting } = useForm<ApproveForm>({
     defaultValues: { workspaceId: reg.workspaceId ?? '', deviceId: '' },
   });
-  const workspaceId = watch('workspaceId');
 
-  // Load client workspaces for MSP
+  const { register: regNew, handleSubmit: handleNew } = useForm<NewClientForm>({
+    defaultValues: { name: reg.companyName ?? '', taxId: reg.nip ?? '', phone: reg.contactPhone ?? '', email: reg.contactEmail ?? '' },
+  });
+
   const { data: clients = [] } = useQuery({
     queryKey: ['operator', 'clients'],
     queryFn: () => apiClient.get('/operator/clients').then(r => r.data).catch(() => []),
   });
 
-  const { register: regNew, handleSubmit: handleNew } = useForm<NewClientForm>({
-    defaultValues: {
-      name:  reg.companyName ?? '',
-      taxId: reg.nip ?? '',
-      phone: reg.contactPhone ?? '',
-      email: reg.contactEmail ?? '',
-    },
-  });
+  const { data: devices = [] } = useQuery({ queryKey: ['devices'], queryFn: () => devicesApi.getAll({}) });
 
-  const { data: devices = [] } = useQuery({
-    queryKey: ['devices'],
-    queryFn: () => devicesApi.getAll({}),
-  });
+  const onSuccess = () => { toast.success('Agent zatwierdzony'); qc.invalidateQueries({ queryKey: ['agents'] }); qc.invalidateQueries({ queryKey: ['devices'] }); onClose(); };
 
-  const successCb = () => {
-    toast.success('Agent zatwierdzony');
-    qc.invalidateQueries({ queryKey: ['agents'] });
-    qc.invalidateQueries({ queryKey: ['devices'] });
-    onClose();
-  };
-
-  const existingMutation = useMutation({
+  const existingMut = useMutation({
     mutationFn: (d: ApproveForm) => agentsApi.approve(reg.id, d.workspaceId || undefined, d.deviceId || undefined),
-    onSuccess: successCb,
-    onError: (err) => toast.error(getErrorMessage(err)),
+    onSuccess, onError: (e) => toast.error(getErrorMessage(e)),
   });
 
-  const newClientMutation = useMutation({
+  const newClientMut = useMutation({
     mutationFn: (d: NewClientForm) => agentsApi.approveNewClient(reg.id, d),
-    onSuccess: successCb,
-    onError: (err) => toast.error(getErrorMessage(err)),
+    onSuccess, onError: (e) => toast.error(getErrorMessage(e)),
   });
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    fontSize: '0.875rem',
-    background: 'var(--hover-bg)',
-    border: '1px solid var(--border)',
-    borderRadius: '0.5rem',
-    padding: '0.5rem 0.75rem',
-    color: 'var(--t)',
-    outline: 'none',
+  /* ── shared styles using design tokens ── */
+  const input: React.CSSProperties = {
+    width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13,
+    background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)', outline: 'none',
   };
-
-  const labelStyle: React.CSSProperties = {
-    display: 'block',
-    fontSize: '0.75rem',
-    fontWeight: 500,
-    color: 'var(--ts)',
-    marginBottom: '0.25rem',
-  };
+  const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--tm)', marginBottom: 4 };
+  const tabBtn = (active: boolean): React.CSSProperties => ({
+    flex: 1, padding: '10px 0', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s',
+    background: active ? 'var(--accent-g)' : 'transparent', color: active ? 'var(--accent)' : 'var(--tm)',
+  });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}>
-      <div
-        className="rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto"
-        style={{ background: 'var(--bg, #fff)', border: '1px solid var(--border)' }}
-      >
-        <h2 className="text-lg font-bold" style={{ color: 'var(--t)' }}>Zatwierdz urzadzenie</h2>
+    /* Overlay */
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+      onClick={onClose}>
+      {/* Panel — var(--bg2) = #fff in light, #0c1324 in dark — opaque, theme-aware */}
+      <div onClick={e => e.stopPropagation()} style={{
+        background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16,
+        padding: 24, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto',
+      }}>
+        {/* Header */}
+        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--t)', marginBottom: 16 }}>Zatwierdź urządzenie</div>
 
-        {/* Registration info */}
-        <div className="rounded-xl p-3 text-xs space-y-1" style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--ts)' }}>
-          {reg.companyName && <div><span className="font-medium" style={{ color: 'var(--ts)' }}>Firma:</span> {reg.companyName}</div>}
-          {(reg.contactFirstName || reg.contactLastName) && (
-            <div><span className="font-medium" style={{ color: 'var(--ts)' }}>Kontakt:</span> {[reg.contactFirstName, reg.contactLastName].filter(Boolean).join(' ')}</div>
-          )}
-          {reg.contactEmail && <div><span className="font-medium" style={{ color: 'var(--ts)' }}>E-mail:</span> {reg.contactEmail}</div>}
-          {reg.nip          && <div><span className="font-medium" style={{ color: 'var(--ts)' }}>NIP:</span> {reg.nip}</div>}
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.25rem', marginTop: '0.25rem' }}>
-            {reg.hostname  && <div><span className="font-medium" style={{ color: 'var(--ts)' }}>Komputer:</span> {reg.hostname}</div>}
-            {reg.ipAddress && <div><span className="font-medium" style={{ color: 'var(--ts)' }}>IP:</span> {reg.ipAddress}</div>}
+        {/* Agent info */}
+        <div style={{ padding: 12, borderRadius: 10, background: 'var(--hover-bg)', border: '1px solid var(--border)', marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: '4px 8px', fontSize: 12 }}>
+            {reg.companyName && <><span style={{ color: 'var(--tm)' }}>Firma</span><span style={{ color: 'var(--t)', fontWeight: 500 }}>{reg.companyName}</span></>}
+            {reg.nip && <><span style={{ color: 'var(--tm)' }}>NIP</span><span style={{ color: 'var(--t)', fontWeight: 500 }}>{reg.nip}</span></>}
+            {reg.hostname && <><span style={{ color: 'var(--tm)' }}>Komputer</span><span style={{ color: 'var(--t)', fontWeight: 500 }}>{reg.hostname}</span></>}
+            {reg.ipAddress && <><span style={{ color: 'var(--tm)' }}>IP</span><span style={{ color: 'var(--t)', fontWeight: 500 }}>{reg.ipAddress}</span></>}
+            {reg.contactEmail && <><span style={{ color: 'var(--tm)' }}>E-mail</span><span style={{ color: 'var(--t)', fontWeight: 500 }}>{reg.contactEmail}</span></>}
           </div>
         </div>
 
-        {/* Mode toggle */}
-        <div className="flex rounded-xl overflow-hidden text-sm font-medium" style={{ border: '1px solid var(--border)' }}>
-          <button
-            type="button"
-            onClick={() => setMode('existing')}
-            className="flex-1 py-2.5 transition-colors"
-            style={{
-              background: mode === 'existing' ? 'rgba(139,92,246,0.25)' : 'var(--bg-card)',
-              color: mode === 'existing' ? '#A78BFA' : 'var(--ts)',
-            }}
-          >
-            Przypisz do istniejacej firmy
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('new')}
-            className="flex-1 py-2.5 transition-colors"
-            style={{
-              background: mode === 'new' ? 'rgba(139,92,246,0.25)' : 'var(--bg-card)',
-              color: mode === 'new' ? '#A78BFA' : 'var(--ts)',
-            }}
-          >
-            Utworz nowa firme
-          </button>
+        {/* Tab toggle */}
+        <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)', marginBottom: 16 }}>
+          <button type="button" onClick={() => setMode('existing')} style={tabBtn(mode === 'existing')}>Przypisz do istniejącej firmy</button>
+          <button type="button" onClick={() => setMode('new')} style={tabBtn(mode === 'new')}>Utwórz nową firmę</button>
         </div>
 
+        {/* Content */}
         {mode === 'existing' ? (
-          <form onSubmit={handleExisting(d => existingMutation.mutate(d))} className="space-y-4">
-            <div>
-              <label style={labelStyle}>Firma (workspace) *</label>
-              <select style={inputStyle} {...regExisting('workspaceId', { required: true })}>
-                <option value="">--- wybierz firmę ---</option>
-                {clients.map((c: any) => (
-                  <option key={c.workspace?.id ?? c.relationId} value={c.workspace?.id}>
-                    {c.workspace?.name}
-                  </option>
-                ))}
-              </select>
+          <form onSubmit={handleExisting(d => existingMut.mutate(d))}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={label}>Firma (workspace) *</label>
+                <select style={input} {...regExisting('workspaceId', { required: true })}>
+                  <option value="">— wybierz firmę —</option>
+                  {clients.map((c: any) => <option key={c.workspace?.id ?? c.relationId} value={c.workspace?.id}>{c.workspace?.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={label}>Urządzenie (opcjonalne)</label>
+                <select style={input} {...regExisting('deviceId')}>
+                  <option value="">— auto-utwórz nowe urządzenie —</option>
+                  {devices.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+              </div>
             </div>
-            <Select
-              label="Urzadzenie (opcjonalne)"
-              placeholder="--- auto-utworz nowe ---"
-              options={[
-                { value: '', label: '--- auto-utworz nowe urzadzenie ---' },
-                ...devices.map((d: any) => ({ value: d.id, label: d.name })),
-              ]}
-              {...regExisting('deviceId')}
-            />
-            <div className="flex justify-end gap-3 pt-2">
-              <Button variant="secondary" type="button" onClick={onClose}>Anuluj</Button>
-              <Button type="submit" loading={existingMutation.isPending}>Zatwierdz</Button>
+            {/* Footer */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
+              <button type="button" onClick={onClose} style={{ padding: '8px 20px', borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', color: 'var(--ts)', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>Anuluj</button>
+              <button type="submit" disabled={existingMut.isPending} style={{ padding: '8px 20px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: existingMut.isPending ? 0.6 : 1 }}>
+                {existingMut.isPending ? 'Zapisuję...' : 'Zatwierdź'}
+              </button>
             </div>
           </form>
         ) : (
-          <form onSubmit={handleNew(d => newClientMutation.mutate(d))} className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
-                <label style={labelStyle}>Nazwa firmy *</label>
-                <input style={inputStyle} placeholder="np. ACME Sp. z o.o." {...regNew('name', { required: true })} />
-              </div>
-              <div>
-                <label style={labelStyle}>NIP</label>
-                <input style={inputStyle} placeholder="0000000000" {...regNew('taxId')} />
-              </div>
-              <div>
-                <label style={labelStyle}>Telefon</label>
-                <input style={inputStyle} placeholder="+48 000 000 000" {...regNew('phone')} />
-              </div>
-              <div className="col-span-2">
-                <label style={labelStyle}>E-mail</label>
-                <input style={inputStyle} type="email" placeholder="firma@email.pl" {...regNew('email')} />
-              </div>
-              <div className="col-span-2">
-                <label style={labelStyle}>Adres</label>
-                <input style={inputStyle} placeholder="ul. Przykladowa 1" {...regNew('addressLine1')} />
-              </div>
-              <div>
-                <label style={labelStyle}>Kod pocztowy</label>
-                <input style={inputStyle} placeholder="00-000" {...regNew('postalCode')} />
-              </div>
-              <div>
-                <label style={labelStyle}>Miasto</label>
-                <input style={inputStyle} placeholder="Warszawa" {...regNew('city')} />
-              </div>
+          <form onSubmit={handleNew(d => newClientMut.mutate(d))}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div style={{ gridColumn: 'span 2' }}><label style={label}>Nazwa firmy *</label><input style={input} placeholder="np. ACME Sp. z o.o." {...regNew('name', { required: true })} /></div>
+              <div><label style={label}>NIP</label><input style={input} placeholder="0000000000" {...regNew('taxId')} /></div>
+              <div><label style={label}>Telefon</label><input style={input} placeholder="+48 000 000 000" {...regNew('phone')} /></div>
+              <div style={{ gridColumn: 'span 2' }}><label style={label}>E-mail</label><input style={input} type="email" placeholder="firma@email.pl" {...regNew('email')} /></div>
+              <div style={{ gridColumn: 'span 2' }}><label style={label}>Adres</label><input style={input} placeholder="ul. Przykładowa 1" {...regNew('addressLine1')} /></div>
+              <div><label style={label}>Kod pocztowy</label><input style={input} placeholder="00-000" {...regNew('postalCode')} /></div>
+              <div><label style={label}>Miasto</label><input style={input} placeholder="Warszawa" {...regNew('city')} /></div>
             </div>
-            <div className="flex justify-end gap-3 pt-2">
-              <Button variant="secondary" type="button" onClick={onClose}>Anuluj</Button>
-              <Button type="submit" loading={newClientMutation.isPending}>Utworz firme i zatwierdz</Button>
+            {/* Footer */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
+              <button type="button" onClick={onClose} style={{ padding: '8px 20px', borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', color: 'var(--ts)', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>Anuluj</button>
+              <button type="submit" disabled={newClientMut.isPending} style={{ padding: '8px 20px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, opacity: newClientMut.isPending ? 0.6 : 1 }}>
+                {newClientMut.isPending ? 'Zapisuję...' : 'Utwórz firmę i zatwierdź'}
+              </button>
             </div>
           </form>
         )}
