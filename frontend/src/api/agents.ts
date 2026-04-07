@@ -80,8 +80,8 @@ export const agentsApi = {
   getAll: (): Promise<AgentRegistration[]> =>
     api.get('/agent').then(r => r.data),
 
-  approve: (id: string, clientId?: string, deviceId?: string): Promise<AgentRegistration> =>
-    api.post(`/agent/${id}/approve`, { clientId, deviceId }).then(r => r.data),
+  approve: (id: string, workspaceId?: string, deviceId?: string): Promise<AgentRegistration> =>
+    api.post(`/agent/${id}/approve`, { workspaceId, deviceId }).then(r => r.data),
 
   approveNewClient: (id: string, clientData: {
     name: string; taxId?: string; phone?: string; email?: string;

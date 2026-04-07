@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { Monitor, Check, Trash2, Wifi, WifiOff, Clock, ChevronDown, ChevronUp, Cpu, HardDrive, Network, Package, RefreshCw, Search, ExternalLink } from 'lucide-react';
 import { agentsApi, AgentRegistration, InstalledSoftware, DiskInfo, NetworkIface } from '../../../api/agents';
 import { devicesApi } from '../../../api/devices';
+import { apiClient } from '../../../api/client';
 import { MspCompanyFilter } from '../../../components/ui/MspCompanyFilter';
 import { Button } from '../../../components/ui/Button';
 import { Select } from '../../../components/ui/Select';
@@ -507,7 +508,7 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
 
 /* ── ApproveModal (dark glass) ───────────────────────────── */
 interface ApproveForm {
-  clientId: string;
+  workspaceId: string;
   deviceId?: string;
 }
 
@@ -526,9 +527,15 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
   const [mode, setMode] = useState<'existing' | 'new'>('existing');
 
   const { register: regExisting, handleSubmit: handleExisting, watch } = useForm<ApproveForm>({
-    defaultValues: { clientId: reg.clientId ?? '', deviceId: '' },
+    defaultValues: { workspaceId: reg.workspaceId ?? '', deviceId: '' },
   });
-  const clientId = watch('clientId');
+  const workspaceId = watch('workspaceId');
+
+  // Load client workspaces for MSP
+  const { data: clients = [] } = useQuery({
+    queryKey: ['operator', 'clients'],
+    queryFn: () => apiClient.get('/operator/clients').then(r => r.data).catch(() => []),
+  });
 
   const { register: regNew, handleSubmit: handleNew } = useForm<NewClientForm>({
     defaultValues: {
@@ -552,7 +559,7 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
   };
 
   const existingMutation = useMutation({
-    mutationFn: (d: ApproveForm) => agentsApi.approve(reg.id, d.clientId || undefined, d.deviceId || undefined),
+    mutationFn: (d: ApproveForm) => agentsApi.approve(reg.id, d.workspaceId || undefined, d.deviceId || undefined),
     onSuccess: successCb,
     onError: (err) => toast.error(getErrorMessage(err)),
   });
@@ -632,6 +639,17 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
 
         {mode === 'existing' ? (
           <form onSubmit={handleExisting(d => existingMutation.mutate(d))} className="space-y-4">
+            <div>
+              <label style={labelStyle}>Firma (workspace) *</label>
+              <select style={inputStyle} {...regExisting('workspaceId', { required: true })}>
+                <option value="">--- wybierz firmę ---</option>
+                {clients.map((c: any) => (
+                  <option key={c.workspace?.id ?? c.relationId} value={c.workspace?.id}>
+                    {c.workspace?.name}
+                  </option>
+                ))}
+              </select>
+            </div>
             <Select
               label="Urzadzenie (opcjonalne)"
               placeholder="--- auto-utworz nowe ---"
@@ -718,10 +736,13 @@ export function WaitingRoomPage() {
   });
 
   const quickApproveMutation = useMutation({
-    mutationFn: (reg: AgentRegistration) =>
-      agentsApi.approve(reg.id, undefined, undefined),
+    mutationFn: (reg: AgentRegistration) => {
+      // Quick approve only works if agent has workspace assigned
+      if (!reg.workspaceId) throw new Error('Brak workspace — użyj pełnego zatwierdzenia');
+      return agentsApi.approve(reg.id, reg.workspaceId, undefined);
+    },
     onSuccess: () => {
-      toast.success('Agent zatwierdzony --- urzadzenie dodane automatycznie');
+      toast.success('Agent zatwierdzony — urządzenie dodane automatycznie');
       qc.invalidateQueries({ queryKey: ['agents'] });
       qc.invalidateQueries({ queryKey: ['devices'] });
     },
