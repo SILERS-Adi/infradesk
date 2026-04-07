@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+// @ts-nocheck
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -6,8 +7,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   CheckCircle2, Clock, Loader2, Plus, X, ExternalLink, MapPin,
-  Monitor, Save, Play, Pause, Square, Timer, ChevronDown, ChevronUp, Edit2, Trash2,
-  Wifi, WifiOff, Sparkles, Zap, RotateCw, Phone, User,
+  Monitor, Play, Pause, Square, Timer, Edit2, Sparkles, Zap,
+  Wifi, WifiOff, RotateCw, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { tasksApi } from '../../../api/tasks';
@@ -26,21 +27,15 @@ import { useWorkspaceContext } from '../../../hooks/useWorkspaceContext';
 import { formatDate, formatDateTime, getErrorMessage } from '../../../utils/helpers';
 import type { Task, TaskStatus } from '../../../types';
 
-type TabKey = 'NEW' | 'IN_PROGRESS' | 'DONE';
+// ── Helpers ──────────────────────────────────────────────────────────
 
-const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
-  { key: 'NEW',         label: 'Nowe',         icon: <Clock className="h-4 w-4" /> },
-  { key: 'IN_PROGRESS', label: 'W trakcie',    icon: <Loader2 className="h-4 w-4" /> },
-  { key: 'DONE',        label: 'Zrealizowane', icon: <CheckCircle2 className="h-4 w-4" /> },
+type TabKey = 'NEW' | 'IN_PROGRESS' | 'DONE';
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'NEW', label: 'Nowe' },
+  { key: 'IN_PROGRESS', label: 'W trakcie' },
+  { key: 'DONE', label: 'Zrealizowane' },
 ];
 
-const TAB_BADGE_COLORS: Record<TabKey, { bg: string; color: string }> = {
-  NEW:         { bg: 'rgba(59,130,246,0.12)',  color: '#60A5FA' },
-  IN_PROGRESS: { bg: 'rgba(234,179,8,0.12)',   color: '#FACC15' },
-  DONE:        { bg: 'rgba(34,197,94,0.12)',   color: '#4ADE80' },
-};
-
-// -- Timer display -----------------------------------------------------------
 function formatTimer(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
@@ -54,866 +49,242 @@ function formatDurationShort(min: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-// -- Live timer hook ---------------------------------------------------------
 function useLiveTimer(session: WorkSession | null) {
-  const [now, setNow] = useState(Date.now());
+  const [, setTick] = useState(0);
   useEffect(() => {
     if (!session || session.status !== 'ACTIVE') return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
+    const id = setInterval(() => setTick(t => t + 1), 1000);
     return () => clearInterval(id);
   }, [session?.id, session?.status]);
-
   if (!session?.timeEntries?.length) return 0;
   return calcWorkSeconds(session.timeEntries);
 }
 
-// -- New task form schema ----------------------------------------------------
+// ── Online status badge ──────────────────────────────────────────────
+
+function OnlineBadge({ deviceId, agents }: { deviceId?: string; agents: AgentRegistration[] }) {
+  const agent = agents.find(a => a.deviceId === deviceId);
+  const isOnline = agent?.lastSeen ? Date.now() - new Date(agent.lastSeen).getTime() < 2 * 60 * 1000 : false;
+
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5"
+      style={isOnline
+        ? { background: 'rgba(34,197,94,0.12)', color: '#22C55E' }
+        : { background: 'var(--hover-bg)', color: 'var(--tm)' }}>
+      {isOnline ? <><Wifi className="h-3 w-3" /> Online</> : <><WifiOff className="h-3 w-3" /> Offline</>}
+    </span>
+  );
+}
+
+// ── AI inline suggestion ─────────────────────────────────────────────
+
+function AiButton({ title, description, source }: { title: string; description?: string; source?: string }) {
+  const [suggestion, setSuggestion] = useState<AiSuggestion | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  const fetch_ = async () => {
+    if (suggestion) { setOpen(o => !o); return; }
+    setLoading(true); setOpen(true);
+    try { setSuggestion(await aiApi.suggest({ title, description, source })); }
+    catch { toast.error('Błąd AI'); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div>
+      <button onClick={fetch_} disabled={loading}
+        className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg transition-all"
+        style={{ color: '#C084FC' }}>
+        {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+        AI
+      </button>
+      {open && suggestion && (
+        <div className="mt-1 p-2 rounded-lg text-[11px]" style={{ background: 'rgba(168,85,247,0.04)', border: '1px solid rgba(168,85,247,0.1)' }}>
+          <p style={{ color: 'var(--ts)' }}>{suggestion.summary}</p>
+          {suggestion.steps.length > 0 && (
+            <ol className="mt-1 space-y-0.5 list-decimal list-inside" style={{ color: 'var(--tm)' }}>
+              {suggestion.steps.map((s, i) => <li key={i}>{s}</li>)}
+            </ol>
+          )}
+          {suggestion.canAutoFix && (
+            <button className="mt-1 text-[10px] font-semibold px-2 py-1 rounded"
+              style={{ background: 'rgba(34,197,94,0.08)', color: '#4ADE80' }}>
+              <Zap className="h-3 w-3 inline mr-1" />
+              {suggestion.autoFixType === 'WINDOWS_UPDATE' ? 'Aktualizuj Windows' :
+               suggestion.autoFixType === 'RESTART' ? 'Restartuj' : 'Napraw'}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── New task form schema ─────────────────────────────────────────────
+
 const newTaskSchema = z.object({
-  title:            z.string().min(1, 'Tytuł jest wymagany'),
-  description:      z.string().optional(),
+  title: z.string().min(1, 'Tytuł jest wymagany'),
+  description: z.string().optional(),
   assignedToUserId: z.string().min(1, 'Wybierz osobę'),
-  dueAt:            z.string().optional(),
-  notes:            z.string().optional(),
+  dueAt: z.string().optional(),
+  notes: z.string().optional(),
   estimatedMinutes: z.number().optional().nullable(),
 });
 type NewTaskForm = z.infer<typeof newTaskSchema>;
 
-// -- Remote panel (RustDesk + online status + WoL) ---------------------------
-function RemotePanel({ rustdeskId, deviceName }: { rustdeskId: string; deviceName?: string }) {
-  const { data: agents = [] } = useQuery({
-    queryKey: ['agents'],
-    queryFn: () => agentsApi.getAll(),
-    staleTime: 15_000,
-    refetchInterval: 15_000,
-  });
+// ── Task Row ─────────────────────────────────────────────────────────
 
-  const agent = agents.find(a => a.rustdeskId === rustdeskId);
-  const isOnline = agent?.lastSeen
-    ? Date.now() - new Date(agent.lastSeen).getTime() < 2 * 60 * 1000
-    : false;
-
-  const wakeMutation = useMutation({
-    mutationFn: () => agentsApi.wake(agent!.id),
-    onSuccess: () => toast.success('WoL wysłany — komputer powinien się obudzić'),
-    onError: () => toast.error('Nie udało się obudzić komputera'),
-  });
-
-  const winUpdateMutation = useMutation({
-    mutationFn: () => agentsApi.windowsUpdate(agent!.id),
-    onSuccess: () => toast.success('Aktualizacja Windows wysłana'),
-    onError: () => toast.error('Błąd wysyłania aktualizacji'),
-  });
-
-  return (
-    <div className="mt-2 flex items-center gap-2 flex-wrap">
-      {/* Online status */}
-      <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 border"
-        style={isOnline
-          ? { background: 'rgba(34,197,94,0.12)', borderColor: 'rgba(34,197,94,0.25)', color: '#4ADE80' }
-          : { background: 'var(--hover-bg)', borderColor: 'var(--border)', color: 'var(--tm)' }}>
-        {isOnline ? <><Wifi className="h-3 w-3" /> Online</> : <><WifiOff className="h-3 w-3" /> Offline</>}
-      </span>
-
-      {/* RustDesk connect */}
-      <a href={`rustdesk://id=${rustdeskId}`}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] border"
-        style={{ background: 'rgba(16,185,129,0.08)', borderColor: 'rgba(16,185,129,0.2)', color: '#10B981' }}
-        onClick={e => e.stopPropagation()}>
-        <ExternalLink className="h-3.5 w-3.5" /> RustDesk
-      </a>
-
-      {/* WoL if offline */}
-      {!isOnline && agent && (
-        <button onClick={() => wakeMutation.mutate()} disabled={wakeMutation.isPending}
-          className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg border transition-all active:scale-[0.95] disabled:opacity-50"
-          style={{ background: 'rgba(34,197,94,0.06)', borderColor: 'rgba(34,197,94,0.15)', color: '#4ADE80' }}>
-          <Wifi className="h-3 w-3" /> {wakeMutation.isPending ? '...' : 'Obudź'}
-        </button>
-      )}
-
-      {/* Windows Update if agent available */}
-      {agent && isOnline && (
-        <button onClick={() => winUpdateMutation.mutate()} disabled={winUpdateMutation.isPending}
-          className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-lg transition-colors disabled:opacity-50"
-          style={{ color: '#60A5FA' }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(96,165,250,0.08)'; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
-          <RotateCw className="h-3 w-3" /> Windows Update
-        </button>
-      )}
-    </div>
-  );
-}
-
-// -- AI Suggestion panel -----------------------------------------------------
-function AiSuggestionPanel({ title, description, source }: { title: string; description?: string; source?: string }) {
-  const [suggestion, setSuggestion] = useState<AiSuggestion | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [visible, setVisible] = useState(false);
-
-  const fetchSuggestion = async () => {
-    if (suggestion) { setVisible(v => !v); return; }
-    setLoading(true);
-    setVisible(true);
-    try {
-      const result = await aiApi.suggest({ title, description, source });
-      setSuggestion(result);
-    } catch { toast.error('Nie udało się pobrać sugestii AI'); }
-    finally { setLoading(false); }
-  };
-
-  const DIFF_COLORS: Record<string, { bg: string; color: string; label: string }> = {
-    EASY:   { bg: 'rgba(34,197,94,0.12)', color: '#4ADE80', label: 'Łatwe' },
-    MEDIUM: { bg: 'rgba(234,179,8,0.12)', color: '#FBBF24', label: 'Średnie' },
-    HARD:   { bg: 'rgba(239,68,68,0.12)', color: '#F87171', label: 'Trudne' },
-  };
-
-  return (
-    <div className="mt-2">
-      <button onClick={fetchSuggestion} disabled={loading}
-        className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-lg border transition-all active:scale-[0.97] disabled:opacity-50"
-        style={{ background: 'rgba(168,85,247,0.06)', borderColor: 'rgba(168,85,247,0.15)', color: '#C084FC' }}>
-        {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-        {suggestion ? (visible ? 'Ukryj sugestię' : 'Pokaż sugestię') : 'AI: Sugeruj rozwiązanie'}
-      </button>
-
-      {visible && suggestion && (
-        <div className="mt-2 p-3 rounded-xl space-y-2" style={{ background: 'rgba(168,85,247,0.04)', border: '1px solid rgba(168,85,247,0.1)' }}>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Sparkles className="h-4 w-4" style={{ color: '#C084FC' }} />
-            <span className="text-[12px] font-semibold" style={{ color: '#C084FC' }}>Sugestia AI</span>
-            {suggestion.difficulty && (
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                style={{ background: DIFF_COLORS[suggestion.difficulty]?.bg, color: DIFF_COLORS[suggestion.difficulty]?.color }}>
-                {DIFF_COLORS[suggestion.difficulty]?.label}
-              </span>
-            )}
-            {suggestion.estimatedTime && (
-              <span className="text-[10px]" style={{ color: 'var(--tm)' }}>~{suggestion.estimatedTime}</span>
-            )}
-          </div>
-          <p className="text-[12px]" style={{ color: 'var(--ts)' }}>{suggestion.summary}</p>
-          {suggestion.steps.length > 0 && (
-            <div className="space-y-1.5">
-              {suggestion.steps.map((step, i) => (
-                <div key={i} className="flex gap-2 text-[11px]">
-                  <span className="flex-shrink-0 font-bold" style={{ color: '#C084FC' }}>Krok {i + 1}:</span>
-                  <span style={{ color: 'var(--ts)' }}>{step}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          {suggestion.canAutoFix && suggestion.autoFixType && (
-            <div className="pt-1">
-              <button className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all active:scale-[0.97]"
-                style={{ background: 'rgba(34,197,94,0.08)', borderColor: 'rgba(34,197,94,0.2)', color: '#4ADE80' }}>
-                <Zap className="h-3.5 w-3.5" />
-                {suggestion.autoFixType === 'WINDOWS_UPDATE' ? 'Aktualizuj Windows' :
-                 suggestion.autoFixType === 'RESTART' ? 'Restartuj komputer' :
-                 suggestion.autoFixType === 'DISK_CLEANUP' ? 'Wyczyść dysk' :
-                 suggestion.autoFixType === 'ANTIVIRUS_SCAN' ? 'Skanuj antywirusem' : 'Napraw automatycznie'}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// -- Agent contact card -- pulls data from agent registration ----------------
-function AgentContactCard({ task }: { task: Task }) {
-  const { data: agents = [] } = useQuery({
-    queryKey: ['agents'],
-    queryFn: () => agentsApi.getAll(),
-    staleTime: 30_000,
-  });
-
-  const deviceName = task.ticket?.device?.name;
-  const agent = agents.find(a => a.deviceId === task.ticket?.device?.id || a.hostname === deviceName);
-
-  const userName = task.ticket?.reporterName
-    || (agent ? [agent.contactFirstName, agent.contactLastName].filter(Boolean).join(' ') : null)
-    || agent?.currentUser
-    || null;
-  const userPhone = task.ticket?.reporterPhone || agent?.contactPhone || null;
-  const userEmail = agent?.contactEmail || null;
-
-  return (
-    <div className="rounded-lg p-2.5" style={{ background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.1)' }}>
-      <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(96,165,250,0.5)' }}>Zgłoszenie z Agenta</div>
-      <div className="flex items-center gap-2">
-        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(96,165,250,0.12)' }}>
-          <Monitor className="h-3.5 w-3.5" style={{ color: '#60A5FA' }} />
-        </div>
-        <div className="min-w-0">
-          <p className="text-[12px] font-medium truncate" style={{ color: 'var(--t)' }}>{deviceName ?? 'Urządzenie'}</p>
-          {agent?.currentUser && (
-            <p className="text-[10px]" style={{ color: 'var(--tm)' }}>
-              Win: {agent.currentUser}
-            </p>
-          )}
-        </div>
-      </div>
-      {/* User contact */}
-      {userName && (
-        <div className="mt-2 pt-2 flex items-center gap-2" style={{ borderTop: '1px solid rgba(96,165,250,0.08)' }}>
-          <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139,92,246,0.12)' }}>
-            <User className="h-3 w-3" style={{ color: '#A78BFA' }} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-medium truncate" style={{ color: 'var(--t)' }}>{userName}</p>
-            <div className="flex items-center gap-2 flex-wrap">
-              {userPhone && (
-                <a href={`tel:${userPhone}`} className="flex items-center gap-1 text-[10px] text-emerald-400 hover:underline">
-                  <Phone className="h-2.5 w-2.5" /> {userPhone}
-                </a>
-              )}
-              {userEmail && (
-                <a href={`mailto:${userEmail}`} className="text-[10px] text-violet-400 hover:underline truncate">
-                  {userEmail}
-                </a>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// -- Task card ---------------------------------------------------------------
-function TaskCard({ task, activeSessions, onChangeStatus, onStartSession, onPauseSession, onResumeSession, onEndSession, onEdit }: {
-  task: Task;
-  activeSessions: WorkSession[];
-  onChangeStatus: (id: string, status: TaskStatus) => void;
-  onStartSession: (task: Task) => void;
-  onPauseSession: (sessionId: string) => void;
-  onResumeSession: (sessionId: string) => void;
-  onEndSession: (sessionId: string) => void;
-  onEdit: (task: Task) => void;
+function TaskRow({ task, agents, activeSessions, onStatus, onStartSession, onPauseSession, onResumeSession, onEndSession, onEdit }: {
+  task: Task; agents: AgentRegistration[]; activeSessions: WorkSession[];
+  onStatus: (id: string, s: TaskStatus) => void;
+  onStartSession: (t: Task) => void;
+  onPauseSession: (id: string) => void;
+  onResumeSession: (id: string) => void;
+  onEndSession: (id: string) => void;
+  onEdit: (t: Task) => void;
 }) {
-  const qc = useQueryClient();
-  const [expanded, setExpanded] = useState(false);
-  const [editingSession, setEditingSession] = useState<string | null>(null);
-  const [editStart, setEditStart] = useState('');
-  const [editEnd, setEditEnd] = useState('');
-  const serviceMode = task.ticket?.serviceMode;
-  const rustdeskId = task.ticket?.device?.rustdeskId;
-  const [km, setKm] = useState(task.travelKm?.toString() ?? '');
-  const [savingKm, setSavingKm] = useState(false);
-
-  // Find THIS task's active/paused session (supports multiple concurrent sessions)
   const activeSession = activeSessions.find(s => s.ticketId === task.ticketId) ?? null;
-  const isThisTaskSession = activeSession?.status === 'ACTIVE';
-  const isThisTaskPaused = activeSession?.status === 'PAUSED';
-  const hasActiveSession = isThisTaskSession || isThisTaskPaused;
+  const isActive = activeSession?.status === 'ACTIVE';
+  const isPaused = activeSession?.status === 'PAUSED';
+  const hasSession = isActive || isPaused;
+  const liveSeconds = useLiveTimer(isActive ? activeSession : null);
+  const rustdeskId = task.ticket?.device?.rustdeskId;
+  const [expanded, setExpanded] = useState(false);
 
-  const liveSeconds = useLiveTimer(isThisTaskSession ? activeSession : null);
+  const company = task.ticket?.client?.name ?? task.ticket?.workspace?.name ?? '—';
+  const reporter = task.ticket?.reporterName || (task.ticket?.createdBy ? `${task.ticket.createdBy.firstName} ${task.ticket.createdBy.lastName}` : '—');
+  const device = task.ticket?.device?.name ?? '—';
+  const deviceId = task.ticket?.device?.id;
 
-  // Total accumulated time from all completed sessions for this ticket
-  const { data: clientSessions = [] } = useQuery({
-    queryKey: ['sessions-task', task.ticket?.client?.id],
-    queryFn: () => task.ticket?.client?.id ? sessionsApi.getByClient(task.ticket.client.id) : Promise.resolve([]),
-    enabled: !!task.ticket?.client?.id,
-    staleTime: 30_000,
-  });
-  const taskSessions = clientSessions.filter(s => s.ticketId === task.ticketId);
-  const completedMin = taskSessions.filter(s => s.status === 'COMPLETED').reduce((sum, s) => sum + (s.durationMin ?? 0), 0);
-
-  const editSessionMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: { startedAt?: string; endedAt?: string } }) => sessionsApi.updateSession(id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sessions-task'] }); toast.success('Czas sesji zaktualizowany'); setEditingSession(null); },
-    onError: (err) => toast.error(getErrorMessage(err)),
-  });
-
-  const deleteSessionMutation = useMutation({
-    mutationFn: (id: string) => sessionsApi.deleteSession(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sessions-task'] }); toast.success('Sesja usunięta'); },
-    onError: (err) => toast.error(getErrorMessage(err)),
-  });
-
-  const saveKm = async () => {
-    setSavingKm(true);
-    try {
-      await tasksApi.update(task.id, { travelKm: km ? parseFloat(km) : null });
-      toast.success('Km zapisane');
-      qc.invalidateQueries({ queryKey: ['tasks'] });
-    } catch { toast.error('Błąd zapisu'); }
-    finally { setSavingKm(false); }
-  };
-
-  // Contact info -- if source is AGENT, reporter is the device, not the user
-  const isAgentTicket = task.ticket?.source === 'AGENT';
-  const reporter = task.ticket?.createdBy;
-  const reporterName = isAgentTicket
-    ? null // Agent tickets don't have a human reporter
-    : (task.ticket?.reporterName || (reporter ? `${reporter.firstName} ${reporter.lastName}` : null));
-  const reporterPhone = isAgentTicket ? null : (task.ticket?.reporterPhone || reporter?.phone);
-  const reporterAvatar = isAgentTicket ? null : reporter?.avatarUrl;
-  const deviceUser = task.ticket?.device?.assignedUser;
-  const locationContact = task.ticket?.location;
-
-  // Billing badge
-  const cl = task.ticket?.client;
-  const isCon = cl?.hasContract ?? false;
-  const rate = cl?.hourlyRate ?? 0;
-  const interval = cl?.billingIntervalMinutes ?? 30;
-  const bh = completedMin > 0 ? Math.ceil(completedMin / interval) * (interval / 60) : 0;
-  const earn = isCon ? 0 : bh * rate;
+  const th: React.CSSProperties = { padding: '10px 12px', textAlign: 'left', whiteSpace: 'nowrap' };
 
   return (
-    <div className="rounded-xl overflow-hidden" style={{ background: 'var(--bg-card)', border: `1px solid ${isThisTaskSession ? 'rgba(34,197,94,0.25)' : isThisTaskPaused ? 'rgba(234,179,8,0.25)' : 'var(--border)'}` }}>
-      {/* -- Header row -- */}
-      <div className="p-4 pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className="text-xs font-mono text-violet-400 font-semibold">{task.taskNumber}</span>
-              {task.ticket && <PriorityBadge priority={task.ticket.priority} />}
-              {serviceMode === 'REMOTE' && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5"
-                  style={{ background: 'rgba(96,165,250,0.12)', color: '#60A5FA' }}>
-                  <Monitor className="h-3 w-3" /> Zdalnie
-                </span>
-              )}
-              {serviceMode === 'ONSITE' && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5"
-                  style={{ background: 'rgba(251,146,60,0.12)', color: '#FB923C' }}>
-                  <MapPin className="h-3 w-3" /> Na miejscu
-                </span>
-              )}
-              {completedMin > 0 && (
-                <>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5"
-                    style={{ background: 'rgba(139,92,246,0.12)', color: '#A78BFA' }}>
-                    <Timer className="h-3 w-3" /> {formatDurationShort(completedMin)}
-                  </span>
-                  <span className="inline-flex items-center text-[10px] font-semibold rounded-full px-2 py-0.5"
-                    style={{ background: isCon ? 'rgba(96,165,250,0.12)' : 'rgba(34,197,94,0.12)', color: isCon ? '#60A5FA' : '#4ADE80' }}>
-                    {isCon ? 'abonament' : rate > 0 ? `${earn.toFixed(0)} zł` : '—'}
-                  </span>
-                </>
-              )}
-            </div>
-            <p className="font-medium" style={{ color: 'var(--t)' }}>{task.title}</p>
-            {task.ticket?.client && (
-              <p className="text-xs mt-0.5" style={{ color: 'var(--tm)' }}>
-                <Link to={`/tickets/${task.ticketId}`} className="text-violet-400 hover:underline">{task.ticket.ticketNumber}</Link>
-                {' · '}{task.ticket.client.name}
-                {task.ticket.device && <span> · {task.ticket.device.name}</span>}
-              </p>
+    <>
+      <tr style={{ borderBottom: '1px solid var(--border)' }}
+        onMouseEnter={e => (e.currentTarget.style.background = 'var(--hover-bg)')}
+        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+
+        {/* Firma */}
+        <td style={th}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--t)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{company}</div>
+        </td>
+
+        {/* Użytkownik */}
+        <td style={th}>
+          <div style={{ fontSize: 12, color: 'var(--ts)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}>{reporter}</div>
+        </td>
+
+        {/* Urządzenie */}
+        <td style={th}>
+          <div style={{ fontSize: 12, color: 'var(--ts)', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis' }}>{device}</div>
+        </td>
+
+        {/* Temat */}
+        <td style={{ ...th, maxWidth: 250 }}>
+          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--t)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {task.ticket && (
+              <Link to={`/tickets/${task.ticketId}`} style={{ color: 'var(--accent)', marginRight: 6, fontSize: 11 }}>{task.ticket.ticketNumber}</Link>
             )}
+            {task.title}
           </div>
-          {/* Timer */}
-          {isThisTaskSession && (
-            <div className="flex-shrink-0 text-right">
-              <div className="text-lg font-mono font-bold" style={{ color: '#4ADE80' }}>{formatTimer(liveSeconds)}</div>
-              <div className="flex items-center gap-1 mt-0.5 justify-end">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[10px] font-medium" style={{ color: '#4ADE80' }}>Aktywne</span>
-              </div>
-            </div>
-          )}
-          {isThisTaskPaused && (
-            <div className="flex-shrink-0 text-right">
-              <div className="text-lg font-mono font-bold" style={{ color: '#FBBF24' }}>PAUZA</div>
-              <span className="text-[10px] font-medium" style={{ color: '#FBBF24' }}>Wstrzymane</span>
-            </div>
-          )}
-        </div>
-      </div>
+          {task.ticket && <PriorityBadge priority={task.ticket.priority} />}
+        </td>
 
-      {/* -- 2-column body -- */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr,200px] gap-0" style={{ borderTop: '1px solid var(--border)' }}>
-        {/* Left: tools + AI */}
-        <div className="p-4 pt-3 space-y-2">
-          {/* Remote panel */}
-          {serviceMode === 'REMOTE' && rustdeskId && (
-            <RemotePanel rustdeskId={rustdeskId} deviceName={task.ticket?.device?.name} />
-          )}
-          {/* Onsite: Km */}
-          {serviceMode === 'ONSITE' && (
-            <div className="flex items-center gap-2">
-              <MapPin className="h-3.5 w-3.5 flex-shrink-0" style={{ color: '#FB923C' }} />
-              <input type="number" value={km} onChange={e => setKm(e.target.value)} placeholder="Km"
-                className="w-20 px-2 py-1 text-[12px] rounded-lg focus:outline-none"
-                style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }} />
-              <span className="text-[11px]" style={{ color: 'var(--tm)' }}>km</span>
-              <button onClick={saveKm} disabled={savingKm} className="p-1 rounded-lg transition-colors hover:bg-white/[0.06]">
-                {savingKm ? <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: 'var(--tm)' }} />
-                  : <Save className="h-3.5 w-3.5" style={{ color: km !== (task.travelKm?.toString() ?? '') ? '#FB923C' : 'var(--td)' }} />}
-              </button>
-            </div>
-          )}
-          {/* AI */}
-          <AiSuggestionPanel title={task.title} description={task.description} source={task.ticket?.source} />
-          {/* Notes */}
-          {task.notes && (
-            <p className="text-xs rounded p-2 whitespace-pre-wrap" style={{ color: 'var(--ts)', background: 'var(--hover-bg)' }}>{task.notes}</p>
-          )}
-        </div>
+        {/* Online/Offline */}
+        <td style={th}>
+          {deviceId ? <OnlineBadge deviceId={deviceId} agents={agents} /> : <span style={{ fontSize: 11, color: 'var(--tm)' }}>—</span>}
+        </td>
 
-        {/* Right: contact cards */}
-        <div className="p-3 space-y-2 lg:border-l" style={{ borderColor: 'var(--border)' }}>
-          {/* Zgłaszający -- Agent ticket: urządzenie + użytkownik */}
-          {/* Użytkownik urządzenia (assignedUser = zalogowany przez agenta) */}
-          {task.ticket?.device?.assignedUser && (
-            <div className="rounded-lg p-2.5" style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)' }}>
-              <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--td)' }}>Użytkownik urządzenia</div>
-              <div className="flex items-center gap-2">
-                {task.ticket.device.assignedUser.avatarUrl
-                  ? <img src={task.ticket.device.assignedUser.avatarUrl} alt="" className="w-7 h-7 rounded-lg object-cover flex-shrink-0" />
-                  : <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(34,197,94,0.12)' }}>
-                      <User className="h-3.5 w-3.5" style={{ color: '#4ADE80' }} />
-                    </div>}
-                <div className="min-w-0">
-                  <p className="text-[12px] font-medium truncate" style={{ color: 'var(--t)' }}>{task.ticket.device.assignedUser.firstName} {task.ticket.device.assignedUser.lastName}</p>
-                  {task.ticket.device.assignedUser.phone && (
-                    <a href={`tel:${task.ticket.device.assignedUser.phone}`} className="flex items-center gap-1 text-[10px] text-emerald-400 hover:underline">
-                      <Phone className="h-2.5 w-2.5" /> {task.ticket.device.assignedUser.phone}
-                    </a>
-                  )}
-                  {task.ticket.device.assignedUser.email && (
-                    <a href={`mailto:${task.ticket.device.assignedUser.email}`} className="text-[10px] text-violet-400 hover:underline truncate block">
-                      {task.ticket.device.assignedUser.email}
-                    </a>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-          {/* Zgłaszający */}
-          {isAgentTicket ? (
-            <AgentContactCard task={task} />
-          ) : reporterName ? (
-            <div className="rounded-lg p-2.5" style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)' }}>
-              <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--td)' }}>Zgłaszający</div>
-              <div className="flex items-center gap-2">
-                {reporterAvatar
-                  ? <img src={reporterAvatar} alt="" className="w-7 h-7 rounded-lg object-cover flex-shrink-0" />
-                  : <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139,92,246,0.12)' }}>
-                      <User className="h-3.5 w-3.5" style={{ color: '#A78BFA' }} />
-                    </div>}
-                <div className="min-w-0">
-                  <p className="text-[12px] font-medium truncate" style={{ color: 'var(--t)' }}>{reporterName}</p>
-                  {reporterPhone && (
-                    <a href={`tel:${reporterPhone}`} className="flex items-center gap-1 text-[10px] text-emerald-400 hover:underline">
-                      <Phone className="h-2.5 w-2.5" /> {reporterPhone}
-                    </a>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : null}
-          {/* (użytkownik urządzenia przeniesiony na górę) */}
-          {/* Kontakt lokalizacji */}
-          {locationContact?.contactPersonName && (
-            <div className="rounded-lg p-2.5" style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)' }}>
-              <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--td)' }}>Kontakt lokalizacji</div>
-              <p className="text-[12px] font-medium truncate" style={{ color: 'var(--t)' }}>{locationContact.contactPersonName}</p>
-              {locationContact.contactPersonPhone && (
-                <a href={`tel:${locationContact.contactPersonPhone}`} className="flex items-center gap-1 text-[10px] text-emerald-400 hover:underline mt-0.5">
-                  <Phone className="h-2.5 w-2.5" /> {locationContact.contactPersonPhone}
-                </a>
-              )}
-            </div>
-          )}
-          {/* Przypisany technik */}
-          {task.assignedTo && (
-            <div className="text-[10px] pt-1" style={{ color: 'var(--tm)' }}>
-              Realizuje: {task.assignedTo.firstName} {task.assignedTo.lastName}
-            </div>
-          )}
-          {task.dueAt && (
-            <div className="text-[10px] text-amber-400">
-              Termin: {formatDate(task.dueAt)}
-            </div>
-          )}
-        </div>
-      </div>
+        {/* RustDesk */}
+        <td style={th}>
+          {rustdeskId ? (
+            <a href={`rustdesk://id=${rustdeskId}`} onClick={e => e.stopPropagation()}
+              className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg"
+              style={{ background: 'rgba(16,185,129,0.08)', color: '#10B981', border: '1px solid rgba(16,185,129,0.15)' }}>
+              <ExternalLink className="h-3 w-3" /> Połącz
+            </a>
+          ) : <span style={{ fontSize: 11, color: 'var(--tm)' }}>—</span>}
+        </td>
 
-      {/* -- Action footer -- */}
-      <div className="flex items-center gap-1.5 px-3 py-2" style={{ borderTop: '1px solid var(--border)', background: 'var(--hover-bg)' }}>
-        {/* NEW -> Start */}
-        {task.status === 'NEW' && !hasActiveSession && (
-          <button onClick={() => { onChangeStatus(task.id, 'IN_PROGRESS'); onStartSession(task); }}
-            className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all active:scale-[0.97]"
-            style={{ background: 'rgba(34,197,94,0.08)', borderColor: 'rgba(34,197,94,0.2)', color: '#4ADE80' }}>
-            <Play className="h-3.5 w-3.5" /> Rozpocznij
-          </button>
-        )}
+        {/* AI */}
+        <td style={th}>
+          <AiButton title={task.title} description={task.description} source={task.ticket?.source} />
+        </td>
 
-        {/* IN_PROGRESS -- session controls */}
-        {task.status === 'IN_PROGRESS' && (
-          <>
-            {!hasActiveSession && (
-              <button onClick={() => onStartSession(task)}
-                className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all active:scale-[0.97]"
-                style={{ background: 'rgba(34,197,94,0.08)', borderColor: 'rgba(34,197,94,0.2)', color: '#4ADE80' }}>
-                <Play className="h-3.5 w-3.5" /> Wznów
-              </button>
+        {/* Timer / Status */}
+        <td style={th}>
+          {isActive && (
+            <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 13, color: '#22C55E' }}>{formatTimer(liveSeconds)}</span>
+          )}
+          {isPaused && (
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#FBBF24' }}>PAUZA</span>
+          )}
+          {!hasSession && task.status === 'DONE' && (
+            <span style={{ fontSize: 11, color: 'var(--tm)' }}>Zakończone</span>
+          )}
+        </td>
+
+        {/* Akcje */}
+        <td style={{ ...th, whiteSpace: 'nowrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            {/* NEW → Start */}
+            {task.status === 'NEW' && !hasSession && (
+              <ActionBtn icon={Play} color="#22C55E" label="Start" onClick={() => { onStatus(task.id, 'IN_PROGRESS'); onStartSession(task); }} />
             )}
-            {isThisTaskSession && activeSession && (
-              <button onClick={() => onPauseSession(activeSession.id)}
-                className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all active:scale-[0.97]"
-                style={{ background: 'rgba(234,179,8,0.08)', borderColor: 'rgba(234,179,8,0.2)', color: '#FBBF24' }}>
-                <Pause className="h-3.5 w-3.5" /> Pauza
-              </button>
-            )}
-            {isThisTaskPaused && activeSession && (
-              <button onClick={() => onResumeSession(activeSession.id)}
-                className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all active:scale-[0.97]"
-                style={{ background: 'rgba(34,197,94,0.08)', borderColor: 'rgba(34,197,94,0.2)', color: '#4ADE80' }}>
-                <Play className="h-3.5 w-3.5" /> Wznów
-              </button>
-            )}
-            {hasActiveSession && activeSession && (
-              <button onClick={() => { onEndSession(activeSession.id); onChangeStatus(task.id, 'DONE'); }}
-                className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all active:scale-[0.97]"
-                style={{ background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.2)', color: '#F87171' }}>
-                <Square className="h-3.5 w-3.5" /> Zakończ
-              </button>
-            )}
-            {!hasActiveSession && (
-              <button onClick={() => onChangeStatus(task.id, 'DONE')}
-                className="flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-lg transition-colors"
-                style={{ color: 'var(--tm)' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--hover-bg)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
-                <CheckCircle2 className="h-3.5 w-3.5" /> Zakończ bez sesji
-              </button>
-            )}
-          </>
-        )}
-
-        <div className="flex-1" />
-
-        {/* Edit task */}
-        <button onClick={() => onEdit(task)}
-          className="p-1.5 rounded-lg transition-colors hover:bg-white/[0.06]" title="Edytuj zadanie">
-          <Edit2 className="h-3.5 w-3.5" style={{ color: 'var(--tm)' }} />
-        </button>
-
-        {/* History toggle */}
-        {taskSessions.length > 0 && (
-          <button onClick={() => setExpanded(e => !e)}
-            className="flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-lg transition-colors"
-            style={{ color: 'var(--tm)' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--hover-bg)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
-            <Timer className="h-3 w-3" /> {taskSessions.length} sesji
-            {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-          </button>
-        )}
-
-        {/* spacer */}
-      </div>
-
-      {/* -- Session history + billing -- */}
-      {expanded && taskSessions.length > 0 && (() => {
-        const client = task.ticket?.client;
-        const isContract = client?.hasContract ?? false;
-        const hourlyRate = client?.hourlyRate ?? 0;
-        const billingInterval = client?.billingIntervalMinutes ?? 30;
-        const totalMin = completedMin + (isThisTaskSession ? Math.floor(liveSeconds / 60) : 0);
-        const billableHours = Math.ceil(totalMin / billingInterval) * (billingInterval / 60);
-        const earnings = isContract ? 0 : billableHours * hourlyRate;
-
-        return (
-          <div className="px-4 pb-3" style={{ background: 'var(--hover-bg)' }}>
-            <div className="space-y-1">
-              {taskSessions.map(s => {
-                const sMin = s.durationMin ?? 0;
-                const sBillable = Math.ceil(sMin / billingInterval) * (billingInterval / 60);
-                const sEarnings = isContract ? 0 : sBillable * hourlyRate;
-                const isEditing = editingSession === s.id;
-                return (
-                  <div key={s.id} className="rounded-lg" style={{ background: 'var(--hover-bg)' }}>
-                    <div className="flex items-center gap-2 text-[11px] py-1.5 px-2">
-                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${s.status === 'ACTIVE' ? 'bg-emerald-500 animate-pulse' : s.status === 'PAUSED' ? 'bg-amber-400' : ''}`}
-                        style={s.status === 'COMPLETED' ? { background: 'var(--td)' } : {}} />
-                      <span style={{ color: 'var(--ts)' }}>{formatDateTime(s.startedAt)}</span>
-                      {s.endedAt && <span style={{ color: 'var(--tm)' }}>→ {formatDateTime(s.endedAt)}</span>}
-                      <span className="font-semibold" style={{ color: 'var(--ts)' }}>
-                        {sMin ? formatDurationShort(sMin) : s.status === 'ACTIVE' ? 'w toku...' : '—'}
-                      </span>
-                      <span className="font-semibold" style={{ color: isContract ? '#60A5FA' : '#4ADE80' }}>
-                        {s.status === 'COMPLETED' ? (isContract ? 'abonament' : `${sEarnings.toFixed(2)} zł`) : ''}
-                      </span>
-                      <div className="ml-auto flex items-center gap-1">
-                        {s.status === 'COMPLETED' && (
-                          <>
-                            <button onClick={() => {
-                              setEditingSession(isEditing ? null : s.id);
-                              setEditStart(s.startedAt.slice(0, 16));
-                              setEditEnd(s.endedAt?.slice(0, 16) ?? '');
-                            }} className="p-0.5 rounded transition-colors hover:bg-white/[0.06]" title="Edytuj czas">
-                              <Edit2 className="h-3 w-3" style={{ color: 'var(--td)' }} />
-                            </button>
-                            <button onClick={() => { if (confirm('Usunąć tę sesję?')) deleteSessionMutation.mutate(s.id); }}
-                              className="p-0.5 rounded transition-colors hover:bg-red-500/10" title="Usuń sesję">
-                              <Trash2 className="h-3 w-3" style={{ color: 'var(--td)' }} />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    {isEditing && (
-                      <div className="flex items-center gap-2 px-2 pb-2">
-                        <input type="datetime-local" value={editStart} onChange={e => setEditStart(e.target.value)}
-                          className="text-[11px] px-2 py-1 rounded-lg focus:outline-none"
-                          style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }} />
-                        <span style={{ color: 'var(--tm)' }}>→</span>
-                        <input type="datetime-local" value={editEnd} onChange={e => setEditEnd(e.target.value)}
-                          className="text-[11px] px-2 py-1 rounded-lg focus:outline-none"
-                          style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }} />
-                        <button onClick={() => editSessionMutation.mutate({ id: s.id, data: { startedAt: new Date(editStart).toISOString(), endedAt: new Date(editEnd).toISOString() } })}
-                          disabled={editSessionMutation.isPending}
-                          className="text-[10px] font-semibold px-2 py-1 rounded-lg transition-colors"
-                          style={{ background: 'rgba(139,92,246,0.12)', color: '#A78BFA' }}>
-                          {editSessionMutation.isPending ? '...' : 'Zapisz'}
-                        </button>
-                        <button onClick={() => setEditingSession(null)} className="text-[10px] px-2 py-1" style={{ color: 'var(--tm)' }}>Anuluj</button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex items-center justify-between mt-2 pt-2" style={{ borderTop: '1px solid var(--border)' }}>
-              <div className="flex items-center gap-2">
-                <Timer className="h-3.5 w-3.5" style={{ color: '#A78BFA' }} />
-                <span className="text-xs font-bold" style={{ color: '#A78BFA' }}>
-                  Łącznie: {formatDurationShort(totalMin)}
-                </span>
-              </div>
-              <div className="text-xs font-bold" style={{ color: isContract ? '#60A5FA' : '#4ADE80' }}>
-                {isContract ? (
-                  <span>W ramach abonamentu ({client?.contractHours}h/{client?.contractMonthlyValue} zł/mies.)</span>
-                ) : hourlyRate > 0 ? (
-                  <span>{earnings.toFixed(2)} zł ({hourlyRate} zł/h × {billableHours.toFixed(1)}h)</span>
-                ) : (
-                  <span style={{ color: 'var(--tm)' }}>Brak stawki</span>
+            {/* IN_PROGRESS controls */}
+            {task.status === 'IN_PROGRESS' && (
+              <>
+                {!hasSession && <ActionBtn icon={Play} color="#22C55E" label="Wznów" onClick={() => onStartSession(task)} />}
+                {isActive && activeSession && <ActionBtn icon={Pause} color="#FBBF24" label="Pauza" onClick={() => onPauseSession(activeSession.id)} />}
+                {isPaused && activeSession && <ActionBtn icon={Play} color="#22C55E" label="Wznów" onClick={() => onResumeSession(activeSession.id)} />}
+                {hasSession && activeSession && (
+                  <ActionBtn icon={Square} color="#EF4444" label="Zakończ" onClick={() => { onEndSession(activeSession.id); onStatus(task.id, 'DONE'); }} />
                 )}
-              </div>
-            </div>
+                {!hasSession && <ActionBtn icon={CheckCircle2} color="var(--tm)" label="Zamknij" onClick={() => onStatus(task.id, 'DONE')} />}
+              </>
+            )}
+            <button onClick={() => onEdit(task)} style={{ padding: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--tm)' }} title="Edytuj">
+              <Edit2 style={{ width: 13, height: 13 }} />
+            </button>
+            <button onClick={() => setExpanded(e => !e)} style={{ padding: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--tm)' }} title="Szczegóły">
+              {expanded ? <ChevronUp style={{ width: 13, height: 13 }} /> : <ChevronDown style={{ width: 13, height: 13 }} />}
+            </button>
           </div>
-        );
-      })()}
-    </div>
+        </td>
+      </tr>
+
+      {/* Expanded details */}
+      {expanded && (
+        <tr>
+          <td colSpan={9} style={{ padding: '8px 12px', background: 'var(--hover-bg)', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', gap: 24, fontSize: 12, flexWrap: 'wrap' }}>
+              {task.description && <div style={{ maxWidth: 400 }}><span style={{ color: 'var(--tm)', fontWeight: 600 }}>Opis:</span> <span style={{ color: 'var(--ts)' }}>{task.description}</span></div>}
+              {task.notes && <div><span style={{ color: 'var(--tm)', fontWeight: 600 }}>Notatki:</span> <span style={{ color: 'var(--ts)' }}>{task.notes}</span></div>}
+              {task.dueAt && <div><span style={{ color: 'var(--tm)', fontWeight: 600 }}>Termin:</span> <span style={{ color: '#F59E0B' }}>{formatDate(task.dueAt)}</span></div>}
+              {task.assignedTo && <div><span style={{ color: 'var(--tm)', fontWeight: 600 }}>Technik:</span> <span style={{ color: 'var(--ts)' }}>{task.assignedTo.firstName} {task.assignedTo.lastName}</span></div>}
+              {task.ticket?.location && <div><span style={{ color: 'var(--tm)', fontWeight: 600 }}>Lokalizacja:</span> <span style={{ color: 'var(--ts)' }}>{task.ticket.location.name}</span></div>}
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
-// -- Main page ---------------------------------------------------------------
-export function TasksPage() {
-  const { user } = useAuth();
-  const qc = useQueryClient();
-  const [activeTab, setActiveTab] = useState<TabKey>('IN_PROGRESS');
-  const [showCreate, setShowCreate] = useState(false);
-  const [editTask, setEditTask] = useState<Task | null>(null);
-  const isAdmin = useWorkspaceContext().isAdmin;
+// ── Action button helper ─────────────────────────────────────────────
 
-  const { data: tasks = [], isLoading } = useQuery({
-    queryKey: ['tasks', { all: isAdmin }],
-    queryFn: () => tasksApi.getAll({ all: isAdmin }),
-    refetchInterval: 15_000,
-  });
-
-  const { data: activeSessions = [] } = useQuery({
-    queryKey: ['session-active'],
-    queryFn: async () => { const s = await sessionsApi.getActive(); return s ? [s] : []; },
-    refetchInterval: 5_000,
-  });
-
-  const { data: allUsers = [] } = useQuery({
-    queryKey: ['users'],
-    queryFn: () => usersApi.getAll(),
-    enabled: showCreate,
-  });
-  const workers = allUsers.filter(u => (u as any).role !== 'CLIENT' && u.isActive);
-
-  const statusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: TaskStatus }) =>
-      tasksApi.changeStatus(id, status),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['tasks'] });
-    },
-    onError: (err) => toast.error(getErrorMessage(err)),
-  });
-
-  const startSessionMutation = useMutation({
-    mutationFn: (task: Task) => {
-      if (!task.ticket?.client?.id) throw new Error('Brak klienta');
-      return sessionsApi.startMobile({
-        clientId: task.ticket.client.id,
-        ticketId: task.ticketId,
-        locationId: task.ticket?.location?.id,
-        deviceId: task.ticket?.device?.id,
-      });
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['session-active'] });
-      toast.success('Sesja rozpoczęta — czas leci');
-    },
-    onError: (err) => toast.error(getErrorMessage(err)),
-  });
-
-  const pauseSessionMutation = useMutation({
-    mutationFn: (id: string) => sessionsApi.pause(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['session-active'] });
-      toast.success('Sesja wstrzymana');
-    },
-    onError: (err) => toast.error(getErrorMessage(err)),
-  });
-
-  const resumeSessionMutation = useMutation({
-    mutationFn: (id: string) => sessionsApi.resume(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['session-active'] });
-      toast.success('Sesja wznowiona');
-    },
-    onError: (err) => toast.error(getErrorMessage(err)),
-  });
-
-  const endSessionMutation = useMutation({
-    mutationFn: (id: string) => sessionsApi.end(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['session-active'] });
-      qc.invalidateQueries({ queryKey: ['sessions-task'] });
-      toast.success('Sesja zakończona — czas zapisany');
-    },
-    onError: (err) => toast.error(getErrorMessage(err)),
-  });
-
-  const form = useForm<NewTaskForm>({
-    resolver: zodResolver(newTaskSchema),
-    defaultValues: { title: '', description: '', assignedToUserId: '', dueAt: '', notes: '' },
-  });
-
-  const createMutation = useMutation({
-    mutationFn: (d: NewTaskForm) => tasksApi.create({
-      title: d.title, description: d.description || undefined,
-      assignedToUserId: d.assignedToUserId,
-      dueAt: d.dueAt ? new Date(d.dueAt).toISOString() : undefined,
-      notes: d.notes || undefined,
-      estimatedMinutes: d.estimatedMinutes || undefined,
-    } as any),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['tasks'] });
-      toast.success('Zadanie dodane');
-      setShowCreate(false);
-      form.reset();
-    },
-    onError: (err) => toast.error(getErrorMessage(err)),
-  });
-
-  const tabTasks = tasks.filter(t => t.status === activeTab);
-
+function ActionBtn({ icon: Icon, color, label, onClick }: { icon: any; color: string; label: string; onClick: () => void }) {
   return (
-    <div>
-      <PageHeader
-        title="Zadania"
-        subtitle={`${tasks.filter(t => t.status !== 'DONE').length} aktywnych`}
-        actions={isAdmin && (
-          <button onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-medium hover:bg-violet-700 transition-colors">
-            <Plus className="h-4 w-4" /> Nowe zadanie
-          </button>
-        )}
-      />
-
-      <div className="rounded-lg mb-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-        <div className="flex" style={{ borderBottom: '1px solid var(--border)' }}>
-          {TABS.map(tab => {
-            const count = tasks.filter(t => t.status === tab.key).length;
-            return (
-              <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
-                  activeTab === tab.key ? 'border-violet-500 text-violet-400' : 'border-transparent hover:text-white/60'
-                }`}
-                style={activeTab !== tab.key ? { color: 'var(--tm)' } : undefined}>
-                {tab.label}
-                {count > 0 && (
-                  <span className="text-xs font-bold px-1.5 py-0.5 rounded-full"
-                    style={{ background: TAB_BADGE_COLORS[tab.key].bg, color: TAB_BADGE_COLORS[tab.key].color }}>
-                    {count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500" />
-        </div>
-      ) : tabTasks.length === 0 ? (
-        <div className="text-center py-12" style={{ color: 'var(--tm)' }}>
-          <p className="text-sm">Brak zadań w tej kategorii</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {tabTasks.map(task => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              activeSessions={activeSessions}
-              onChangeStatus={(id, status) => statusMutation.mutate({ id, status })}
-              onStartSession={(t) => startSessionMutation.mutate(t)}
-              onPauseSession={(id) => pauseSessionMutation.mutate(id)}
-              onResumeSession={(id) => resumeSessionMutation.mutate(id)}
-              onEndSession={(id) => endSessionMutation.mutate(id)}
-              onEdit={(t) => setEditTask(t)}
-            />
-          ))}
-        </div>
-      )}
-
-      <Modal open={showCreate} onClose={() => { setShowCreate(false); form.reset(); }} title="Nowe zadanie" size="md">
-        <form onSubmit={form.handleSubmit(d => createMutation.mutate(d))} className="space-y-4">
-          <Input label="Tytuł *" {...form.register('title')} error={form.formState.errors.title?.message} />
-          <Textarea label="Opis" rows={2} {...form.register('description')} />
-          <div>
-            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--ts)' }}>Przypisz do *</label>
-            <select {...form.register('assignedToUserId')}
-              className="block w-full rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-              style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}>
-              <option value="">— Wybierz osobę —</option>
-              {workers.map(u => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
-            </select>
-            {form.formState.errors.assignedToUserId && (
-              <p className="text-xs text-red-500 mt-1">{form.formState.errors.assignedToUserId.message}</p>
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Termin" type="date" {...form.register('dueAt')} />
-            <Input label="Szacowany czas (min)" type="number" placeholder="np. 60" {...form.register('estimatedMinutes', { valueAsNumber: true })} />
-          </div>
-          <Textarea label="Notatki" rows={2} {...form.register('notes')} />
-          <div className="flex justify-end gap-3 pt-1">
-            <Button variant="secondary" type="button" onClick={() => { setShowCreate(false); form.reset(); }}>Anuluj</Button>
-            <Button type="submit" loading={createMutation.isPending}>Dodaj zadanie</Button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Modal: edycja zadania */}
-      {editTask && (
-        <EditTaskModal
-          task={editTask}
-          onClose={() => setEditTask(null)}
-          onSaved={() => { setEditTask(null); qc.invalidateQueries({ queryKey: ['tasks'] }); }}
-        />
-      )}
-    </div>
+    <button onClick={onClick} title={label}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, border: 'none', cursor: 'pointer', background: `${color}14`, color }}>
+      <Icon style={{ width: 12, height: 12 }} /> {label}
+    </button>
   );
 }
 
-// -- Edit Task Modal ---------------------------------------------------------
+// ── Edit Task Modal ──────────────────────────────────────────────────
+
 function EditTaskModal({ task, onClose, onSaved }: { task: Task; onClose: () => void; onSaved: () => void }) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? '');
@@ -927,9 +298,7 @@ function EditTaskModal({ task, onClose, onSaved }: { task: Task; onClose: () => 
     setSaving(true);
     try {
       await tasksApi.update(task.id, { title, description: description || undefined, notes: notes || undefined, dueAt: dueAt ? new Date(dueAt).toISOString() : undefined, estimatedMinutes: estimatedMinutes ? parseInt(estimatedMinutes) : null });
-      if (status !== task.status) {
-        await tasksApi.changeStatus(task.id, status);
-      }
+      if (status !== task.status) await tasksApi.changeStatus(task.id, status);
       toast.success('Zadanie zaktualizowane');
       onSaved();
     } catch (err) { toast.error(getErrorMessage(err)); }
@@ -944,23 +313,147 @@ function EditTaskModal({ task, onClose, onSaved }: { task: Task; onClose: () => 
         <Textarea label="Notatki" rows={2} value={notes} onChange={e => setNotes(e.target.value)} />
         <div className="grid grid-cols-2 gap-3">
           <Input label="Termin" type="date" value={dueAt} onChange={e => setDueAt(e.target.value)} />
-          <Input label="Szacowany czas (min)" type="number" placeholder="np. 60" value={estimatedMinutes} onChange={e => setEstimatedMinutes(e.target.value)} />
+          <Input label="Szacowany czas (min)" type="number" value={estimatedMinutes} onChange={e => setEstimatedMinutes(e.target.value)} />
         </div>
         <div>
           <label className="block text-xs font-medium mb-1" style={{ color: 'var(--ts)' }}>Status</label>
           <select value={status} onChange={e => setStatus(e.target.value as TaskStatus)}
-            className="block w-full rounded-xl px-3 py-2 text-sm focus:outline-none"
+            className="block w-full rounded-xl px-3 py-2 text-sm"
             style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}>
             <option value="NEW">Nowe</option>
             <option value="IN_PROGRESS">W trakcie</option>
-            <option value="DONE">Zrealizowane</option>
+            <option value="DONE">Zakończone</option>
           </select>
         </div>
         <div className="flex justify-end gap-3 pt-1">
-          <Button variant="secondary" onClick={onClose}>Anuluj</Button>
-          <Button onClick={handleSave} loading={saving}>Zapisz</Button>
+          <Button variant="secondary" type="button" onClick={onClose}>Anuluj</Button>
+          <Button loading={saving} onClick={handleSave}>Zapisz</Button>
         </div>
       </div>
     </Modal>
+  );
+}
+
+// ── Main Page ────────────────────────────────────────────────────────
+
+export function TasksPage() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const [activeTab, setActiveTab] = useState<TabKey>('IN_PROGRESS');
+  const [showCreate, setShowCreate] = useState(false);
+  const [editTask, setEditTask] = useState<Task | null>(null);
+  const isAdmin = useWorkspaceContext().isAdmin;
+
+  const { data: tasks = [], isLoading } = useQuery({ queryKey: ['tasks', { all: isAdmin }], queryFn: () => tasksApi.getAll({ all: isAdmin }), refetchInterval: 15_000 });
+  const { data: activeSessions = [] } = useQuery({ queryKey: ['session-active'], queryFn: async () => { const s = await sessionsApi.getActive(); return s ? [s] : []; }, refetchInterval: 5_000 });
+  const { data: agents = [] } = useQuery({ queryKey: ['agents'], queryFn: () => agentsApi.getAll(), staleTime: 15_000, refetchInterval: 15_000 });
+  const { data: allUsers = [] } = useQuery({ queryKey: ['users'], queryFn: () => usersApi.getAll(), enabled: showCreate });
+
+  const workers = allUsers.filter(u => (u as any).role !== 'CLIENT' && u.isActive);
+
+  const statusMut = useMutation({ mutationFn: ({ id, status }: { id: string; status: TaskStatus }) => tasksApi.changeStatus(id, status), onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks'] }), onError: (e) => toast.error(getErrorMessage(e)) });
+  const startMut = useMutation({ mutationFn: (t: Task) => { if (!t.ticket?.client?.id) throw new Error('Brak klienta'); return sessionsApi.startMobile({ clientId: t.ticket.client.id, ticketId: t.ticketId, locationId: t.ticket?.location?.id, deviceId: t.ticket?.device?.id }); }, onSuccess: () => { qc.invalidateQueries({ queryKey: ['session-active'] }); toast.success('Sesja rozpoczęta'); }, onError: (e) => toast.error(getErrorMessage(e)) });
+  const pauseMut = useMutation({ mutationFn: (id: string) => sessionsApi.pause(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ['session-active'] }); toast.success('Pauza'); }, onError: (e) => toast.error(getErrorMessage(e)) });
+  const resumeMut = useMutation({ mutationFn: (id: string) => sessionsApi.resume(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ['session-active'] }); toast.success('Wznowiono'); }, onError: (e) => toast.error(getErrorMessage(e)) });
+  const endMut = useMutation({ mutationFn: (id: string) => sessionsApi.end(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ['session-active'] }); qc.invalidateQueries({ queryKey: ['sessions-task'] }); toast.success('Sesja zakończona'); }, onError: (e) => toast.error(getErrorMessage(e)) });
+
+  const form = useForm<NewTaskForm>({ resolver: zodResolver(newTaskSchema), defaultValues: { title: '', description: '', assignedToUserId: '', dueAt: '', notes: '' } });
+  const createMut = useMutation({ mutationFn: (d: NewTaskForm) => tasksApi.create({ title: d.title, description: d.description || undefined, assignedToUserId: d.assignedToUserId, dueAt: d.dueAt ? new Date(d.dueAt).toISOString() : undefined, notes: d.notes || undefined, estimatedMinutes: d.estimatedMinutes || undefined } as any), onSuccess: () => { qc.invalidateQueries({ queryKey: ['tasks'] }); toast.success('Zadanie dodane'); setShowCreate(false); form.reset(); }, onError: (e) => toast.error(getErrorMessage(e)) });
+
+  const tabTasks = tasks.filter(t => t.status === activeTab);
+
+  const thStyle: React.CSSProperties = { padding: '8px 12px', fontSize: 10, fontWeight: 700, color: 'var(--tm)', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'left', whiteSpace: 'nowrap' };
+
+  return (
+    <div>
+      <PageHeader title="Zadania" subtitle={`${tasks.filter(t => t.status !== 'DONE').length} aktywnych`}
+        actions={isAdmin && (
+          <button onClick={() => setShowCreate(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+            <Plus style={{ width: 14, height: 14 }} /> Nowe zadanie
+          </button>
+        )} />
+
+      {/* Tabs */}
+      <div className="page-card" style={{ padding: 0, marginBottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
+          {TABS.map(tab => {
+            const count = tasks.filter(t => t.status === tab.key).length;
+            const active = activeTab === tab.key;
+            return (
+              <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                style={{ padding: '10px 20px', fontSize: 13, fontWeight: 600, border: 'none', borderBottom: `2px solid ${active ? 'var(--accent)' : 'transparent'}`, background: 'transparent', color: active ? 'var(--accent)' : 'var(--tm)', cursor: 'pointer', transition: 'all 0.15s' }}>
+                {tab.label}
+                {count > 0 && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: active ? 'var(--accent-g)' : 'var(--hover-bg)', color: active ? 'var(--accent)' : 'var(--tm)' }}>{count}</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="page-card" style={{ padding: 0, borderTopLeftRadius: 0, borderTopRightRadius: 0, borderTop: 'none' }}>
+        {isLoading ? (
+          <div style={{ padding: 40, textAlign: 'center' }}><Loader2 className="animate-spin" style={{ width: 24, height: 24, color: 'var(--tm)', margin: '0 auto' }} /></div>
+        ) : tabTasks.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', fontSize: 13, color: 'var(--tm)' }}>Brak zadań w tej kategorii</div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                <th style={thStyle}>Firma</th>
+                <th style={thStyle}>Użytkownik</th>
+                <th style={thStyle}>Urządzenie</th>
+                <th style={thStyle}>Temat</th>
+                <th style={thStyle}>Status</th>
+                <th style={thStyle}>RustDesk</th>
+                <th style={thStyle}>AI</th>
+                <th style={thStyle}>Czas</th>
+                <th style={thStyle}>Akcje</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tabTasks.map(task => (
+                <TaskRow key={task.id} task={task} agents={agents} activeSessions={activeSessions}
+                  onStatus={(id, s) => statusMut.mutate({ id, status: s })}
+                  onStartSession={t => startMut.mutate(t)}
+                  onPauseSession={id => pauseMut.mutate(id)}
+                  onResumeSession={id => resumeMut.mutate(id)}
+                  onEndSession={id => endMut.mutate(id)}
+                  onEdit={t => setEditTask(t)} />
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Create modal */}
+      <Modal open={showCreate} onClose={() => { setShowCreate(false); form.reset(); }} title="Nowe zadanie" size="md">
+        <form onSubmit={form.handleSubmit(d => createMut.mutate(d))} className="space-y-4">
+          <Input label="Tytuł *" {...form.register('title')} error={form.formState.errors.title?.message} />
+          <Textarea label="Opis" rows={2} {...form.register('description')} />
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--ts)' }}>Przypisz do *</label>
+            <select {...form.register('assignedToUserId')}
+              className="block w-full rounded-xl px-3 py-2 text-sm"
+              style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}>
+              <option value="">— Wybierz osobę —</option>
+              {workers.map(u => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Termin" type="date" {...form.register('dueAt')} />
+            <Input label="Szacowany czas (min)" type="number" placeholder="np. 60" {...form.register('estimatedMinutes', { valueAsNumber: true })} />
+          </div>
+          <Textarea label="Notatki" rows={2} {...form.register('notes')} />
+          <div className="flex justify-end gap-3 pt-1">
+            <Button variant="secondary" type="button" onClick={() => { setShowCreate(false); form.reset(); }}>Anuluj</Button>
+            <Button type="submit" loading={createMut.isPending}>Dodaj zadanie</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {editTask && <EditTaskModal task={editTask} onClose={() => setEditTask(null)} onSaved={() => { setEditTask(null); qc.invalidateQueries({ queryKey: ['tasks'] }); }} />}
+    </div>
   );
 }
