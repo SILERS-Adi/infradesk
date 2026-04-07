@@ -208,7 +208,7 @@ export default function PlanAndModulesPage() {
   if (isLoading) {
     return (
       <div style={{ padding: 32 }}>
-        <PageHeader title="Plan i moduły" icon={Layers} />
+        <PageHeader title="Plan i moduły" />
         <div style={{ display: 'flex', justifyContent: 'center', padding: 64 }}>
           <Loader2 size={32} style={{ animation: 'spin 1s linear infinite' }} />
         </div>
@@ -221,7 +221,7 @@ export default function PlanAndModulesPage() {
 
   return (
     <div style={{ padding: '24px 32px', maxWidth: 1400 }}>
-      <PageHeader title="Plan i moduły" icon={Layers} />
+      <PageHeader title="Plan i moduły" />
 
       {/* ── Karta aktualnej konfiguracji ── */}
       <div style={{
