@@ -61,7 +61,18 @@ router.get('/tenants', async (_req: Request, res: Response, next: NextFunction) 
 router.patch('/tenants/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const data = req.body;
+    // Whitelist allowed fields to prevent Prisma errors from unknown/computed fields
+    const allowed = [
+      'name', 'slug', 'plan', 'legalName', 'taxId', 'email', 'phone', 'website',
+      'addressLine1', 'postalCode', 'city', 'country', 'maxAgents', 'maxUsers',
+      'enabledModules', 'organizationType', 'isActive', 'logoUrl', 'primaryColor',
+      'orgType', 'platformBillingMode', 'accountManagedBy', 'detachPolicy',
+      'subscriptionStatus', 'billingCycle', 'monthlyPrice', 'paidUntil',
+    ];
+    const data: Record<string, any> = {};
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) data[key] = req.body[key];
+    }
     const workspace = await prisma.workspace.update({ where: { id }, data });
     res.json(workspace);
   } catch (err) { next(err); }
