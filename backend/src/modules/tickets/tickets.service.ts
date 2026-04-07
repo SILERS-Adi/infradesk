@@ -13,6 +13,13 @@ import {
 } from './tickets.validation';
 import { TicketStatus, TicketType, TicketPriority, TicketSource } from '@prisma/client';
 
+// Helper: build workspace filter for MSP scope
+function wsFilter(workspaceId?: string, wsIds?: string[]): Record<string, unknown> {
+  if (wsIds && wsIds.length > 1) return { workspaceId: { in: wsIds } };
+  if (workspaceId) return { workspaceId };
+  return {};
+}
+
 async function generateTaskNumber(): Promise<string> {
   const year = new Date().getFullYear();
   const prefix = `TSK-${year}-`;
@@ -146,27 +153,41 @@ export async function listTickets(params: {
 
 export async function getTicketById(
   id: string,
+  workspaceId?: string,
   _requestingUser?: any,
+  wsIds?: string[],
 ) {
-  const ticket = await prisma.ticket.findUnique({
-    where: { id },
-    select: {
-      ...ticketSelect,
-      comments: {
-        select: {
-          id: true,
-          ticketId: true,
-          userId: true,
-          comment: true,
-          isInternal: true,
-          createdAt: true,
-          updatedAt: true,
-          user: { select: { id: true, firstName: true, lastName: true, email: true } },
-        },
-        orderBy: { createdAt: 'asc' },
+  const selectWithComments = {
+    ...ticketSelect,
+    comments: {
+      select: {
+        id: true,
+        ticketId: true,
+        userId: true,
+        comment: true,
+        isInternal: true,
+        createdAt: true,
+        updatedAt: true,
+        user: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
+      orderBy: { createdAt: 'asc' as const },
     },
-  });
+  };
+
+  // MSP: allow access to tickets from client workspaces
+  const wsFilter = wsIds && wsIds.length > 1
+    ? { workspaceId: { in: wsIds } }
+    : workspaceId ? { workspaceId } : {};
+
+  const ticket = Object.keys(wsFilter).length > 0
+    ? await prisma.ticket.findFirst({
+        where: { id, ...wsFilter },
+        select: selectWithComments,
+      })
+    : await prisma.ticket.findUnique({
+        where: { id },
+        select: selectWithComments,
+      });
 
   if (!ticket) {
     throw new AppError('Ticket not found', 404);
@@ -176,20 +197,22 @@ export async function getTicketById(
 }
 
 export async function createTicket(
-  data: CreateTicketInput,
-  requestingUser: { userId: string }
+  data: CreateTicketInput & { workspaceId?: string },
+  requestingUser: { userId: string },
+  workspaceId?: string,
 ) {
-  if (!data.workspaceId) throw new AppError('workspaceId is required', 400);
+  const resolvedWorkspaceId = workspaceId || data.workspaceId;
+  if (!resolvedWorkspaceId) throw new AppError('workspaceId is required', 400);
 
   // Auto-fill locationId — find first location for workspace if not provided
   if (!data.locationId) {
-    const loc = await prisma.location.findFirst({ where: { workspaceId: data.workspaceId }, select: { id: true } });
+    const loc = await prisma.location.findFirst({ where: { workspaceId: resolvedWorkspaceId }, select: { id: true } });
     if (loc) {
       data.locationId = loc.id;
     } else {
       // Create default location
       const newLoc = await prisma.location.create({
-        data: { workspaceId: data.workspaceId, name: 'Główna', type: 'OFFICE', addressLine1: '-', postalCode: '', city: '' },
+        data: { workspaceId: resolvedWorkspaceId, name: 'Główna', type: 'OFFICE', addressLine1: '-', postalCode: '', city: '' },
       });
       data.locationId = newLoc.id;
     }
@@ -212,9 +235,9 @@ export async function createTicket(
   let providerWorkspaceId: string | null = null;
   try {
     const { resolveTicketProvider } = require('../../utils/ticketRouting');
-    const routing = await resolveTicketProvider(data.workspaceId);
+    const routing = await resolveTicketProvider(resolvedWorkspaceId);
     if (!routing.isInternal && routing.providerWorkspaceId) {
-      requesterWorkspaceId = data.workspaceId;
+      requesterWorkspaceId = resolvedWorkspaceId;
       providerWorkspaceId = routing.providerWorkspaceId;
     }
   } catch (_) { /* ticketRouting not available — skip */ }
@@ -222,7 +245,7 @@ export async function createTicket(
   const ticket = await prisma.ticket.create({
     data: {
       ticketNumber,
-      workspaceId: data.workspaceId,
+      workspaceId: resolvedWorkspaceId,
       requesterWorkspaceId,
       providerWorkspaceId,
       locationId: data.locationId,
@@ -258,7 +281,7 @@ export async function createTicket(
     await prisma.task.create({
       data: {
         taskNumber,
-        workspaceId: data.workspaceId,
+        workspaceId: resolvedWorkspaceId,
         ticketId: ticket.id,
         assignedToUserId,
         createdByUserId: requestingUser.userId,
@@ -271,7 +294,7 @@ export async function createTicket(
 
   // Notify workspace's active agents
   prisma.agentRegistration.findMany({
-    where: { workspaceId: data.workspaceId, status: 'ACTIVE' },
+    where: { workspaceId: resolvedWorkspaceId, status: 'ACTIVE' },
     select: { agentToken: true },
   }).then(regs => {
     for (const reg of regs) {
@@ -289,9 +312,11 @@ export async function createTicket(
 export async function updateTicket(
   id: string,
   data: UpdateTicketInput,
-  performedByUserId: string
+  performedByUserId: string,
+  workspaceId?: string,
+  wsIds?: string[],
 ) {
-  const existing = await prisma.ticket.findUnique({ where: { id } });
+  const existing = await prisma.ticket.findFirst({ where: { id, ...wsFilter(workspaceId, wsIds) } });
   if (!existing) {
     throw new AppError('Ticket not found', 404);
   }
@@ -321,9 +346,14 @@ export async function updateTicket(
 export async function addTicketComment(
   ticketId: string,
   data: AddCommentInput,
-  requestingUser: { userId: string }
+  requestingUser: { userId: string },
+  workspaceId?: string,
+  wsIds?: string[],
 ) {
-  const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
+  const wf = wsFilter(workspaceId, wsIds);
+  const ticket = Object.keys(wf).length > 0
+    ? await prisma.ticket.findFirst({ where: { id: ticketId, ...wf } })
+    : await prisma.ticket.findUnique({ where: { id: ticketId } });
   if (!ticket) {
     throw new AppError('Ticket not found', 404);
   }
@@ -386,9 +416,14 @@ export async function addTicketComment(
 export async function assignTicket(
   ticketId: string,
   data: AssignTicketInput,
-  performedByUserId: string
+  performedByUserId: string,
+  workspaceId?: string,
+  wsIds?: string[],
 ) {
-  const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
+  const wf = wsFilter(workspaceId, wsIds);
+  const ticket = Object.keys(wf).length > 0
+    ? await prisma.ticket.findFirst({ where: { id: ticketId, ...wf } })
+    : await prisma.ticket.findUnique({ where: { id: ticketId } });
   if (!ticket) {
     throw new AppError('Ticket not found', 404);
   }
@@ -467,9 +502,14 @@ export async function assignTicket(
 export async function changeTicketStatus(
   ticketId: string,
   data: ChangeStatusInput,
-  performedByUserId: string
+  performedByUserId: string,
+  workspaceId?: string,
+  wsIds?: string[],
 ) {
-  const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
+  const wf = wsFilter(workspaceId, wsIds);
+  const ticket = Object.keys(wf).length > 0
+    ? await prisma.ticket.findFirst({ where: { id: ticketId, ...wf } })
+    : await prisma.ticket.findUnique({ where: { id: ticketId } });
   if (!ticket) {
     throw new AppError('Ticket not found', 404);
   }
@@ -549,9 +589,14 @@ export async function changeTicketStatus(
 
 export async function cancelTicket(
   ticketId: string,
-  performedByUserId: string
+  performedByUserId: string,
+  workspaceId?: string,
+  wsIds?: string[],
 ) {
-  const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
+  const wf = wsFilter(workspaceId, wsIds);
+  const ticket = Object.keys(wf).length > 0
+    ? await prisma.ticket.findFirst({ where: { id: ticketId, ...wf } })
+    : await prisma.ticket.findUnique({ where: { id: ticketId } });
   if (!ticket) throw new AppError('Ticket not found', 404);
 
   const updated = await prisma.ticket.update({
@@ -581,8 +626,11 @@ export async function completeTicket(ticketId: string) {
   });
 }
 
-export async function deleteTicket(id: string, performedByUserId: string) {
-  const existing = await prisma.ticket.findUnique({ where: { id } });
+export async function deleteTicket(id: string, performedByUserId: string, workspaceId?: string, wsIds?: string[]) {
+  const wf = wsFilter(workspaceId, wsIds);
+  const existing = Object.keys(wf).length > 0
+    ? await prisma.ticket.findFirst({ where: { id, ...wf } })
+    : await prisma.ticket.findUnique({ where: { id } });
   if (!existing) {
     throw new AppError('Ticket not found', 404);
   }

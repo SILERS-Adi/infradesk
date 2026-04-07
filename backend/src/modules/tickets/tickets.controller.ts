@@ -12,6 +12,12 @@ import {
 } from './tickets.service';
 import { TicketStatus, TicketPriority, TicketType } from '@prisma/client';
 import { ticketScopeFilter, isTicketAccessible } from '../../middleware/workspace';
+import { getMspWorkspaceIds } from '../../utils/mspScope';
+
+/** Get MSP-expanded workspace IDs for current request */
+async function mspWsIds(req: Request): Promise<string[]> {
+  return req.workspaceId ? getMspWorkspaceIds(req.workspaceId) : [req.workspaceId!];
+}
 
 export async function getTickets(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -47,7 +53,8 @@ export async function getTickets(req: Request, res: Response, next: NextFunction
 
 export async function getTicket(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const ticket = await getTicketById(req.params.id, req.user!);
+    const wsIds = await mspWsIds(req);
+    const ticket = await getTicketById(req.params.id, req.workspaceId!, req.user!, wsIds);
 
     // Enforce scope on detail
     if (req.membership && !isTicketAccessible(req.membership, {
@@ -69,7 +76,7 @@ export async function postTicket(req: Request, res: Response, next: NextFunction
   try {
     const ticket = await createTicket(req.body, {
       userId: req.user!.userId,
-    });
+    }, req.workspaceId!);
     res.status(201).json(ticket);
   } catch (err) {
     next(err);
@@ -78,7 +85,8 @@ export async function postTicket(req: Request, res: Response, next: NextFunction
 
 export async function patchTicket(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const ticket = await updateTicket(req.params.id, req.body, req.user!.userId);
+    const wsIds = await mspWsIds(req);
+    const ticket = await updateTicket(req.params.id, req.body, req.user!.userId, req.workspaceId!, wsIds);
     res.status(200).json(ticket);
   } catch (err) {
     next(err);
@@ -87,9 +95,10 @@ export async function patchTicket(req: Request, res: Response, next: NextFunctio
 
 export async function postComment(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    const wsIds = await mspWsIds(req);
     const comment = await addTicketComment(req.params.id, req.body, {
       userId: req.user!.userId,
-    });
+    }, req.workspaceId!, wsIds);
     res.status(201).json(comment);
   } catch (err) {
     next(err);
@@ -98,7 +107,8 @@ export async function postComment(req: Request, res: Response, next: NextFunctio
 
 export async function postAssign(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const ticket = await assignTicket(req.params.id, req.body, req.user!.userId);
+    const wsIds = await mspWsIds(req);
+    const ticket = await assignTicket(req.params.id, req.body, req.user!.userId, req.workspaceId!, wsIds);
     res.status(200).json(ticket);
   } catch (err) {
     next(err);
@@ -107,7 +117,8 @@ export async function postAssign(req: Request, res: Response, next: NextFunction
 
 export async function postStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const ticket = await changeTicketStatus(req.params.id, req.body, req.user!.userId);
+    const wsIds = await mspWsIds(req);
+    const ticket = await changeTicketStatus(req.params.id, req.body, req.user!.userId, req.workspaceId!, wsIds);
     res.status(200).json(ticket);
   } catch (err) {
     next(err);
@@ -116,14 +127,16 @@ export async function postStatus(req: Request, res: Response, next: NextFunction
 
 export async function cancelTicket(req: Request, res: Response, next: NextFunction) {
   try {
-    const ticket = await cancelTicketService(req.params.id, req.user!.userId);
+    const wsIds = await mspWsIds(req);
+    const ticket = await cancelTicketService(req.params.id, req.user!.userId, req.workspaceId!, wsIds);
     res.json(ticket);
   } catch (err) { next(err); }
 }
 
 export async function removeTicket(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    await deleteTicket(req.params.id, req.user!.userId);
+    const wsIds = await mspWsIds(req);
+    await deleteTicket(req.params.id, req.user!.userId, req.workspaceId!, wsIds);
     res.status(204).send();
   } catch (err) {
     next(err);
