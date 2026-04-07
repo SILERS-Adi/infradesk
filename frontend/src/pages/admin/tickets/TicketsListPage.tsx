@@ -152,7 +152,7 @@ function AssignPopup({ ticket, technicians }: { ticket: Ticket; technicians: { i
           onClick={e => e.stopPropagation()}
           className="absolute left-0 top-full mt-1 z-50 rounded-[14px] p-3 flex flex-col gap-2.5"
           style={{
-            background: 'rgba(14,20,38,0.97)',
+            background: 'var(--bg-card)',
             backdropFilter: 'blur(16px)',
             border: '1px solid var(--border)',
             boxShadow: '0 8px 32px rgba(0,0,0,0.5)',

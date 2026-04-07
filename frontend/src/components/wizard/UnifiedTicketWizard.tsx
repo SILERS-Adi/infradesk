@@ -418,7 +418,7 @@ export function UnifiedTicketWizard({ open, onClose, onSuccess, defaultClientId,
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} />
       <div className="relative w-full max-w-[580px] max-h-[90vh] flex flex-col rounded-[20px] overflow-hidden"
-        style={{ background: 'rgba(14,20,38,0.97)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.07)', boxShadow: '0 24px 80px rgba(0,0,0,0.5)' }}
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: '0 24px 80px rgba(0,0,0,0.3)' }}
         onClick={e => e.stopPropagation()}>
 
         {/* ── Header ─────────────────────────────────────────────────── */}
