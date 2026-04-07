@@ -106,21 +106,52 @@ def res(name: str) -> str:
     return name
 
 
-# ─── Config I/O ──────────────────────────────────────────────────────────────
+# ─── Config I/O (with DPAPI token encryption on Windows) ─────────────────────
+
+def _dpapi_encrypt(plaintext: str) -> str:
+    try:
+        import win32crypt, base64
+        blob = win32crypt.CryptProtectData(
+            plaintext.encode("utf-8"), "InfraDesk Agent Token", None, None, None, 0)
+        return "dpapi:" + base64.b64encode(blob).decode("ascii")
+    except Exception:
+        return plaintext
+
+def _dpapi_decrypt(encrypted: str) -> str:
+    if not encrypted.startswith("dpapi:"):
+        return encrypted
+    try:
+        import win32crypt, base64
+        blob = base64.b64decode(encrypted[6:])
+        _, data = win32crypt.CryptUnprotectData(blob, None, None, None, 0)
+        return data.decode("utf-8")
+    except Exception as e:
+        log.warning("DPAPI decrypt failed: %s", e)
+        return encrypted
 
 def load_config() -> dict:
     try:
         with open(CONFIG_FILE, encoding="utf-8") as f:
-            return json.load(f)
+            cfg = json.load(f)
+        if cfg.get("token"):
+            cfg["token"] = _dpapi_decrypt(cfg["token"])
+        if cfg.get("token") and not cfg.get("_encrypted"):
+            cfg["_encrypted"] = True
+            save_config(cfg)
+        return cfg
     except Exception:
         return {}
 
 
 def save_config(data: dict):
     os.makedirs(INSTALL_DIR, exist_ok=True)
+    to_save = dict(data)
+    if to_save.get("token") and not to_save.get("token", "").startswith("dpapi:"):
+        to_save["token"] = _dpapi_encrypt(to_save["token"])
+    to_save["_encrypted"] = True
     tmp = CONFIG_FILE + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+        json.dump(to_save, f, indent=2)
         f.flush()
         os.fsync(f.fileno())
     # Atomic replace
@@ -133,7 +164,7 @@ def save_config(data: dict):
         shutil.copy2(tmp, CONFIG_FILE)
         try: os.remove(tmp)
         except Exception: pass
-    log.info("Config SAVED: %s (size=%d keys=%s)", CONFIG_FILE, os.path.getsize(CONFIG_FILE), list(data.keys()))
+    log.info("Config SAVED: %s (size=%d keys=%s)", CONFIG_FILE, os.path.getsize(CONFIG_FILE), list(to_save.keys()))
 
 
 # ─── Instalacja ──────────────────────────────────────────────────────────────
@@ -620,8 +651,6 @@ def install_rustdesk(notify_fn=None) -> bool:
         _notify("Pobieranie SILERS… (może potrwać chwilę)")
         import ssl
         ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
         with urllib.request.urlopen(SILERS_MSI_URL, context=ctx, timeout=120) as resp:
             with open(msi, "wb") as f:
                 f.write(resp.read())
@@ -655,24 +684,49 @@ def install_rustdesk(notify_fn=None) -> bool:
 
 # ─── Auto-update ──────────────────────────────────────────────────────────────
 
+# Ed25519 public key for update manifest signature verification.
+# Generate keypair: python -c "from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey; k=Ed25519PrivateKey.generate(); print(k.public_key().public_bytes_raw().hex())"
+# Keep private key OFFLINE — only used to sign version.json during release.
+UPDATE_SIGNING_PUBLIC_KEY = os.environ.get("INFRADESK_UPDATE_PUBKEY", "")
+
+def _verify_update_signature(data: dict) -> bool:
+    """Verify Ed25519 signature on update manifest. Returns True if valid or no key configured."""
+    sig_hex = data.get("signature")
+    if not UPDATE_SIGNING_PUBLIC_KEY:
+        return True  # No key configured — skip verification (pre-rollout)
+    if not sig_hex:
+        log.warning("Update manifest has no signature — skipping unsigned update")
+        return False
+    try:
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+        pubkey = Ed25519PublicKey.from_public_bytes(bytes.fromhex(UPDATE_SIGNING_PUBLIC_KEY))
+        message = f"{data.get('version')}|{data.get('sha256','')}|{data.get('url','')}".encode()
+        pubkey.verify(bytes.fromhex(sig_hex), message)
+        log.info("Update manifest signature verified OK")
+        return True
+    except Exception as e:
+        log.error("Update manifest signature INVALID: %s", e)
+        return False
+
 def check_for_update():
-    """Zwraca (version, url) jeśli dostępna nowsza wersja, inaczej None."""
+    """Zwraca (version, url, sha256) jeśli dostępna nowsza wersja, inaczej None."""
     try:
         import ssl
         ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
         with urllib.request.urlopen(VERSION_URL, context=ctx, timeout=10) as r:
             data = json.loads(r.read())
+        if not _verify_update_signature(data):
+            return None
         remote = data.get("version", "0.0.0")
+        sha256 = data.get("sha256")
         if tuple(int(x) for x in remote.split(".")) > tuple(int(x) for x in APP_VERSION.split(".")):
-            return remote, data.get("url", f"https://infradesk.pl/downloads/Asystent%20Home.exe")
+            return remote, data.get("url", f"https://infradesk.pl/downloads/Asystent%20Home.exe"), sha256
     except Exception as e:
         log.debug("Update check failed: %s", e)
     return None
 
 
-def do_self_update(download_url, notify_fn=None):
+def do_self_update(download_url, notify_fn=None, expected_sha256=None):
     """Pobiera nową wersję i uruchamia skrypt zastępujący EXE, potem kończy bieżący proces."""
     def _notify(msg):
         log.info(msg)
@@ -685,12 +739,20 @@ def do_self_update(download_url, notify_fn=None):
         _notify("Pobieranie aktualizacji…")
         import ssl
         ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
         with urllib.request.urlopen(download_url, context=ctx, timeout=120) as resp:
             with open(new_exe, "wb") as f:
                 f.write(resp.read())
         log.info("Update downloaded: %d bytes", os.path.getsize(new_exe))
+
+        if expected_sha256:
+            import hashlib
+            actual = hashlib.sha256(open(new_exe, "rb").read()).hexdigest()
+            if actual != expected_sha256:
+                log.error("Update hash mismatch! Expected %s, got %s", expected_sha256, actual)
+                _notify("Błąd: plik aktualizacji jest uszkodzony")
+                os.remove(new_exe)
+                return
+            log.info("Update hash verified: %s", actual)
 
         _notify("Restartuję agenta…")
         # Uruchom nowy exe bezpośrednio z temp — sam się zainstaluje przez install_and_restart()
@@ -813,7 +875,8 @@ class WS:
     def _run(self):
         while True:
             try:
-                ws = websocket.WebSocketApp(f"{WS_BASE}?token={self.token}",
+                ws = websocket.WebSocketApp(WS_BASE,
+                    header=[f"Authorization: Bearer {self.token}"],
                     on_message=lambda _ws, m: self._on(m))
                 ws.run_forever(ping_interval=30)
             except Exception: pass
@@ -1959,28 +2022,56 @@ class BackupScheduler:
         if pwd and ":" in pwd:
             try:
                 from cryptography.fernet import Fernet
-                # Simple AES — for now just use as-is from server
             except Exception:
                 pass
         dbs = cfg.get("sqlDatabases", "").split(",")
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         results = []
 
+        # MSSQL: use shared folder accessible by SQL Server service
+        # %TEMP% is NOT accessible by NT SERVICE\MSSQLSERVER
+        if btype == "SQL_MSSQL":
+            backup_dir = r"C:\ProgramData\InfraDesk\backups"
+        else:
+            backup_dir = tempfile.gettempdir()
+        os.makedirs(backup_dir, exist_ok=True)
+
         for db in dbs:
             db = db.strip()
             if not db: continue
-            output = os.path.join(tempfile.gettempdir(), f"backup_{db}_{timestamp}.sql")
+            output = os.path.join(backup_dir, f"backup_{db}_{timestamp}.sql")
 
+            # Security: pass passwords via env vars, not CLI args (visible in process list)
+            backup_env = os.environ.copy()
             if btype == "SQL_MYSQL":
-                cmd = f'mysqldump -h {host} -P {port} -u {user} -p{pwd} {db}'
+                backup_env["MYSQL_PWD"] = pwd
+                cmd = f'mysqldump -h {host} -P {port} -u {user} {db}'
             elif btype == "SQL_POSTGRES":
-                os.environ["PGPASSWORD"] = pwd
+                backup_env["PGPASSWORD"] = pwd
                 cmd = f'pg_dump -h {host} -p {port} -U {user} {db}'
             elif btype == "SQL_MSSQL":
-                cmd = f'sqlcmd -S {host},{port} -U {user} -P {pwd} -Q "BACKUP DATABASE [{db}] TO DISK=\'{output}.bak\' WITH FORMAT"'
+                if pwd:
+                    backup_env["SQLCMDPASSWORD"] = pwd
+                bak_path = f"{output}.bak"
+                # MSSQL BACKUP DATABASE writes to SQL Server filesystem
+                # Use -P for password via CLI (SQLCMDPASSWORD env not always reliable)
+                auth = f'-U {user} -P "{pwd}"' if pwd else '-E'
+                cmd = f'sqlcmd -S {host},{port} {auth} -Q "BACKUP DATABASE [{db}] TO DISK=N\'{bak_path}\' WITH FORMAT, INIT, COMPRESSION"'
+                log.info("MSSQL backup: %s -> %s", db, bak_path)
                 try:
-                    subprocess.run(cmd, shell=True, check=True, capture_output=True, timeout=3600)
-                    results.append(f"{output}.bak")
+                    result = subprocess.run(cmd, shell=True, check=True, capture_output=True, timeout=7200, env=backup_env, text=True)
+                    if result.stderr:
+                        log.warning("MSSQL stderr: %s", result.stderr[:500])
+                    # Wait for file to appear (SQL Server may still be writing)
+                    for _ in range(30):
+                        if os.path.exists(bak_path) and os.path.getsize(bak_path) > 0:
+                            break
+                        time.sleep(2)
+                    if not os.path.exists(bak_path):
+                        raise RuntimeError(f"MSSQL backup file not found: {bak_path}")
+                    results.append(bak_path)
+                except subprocess.CalledProcessError as e:
+                    raise RuntimeError(f"MSSQL backup failed for {db}: {e.stderr[:500] if e.stderr else e}")
                 except Exception as e:
                     raise RuntimeError(f"MSSQL backup failed for {db}: {e}")
                 continue
@@ -1989,7 +2080,7 @@ class BackupScheduler:
 
             try:
                 with open(output, "w") as f:
-                    subprocess.run(cmd, shell=True, check=True, stdout=f, stderr=subprocess.PIPE, timeout=3600)
+                    subprocess.run(cmd, shell=True, check=True, stdout=f, stderr=subprocess.PIPE, timeout=3600, env=backup_env)
                 results.append(output)
             except Exception as e:
                 raise RuntimeError(f"SQL backup failed for {db}: {e}")
@@ -2478,14 +2569,14 @@ class App:
             result = check_for_update()
             if result and result != self._update_info:
                 self._update_info = result
-                ver, url = result
+                ver, url, sha256 = result
                 log.info("Update available: %s — auto-updating", ver)
                 if self._tray:
                     try: self._tray.notify(f"Aktualizacja do wersji {ver}…", APP_NAME)
                     except Exception: pass
                 # Auto-update
                 try:
-                    do_self_update(url, notify_fn=lambda m: None)
+                    do_self_update(url, notify_fn=lambda m: None, expected_sha256=sha256)
                 except Exception as e:
                     log.error("Auto-update failed: %s", e)
             time.sleep(2 * 3600)
@@ -2600,8 +2691,8 @@ class App:
             # Wymuś sprawdzenie wersji przed aktualizacją
             info = check_for_update()
         if info:
-            _, url = info
-            do_self_update(url, notify_fn=_tray_notify)
+            _, url, sha256 = info
+            do_self_update(url, notify_fn=_tray_notify, expected_sha256=sha256)
         else:
             _tray_notify("Brak aktualizacji — masz najnowszą wersję.")
 
@@ -2747,8 +2838,6 @@ def _check_internet(timeout=5):
     try:
         import urllib.request, ssl
         ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
         urllib.request.urlopen("https://infradesk.pl/health", context=ctx, timeout=timeout)
         return True
     except Exception:
@@ -2922,10 +3011,10 @@ class _BackgroundServices:
             result = check_for_update()
             if result and result != self._update_info:
                 self._update_info = result
-                ver, url = result
+                ver, url, sha256 = result
                 log.info("Update available: %s — auto-updating", ver)
                 try:
-                    do_self_update(url, notify_fn=lambda m: None)
+                    do_self_update(url, notify_fn=lambda m: None, expected_sha256=sha256)
                 except Exception as e:
                     log.error("Auto-update failed: %s", e)
             time.sleep(2 * 3600)
@@ -2949,8 +3038,8 @@ class _BackgroundServices:
         elif mtype == "update":
             info = self._update_info or check_for_update()
             if info:
-                _, url = info
-                do_self_update(url)
+                _, url, sha256 = info
+                do_self_update(url, expected_sha256=sha256)
         elif mtype == "backup_run":
             cid = msg.get("configId", "")
             if cid and self._backup_scheduler:
@@ -4033,8 +4122,6 @@ def speed_test_simple():
     try:
         import urllib.request, ssl, time as _time
         ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
 
         # Ping — 3x to google DNS
         times = []
@@ -4147,8 +4234,6 @@ def get_network_info():
         try:
             import urllib.request, ssl, json as _json
             ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
             req = urllib.request.urlopen("https://ipinfo.io/json", context=ctx, timeout=8)
             data = _json.loads(req.read())
             info["public_ip"] = data.get("ip")
@@ -5333,8 +5418,8 @@ class ServerServiceLoop:
         elif mtype == "update":
             info = check_for_update()
             if info:
-                _, url = info
-                threading.Thread(target=do_self_update, args=(url,), daemon=True).start()
+                _, url, sha256 = info
+                threading.Thread(target=do_self_update, args=(url,), kwargs={"expected_sha256": sha256}, daemon=True).start()
         elif mtype == "backup_run":
             cid = msg.get("configId", "")
             if cid and hasattr(self, '_backup') and self._backup:
@@ -5620,7 +5705,7 @@ def _run_home_webview():
                 try:
                     result = check_for_update()
                     if result:
-                        ver, url = result
+                        ver, url, sha256 = result
                         return {"available": True, "version": ver, "url": url}
                     return {"available": False}
                 except Exception as e:
@@ -5630,8 +5715,8 @@ def _run_home_webview():
                 try:
                     result = check_for_update()
                     if result:
-                        ver, url = result
-                        do_self_update(url)
+                        ver, url, sha256 = result
+                        do_self_update(url, expected_sha256=sha256)
                         return {"ok": True}
                     return {"ok": False, "error": "Brak aktualizacji"}
                 except Exception as e:
@@ -6053,8 +6138,6 @@ def _run_home_webview():
                         method="POST",
                     )
                     ctx = __import__("ssl").create_default_context()
-                    ctx.check_hostname = False
-                    ctx.verify_mode = __import__("ssl").CERT_NONE
                     resp = urllib.request.urlopen(req, context=ctx, timeout=30)
                     result = json.loads(resp.read().decode("utf-8"))
                     return {"ok": True, "content": result.get("content", "")}
@@ -6206,81 +6289,10 @@ def _run_home_webview():
                 return result
 
             def import_browser_passwords(self, browser_name):
-                """Import passwords from a specific browser with AES decryption."""
-                import sqlite3, base64, shutil, json as _json
-                local = os.environ.get("LOCALAPPDATA", "")
-                browsers_config = {
-                    "Chrome": {"path": os.path.join(local, "Google", "Chrome", "User Data"), "db": "Default/Login Data"},
-                    "Edge": {"path": os.path.join(local, "Microsoft", "Edge", "User Data"), "db": "Default/Login Data"},
-                    "Opera": {"path": os.path.join(local, "Opera Software", "Opera Stable"), "db": "Login Data"},
-                    "Brave": {"path": os.path.join(local, "BraveSoftware", "Brave-Browser", "User Data"), "db": "Default/Login Data"},
-                }
-                b = browsers_config.get(browser_name)
-                if not b:
-                    return {"ok": False, "error": f"Nieznana przeglądarka: {browser_name}", "passwords": []}
-                db_path = os.path.join(b["path"], b["db"])
-                if not os.path.exists(db_path):
-                    return {"ok": False, "error": "Baza haseł nie znaleziona", "passwords": []}
-
-                # Get AES master key from Local State
-                master_key = None
-                state_path = os.path.join(b["path"], "Local State")
-                try:
-                    with open(state_path, "r", encoding="utf-8") as f:
-                        state = _json.load(f)
-                    encrypted_key = base64.b64decode(state["os_crypt"]["encrypted_key"])
-                    # Remove 'DPAPI' prefix (5 bytes)
-                    encrypted_key = encrypted_key[5:]
-                    # Decrypt with DPAPI
-                    import ctypes, ctypes.wintypes
-                    class DATA_BLOB(ctypes.Structure):
-                        _fields_ = [("cbData", ctypes.wintypes.DWORD), ("pbData", ctypes.POINTER(ctypes.c_char))]
-                    blob_in = DATA_BLOB(len(encrypted_key), ctypes.create_string_buffer(encrypted_key))
-                    blob_out = DATA_BLOB()
-                    if ctypes.windll.crypt32.CryptUnprotectData(ctypes.byref(blob_in), None, None, None, None, 0, ctypes.byref(blob_out)):
-                        master_key = ctypes.string_at(blob_out.pbData, blob_out.cbData)
-                        ctypes.windll.kernel32.LocalFree(blob_out.pbData)
-                except Exception as e:
-                    log.error("Master key extraction: %s", e)
-
-                passwords = []
-                try:
-                    tmp = os.path.join(tempfile.gettempdir(), f"iad_imp_{browser_name}.db")
-                    try:
-                        shutil.copy2(db_path, tmp)
-                    except:
-                        subprocess.run(["cmd", "/c", "copy", "/Y", db_path, tmp],
-                            capture_output=True, timeout=5, creationflags=_NO_WINDOW)
-                    conn = sqlite3.connect(tmp)
-                    rows = conn.execute("SELECT origin_url, username_value, password_value FROM logins WHERE username_value != ''").fetchall()
-                    for url, user, pw_blob in rows:
-                        pw = ""
-                        try:
-                            if pw_blob[:3] in (b'v10', b'v11') and master_key:
-                                # AES-GCM decryption (Chrome 80+)
-                                from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-                                nonce = pw_blob[3:15]
-                                ciphertext = pw_blob[15:]
-                                pw = AESGCM(master_key).decrypt(nonce, ciphertext, None).decode('utf-8', errors='ignore')
-                            else:
-                                # Legacy DPAPI
-                                import ctypes, ctypes.wintypes
-                                class DATA_BLOB(ctypes.Structure):
-                                    _fields_ = [("cbData", ctypes.wintypes.DWORD), ("pbData", ctypes.POINTER(ctypes.c_char))]
-                                blob_in = DATA_BLOB(len(pw_blob), ctypes.create_string_buffer(pw_blob))
-                                blob_out = DATA_BLOB()
-                                if ctypes.windll.crypt32.CryptUnprotectData(ctypes.byref(blob_in), None, None, None, None, 0, ctypes.byref(blob_out)):
-                                    pw = ctypes.string_at(blob_out.pbData, blob_out.cbData).decode('utf-8', errors='ignore')
-                                    ctypes.windll.kernel32.LocalFree(blob_out.pbData)
-                        except Exception as e:
-                            pw = "[nie udało się odszyfrować]"
-                        passwords.append({"browser": browser_name, "url": url, "login": user, "password": pw})
-                    conn.close()
-                    os.remove(tmp)
-                except Exception as e:
-                    log.error("import_browser_passwords: %s", e)
-                    return {"ok": False, "error": str(e), "passwords": []}
-                return {"ok": True, "passwords": passwords}
+                """DISABLED — browser password extraction removed for security.
+                This function previously extracted saved passwords from Chrome/Edge/Opera/Brave.
+                Removed to prevent unauthorized credential harvesting."""
+                return {"ok": False, "error": "Funkcja importu haseł z przeglądarek została wyłączona ze względów bezpieczeństwa.", "passwords": []}
 
             def ping_host(self, host):
                 """Ping a host — quick, 2 packets."""

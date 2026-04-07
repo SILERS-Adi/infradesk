@@ -299,4 +299,21 @@ export async function cleanupOldBackups() {
       });
     }
   }
+
+  // Cleanup stuck RUNNING backups (older than 2 hours → mark as FAILED)
+  const stuckCutoff = new Date(Date.now() - 2 * 60 * 60 * 1000);
+  const stuck = await prisma.backupHistory.findMany({
+    where: { status: 'RUNNING', startedAt: { lt: stuckCutoff } },
+  });
+  if (stuck.length > 0) {
+    await prisma.backupHistory.updateMany({
+      where: { id: { in: stuck.map(h => h.id) } },
+      data: { status: 'FAILED', errorMessage: 'Timeout — backup nie ukończony w 2h', completedAt: new Date() },
+    });
+    // Also update config lastStatus
+    const configIds = [...new Set(stuck.map(h => h.backupConfigId))];
+    for (const cid of configIds) {
+      await prisma.backupConfig.update({ where: { id: cid }, data: { lastStatus: 'FAILED' } }).catch(() => {});
+    }
+  }
 }
