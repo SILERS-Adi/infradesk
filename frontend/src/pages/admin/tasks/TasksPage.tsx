@@ -8,7 +8,7 @@ import { z } from 'zod';
 import {
   CheckCircle2, Clock, Loader2, Plus, X, ExternalLink, MapPin,
   Monitor, Play, Pause, Square, Timer, Edit2, Sparkles, Zap,
-  Wifi, WifiOff, RotateCw, ChevronDown, ChevronUp,
+  Wifi, WifiOff, RotateCw, ChevronDown, ChevronUp, Settings2, Eye, EyeOff, GripVertical,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { tasksApi } from '../../../api/tasks';
@@ -35,6 +35,28 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'IN_PROGRESS', label: 'W trakcie' },
   { key: 'DONE', label: 'Zrealizowane' },
 ];
+
+// ── Column definitions ───────────────────────────────────────────────
+interface ColDef { key: string; label: string; }
+const ALL_COLUMNS: ColDef[] = [
+  { key: 'company', label: 'Firma' },
+  { key: 'user', label: 'Użytkownik' },
+  { key: 'device', label: 'Urządzenie' },
+  { key: 'subject', label: 'Temat' },
+  { key: 'online', label: 'Status' },
+  { key: 'rustdesk', label: 'RustDesk' },
+  { key: 'ai', label: 'AI' },
+  { key: 'timer', label: 'Czas' },
+  { key: 'actions', label: 'Akcje' },
+];
+const DEFAULT_VISIBLE = ALL_COLUMNS.map(c => c.key);
+const STORAGE_KEY = 'infradesk_tasks_columns';
+
+function loadColumns(): string[] {
+  try { const s = localStorage.getItem(STORAGE_KEY); return s ? JSON.parse(s) : DEFAULT_VISIBLE; }
+  catch { return DEFAULT_VISIBLE; }
+}
+function saveColumns(keys: string[]) { localStorage.setItem(STORAGE_KEY, JSON.stringify(keys)); }
 
 function formatTimer(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -135,8 +157,8 @@ type NewTaskForm = z.infer<typeof newTaskSchema>;
 
 // ── Task Row ─────────────────────────────────────────────────────────
 
-function TaskRow({ task, agents, activeSessions, onStatus, onStartSession, onPauseSession, onResumeSession, onEndSession, onEdit }: {
-  task: Task; agents: AgentRegistration[]; activeSessions: WorkSession[];
+function TaskRow({ task, agents, activeSessions, visibleCols, onStatus, onStartSession, onPauseSession, onResumeSession, onEndSession, onEdit }: {
+  task: Task; agents: AgentRegistration[]; activeSessions: WorkSession[]; visibleCols: string[];
   onStatus: (id: string, s: TaskStatus) => void;
   onStartSession: (t: Task) => void;
   onPauseSession: (id: string) => void;
@@ -165,39 +187,31 @@ function TaskRow({ task, agents, activeSessions, onStatus, onStartSession, onPau
         onMouseEnter={e => (e.currentTarget.style.background = 'var(--hover-bg)')}
         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
 
-        {/* Firma */}
-        <td style={th}>
+        {visibleCols.includes('company') && <td style={th}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--t)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{company}</div>
-        </td>
+        </td>}
 
-        {/* Użytkownik */}
-        <td style={th}>
+        {visibleCols.includes('user') && <td style={th}>
           <div style={{ fontSize: 12, color: 'var(--ts)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}>{reporter}</div>
-        </td>
+        </td>}
 
-        {/* Urządzenie */}
-        <td style={th}>
+        {visibleCols.includes('device') && <td style={th}>
           <div style={{ fontSize: 12, color: 'var(--ts)', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis' }}>{device}</div>
-        </td>
+        </td>}
 
-        {/* Temat */}
-        <td style={{ ...th, maxWidth: 250 }}>
+        {visibleCols.includes('subject') && <td style={{ ...th, maxWidth: 250 }}>
           <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--t)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {task.ticket && (
-              <Link to={`/tickets/${task.ticketId}`} style={{ color: 'var(--accent)', marginRight: 6, fontSize: 11 }}>{task.ticket.ticketNumber}</Link>
-            )}
+            {task.ticket && <Link to={`/tickets/${task.ticketId}`} style={{ color: 'var(--accent)', marginRight: 6, fontSize: 11 }}>{task.ticket.ticketNumber}</Link>}
             {task.title}
           </div>
           {task.ticket && <PriorityBadge priority={task.ticket.priority} />}
-        </td>
+        </td>}
 
-        {/* Online/Offline */}
-        <td style={th}>
+        {visibleCols.includes('online') && <td style={th}>
           {deviceId ? <OnlineBadge deviceId={deviceId} agents={agents} /> : <span style={{ fontSize: 11, color: 'var(--tm)' }}>—</span>}
-        </td>
+        </td>}
 
-        {/* RustDesk */}
-        <td style={th}>
+        {visibleCols.includes('rustdesk') && <td style={th}>
           {rustdeskId ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <a href={`rustdesk://id=${rustdeskId}`} onClick={e => e.stopPropagation()}
@@ -208,28 +222,19 @@ function TaskRow({ task, agents, activeSessions, onStatus, onStartSession, onPau
               <span style={{ fontSize: 10, color: 'var(--tm)', fontFamily: 'monospace' }}>{rustdeskId}</span>
             </div>
           ) : <span style={{ fontSize: 11, color: 'var(--tm)' }}>—</span>}
-        </td>
+        </td>}
 
-        {/* AI */}
-        <td style={th}>
+        {visibleCols.includes('ai') && <td style={th}>
           <AiButton title={task.title} description={task.description} source={task.ticket?.source} />
-        </td>
+        </td>}
 
-        {/* Timer / Status */}
-        <td style={th}>
-          {isActive && (
-            <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 13, color: '#22C55E' }}>{formatTimer(liveSeconds)}</span>
-          )}
-          {isPaused && (
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#FBBF24' }}>PAUZA</span>
-          )}
-          {!hasSession && task.status === 'DONE' && (
-            <span style={{ fontSize: 11, color: 'var(--tm)' }}>Zakończone</span>
-          )}
-        </td>
+        {visibleCols.includes('timer') && <td style={th}>
+          {isActive && <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 13, color: '#22C55E' }}>{formatTimer(liveSeconds)}</span>}
+          {isPaused && <span style={{ fontSize: 11, fontWeight: 700, color: '#FBBF24' }}>PAUZA</span>}
+          {!hasSession && task.status === 'DONE' && <span style={{ fontSize: 11, color: 'var(--tm)' }}>Zakończone</span>}
+        </td>}
 
-        {/* Akcje */}
-        <td style={{ ...th, whiteSpace: 'nowrap' }}>
+        {visibleCols.includes('actions') && <td style={{ ...th, whiteSpace: 'nowrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             {/* NEW → Start */}
             {task.status === 'NEW' && !hasSession && (
@@ -260,7 +265,7 @@ function TaskRow({ task, agents, activeSessions, onStatus, onStartSession, onPau
       {/* Expanded details */}
       {expanded && (
         <tr>
-          <td colSpan={9} style={{ padding: '8px 12px', background: 'var(--hover-bg)', borderBottom: '1px solid var(--border)' }}>
+          <td colSpan={visibleCols.length} style={{ padding: '8px 12px', background: 'var(--hover-bg)', borderBottom: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', gap: 24, fontSize: 12, flexWrap: 'wrap' }}>
               {task.description && <div style={{ maxWidth: 400 }}><span style={{ color: 'var(--tm)', fontWeight: 600 }}>Opis:</span> <span style={{ color: 'var(--ts)' }}>{task.description}</span></div>}
               {task.notes && <div><span style={{ color: 'var(--tm)', fontWeight: 600 }}>Notatki:</span> <span style={{ color: 'var(--ts)' }}>{task.notes}</span></div>}
@@ -345,7 +350,12 @@ export function TasksPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('IN_PROGRESS');
   const [showCreate, setShowCreate] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
+  const [showColEditor, setShowColEditor] = useState(false);
+  const [visibleCols, setVisibleCols] = useState<string[]>(loadColumns);
   const isAdmin = useWorkspaceContext().isAdmin;
+
+  // Persist column visibility
+  useEffect(() => { saveColumns(visibleCols); }, [visibleCols]);
 
   const { data: tasks = [], isLoading } = useQuery({ queryKey: ['tasks', { all: isAdmin }], queryFn: () => tasksApi.getAll({ all: isAdmin }), refetchInterval: 15_000 });
   const { data: activeSessions = [] } = useQuery({ queryKey: ['session-active'], queryFn: async () => { const s = await sessionsApi.getActive(); return s ? [s] : []; }, refetchInterval: 5_000 });
@@ -370,12 +380,18 @@ export function TasksPage() {
   return (
     <div>
       <PageHeader title="Zadania" subtitle={`${tasks.filter(t => t.status !== 'DONE').length} aktywnych`}
-        actions={isAdmin && (
-          <button onClick={() => setShowCreate(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-            <Plus style={{ width: 14, height: 14 }} /> Nowe zadanie
+        actions={<div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setShowColEditor(e => !e)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, background: 'transparent', border: '1px solid var(--border)', color: 'var(--tm)', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>
+            <Settings2 style={{ width: 14, height: 14 }} /> Kolumny
           </button>
-        )} />
+          {isAdmin && (
+            <button onClick={() => setShowCreate(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+              <Plus style={{ width: 14, height: 14 }} /> Nowe zadanie
+            </button>
+          )}
+        </div>} />
 
       {/* Tabs */}
       <div className="page-card" style={{ padding: 0, marginBottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
@@ -404,20 +420,14 @@ export function TasksPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                <th style={thStyle}>Firma</th>
-                <th style={thStyle}>Użytkownik</th>
-                <th style={thStyle}>Urządzenie</th>
-                <th style={thStyle}>Temat</th>
-                <th style={thStyle}>Status</th>
-                <th style={thStyle}>RustDesk</th>
-                <th style={thStyle}>AI</th>
-                <th style={thStyle}>Czas</th>
-                <th style={thStyle}>Akcje</th>
+                {ALL_COLUMNS.filter(c => visibleCols.includes(c.key)).map(c => (
+                  <th key={c.key} style={thStyle}>{c.label}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {tabTasks.map(task => (
-                <TaskRow key={task.id} task={task} agents={agents} activeSessions={activeSessions}
+                <TaskRow key={task.id} task={task} agents={agents} activeSessions={activeSessions} visibleCols={visibleCols}
                   onStatus={(id, s) => statusMut.mutate({ id, status: s })}
                   onStartSession={t => startMut.mutate(t)}
                   onPauseSession={id => pauseMut.mutate(id)}
@@ -457,6 +467,45 @@ export function TasksPage() {
       </Modal>
 
       {editTask && <EditTaskModal task={editTask} onClose={() => setEditTask(null)} onSaved={() => { setEditTask(null); qc.invalidateQueries({ queryKey: ['tasks'] }); }} />}
+
+      {/* Column editor panel */}
+      {showColEditor && (
+        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 40, marginLeft: 'var(--sidebar-width, 220px)' }}>
+          <div style={{ margin: '0 16px 16px', borderRadius: '16px 16px 0 0', overflow: 'hidden', background: 'var(--bg2)', border: '2px solid var(--accent)', boxShadow: '0 -12px 60px rgba(0,0,0,0.35)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Settings2 style={{ width: 16, height: 16, color: 'var(--accent)' }} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--t)' }}>Edycja kolumn</span>
+                <span style={{ fontSize: 11, color: 'var(--tm)' }}>({visibleCols.length} widocznych)</span>
+              </div>
+              <button onClick={() => setShowColEditor(false)} style={{ padding: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--tm)' }}>
+                <X style={{ width: 16, height: 16 }} />
+              </button>
+            </div>
+            <div style={{ padding: '12px 20px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {ALL_COLUMNS.map(col => {
+                const visible = visibleCols.includes(col.key);
+                return (
+                  <button key={col.key} onClick={() => setVisibleCols(prev => visible ? prev.filter(k => k !== col.key) : [...prev, col.key])}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+                      background: visible ? 'var(--accent-g)' : 'transparent',
+                      border: `1px solid ${visible ? 'var(--accent)' : 'var(--border)'}`,
+                      color: visible ? 'var(--accent)' : 'var(--tm)',
+                    }}>
+                    {visible ? <Eye style={{ width: 14, height: 14 }} /> : <EyeOff style={{ width: 14, height: 14 }} />}
+                    {col.label}
+                  </button>
+                );
+              })}
+              <button onClick={() => setVisibleCols(DEFAULT_VISIBLE)}
+                style={{ padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 500, background: 'transparent', border: '1px solid var(--border)', color: 'var(--tm)', cursor: 'pointer' }}>
+                Reset
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
