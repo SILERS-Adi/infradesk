@@ -122,6 +122,7 @@ function CommentBubble({ c, isAdmin, onEdit, onDelete }: {
 export function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const { isAdmin: wsAdmin, isTechnician: wsTech, isMember, isViewer } = useWorkspaceContext();
   const qc = useQueryClient();
   const [comment, setComment] = useState('');
   const [isInternal, setIsInternal] = useState(false);
@@ -183,7 +184,6 @@ export function TicketDetailPage() {
 
   const { text: descText, photoUrls } = parseDescription(ticket.description);
   const allPhotoUrls = [photoUrls, (ticket as any).attachmentUrls].filter(Boolean).join(',');
-  const { isAdmin: wsAdmin, isTechnician: wsTech, isMember, isViewer } = useWorkspaceContext();
   const isAdminOrTech = wsAdmin || wsTech;
   const isClient = isMember || isViewer;
   const comments = ticket.comments ?? [];
@@ -202,7 +202,7 @@ export function TicketDetailPage() {
 
           <Section title="Opis">
             <p className="text-[13px] whitespace-pre-wrap leading-relaxed" style={{ color: 'var(--ts)' }}>{descText}</p>
-            {allPhotoUrls && <div className="mt-3"><AttachmentGallery urls={allPhotoUrls} /></div>}
+            {allPhotoUrls && <div className="mt-3"><AttachmentGallery urls={allPhotoUrls} secure /></div>}
           </Section>
 
           {ticket.resolutionSummary && (
