@@ -5,6 +5,17 @@ import {
   getAllRegistrations, approveRegistration, approveRegistrationWithNewClient, deleteRegistration,
 } from './agent.service';
 
+/**
+ * Fetch agent registration by ID, verifying it belongs to the requester's workspace.
+ * Returns null if not found or workspace mismatch.
+ */
+async function findAgentInWorkspace(id: string, workspaceId?: string | null) {
+  if (!workspaceId) return null;
+  return prisma.agentRegistration.findFirst({
+    where: { id, workspaceId },
+  });
+}
+
 // Token auth middleware (for agent endpoints)
 export async function agentAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const auth = req.headers.authorization;
@@ -54,10 +65,12 @@ export async function getRegistrations(req: Request, res: Response, next: NextFu
     const { agentScopeFilter } = await import('../../middleware/workspace');
     const { getMspWorkspaceIds } = require('../../utils/mspScope');
     const wsIds: string[] = req.workspaceId ? await getMspWorkspaceIds(req.workspaceId) : [];
+    const isMsp = wsIds.length > 1;
     const regs = await getAllRegistrations({
-      workspaceId: wsIds.length > 1 ? undefined : req.workspaceId,
-      workspaceIds: wsIds.length > 1 ? wsIds : undefined,
+      workspaceId: isMsp ? undefined : req.workspaceId,
+      workspaceIds: isMsp ? wsIds : undefined,
       scopeFilter: agentScopeFilter(req.membership),
+      includePendingUnassigned: isMsp, // MSP widzi PENDING agentów bez workspace
     });
     res.json(regs);
   } catch (err) { next(err); }
@@ -80,7 +93,7 @@ export async function postApproveNewClient(req: Request, res: Response, next: Ne
 export async function postPushUpdate(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { notifyAgent } = await import('../../utils/websocket');
-    const reg = await prisma.agentRegistration.findUnique({ where: { id: req.params.id } });
+    const reg = await findAgentInWorkspace(req.params.id, req.workspaceId);
     if (!reg) { res.status(404).json({ error: 'Not found' }); return; }
     notifyAgent(reg.agentToken, { type: 'update' });
     res.json({ ok: true });
@@ -90,7 +103,7 @@ export async function postPushUpdate(req: Request, res: Response, next: NextFunc
 export async function postWindowsUpdate(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { notifyAgent } = await import('../../utils/websocket');
-    const reg = await prisma.agentRegistration.findUnique({ where: { id: req.params.id } });
+    const reg = await findAgentInWorkspace(req.params.id, req.workspaceId);
     if (!reg) { res.status(404).json({ error: 'Not found' }); return; }
     const { scheduleTime } = req.body as { scheduleTime?: string };
     notifyAgent(reg.agentToken, { type: 'windows_update', scheduleTime: scheduleTime || null });
@@ -101,7 +114,7 @@ export async function postWindowsUpdate(req: Request, res: Response, next: NextF
 export async function postRestartService(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { notifyAgent } = await import('../../utils/websocket');
-    const reg = await prisma.agentRegistration.findUnique({ where: { id: req.params.id } });
+    const reg = await findAgentInWorkspace(req.params.id, req.workspaceId);
     if (!reg) { res.status(404).json({ error: 'Not found' }); return; }
     const { serviceName } = req.body as { serviceName: string };
     if (!serviceName) { res.status(400).json({ error: 'serviceName required' }); return; }
@@ -113,7 +126,7 @@ export async function postRestartService(req: Request, res: Response, next: Next
 export async function postSystemReboot(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { notifyAgent } = await import('../../utils/websocket');
-    const reg = await prisma.agentRegistration.findUnique({ where: { id: req.params.id } });
+    const reg = await findAgentInWorkspace(req.params.id, req.workspaceId);
     if (!reg) { res.status(404).json({ error: 'Not found' }); return; }
     const { delay } = req.body as { delay?: number };
     notifyAgent(reg.agentToken, { type: 'system_reboot', delay: delay ?? 60 });
@@ -131,8 +144,8 @@ export async function deleteReg(req: Request, res: Response, next: NextFunction)
 export async function postWakeDevice(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { notifyAgent } = await import('../../utils/websocket');
-    const reg = await prisma.agentRegistration.findUnique({
-      where: { id: req.params.id },
+    const reg = await prisma.agentRegistration.findFirst({
+      where: { id: req.params.id, ...(req.workspaceId ? { workspaceId: req.workspaceId } : {}) },
       include: { device: { select: { macAddress: true } } },
     });
     if (!reg) { res.status(404).json({ error: 'Not found' }); return; }
@@ -168,9 +181,8 @@ export async function getAuditData(req: Request, res: Response, next: NextFuncti
 
 export async function getConnectPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const reg = await (prisma.agentRegistration.findUnique as any)({
-      where: { id: req.params.id },
-    });
+    // Security: verify agent belongs to requesting user's workspace
+    const reg = await findAgentInWorkspace(req.params.id, req.workspaceId);
     if (!reg?.rustdeskId) { res.status(400).json({ error: 'Brak RustDesk ID' }); return; }
     const { generateOneTimePassword } = await import('../../utils/rustdesk');
     const password = await generateOneTimePassword(reg.rustdeskId as string);
@@ -259,7 +271,7 @@ export async function postRustdeskSync(req: Request, res: Response, next: NextFu
 export async function getRustdeskActiveSessions(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { getActiveRustDeskSessions } = await import('../../utils/rustdesk');
-    const sessions = await getActiveRustDeskSessions(prisma);
+    const sessions = await getActiveRustDeskSessions(prisma, req.workspaceId);
     res.json(sessions);
   } catch (err) { next(err); }
 }

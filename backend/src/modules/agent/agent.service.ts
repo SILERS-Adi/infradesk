@@ -463,12 +463,21 @@ export async function getAllRegistrations(params: {
   workspaceId?: string | null;
   workspaceIds?: string[];
   scopeFilter?: Record<string, unknown>;
+  includePendingUnassigned?: boolean;
 }) {
-  const { workspaceId, workspaceIds, scopeFilter } = params;
+  const { workspaceId, workspaceIds, scopeFilter, includePendingUnassigned } = params;
   const where: Record<string, unknown> = {};
 
   if (workspaceIds && workspaceIds.length > 0) {
-    where.workspaceId = { in: workspaceIds };
+    if (includePendingUnassigned) {
+      // MSP: show agents from client workspaces + PENDING agents without workspace
+      where.OR = [
+        { workspaceId: { in: workspaceIds } },
+        { workspaceId: null, status: 'PENDING' },
+      ];
+    } else {
+      where.workspaceId = { in: workspaceIds };
+    }
   } else if (workspaceId) {
     where.workspaceId = workspaceId;
   }
