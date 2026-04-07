@@ -505,7 +505,7 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
   );
 }
 
-/* ── ApproveModal v3 — od zera, zero useForm, plain useState ── */
+/* ── ApproveModal v4 — ultra proste, workspace lista z /superadmin/tenants ── */
 
 function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () => void }) {
   const qc = useQueryClient();
@@ -522,18 +522,35 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
   const [newEmail, setNewEmail] = useState(reg.contactEmail ?? '');
   const [newCity, setNewCity] = useState('');
 
-  // Load clients
-  const { data: clients = [], isLoading: loadingClients } = useQuery({
-    queryKey: ['operator', 'clients'],
-    queryFn: () => apiClient.get('/operator/clients').then(r => r.data).catch(() => []),
+  // Load ALL workspaces — two sources, use whichever works
+  const { data: workspaces = [], isLoading: loadingWs } = useQuery({
+    queryKey: ['approve-workspaces'],
+    queryFn: async () => {
+      // Try operator clients first
+      try {
+        const clients = await apiClient.get('/operator/clients').then(r => r.data);
+        if (clients?.length > 0) return clients.map((c: any) => ({ id: c.workspace?.id, name: c.workspace?.name, taxId: c.workspace?.taxId })).filter((w: any) => w.id);
+      } catch {}
+      // Fallback: all workspaces (superadmin or workspace list)
+      try {
+        const all = await apiClient.get('/superadmin/workspaces-list').then(r => r.data);
+        if (all?.length > 0) return all.map((w: any) => ({ id: w.id, name: w.name, taxId: w.taxId }));
+      } catch {}
+      // Last resort: workspace relations
+      try {
+        const rels = await apiClient.get('/workspace-relations').then(r => r.data);
+        if (rels?.length > 0) return rels.map((r: any) => ({ id: r.clientWorkspaceId ?? r.id, name: r.clientWorkspace?.name ?? r.name ?? '?', taxId: null }));
+      } catch {}
+      return [];
+    },
   });
 
-  // Auto-match by NIP when clients load
+  // Auto-match by NIP
   useEffect(() => {
-    if (selectedWsId || !reg.nip || clients.length === 0) return;
-    const match = clients.find((c: any) => c.workspace?.taxId === reg.nip);
-    if (match) setSelectedWsId(match.workspace.id);
-  }, [clients, reg.nip, selectedWsId]);
+    if (selectedWsId || !reg.nip || workspaces.length === 0) return;
+    const match = workspaces.find((w: any) => w.taxId === reg.nip);
+    if (match) setSelectedWsId(match.id);
+  }, [workspaces, reg.nip, selectedWsId]);
 
   const handleApproveExisting = async () => {
     if (!selectedWsId) { toast.error('Wybierz firmę'); return; }
@@ -605,20 +622,20 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
         {mode === 'existing' ? (
           <>
             <div style={labelS}>Wybierz firmę *</div>
-            {loadingClients ? (
+            {loadingWs ? (
               <div style={{ padding: 16, textAlign: 'center', color: c.muted, fontSize: 12 }}>Ładowanie...</div>
-            ) : clients.length === 0 ? (
+            ) : workspaces.length === 0 ? (
               <div style={{ padding: 16, textAlign: 'center', color: c.muted, fontSize: 12 }}>Brak firm — dodaj klienta w sekcji Firmy klientów</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 220, overflowY: 'auto', border: `1px solid ${c.border}`, borderRadius: 8, padding: 4, marginBottom: 16 }}>
-                {clients.map((cl: any) => {
-                  const wsId = cl.workspace?.id;
-                  const wsName = cl.workspace?.name ?? '—';
-                  const wsTaxId = cl.workspace?.taxId;
+                {workspaces.map((ws: any) => {
+                  const wsId = ws.id;
+                  const wsName = ws.name ?? '—';
+                  const wsTaxId = ws.taxId;
                   const isSelected = selectedWsId === wsId;
                   const isMatch = reg.nip && wsTaxId === reg.nip;
                   return (
-                    <div key={wsId ?? cl.relationId} onClick={() => setSelectedWsId(wsId)}
+                    <div key={wsId} onClick={() => setSelectedWsId(wsId)}
                       style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 6, cursor: 'pointer',
                         background: isSelected ? c.selected : 'transparent', border: isSelected ? `2px solid ${c.accent}` : '2px solid transparent',
