@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
@@ -517,17 +517,31 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
   const qc = useQueryClient();
   const [mode, setMode] = useState<'existing' | 'new'>('existing');
 
-  const { register: regExisting, handleSubmit: handleExisting } = useForm<ApproveForm>({
-    defaultValues: { workspaceId: reg.workspaceId ?? '', deviceId: '' },
-  });
-
-  const { register: regNew, handleSubmit: handleNew } = useForm<NewClientForm>({
-    defaultValues: { name: reg.companyName ?? '', taxId: reg.nip ?? '', phone: reg.contactPhone ?? '', email: reg.contactEmail ?? '' },
-  });
-
   const { data: clients = [] } = useQuery({
     queryKey: ['operator', 'clients'],
     queryFn: () => apiClient.get('/operator/clients').then(r => r.data).catch(() => []),
+  });
+
+  // Auto-match workspace by NIP from agent registration
+  const autoMatchedWsId = (() => {
+    if (reg.workspaceId) return reg.workspaceId;
+    if (reg.nip) {
+      const match = clients.find((c: any) => c.workspace?.taxId === reg.nip);
+      if (match) return match.workspace.id;
+    }
+    return '';
+  })();
+
+  const { register: regExisting, handleSubmit: handleExisting, reset: resetExisting } = useForm<ApproveForm>({
+    defaultValues: { workspaceId: autoMatchedWsId, deviceId: '' },
+  });
+
+  // Re-set workspace when clients load and NIP matches
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (autoMatchedWsId) resetExisting({ workspaceId: autoMatchedWsId, deviceId: '' }); }, [autoMatchedWsId]);
+
+  const { register: regNew, handleSubmit: handleNew } = useForm<NewClientForm>({
+    defaultValues: { name: reg.companyName ?? '', taxId: reg.nip ?? '', phone: reg.contactPhone ?? '', email: reg.contactEmail ?? '' },
   });
 
   const { data: devices = [] } = useQuery({ queryKey: ['devices'], queryFn: () => devicesApi.getAll({}) });
