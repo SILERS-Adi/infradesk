@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -135,9 +136,25 @@ function AssignPopup({ ticket, technicians }: { ticket: Ticket; technicians: { i
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const popupH = 180;
+      setPos({
+        top: spaceBelow < popupH ? rect.top - popupH : rect.bottom + 4,
+        left: rect.left,
+      });
+    }
+  }, [open]);
+
   return (
-    <div className="relative">
+    <div>
       <button
+        ref={btnRef}
         onClick={e => { e.stopPropagation(); setOpen(true); }}
         disabled={assignMutation.isPending}
         className="text-xs font-medium"
@@ -146,16 +163,15 @@ function AssignPopup({ ticket, technicians }: { ticket: Ticket; technicians: { i
         {assignMutation.isPending ? 'Przydzielam...' : 'Przydziel'}
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
           ref={popupRef}
           onClick={e => e.stopPropagation()}
-          className="absolute left-0 top-full mt-1 z-50 rounded-[14px] p-3 flex flex-col gap-2.5"
+          className="rounded-[14px] p-3 flex flex-col gap-2.5"
           style={{
-            background: 'var(--bg-card)',
-            backdropFilter: 'blur(16px)',
-            border: '1px solid var(--border)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+            position: 'fixed', top: pos.top, left: pos.left, zIndex: 99999,
+            background: 'var(--bg2)', border: '1px solid var(--border)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
             minWidth: 220,
           }}
         >
@@ -220,7 +236,8 @@ function AssignPopup({ ticket, technicians }: { ticket: Ticket; technicians: { i
           >
             {assignMutation.isPending ? 'Przydzielam...' : 'Przydziel'}
           </button>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

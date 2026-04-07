@@ -34,10 +34,12 @@ export async function listTasks(req: Request, res: Response, next: NextFunction)
 
 export async function getTask(req: Request, res: Response, next: NextFunction) {
   try {
+    const { getMspWorkspaceIds } = require('../../utils/mspScope');
+    const wsIds: string[] = req.workspaceId ? await getMspWorkspaceIds(req.workspaceId) : [req.workspaceId!];
     const task = await tasksService.getTaskById(req.params.id, {
       id: req.user!.userId,
       role: 'ADMIN',
-    }, req.workspaceId!);
+    }, req.workspaceId!, wsIds);
     res.json(task);
   } catch (err) { next(err); }
 }
@@ -45,10 +47,12 @@ export async function getTask(req: Request, res: Response, next: NextFunction) {
 export async function changeStatus(req: Request, res: Response, next: NextFunction) {
   try {
     const data = changeTaskStatusSchema.parse(req.body);
+    const { getMspWorkspaceIds } = require('../../utils/mspScope');
+    const wsIds: string[] = req.workspaceId ? await getMspWorkspaceIds(req.workspaceId) : [req.workspaceId!];
     const task = await tasksService.changeTaskStatus(req.params.id, data, {
       id: req.user!.userId,
       role: 'ADMIN',
-    }, req.workspaceId!);
+    }, req.workspaceId!, wsIds);
     res.json(task);
   } catch (err) { next(err); }
 }
@@ -56,10 +60,12 @@ export async function changeStatus(req: Request, res: Response, next: NextFuncti
 export async function updateTask(req: Request, res: Response, next: NextFunction) {
   try {
     const data = updateTaskSchema.parse(req.body);
+    const { getMspWorkspaceIds } = require('../../utils/mspScope');
+    const wsIds: string[] = req.workspaceId ? await getMspWorkspaceIds(req.workspaceId) : [req.workspaceId!];
     const task = await tasksService.updateTask(req.params.id, data, {
       id: req.user!.userId,
       role: 'ADMIN',
-    }, req.workspaceId!);
+    }, req.workspaceId!, wsIds);
     res.json(task);
   } catch (err) { next(err); }
 }

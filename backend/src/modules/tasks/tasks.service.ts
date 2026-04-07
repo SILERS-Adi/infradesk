@@ -120,8 +120,9 @@ export async function listTasks(params: {
   return tasks;
 }
 
-export async function getTaskById(id: string, requestingUser: { id: string; role: string }, workspaceId: string) {
-  const task = await prisma.task.findFirst({ where: { id, workspaceId }, select: taskSelect });
+export async function getTaskById(id: string, requestingUser: { id: string; role: string }, workspaceId: string, wsIds?: string[]) {
+  const wsFilter = wsIds && wsIds.length > 1 ? { workspaceId: { in: wsIds } } : { workspaceId };
+  const task = await prisma.task.findFirst({ where: { id, ...wsFilter }, select: taskSelect });
   if (!task) throw new AppError('Task not found', 404);
 
   if (requestingUser.role === 'TECHNICIAN' && task.assignedTo.id !== requestingUser.id) {
@@ -136,8 +137,10 @@ export async function changeTaskStatus(
   data: ChangeTaskStatusInput,
   requestingUser: { id: string; role: string },
   workspaceId: string,
+  wsIds?: string[],
 ) {
-  const task = await prisma.task.findFirst({ where: { id, workspaceId } });
+  const wsFilter = wsIds && wsIds.length > 1 ? { workspaceId: { in: wsIds } } : { workspaceId };
+  const task = await prisma.task.findFirst({ where: { id, ...wsFilter } });
   if (!task) throw new AppError('Task not found', 404);
 
   if (requestingUser.role === 'TECHNICIAN' && task.assignedToUserId !== requestingUser.id) {
@@ -179,8 +182,10 @@ export async function updateTask(
   data: UpdateTaskInput,
   requestingUser: { id: string; role: string },
   workspaceId: string,
+  wsIds?: string[],
 ) {
-  const task = await prisma.task.findFirst({ where: { id, workspaceId } });
+  const wsFilter = wsIds && wsIds.length > 1 ? { workspaceId: { in: wsIds } } : { workspaceId };
+  const task = await prisma.task.findFirst({ where: { id, ...wsFilter } });
   if (!task) throw new AppError('Task not found', 404);
 
   const updateData: Record<string, unknown> = {};
