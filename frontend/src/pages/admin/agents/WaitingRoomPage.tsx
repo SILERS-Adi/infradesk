@@ -565,7 +565,7 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
         padding: 24, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto',
       }}>
         {/* Header */}
-        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--t)', marginBottom: 16 }}>Zatwierdź urządzenie</div>
+        <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--t)', marginBottom: 16 }}>NOWA WERSJA !!!!!</div>
 
         {/* Agent info */}
         <div style={{ padding: 12, borderRadius: 10, background: 'var(--hover-bg)', border: '1px solid var(--border)', marginBottom: 16 }}>
