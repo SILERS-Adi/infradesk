@@ -1,14 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
-import { loginService, refreshTokenService, getMeService, forgotPasswordService, resetPasswordService, registerService, checkSlugAvailability, verifyEmailService, resendVerificationEmail } from './auth.service';
+import { loginService, refreshTokenService, revokeRefreshTokens, getMeService, forgotPasswordService, resetPasswordService, registerService, checkSlugAvailability, verifyEmailService, resendVerificationEmail } from './auth.service';
 import prisma from '../../lib/prisma';
 import { signAccessToken, signRefreshToken, JwtPayload } from '../../utils/jwt';
 import { verifyRefreshToken } from '../../utils/jwt';
 import { setAuthCookies, clearAuthCookies } from '../../utils/authCookies';
+import { setCsrfCookie, clearCsrfCookie } from '../../middleware/csrf';
 
 export async function login(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const result = await loginService(req.body);
     setAuthCookies(res, result.accessToken, result.refreshToken);
+    setCsrfCookie(res);
 
     // Include workspace info for subdomain redirect
     const memberships = await prisma.workspaceMembership.findMany({
@@ -39,6 +41,7 @@ export async function refresh(req: Request, res: Response, next: NextFunction): 
 
     const result = await refreshTokenService(refreshToken);
     setAuthCookies(res, result.accessToken, result.refreshToken);
+    setCsrfCookie(res);
     res.status(200).json(result);
   } catch (err) {
     next(err);
@@ -88,6 +91,8 @@ export async function me(req: Request, res: Response, next: NextFunction): Promi
   try {
     const userId = req.user!.userId;
     const user = await getMeService(userId);
+    // Ensure CSRF cookie is always fresh (fixes mismatch after deploys)
+    if (!req.cookies?.infradesk_csrf) setCsrfCookie(res);
     res.status(200).json(user);
   } catch (err) {
     next(err);
@@ -131,7 +136,12 @@ export async function checkSlug(req: Request, res: Response, next: NextFunction)
 }
 
 export async function logout(req: Request, res: Response): Promise<void> {
+  // Revoke all refresh tokens for this user (bumps tokenVersion)
+  if (req.user?.userId) {
+    await revokeRefreshTokens(req.user.userId).catch(() => {});
+  }
   clearAuthCookies(res);
+  clearCsrfCookie(res);
   res.json({ success: true });
 }
 
