@@ -259,7 +259,7 @@ function TaskRow({ task, agents, activeSessions, visibleCols, onStatus, onStartS
               {expanded ? <ChevronUp style={{ width: 13, height: 13 }} /> : <ChevronDown style={{ width: 13, height: 13 }} />}
             </button>
           </div>
-        </td>
+        </td>}
       </tr>
 
       {/* Expanded details */}
