@@ -593,7 +593,7 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}>
       <div
         className="rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto"
-        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+        style={{ background: 'var(--bg, #fff)', border: '1px solid var(--border)' }}
       >
         <h2 className="text-lg font-bold" style={{ color: 'var(--t)' }}>Zatwierdz urzadzenie</h2>
 
