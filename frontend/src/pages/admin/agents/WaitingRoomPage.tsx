@@ -561,8 +561,7 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
   /* ── shared styles using design tokens ── */
   const input: React.CSSProperties = {
     width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13,
-    background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)', outline: 'none',
-    colorScheme: 'light dark',
+    background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--t)', outline: 'none',
   };
   const label: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--tm)', marginBottom: 4 };
   const tabBtn = (active: boolean): React.CSSProperties => ({
