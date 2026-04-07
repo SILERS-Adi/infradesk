@@ -205,14 +205,6 @@ export default function MonitoringPage() {
         </p>
       </div>
 
-      {/* Dashboard summary */}
-      <MonitoringDashboard agents={filteredAgents} />
-
-      {/* Alerts */}
-      <div className="mb-6">
-        <AlertsPanel />
-      </div>
-
       {/* Tabs */}
       <div className="flex gap-1 mb-6 p-1 rounded-xl" style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)' }}>
         {TABS.map(t => (
@@ -230,6 +222,14 @@ export default function MonitoringPage() {
             {t.label}
           </button>
         ))}
+      </div>
+
+      {/* Dashboard summary */}
+      <MonitoringDashboard agents={filteredAgents} />
+
+      {/* Alerts */}
+      <div className="mb-6">
+        <AlertsPanel />
       </div>
 
       {isLoading ? (
