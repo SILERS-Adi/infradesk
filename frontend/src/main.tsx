@@ -12,9 +12,5 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   </React.StrictMode>
 );
 
-// Register PWA service worker
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {/* SW not critical */});
-  });
-}
+// Service worker disabled — was causing stale cache issues.
+// The unregister script in index.html cleans up existing SW installations.

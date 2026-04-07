@@ -25,6 +25,23 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Force unregister stale service workers and clear old caches (one-time migration)
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(regs) {
+          var hadSW = false;
+          regs.forEach(function(r) { r.unregister(); hadSW = true; });
+          if (hadSW && !sessionStorage.getItem('sw_cleared')) {
+            caches.keys().then(function(keys) {
+              return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+            }).then(function() {
+              sessionStorage.setItem('sw_cleared', '1');
+              location.reload();
+            });
+          }
+        });
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
