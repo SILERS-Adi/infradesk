@@ -241,7 +241,7 @@ model Workspace {
 
   maxAgents      Int      @default(10)
   maxUsers       Int      @default(5)
-  enabledModules String[] @default(["infrastructure", "service-desk"])
+  enabledModules String[] @default(["infrastructure", "service-desk"]) // @deprecated — use WorkspaceModule table. Kept as fallback for migration period.
 
   // Subscription
   subscriptionStatus String    @default("TRIAL") // TRIAL | ACTIVE | EXPIRED | PAUSED
@@ -415,8 +415,8 @@ model WorkspaceMembership {
   managementId   String?
 
   // Permission model v2
-  accountType    String           @default("USER")       // "ADMIN" | "USER"
-  accessScope    String           @default("FULL")       // "FULL" | "RESTRICTED"
+  accountType    String           @default("USER")       // @deprecated — use role instead. Kept for permission UI backward compat.
+  accessScope    String           @default("FULL")       // @deprecated — use scopeType instead. Kept for permission UI backward compat.
 
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt

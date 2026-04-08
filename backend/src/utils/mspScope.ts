@@ -7,12 +7,17 @@ import prisma from '../lib/prisma';
 export async function getMspWorkspaceIds(workspaceId: string): Promise<string[]> {
   const ws = await prisma.workspace.findUnique({
     where: { id: workspaceId },
-    select: { organizationType: true },
+    select: { orgType: true, organizationType: true },
   });
 
-  if (!ws || (ws.organizationType !== 'msp' && ws.organizationType !== 'it_operator')) {
-    return [workspaceId];
-  }
+  if (!ws) return [workspaceId];
+
+  // Prefer canonical orgType, fallback to legacy organizationType
+  const isMsp = ws.orgType
+    ? (ws.orgType === 'MSP' || ws.orgType === 'IT_OPERATOR')
+    : (ws.organizationType === 'msp' || ws.organizationType === 'it_operator');
+
+  if (!isMsp) return [workspaceId];
 
   const relations = await prisma.workspaceRelation.findMany({
     where: { providerWorkspaceId: workspaceId, status: 'ACTIVE' },

@@ -15,8 +15,11 @@ async function requireOperator(req: Request, res: Response, next: NextFunction):
   const wsId = req.workspaceId;
   if (!wsId) { res.status(400).json({ error: 'Workspace context required' }); return; }
 
-  const ws = await prisma.workspace.findUnique({ where: { id: wsId }, select: { organizationType: true } });
-  if (!ws || (ws.organizationType !== 'msp' && ws.organizationType !== 'it_operator')) {
+  const ws = await prisma.workspace.findUnique({ where: { id: wsId }, select: { orgType: true, organizationType: true } });
+  const isMsp = ws?.orgType
+    ? (ws.orgType === 'MSP' || ws.orgType === 'IT_OPERATOR')
+    : (ws?.organizationType === 'msp' || ws?.organizationType === 'it_operator');
+  if (!ws || !isMsp) {
     res.status(403).json({ error: 'Dostępne tylko dla MSP / Centrum Obsługi IT', code: 'NOT_OPERATOR' });
     return;
   }

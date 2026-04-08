@@ -154,6 +154,7 @@ export async function createCredential(data: CreateCredentialInput, performedByU
       additionalData:    data.additionalData,
       notes:             data.notes,
       isSharedWithClient: data.isSharedWithClient,
+      visibility:        data.isSharedWithClient ? 'SHARED' : 'COMPANY',
       createdByUserId:   performedByUserId,
     },
     select: credentialSelect,
