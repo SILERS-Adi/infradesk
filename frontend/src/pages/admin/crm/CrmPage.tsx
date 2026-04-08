@@ -121,7 +121,8 @@ const ALL_COLUMNS: ColDef[] = [
     key: 'quoteValue', label: 'Wartość', group: 'Finanse', defaultVisible: false,
     render: (a) => {
       if (a.type !== 'QUOTE' || a.quoteValue == null) return <span style={{ color: 'var(--td)' }}>—</span>;
-      return <span className="text-xs font-medium" style={{ color: 'var(--ts)' }}>{a.quoteValue.toLocaleString('pl-PL')} zł</span>;
+      const val = typeof a.quoteValue === 'string' ? parseFloat(a.quoteValue) : a.quoteValue;
+      return <span className="text-xs font-medium" style={{ color: 'var(--ts)' }}>{val.toLocaleString('pl-PL')} zł</span>;
     },
   },
 

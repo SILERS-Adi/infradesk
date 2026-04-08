@@ -29,6 +29,14 @@ export function getInitials(firstName: string, lastName: string): string {
   return `${firstName[0] ?? ''}${lastName[0] ?? ''}`.toUpperCase();
 }
 
+/** Safely convert Prisma Decimal (string or number) to number. Returns 0 for null/undefined. */
+export function toNumber(val: string | number | null | undefined): number {
+  if (val == null) return 0;
+  if (typeof val === 'number') return val;
+  const n = parseFloat(val);
+  return isNaN(n) ? 0 : n;
+}
+
 export function getErrorMessage(error: unknown): string {
   if (error && typeof error === 'object' && 'response' in error) {
     const axiosError = error as { response?: { data?: { message?: string; error?: string; details?: { field: string; message: string }[] } } };
