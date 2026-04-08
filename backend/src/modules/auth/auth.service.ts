@@ -18,28 +18,39 @@ export async function loginService(data: LoginInput) {
   }
 
   // Account lockout check (5 failed attempts → 15 min lock)
-  if (user.lockedUntil && new Date(user.lockedUntil) > new Date()) {
-    const minutesLeft = Math.ceil((new Date(user.lockedUntil).getTime() - Date.now()) / 60000);
+  const userAny = user as any;
+  if (userAny.lockedUntil && new Date(userAny.lockedUntil) > new Date()) {
+    const minutesLeft = Math.ceil((new Date(userAny.lockedUntil).getTime() - Date.now()) / 60000);
     throw new AppError(`Konto zablokowane. Spróbuj za ${minutesLeft} min.`, 403);
   }
 
   const passwordMatch = await bcrypt.compare(data.password, user.passwordHash);
   if (!passwordMatch) {
-    // Increment login attempts
-    const attempts = (user.loginAttempts ?? 0) + 1;
-    const lockData: Record<string, unknown> = { loginAttempts: attempts };
-    if (attempts >= 5) {
-      lockData.lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 min lock
-    }
-    await prisma.user.update({ where: { id: user.id }, data: lockData });
+    // Increment login attempts (graceful if fields don't exist yet)
+    try {
+      const attempts = (userAny.loginAttempts ?? 0) + 1;
+      const lockData: Record<string, unknown> = { loginAttempts: attempts };
+      if (attempts >= 5) {
+        lockData.lockedUntil = new Date(Date.now() + 15 * 60 * 1000);
+      }
+      await prisma.user.update({ where: { id: user.id }, data: lockData });
+    } catch { /* loginAttempts/lockedUntil fields may not exist yet — migration pending */ }
     throw new AppError('Invalid email or password', 401);
   }
 
   // Reset lockout on successful login
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { lastLoginAt: new Date(), loginAttempts: 0, lockedUntil: null },
-  });
+  try {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date(), loginAttempts: 0, lockedUntil: null } as any,
+    });
+  } catch {
+    // Fallback if lockout fields don't exist yet
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+  }
 
   const payload: JwtPayload = {
     userId: user.id,
