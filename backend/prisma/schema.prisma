@@ -633,8 +633,9 @@ model Location {
   notes              String?
   latitude           Float?
   longitude          Float?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime? // Soft delete — null means active
 
   workspace     Workspace     @relation("LocationWorkspace", fields: [workspaceId], references: [id])
   devices       Device[]
@@ -693,6 +694,7 @@ model Device {
   managerId          String?
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
+  deletedAt          DateTime?         // Soft delete — null means active
 
   workspace     Workspace           @relation("DeviceWorkspace", fields: [workspaceId], references: [id])
   manager       User?               @relation("DeviceDirectManager", fields: [managerId], references: [id])
@@ -788,6 +790,7 @@ model Ticket {
   serviceMode       String?
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
+  deletedAt         DateTime?      // Soft delete — null means active
   reporterName      String?
   reporterPhone     String?
 
