@@ -69,6 +69,7 @@ import workspaceRelationsRouter from './modules/workspace-relations/workspace-re
 import helpdeskSettingsRouter from './modules/helpdesk-settings/helpdesk-settings.routes';
 import operatorRouter from './modules/operator/operator.routes';
 import workspaceConfigRouter from './modules/workspace-config/workspace-config.routes';
+import eventsRouter from './modules/events/events.routes';
 
 // Middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -346,6 +347,7 @@ app.use('/api/workspace-relations', workspaceRelationsRouter);
 app.use('/api/helpdesk-settings', helpdeskSettingsRouter);
 app.use('/api/operator', operatorRouter);
 app.use('/api/workspace-config', workspaceConfigRouter);
+app.use('/api/events', eventsRouter);
 app.use('/api/service/vehicles', authenticate, requireModule('skp'), serviceVehiclesRouter);
 app.use('/api/service/inspections', authenticate, requireModule('skp'), serviceInspectionsRouter);
 // Public agent endpoints (no auth)
@@ -851,28 +853,9 @@ const PORT = Number(config.port);
 seedAccessTypes().catch(console.error);
 initDefaultSettings().catch(console.error);
 initWebPush().catch(console.error);
-// Backup retention cleanup every 6 hours
-setInterval(() => cleanupOldBackups().catch(e => console.error('Backup cleanup error:', e)), 6 * 60 * 60 * 1000);
-
-// RustDesk → WorkSession sync every 2 minutes
-// Security note: processes ALL workspaces intentionally — each synced session is assigned
-// to the correct workspace via device.workspaceId from the database (trusted source).
-// User-facing endpoints (GET /rustdesk/active) are workspace-filtered separately.
-setInterval(async () => {
-  try {
-    const { syncCompletedRustDeskSessions } = await import('./utils/rustdesk');
-    const result = await syncCompletedRustDeskSessions(prisma);
-    if (result.created > 0) console.log(`RustDesk sync: ${result.created} new sessions imported`);
-  } catch (e) { /* silent — RustDesk may be unavailable */ }
-}, 2 * 60 * 1000);
-// Run once on startup after 10s
-setTimeout(async () => {
-  try {
-    const { syncCompletedRustDeskSessions } = await import('./utils/rustdesk');
-    const result = await syncCompletedRustDeskSessions(prisma);
-    if (result.created > 0) console.log(`RustDesk sync (startup): ${result.created} sessions imported`);
-  } catch (e) { /* silent */ }
-}, 10_000);
+// Background jobs — BullMQ (Redis) with setInterval fallback
+import { startJobScheduler } from './jobs/scheduler';
+startJobScheduler().catch(e => console.error('Job scheduler init error:', e));
 
 const server = http.createServer(app);
 initWebSocket(server);
@@ -880,11 +863,6 @@ initWebSocket(server);
 server.listen(PORT, () => {
   console.log(`InfraDesk API running on port ${PORT} [${config.nodeEnv}]`);
 });
-
-// ── Production monitoring ───────────────────────────────────────────────────
-
-// Alert check every 5 minutes
-setInterval(() => checkAndAlert().catch(e => console.error('Alert check error:', e)), 5 * 60 * 1000);
 
 // ── Uncaught exception / rejection handlers ─────────────────────────────────
 

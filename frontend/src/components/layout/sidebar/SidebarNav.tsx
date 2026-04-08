@@ -9,6 +9,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useState } from 'react';
 import { ticketsApi } from '../../../api/tickets';
 import { tasksApi } from '../../../api/tasks';
+import { useEventStream } from '../../../hooks/useEventStream';
 import { useEffectiveMenu } from '../../../hooks/useEffectiveMenu';
 import { useMenuPreference } from '../../../hooks/useMenuPreference';
 import { useMenuStore } from '../../../store/menuStore';
@@ -33,22 +34,25 @@ export function SidebarNav({ collapsed, mobile, onMobileClose }: Props) {
 
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  // Badge data
+  // Badge data — SSE push with React Query fallback
+  const { badges: sseBadges, connected: sseConnected } = useEventStream();
+
   const { data: queueTickets = [] } = useQuery({
     queryKey: ['tickets-queue'],
     queryFn: () => ticketsApi.getAll({ status: 'PENDING' }),
-    refetchInterval: 30_000, staleTime: 15_000,
+    refetchInterval: sseConnected ? false : 30_000, // Disable polling when SSE active
+    staleTime: 15_000,
   });
   const { data: myTasks = [] } = useQuery({
     queryKey: ['tasks', { all: false }],
     queryFn: () => tasksApi.getAll({ all: false }),
-    refetchInterval: 30_000, staleTime: 15_000,
+    refetchInterval: sseConnected ? false : 30_000,
+    staleTime: 15_000,
   });
 
-  const badges: Record<string, number> = {
-    ticketQueue: queueTickets.length,
-    activeTasks: myTasks.filter((t: any) => t.status !== 'DONE').length,
-  };
+  const badges: Record<string, number> = sseConnected
+    ? { ticketQueue: sseBadges.ticketQueue, activeTasks: sseBadges.activeTasks }
+    : { ticketQueue: queueTickets.length, activeTasks: myTasks.filter((t: any) => t.status !== 'DONE').length };
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
