@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import { authenticate } from '../../middleware/auth';
 import { withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
 import { validate } from '../../middleware/validate';
@@ -9,6 +10,26 @@ import {
 } from './backup.controller';
 import { requireFeature } from '../../middleware/planLimits';
 import prisma from '../../lib/prisma';
+import { config } from '../../config';
+
+/** Sign OAuth state with HMAC-SHA256 to prevent tampering */
+function signOAuthState(data: object): string {
+  const payload = Buffer.from(JSON.stringify(data)).toString('base64');
+  const hmac = crypto.createHmac('sha256', config.jwtSecret).update(payload).digest('hex');
+  return payload + '.' + hmac;
+}
+
+/** Verify and parse signed OAuth state */
+function verifyOAuthState(state: string): any | null {
+  const dotIdx = state.lastIndexOf('.');
+  if (dotIdx === -1) return null;
+  const payload = state.slice(0, dotIdx);
+  const sig = state.slice(dotIdx + 1);
+  const expected = crypto.createHmac('sha256', config.jwtSecret).update(payload).digest('hex');
+  if (!crypto.timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'))) return null;
+  try { return JSON.parse(Buffer.from(payload, 'base64').toString()); }
+  catch { return null; }
+}
 
 const router = Router();
 
@@ -42,7 +63,7 @@ router.get('/google/auth-url', authenticate, async (req: Request, res: Response,
     const protocol = req.get('x-forwarded-proto') || req.protocol || 'https';
     const redirectUri = `${protocol}://${host}/api/backup/google/callback`;
     const scope = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email';
-    const state = Buffer.from(JSON.stringify({ userId: req.user?.userId, workspaceId: req.workspaceId })).toString('base64');
+    const state = signOAuthState({ userId: req.user?.userId, workspaceId: req.workspaceId });
     const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(creds.clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent&state=${encodeURIComponent(state)}`;
     res.json({ url });
   } catch (err) { next(err); }
@@ -58,11 +79,15 @@ router.get('/google/callback', async (req: Request, res: Response, next: NextFun
     }
     if (!code) { res.redirect('/?gdrive_error=no_code'); return; }
 
-    // Callback nie ma req.workspaceId (brak auth), szukamy w state lub fallback na platform
+    // Callback nie ma req.workspaceId (brak auth), szukamy w HMAC-signed state
     let wsId: string | undefined;
     try {
       const { state } = req.query as Record<string, string>;
-      if (state) { const s = JSON.parse(Buffer.from(state, 'base64').toString()); wsId = s.workspaceId; }
+      if (state) {
+        const parsed = verifyOAuthState(state);
+        if (!parsed) { res.redirect('/?gdrive_error=invalid_state'); return; }
+        wsId = parsed.workspaceId;
+      }
     } catch {}
     const creds = await getGoogleCredentials(wsId);
     if (!creds) { res.redirect('/?gdrive_error=not_configured'); return; }

@@ -276,6 +276,8 @@ model Workspace {
   locations          Location[]            @relation("LocationWorkspace")
   devices            Device[]              @relation("DeviceWorkspace")
   tickets            Ticket[]              @relation("TicketWorkspace")
+  ticketsRequested   Ticket[]              @relation("TicketRequesterWorkspace")
+  ticketsProvided    Ticket[]              @relation("TicketProviderWorkspace")
   credentials        Credential[]          @relation("CredentialWorkspace")
   agents             AgentRegistration[]   @relation("AgentWorkspace")
   tasks              Task[]                @relation("TaskWorkspace")
@@ -554,14 +556,17 @@ model User {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
-  downloadPin  String?
-  avatarUrl    String?
-  tokenVersion Int       @default(0) // Incremented on logout/password change — invalidates all refresh tokens
+  downloadPin    String?
+  avatarUrl      String?
+  tokenVersion   Int       @default(0) // Incremented on logout/password change — invalidates all refresh tokens
+  loginAttempts  Int       @default(0) // Failed login counter for account lockout
+  lockedUntil    DateTime?             // Account lockout expiry
 
   workspaceMemberships WorkspaceMembership[]
 
   createdTickets        Ticket[]            @relation("TicketCreatedBy")
   assignedTickets       Ticket[]            @relation("TicketAssignedTo")
+  ratedTickets          Ticket[]            @relation("TicketRatedBy")
   ticketComments        TicketComment[]
   createdCredentials    Credential[]
   activityLogs          ActivityLog[]
@@ -746,7 +751,7 @@ model Credential {
 
 model Ticket {
   id                    String         @id @default(uuid())
-  ticketNumber          String         @unique
+  ticketNumber          String
   workspaceId           String
   requesterWorkspaceId  String?        // firma zgłaszająca (null = wewnętrzne)
   providerWorkspaceId   String?        // firma obsługująca (null = wewnętrzne)
@@ -789,7 +794,14 @@ model Ticket {
   workSessions  WorkSession[]
   crmActivities CrmActivity[]   @relation("CrmLinkedTicket")
 
+  requesterWorkspace Workspace? @relation("TicketRequesterWorkspace", fields: [requesterWorkspaceId], references: [id], onDelete: SetNull)
+  providerWorkspace  Workspace? @relation("TicketProviderWorkspace", fields: [providerWorkspaceId], references: [id], onDelete: SetNull)
+  ratedByUser        User?      @relation("TicketRatedBy", fields: [ratedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, ticketNumber])
   @@index([workspaceId])
+  @@index([requesterWorkspaceId])
+  @@index([providerWorkspaceId])
 }
 
 model TicketComment {
@@ -851,7 +863,7 @@ model CrmActivity {
   // QUOTE
   quoteDescription   String?
   quoteStatus        QuoteStatus?
-  quoteValue         Float?
+  quoteValue         Decimal?  @db.Decimal(12, 2)
   quoteAttachmentUrl String?
   linkedTicketId     String?
 
@@ -1127,7 +1139,7 @@ enum TaskStatus {
 model Task {
   id               String     @id @default(uuid())
   workspaceId      String
-  taskNumber       String     @unique
+  taskNumber       String
   ticketId         String?
   assignedToUserId String
   createdByUserId  String
@@ -1147,6 +1159,7 @@ model Task {
   assignedTo User      @relation("TaskAssignedTo", fields: [assignedToUserId], references: [id])
   createdBy  User      @relation("TaskCreatedBy", fields: [createdByUserId], references: [id])
 
+  @@unique([workspaceId, taskNumber])
   @@index([workspaceId])
 }
 
@@ -1161,7 +1174,7 @@ enum OrderStatus {
 model Order {
   id               String      @id @default(uuid())
   workspaceId      String
-  orderNumber      String      @unique
+  orderNumber      String
   ticketId         String?
   createdByUserId  String
   assignedToUserId String?
@@ -1176,6 +1189,7 @@ model Order {
   assignedTo User?       @relation("OrderAssignedTo", fields: [assignedToUserId], references: [id])
   items      OrderItem[]
 
+  @@unique([workspaceId, orderNumber])
   @@index([workspaceId])
 }
 
@@ -1183,10 +1197,10 @@ model OrderItem {
   id             String   @id @default(uuid())
   orderId        String
   name           String
-  price          Float?
-  quantity       Int      @default(1)
+  price          Decimal?  @db.Decimal(12, 2)
+  quantity       Int       @default(1)
   link           String?
-  addToInventory Boolean  @default(false)
+  addToInventory Boolean   @default(false)
   createdAt      DateTime @default(now())
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -1195,7 +1209,7 @@ model OrderItem {
 model Delegation {
   id               String    @id @default(uuid())
   workspaceId      String
-  delegationNumber String    @unique
+  delegationNumber String
   createdByUserId  String
   assignedToUserId String?
   title            String
@@ -1208,6 +1222,7 @@ model Delegation {
   createdBy  User      @relation("DelegationCreatedBy", fields: [createdByUserId], references: [id])
   assignedTo User?     @relation("DelegationAssignedTo", fields: [assignedToUserId], references: [id])
 
+  @@unique([workspaceId, delegationNumber])
   @@index([workspaceId])
 }
 
@@ -1234,7 +1249,7 @@ model Subscription {
   userId       String
   name         String
   category     String    @default("OTHER")
-  amount       Float?
+  amount       Decimal?  @db.Decimal(12, 2)
   currency     String    @default("PLN")
   billingCycle String    @default("MONTHLY")
   nextPayment  DateTime?
@@ -1454,8 +1469,8 @@ model ShipmentItem {
   sku            String?
   quantity       Int     @default(1)
   weight         Int     @default(0)
-  unitPrice      Float   @default(0)
-  totalPrice     Float   @default(0)
+  unitPrice      Decimal @default(0) @db.Decimal(12, 2)
+  totalPrice     Decimal @default(0) @db.Decimal(12, 2)
   allegroOfferId String?
   imageUrl       String?
 
@@ -1548,7 +1563,7 @@ model PackingCustomer {
   nip           String?
   notes         String?
   totalOrders   Int       @default(0)
-  totalSpent    Float     @default(0)
+  totalSpent    Decimal   @default(0)  @db.Decimal(12, 2)
   firstOrderAt  DateTime?
   lastOrderAt   DateTime?
   createdAt     DateTime  @default(now())

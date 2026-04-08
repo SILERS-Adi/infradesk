@@ -13,7 +13,12 @@ export const createUserSchema = z.object({
   lastName: z.string().min(1).max(100),
   email: z.string().email(),
   phone: z.string().optional(),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  password: z.string()
+    .min(8, 'Hasło musi mieć min. 8 znaków')
+    .regex(/[A-Z]/, 'Hasło musi zawierać wielką literę')
+    .regex(/[a-z]/, 'Hasło musi zawierać małą literę')
+    .regex(/[0-9]/, 'Hasło musi zawierać cyfrę')
+    .regex(/[^A-Za-z0-9]/, 'Hasło musi zawierać znak specjalny'),
   role: roleEnum,
   roles: z.array(roleEnum).optional(),
   isActive: z.boolean().default(true),
@@ -40,7 +45,7 @@ export const updateUserSchema = z.object({
     emailOnTicketUpdate: z.boolean().optional(),
     emailOnAssignment:   z.boolean().optional(),
   }).optional(),
-  downloadPin: z.string().max(50).optional().nullable(),
+  downloadPin: z.string().min(6, 'PIN musi mieć min. 6 znaków').max(50).optional().nullable(),
   avatarUrl: z.string().optional().nullable(),
 });
 
@@ -48,7 +53,7 @@ export const listUsersQuerySchema = z.object({
   role: z.enum(['ADMIN', 'TECHNICIAN', 'CLIENT']).optional(),
   isActive: z.string().optional().transform((v) => v === 'true' ? true : v === 'false' ? false : undefined),
   page: z.string().optional().transform((v) => v ? parseInt(v, 10) : 1),
-  limit: z.string().optional().transform((v) => v ? parseInt(v, 10) : 20),
+  limit: z.string().optional().transform((v) => Math.min(v ? parseInt(v, 10) : 20, 100)),
 });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;

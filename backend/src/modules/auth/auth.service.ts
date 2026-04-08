@@ -17,15 +17,37 @@ export async function loginService(data: LoginInput) {
     throw new AppError('Invalid email or password', 401);
   }
 
+  // Account lockout check (5 failed attempts → 15 min lock)
+  const userAny = user as any;
+  if (userAny.lockedUntil && new Date(userAny.lockedUntil) > new Date()) {
+    const minutesLeft = Math.ceil((new Date(userAny.lockedUntil).getTime() - Date.now()) / 60000);
+    throw new AppError(`Konto zablokowane. Spróbuj za ${minutesLeft} min.`, 403);
+  }
+
   const passwordMatch = await bcrypt.compare(data.password, user.passwordHash);
   if (!passwordMatch) {
+    // Increment login attempts
+    const attempts = (userAny.loginAttempts ?? 0) + 1;
+    const lockData: any = { loginAttempts: attempts };
+    if (attempts >= 5) {
+      lockData.lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 min lock
+    }
+    try { await prisma.user.update({ where: { id: user.id }, data: lockData }); } catch { /* fields may not exist yet */ }
     throw new AppError('Invalid email or password', 401);
   }
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { lastLoginAt: new Date() },
-  });
+  // Reset lockout on successful login
+  try {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date(), loginAttempts: 0, lockedUntil: null } as any,
+    });
+  } catch {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+  }
 
   const payload: JwtPayload = {
     userId: user.id,
@@ -34,7 +56,7 @@ export async function loginService(data: LoginInput) {
   };
 
   const accessToken = signAccessToken(payload);
-  const refreshToken = signRefreshToken(payload);
+  const refreshToken = signRefreshToken({ ...payload, tokenVersion: user.tokenVersion ?? 0 });
 
   await logActivity(prisma, {
     entityType: 'User',
@@ -73,6 +95,11 @@ export async function refreshTokenService(refreshToken: string) {
     throw new AppError('User not found or inactive', 401);
   }
 
+  // Token rotation: reject if tokenVersion doesn't match (token was revoked)
+  if (payload.tokenVersion !== undefined && payload.tokenVersion !== (user.tokenVersion ?? 0)) {
+    throw new AppError('Refresh token revoked', 401);
+  }
+
   const newPayload: JwtPayload = {
     userId: user.id,
     email: user.email,
@@ -80,12 +107,20 @@ export async function refreshTokenService(refreshToken: string) {
   };
 
   const newAccessToken = signAccessToken(newPayload);
-  const newRefreshToken = signRefreshToken(newPayload);
+  const newRefreshToken = signRefreshToken({ ...newPayload, tokenVersion: user.tokenVersion ?? 0 });
 
   return {
     accessToken: newAccessToken,
     refreshToken: newRefreshToken,
   };
+}
+
+/** Revoke all refresh tokens for a user (logout, password change). */
+export async function revokeRefreshTokens(userId: string) {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { tokenVersion: { increment: 1 } },
+  });
 }
 
 export async function getMeService(userId: string) {

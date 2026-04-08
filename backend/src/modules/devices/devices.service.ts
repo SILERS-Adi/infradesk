@@ -125,9 +125,10 @@ export async function listDevices(params: {
 export async function getDeviceById(
   id: string,
   _requestingUser?: any,
+  workspaceId?: string,
 ) {
-  const device = await prisma.device.findUnique({
-    where: { id },
+  const device = await prisma.device.findFirst({
+    where: workspaceId ? { id, workspaceId } : { id },
     select: deviceSelectWithInternalNotes,
   });
 
@@ -154,19 +155,15 @@ export async function getDeviceById(
 }
 
 export async function getDeviceByQrValue(qrCodeValue: string) {
+  // Security: Public endpoint — return minimal data only (no serial numbers, addresses, etc.)
   const device = await prisma.device.findUnique({
     where: { qrCodeValue },
     select: {
       id: true,
       name: true,
-      assetTag: true,
-      manufacturer: true,
-      model: true,
-      serialNumber: true,
       status: true,
-      criticality: true,
       clientVisibleNotes: true,
-      location: { select: { id: true, name: true, addressLine1: true, postalCode: true, city: true, country: true } },
+      location: { select: { id: true, name: true } },
       deviceType: { select: { id: true, name: true, icon: true } },
     },
   });
@@ -178,8 +175,8 @@ export async function getDeviceByQrValue(qrCodeValue: string) {
   return device;
 }
 
-export async function createDevice(data: CreateDeviceInput, performedByUserId: string) {
-  const location = await prisma.location.findUnique({ where: { id: data.locationId } });
+export async function createDevice(data: CreateDeviceInput & { workspaceId: string }, performedByUserId: string) {
+  const location = await prisma.location.findFirst({ where: { id: data.locationId, workspaceId: data.workspaceId } });
   if (!location) {
     throw new AppError('Location not found', 404);
   }
@@ -211,19 +208,16 @@ export async function createDevice(data: CreateDeviceInput, performedByUserId: s
   return device;
 }
 
-export async function updateDevice(id: string, data: UpdateDeviceInput, performedByUserId: string) {
-  const existing = await prisma.device.findUnique({ where: { id } });
+export async function updateDevice(id: string, data: UpdateDeviceInput, performedByUserId: string, workspaceId?: string) {
+  const existing = await prisma.device.findFirst({ where: workspaceId ? { id, workspaceId } : { id } });
   if (!existing) {
     throw new AppError('Device not found', 404);
   }
 
   if (data.locationId) {
-    const location = await prisma.location.findUnique({ where: { id: data.locationId } });
+    const location = await prisma.location.findFirst({ where: { id: data.locationId, workspaceId: existing.workspaceId } });
     if (!location) {
       throw new AppError('Location not found', 404);
-    }
-    if (location.workspaceId !== existing.workspaceId) {
-      throw new AppError('Location does not belong to device workspace', 400);
     }
   }
 
@@ -250,8 +244,8 @@ export async function updateDevice(id: string, data: UpdateDeviceInput, performe
   return device;
 }
 
-export async function deleteDevice(id: string, performedByUserId: string) {
-  const existing = await prisma.device.findUnique({ where: { id } });
+export async function deleteDevice(id: string, performedByUserId: string, workspaceId?: string) {
+  const existing = await prisma.device.findFirst({ where: workspaceId ? { id, workspaceId } : { id } });
   if (!existing) {
     throw new AppError('Device not found', 404);
   }
@@ -270,11 +264,16 @@ export async function deleteDevice(id: string, performedByUserId: string) {
   });
 }
 
-export async function generateDeviceQrCode(id: string): Promise<string> {
-  const device = await prisma.device.findUnique({
-    where: { id },
-    select: { id: true, qrCodeValue: true, name: true },
-  });
+export async function generateDeviceQrCode(id: string, workspaceId?: string): Promise<string> {
+  const device = workspaceId
+    ? await prisma.device.findFirst({
+        where: { id, workspaceId },
+        select: { id: true, qrCodeValue: true, name: true },
+      })
+    : await prisma.device.findUnique({
+        where: { id },
+        select: { id: true, qrCodeValue: true, name: true },
+      });
 
   if (!device) {
     throw new AppError('Device not found', 404);

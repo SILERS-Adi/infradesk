@@ -14,7 +14,12 @@ export const registerSchema = z.object({
   firstName: z.string().min(2, 'Imię jest wymagane'),
   lastName: z.string().min(2, 'Nazwisko jest wymagane'),
   email: z.string().email('Nieprawidłowy adres email'),
-  password: z.string().min(8, 'Hasło musi mieć min. 8 znaków'),
+  password: z.string()
+    .min(8, 'Hasło musi mieć min. 8 znaków')
+    .regex(/[A-Z]/, 'Hasło musi zawierać wielką literę')
+    .regex(/[a-z]/, 'Hasło musi zawierać małą literę')
+    .regex(/[0-9]/, 'Hasło musi zawierać cyfrę')
+    .regex(/[^A-Za-z0-9]/, 'Hasło musi zawierać znak specjalny'),
   phone: z.string().optional(),
   // Company fields
   companyName: z.string().optional(),
