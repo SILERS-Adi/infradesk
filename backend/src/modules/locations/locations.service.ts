@@ -10,7 +10,8 @@ export async function listLocations(params: {
   scopeFilter?: Record<string, unknown>;
   requestingUser?: any;
 }) {
-  const { workspaceId, page = 1, limit = 50, scopeFilter } = params;
+  const { workspaceId, page = 1, limit: rawLimit = 50, scopeFilter } = params;
+  const limit = Math.min(rawLimit, 100);
   const skip = (page - 1) * limit;
 
   const where: Record<string, unknown> = {};
@@ -50,9 +51,9 @@ export async function listLocations(params: {
   };
 }
 
-export async function getLocationById(id: string, _requestingUser?: any) {
-  const location = await prisma.location.findUnique({
-    where: { id },
+export async function getLocationById(id: string, workspaceId?: string, _requestingUser?: any) {
+  const location = await prisma.location.findFirst({
+    where: { id, ...(workspaceId ? { workspaceId } : {}) },
     include: {
       devices: {
         select: {
@@ -82,7 +83,7 @@ export async function getLocationById(id: string, _requestingUser?: any) {
   };
 }
 
-export async function createLocation(data: CreateLocationInput, performedByUserId: string) {
+export async function createLocation(data: CreateLocationInput & { workspaceId: string }, performedByUserId: string) {
   const location = await prisma.location.create({ data });
 
   await logActivity(prisma, {
@@ -96,8 +97,10 @@ export async function createLocation(data: CreateLocationInput, performedByUserI
   return location;
 }
 
-export async function updateLocation(id: string, data: UpdateLocationInput, performedByUserId: string) {
-  const existing = await prisma.location.findUnique({ where: { id } });
+export async function updateLocation(id: string, data: UpdateLocationInput, performedByUserId: string, workspaceId?: string) {
+  const existing = await prisma.location.findFirst({
+    where: { id, ...(workspaceId ? { workspaceId } : {}) },
+  });
   if (!existing) {
     throw new AppError('Location not found', 404);
   }
@@ -118,8 +121,10 @@ export async function updateLocation(id: string, data: UpdateLocationInput, perf
   return location;
 }
 
-export async function deleteLocation(id: string, performedByUserId: string) {
-  const existing = await prisma.location.findUnique({ where: { id } });
+export async function deleteLocation(id: string, performedByUserId: string, workspaceId?: string) {
+  const existing = await prisma.location.findFirst({
+    where: { id, ...(workspaceId ? { workspaceId } : {}) },
+  });
   if (!existing) {
     throw new AppError('Location not found', 404);
   }

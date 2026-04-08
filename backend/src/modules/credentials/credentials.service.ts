@@ -40,7 +40,8 @@ export async function listCredentials(params: {
   scopeFilter?: Record<string, unknown>;
   requestingUser?: any;
 }) {
-  const { workspaceId, locationId, deviceId, category, page = 1, limit = 20, scopeFilter } = params;
+  const { workspaceId, locationId, deviceId, category, page = 1, limit: rawLimit = 20, scopeFilter } = params;
+  const limit = Math.min(rawLimit, 100);
   const skip = (page - 1) * limit;
 
   const where: Record<string, unknown> = {};
@@ -82,10 +83,11 @@ export async function listCredentials(params: {
 
 export async function getCredentialById(
   id: string,
+  workspaceId: string,
   _requestingUser?: any,
 ) {
-  const credential = await prisma.credential.findUnique({
-    where: { id },
+  const credential = await prisma.credential.findFirst({
+    where: { id, workspaceId },
     select: credentialSelect,
   });
 
@@ -98,10 +100,11 @@ export async function getCredentialById(
 
 export async function revealCredential(
   id: string,
+  workspaceId: string,
   requestingUser: { userId: string }
 ) {
-  const credential = await prisma.credential.findUnique({
-    where: { id },
+  const credential = await prisma.credential.findFirst({
+    where: { id, workspaceId },
     select: { ...credentialSelect, passwordEncrypted: true },
   });
 
@@ -132,12 +135,12 @@ export async function revealCredential(
   };
 }
 
-export async function createCredential(data: CreateCredentialInput, performedByUserId: string) {
+export async function createCredential(data: CreateCredentialInput, performedByUserId: string, workspaceId: string) {
   const passwordEncrypted = encrypt(data.password);
 
   const credential = await prisma.credential.create({
     data: {
-      workspaceId:       data.workspaceId,
+      workspaceId,
       locationId:        data.locationId,
       deviceId:          data.deviceId,
       accessTypeId:      data.accessTypeId,
@@ -167,8 +170,8 @@ export async function createCredential(data: CreateCredentialInput, performedByU
   return credential;
 }
 
-export async function updateCredential(id: string, data: UpdateCredentialInput, performedByUserId: string) {
-  const existing = await prisma.credential.findUnique({ where: { id } });
+export async function updateCredential(id: string, data: UpdateCredentialInput, performedByUserId: string, workspaceId: string) {
+  const existing = await prisma.credential.findFirst({ where: { id, workspaceId } });
   if (!existing) {
     throw new AppError('Credential not found', 404);
   }
@@ -201,8 +204,8 @@ export async function updateCredential(id: string, data: UpdateCredentialInput, 
   return credential;
 }
 
-export async function deleteCredential(id: string, performedByUserId: string) {
-  const existing = await prisma.credential.findUnique({ where: { id } });
+export async function deleteCredential(id: string, performedByUserId: string, workspaceId: string) {
+  const existing = await prisma.credential.findFirst({ where: { id, workspaceId } });
   if (!existing) {
     throw new AppError('Credential not found', 404);
   }

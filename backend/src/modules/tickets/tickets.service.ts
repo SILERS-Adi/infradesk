@@ -97,8 +97,9 @@ export async function listTickets(params: {
 }) {
   const {
     workspaceId, workspaceIds, locationId, deviceId, status, priority, type,
-    assignedToUserId, unassigned, search, page = 1, limit = 20, scopeFilter,
+    assignedToUserId, unassigned, search, page = 1, limit: rawLimit = 20, scopeFilter,
   } = params;
+  const limit = Math.min(rawLimit, 100);
   const skip = (page - 1) * limit;
 
   const where: Record<string, unknown> = {};

@@ -70,7 +70,8 @@ export async function listDevices(params: {
   scopeFilter?: Record<string, unknown>;
   requestingUser?: any;
 }) {
-  const { workspaceId, workspaceIds, locationId, status, criticality, search, page = 1, limit = 20, scopeFilter } = params;
+  const { workspaceId, workspaceIds, locationId, status, criticality, search, page = 1, limit: rawLimit = 20, scopeFilter } = params;
+  const limit = Math.min(rawLimit, 100);
   const skip = (page - 1) * limit;
 
   const where: Record<string, unknown> = {};

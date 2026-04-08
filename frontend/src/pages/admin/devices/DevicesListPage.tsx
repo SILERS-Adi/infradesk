@@ -13,6 +13,8 @@ import { Modal } from '../../../components/ui/Modal';
 import { SearchInput } from '../../../components/ui/SearchInput';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { ErrorState } from '../../../components/ui/ErrorState';
+import { ScopedAccessBanner } from '../../../components/ui/ScopedAccessBanner';
 import { DeviceForm } from '../../../components/forms/DeviceForm';
 import { useDebounce } from '../../../hooks/useDebounce';
 import type { Device } from '../../../types';
@@ -163,7 +165,7 @@ export function DevicesListPage() {
   useEffect(() => { saveDeviceCols(visibleKeys); }, [visibleKeys]);
   const debouncedSearch = useDebounce(search);
 
-  const { data: devices = [], isLoading } = useQuery({
+  const { data: devices = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['devices', { status, search: debouncedSearch, companyFilter }],
     queryFn: () => devicesApi.getAll({
       status: status || undefined,
@@ -387,9 +389,10 @@ export function DevicesListPage() {
       <div className="rounded-b-[18px] overflow-hidden"
         style={{ background: 'var(--bg-card)', borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
 
+        <ScopedAccessBanner />
         {isLoading && <LoadingSpinner />}
-
-        {!isLoading && sortedDevices.length === 0 && (
+        {!isLoading && isError && <ErrorState onRetry={() => refetch()} />}
+        {!isLoading && !isError && sortedDevices.length === 0 && (
           <EmptyState
             icon={<Monitor style={{ width: 22, height: 22, color: 'var(--td)' }} />}
             title={isScoped ? 'Brak dostępu' : 'Brak urządzeń'}

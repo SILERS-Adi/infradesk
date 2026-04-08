@@ -13,6 +13,8 @@ import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import { SearchInput } from '../../../components/ui/SearchInput';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { ErrorState } from '../../../components/ui/ErrorState';
+import { ScopedAccessBanner } from '../../../components/ui/ScopedAccessBanner';
 import { LocationForm } from '../../../components/forms/LocationForm';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { getErrorMessage } from '../../../utils/helpers';
@@ -85,7 +87,7 @@ export function LocationsListPage() {
 
   useEffect(() => { saveColumns(visibleKeys); }, [visibleKeys]);
 
-  const { data: locations = [], isLoading } = useQuery({
+  const { data: locations = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['locations'],
     queryFn: () => locationsApi.getAll(),
   });
@@ -141,9 +143,10 @@ export function LocationsListPage() {
         <SearchInput value={search} onChange={setSearch} placeholder="Szukaj: nazwa, klient, miasto, typ..." />
       </div>
 
+      <ScopedAccessBanner />
       {isLoading && <LoadingSpinner />}
-
-      {!isLoading && filtered.length === 0 && (
+      {!isLoading && isError && <ErrorState onRetry={() => refetch()} />}
+      {!isLoading && !isError && filtered.length === 0 && (
         <div className="page-card">
           <EmptyState
             icon={<MapPin style={{ width: 22, height: 22, color: 'var(--td)' }} />}

@@ -40,13 +40,13 @@ export async function listCrmActivities(params: {
   followUp?: boolean;
   page?: number;
   limit?: number;
-  workspaceId?: string | null;
+  workspaceId: string;
 }) {
-  const { type, quoteStatus, followUp, page = 1, limit = 50, workspaceId } = params;
+  const { type, quoteStatus, followUp, page = 1, limit: rawLimit = 50, workspaceId } = params;
+  const limit = Math.min(rawLimit, 100);
   const skip = (page - 1) * limit;
 
-  const where: Record<string, unknown> = {};
-  if (workspaceId) where.workspaceId = workspaceId;
+  const where: Record<string, unknown> = { workspaceId };
   if (type) where.type = type;
   if (quoteStatus) where.quoteStatus = quoteStatus;
   if (followUp) where.followUpRequired = true;
@@ -63,19 +63,23 @@ export async function listCrmActivities(params: {
   return { data, pagination: { total, page, limit, totalPages: Math.ceil(total / limit) } };
 }
 
-export async function getCrmActivityById(id: string) {
-  const activity = await prisma.crmActivity.findUnique({ where: { id }, select: activitySelect });
+export async function getCrmActivityById(id: string, workspaceId: string) {
+  const activity = await prisma.crmActivity.findFirst({
+    where: { id, workspaceId },
+    select: activitySelect,
+  });
   if (!activity) throw new AppError('CRM activity not found', 404);
   return activity;
 }
 
 export async function createCrmActivity(
   data: CreateCrmActivityInput,
-  createdByUserId: string
+  createdByUserId: string,
+  workspaceId: string,
 ) {
   return prisma.crmActivity.create({
     data: {
-      workspaceId: data.workspaceId,
+      workspaceId,
       locationId: data.locationId ?? null,
       deviceId: data.deviceId ?? null,
       createdByUserId,
@@ -101,8 +105,8 @@ export async function createCrmActivity(
   });
 }
 
-export async function updateCrmActivity(id: string, data: UpdateCrmActivityInput) {
-  const existing = await prisma.crmActivity.findUnique({ where: { id } });
+export async function updateCrmActivity(id: string, data: UpdateCrmActivityInput, workspaceId: string) {
+  const existing = await prisma.crmActivity.findFirst({ where: { id, workspaceId } });
   if (!existing) throw new AppError('CRM activity not found', 404);
 
   return prisma.crmActivity.update({
@@ -117,8 +121,8 @@ export async function updateCrmActivity(id: string, data: UpdateCrmActivityInput
   });
 }
 
-export async function deleteCrmActivity(id: string) {
-  const existing = await prisma.crmActivity.findUnique({ where: { id } });
+export async function deleteCrmActivity(id: string, workspaceId: string) {
+  const existing = await prisma.crmActivity.findFirst({ where: { id, workspaceId } });
   if (!existing) throw new AppError('CRM activity not found', 404);
   await prisma.crmActivity.delete({ where: { id } });
 }

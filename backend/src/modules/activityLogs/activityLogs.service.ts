@@ -10,7 +10,8 @@ export async function listActivityLogs(params: {
   workspaceId?: string | null;
   workspaceIds?: string[];
 }) {
-  const { entityType, entityId, performedByUserId, actionType, page = 1, limit = 50, workspaceId, workspaceIds } = params;
+  const { entityType, entityId, performedByUserId, actionType, page = 1, limit: rawLimit = 50, workspaceId, workspaceIds } = params;
+  const limit = Math.min(rawLimit, 100);
   const skip = (page - 1) * limit;
 
   const where: Record<string, unknown> = {};

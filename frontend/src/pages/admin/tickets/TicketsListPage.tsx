@@ -18,6 +18,8 @@ import { PriorityBadge } from '../../../components/ui/PriorityBadge';
 import { SearchInput } from '../../../components/ui/SearchInput';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { ErrorState } from '../../../components/ui/ErrorState';
+import { ScopedAccessBanner } from '../../../components/ui/ScopedAccessBanner';
 import { useWorkspaceContext } from '../../../hooks/useWorkspaceContext';
 import { UnifiedTicketWizard } from '../../../components/wizard/UnifiedTicketWizard';
 import { formatDate } from '../../../utils/helpers';
@@ -311,7 +313,7 @@ export function TicketsListPage() {
 
   useEffect(() => { saveColumns(visibleKeys); }, [visibleKeys]);
 
-  const { data: allTickets = [], isLoading } = useQuery({
+  const { data: allTickets = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['tickets-all'],
     queryFn: () => ticketsApi.getAll({ limit: '500' }),
   });
@@ -589,11 +591,16 @@ export function TicketsListPage() {
           <SearchInput value={search} onChange={setSearch} placeholder="Nr zgłoszenia, tytuł, klient..." />
         </div>
 
+        <ScopedAccessBanner />
+
         {/* Loading (IDS) */}
         {isLoading && <LoadingSpinner />}
 
+        {/* Error state */}
+        {!isLoading && isError && <ErrorState onRetry={() => refetch()} />}
+
         {/* Empty state (IDS) */}
-        {!isLoading && sortedTickets.length === 0 && (
+        {!isLoading && !isError && sortedTickets.length === 0 && (
           <EmptyState
             icon={<AlertTriangle style={{ width: 22, height: 22, color: 'var(--td)' }} />}
             title={isScoped ? 'Brak dostępu' : 'Brak zgłoszeń'}

@@ -32,7 +32,8 @@ export async function listAllSessions(params: {
   limit?: number;
   scopeFilter?: Record<string, unknown>;
 }) {
-  const { workspaceId, workspaceIds, techId, from, to, page = 1, limit = 50, scopeFilter } = params;
+  const { workspaceId, workspaceIds, techId, from, to, page = 1, limit: rawLimit = 50, scopeFilter } = params;
+  const limit = Math.min(rawLimit, 100);
   const skip = (page - 1) * limit;
   const where: Record<string, unknown> = {};
   if (workspaceIds && workspaceIds.length > 1) {
