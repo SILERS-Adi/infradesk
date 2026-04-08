@@ -21,8 +21,8 @@ export const crmApi = {
     return data.data;
   },
 
-  getTimeline: async (clientId: string) => {
-    const { data } = await apiClient.get<unknown[]>(`/crm/timeline/${clientId}`);
+  getTimeline: async (_clientId?: string) => {
+    const { data } = await apiClient.get<unknown[]>('/crm/timeline');
     return data;
   },
 

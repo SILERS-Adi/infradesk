@@ -251,7 +251,7 @@ export function DownloadsPage() {
       description: 'Dla firm. Monitoring sprzętu, S.M.A.R.T., RAID, Event Log, zgłoszenia serwisowe, pomoc zdalna.',
       color: 'indigo',
       files: [
-        { label: 'Asystent Business — Windows', url: '/downloads/Asystent%20Business.exe', badge: 'v1.0.0', primary: true, size: '~40 MB' },
+        { label: 'Asystent Business — Windows', url: '/downloads/Asystent%20Business%203.0.exe', badge: versionBadge, primary: true, size: '~40 MB' },
       ],
       notes: [
         'Wymaga Windows 10 lub nowszego',

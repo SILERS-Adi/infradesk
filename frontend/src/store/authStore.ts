@@ -5,8 +5,6 @@ import { useWorkspace } from './workspaceStore';
 
 interface AuthState {
   user: User | null;
-  accessToken: string | null;
-  refreshToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
 }
@@ -19,11 +17,13 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const STORAGE_KEYS = {
-  ACCESS_TOKEN: 'infradesk_access_token',
-  REFRESH_TOKEN: 'infradesk_refresh_token',
-  USER: 'infradesk_user',
-};
+const USER_KEY = 'infradesk_user';
+
+// Legacy cleanup — remove tokens that were previously stored in localStorage
+function cleanupLegacyStorage() {
+  localStorage.removeItem('infradesk_access_token');
+  localStorage.removeItem('infradesk_refresh_token');
+}
 
 /** Decode JWT payload without verification (for reading claims like isSuperAdmin) */
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
@@ -36,86 +36,80 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     user: null,
-    accessToken: null,
-    refreshToken: null,
     isAuthenticated: false,
     isLoading: true,
   });
 
   useEffect(() => {
-    const accessToken = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-    const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
-    const userStr = localStorage.getItem(STORAGE_KEYS.USER);
+    cleanupLegacyStorage();
 
-    if (accessToken && userStr) {
+    // Auth is now cookie-based (httpOnly). Check if we have a valid session:
+    // 1. Check infradesk_logged_in cookie (non-httpOnly, set by backend)
+    // 2. If present, fetch /api/auth/me to get user data
+    const hasCookie = document.cookie.includes('infradesk_logged_in=1');
+    const cachedUserStr = localStorage.getItem(USER_KEY);
+
+    if (hasCookie && cachedUserStr) {
+      // Fast path: use cached user data, then revalidate in background
       try {
-        const user = JSON.parse(userStr) as User;
-        // Merge isSuperAdmin from JWT if missing in cached user
-        if (user.isSuperAdmin == null) {
-          const jwt = decodeJwtPayload(accessToken);
-          if (jwt?.isSuperAdmin) user.isSuperAdmin = true;
-        }
-        setState({
-          user,
-          accessToken,
-          refreshToken,
-          isAuthenticated: true,
-          isLoading: false,
-        });
+        const user = JSON.parse(cachedUserStr) as User;
+        setState({ user, isAuthenticated: true, isLoading: false });
       } catch {
         setState(s => ({ ...s, isLoading: false }));
       }
+      // Background revalidate
+      fetch('/api/auth/me', { credentials: 'include' })
+        .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+        .then(user => {
+          localStorage.setItem(USER_KEY, JSON.stringify(user));
+          setState({ user, isAuthenticated: true, isLoading: false });
+        })
+        .catch(() => {
+          // Session expired — try refresh via cookie
+          fetch('/api/auth/refresh', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+            .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+            .then(() => fetch('/api/auth/me', { credentials: 'include' }))
+            .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+            .then(user => {
+              localStorage.setItem(USER_KEY, JSON.stringify(user));
+              setState({ user, isAuthenticated: true, isLoading: false });
+            })
+            .catch(() => {
+              localStorage.removeItem(USER_KEY);
+              setState({ user: null, isAuthenticated: false, isLoading: false });
+            });
+        });
+    } else if (hasCookie) {
+      // Cookie exists but no cached user — fetch from server
+      fetch('/api/auth/me', { credentials: 'include' })
+        .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+        .then(user => {
+          localStorage.setItem(USER_KEY, JSON.stringify(user));
+          setState({ user, isAuthenticated: true, isLoading: false });
+        })
+        .catch(() => setState(s => ({ ...s, isLoading: false })));
     } else {
-      // No localStorage tokens — try cookie-based session (cross-subdomain)
-      const hasCookie = document.cookie.includes('infradesk_logged_in=1');
-      if (hasCookie) {
-        // Cookie exists but no localStorage — we're on a different subdomain
-        fetch('/api/auth/refresh', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}' })
-          .then(r => { if (!r.ok) throw new Error(); return r.json(); })
-          .then(data => {
-            localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, data.accessToken);
-            localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, data.refreshToken);
-            // Fetch user profile
-            return fetch('/api/auth/me', { headers: { Authorization: `Bearer ${data.accessToken}` } });
-          })
-          .then(r => { if (!r.ok) throw new Error(); return r.json(); })
-          .then(user => {
-            localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
-            setState({ user, accessToken: localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN), refreshToken: localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN), isAuthenticated: true, isLoading: false });
-          })
-          .catch(() => setState(s => ({ ...s, isLoading: false })));
-      } else {
-        setState(s => ({ ...s, isLoading: false }));
-      }
+      setState(s => ({ ...s, isLoading: false }));
     }
   }, []);
 
-  const setTokens = useCallback((accessToken: string, refreshToken: string) => {
-    localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
-    localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
-    setState(s => ({ ...s, accessToken, refreshToken, isAuthenticated: true }));
+  // setTokens: called after login/refresh — tokens are in httpOnly cookies (set by server),
+  // we just need to update local state. Tokens params are kept for API compatibility but not stored.
+  const setTokens = useCallback((_accessToken: string, _refreshToken: string) => {
+    setState(s => ({ ...s, isAuthenticated: true }));
   }, []);
 
   const setUser = useCallback((user: User) => {
-    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
     setState(s => ({ ...s, user, isAuthenticated: true }));
   }, []);
 
   const logout = useCallback(() => {
     unsubscribeFromPush().catch(() => {});
-    // Clear server cookies (cross-subdomain)
     fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
     useWorkspace.getState().clear();
-    localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.USER);
-    setState({
-      user: null,
-      accessToken: null,
-      refreshToken: null,
-      isAuthenticated: false,
-      isLoading: false,
-    });
+    localStorage.removeItem(USER_KEY);
+    setState({ user: null, isAuthenticated: false, isLoading: false });
   }, []);
 
   return createElement(
@@ -131,10 +125,11 @@ export function useAuth() {
   return ctx;
 }
 
+// These return null now — auth is cookie-based. Kept for backward compat with API client interceptor.
 export function getStoredToken(): string | null {
-  return localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+  return null;
 }
 
 export function getStoredRefreshToken(): string | null {
-  return localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+  return null;
 }

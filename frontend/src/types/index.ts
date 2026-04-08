@@ -89,6 +89,8 @@ export interface Location {
   createdAt: string;
   updatedAt: string;
   _count?: { devices: number };
+  client?: { id: string; name: string } | null; // Populated by API join
+  workspace?: { id: string; name: string } | null;
 }
 
 export interface DeviceType {
@@ -388,6 +390,7 @@ export interface Order {
   ticket?: { id: string; ticketNumber: string; title: string };
   createdBy?: { id: string; firstName: string; lastName: string };
   assignedTo?: { id: string; firstName: string; lastName: string };
+  location?: { id: string; name: string } | null;
   items: OrderItem[];
 }
 
@@ -403,6 +406,7 @@ export interface Delegation {
   updatedAt: string;
   createdBy?: { id: string; firstName: string; lastName: string };
   assignedTo?: { id: string; firstName: string; lastName: string };
+  location?: { id: string; name: string } | null;
 }
 
 export interface ApiError {

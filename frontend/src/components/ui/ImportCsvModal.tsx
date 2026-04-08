@@ -1,6 +1,6 @@
-// @ts-nocheck
 import { useState, useRef } from 'react';
 import { Upload, X, CheckCircle, AlertCircle, Loader2, FileText } from 'lucide-react';
+import { clientsApi } from '../../api/clients';
 
 interface ParsedRow {
   name: string;

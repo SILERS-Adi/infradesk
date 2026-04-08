@@ -203,7 +203,7 @@ export function PublicDownloadsPage() {
     },
     { icon: <Server className="h-6 w-6" />, name: 'Asystent Business', description: 'Dla firm. Monitoring sprzętu, S.M.A.R.T., RAID, Event Log, zgłoszenia serwisowe, pomoc zdalna.', color: 'violet',
       files: [
-        { label: 'Asystent Business — Windows', url: '/downloads/Asystent%20Business.exe', badge: 'v1.0.0', primary: true, size: '~40 MB' },
+        { label: 'Asystent Business — Windows', url: '/downloads/Asystent%20Business%203.0.exe', badge: versionBadge, primary: true, size: '~40 MB' },
       ],
       notes: ['Wymaga Windows 10 lub nowszego', 'S.M.A.R.T., RAID, Event Log, certyfikaty SSL', 'Formularz zgłoszeń ze screenshotami', 'Działa też jako usługa Windows (serwery)'],
     },

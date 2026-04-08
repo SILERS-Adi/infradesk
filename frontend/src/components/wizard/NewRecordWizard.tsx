@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, Mic, MicOff, Star, Search, ChevronRight, ChevronLeft, Plus, Trash2, ExternalLink } from 'lucide-react';
@@ -10,7 +9,11 @@ import { favoritesApi } from '../../api/favorites';
 import { aiApi } from '../../api/ai';
 import { locationsApi } from '../../api/locations';
 import { usersApi } from '../../api/users';
+import { clientsApi } from '../../api/clients';
 import { getErrorMessage } from '../../utils/helpers';
+import type { TicketPriority } from '../../types';
+
+type Client = { id: string; name: string; [key: string]: any };
 
 type RecordType = 'SERVICE' | 'ORDER' | 'DELEGATION' | 'OTHER';
 type ChannelType = 'PHONE' | 'MESSAGE' | 'IN_PERSON';
@@ -145,7 +148,7 @@ export function NewRecordWizard({ open, onClose, onSuccess }: Props) {
 
   const createClientMutation = useMutation({
     mutationFn: () => clientsApi.create({ name: newClient.name.trim(), taxId: newClient.taxId || undefined, city: newClient.city || undefined, phone: newClient.phone || undefined, email: newClient.email || undefined }),
-    onSuccess: (created) => {
+    onSuccess: (created: any) => {
       qc.invalidateQueries({ queryKey: ['clients-all'] });
       set({ clientId: created.id, clientName: created.name, locationId: '', locationName: '' });
       setNewClient({ name: '', taxId: '', city: '', phone: '', email: '' });

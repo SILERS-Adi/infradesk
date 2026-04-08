@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useQuery } from '@tanstack/react-query';
 import { delegationsApi } from '../../../api/delegations';
 import { PageHeader } from '../../../components/ui/PageHeader';

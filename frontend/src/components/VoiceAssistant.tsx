@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Mic, MicOff, X, Sparkles, Loader2, CheckCircle2, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
@@ -10,6 +9,7 @@ import { tasksApi } from '../api/tasks';
 import { ordersApi } from '../api/orders';
 import { delegationsApi } from '../api/delegations';
 import { usersApi } from '../api/users';
+import { clientsApi } from '../api/clients';
 
 interface HistoryEntry {
   id: number;
@@ -61,7 +61,7 @@ export function VoiceAssistant() {
   const findClient = useCallback((name: string | null | undefined) => {
     if (!name) return null;
     const lower = name.toLowerCase();
-    return clients.find(c => c.name.toLowerCase().includes(lower) || lower.includes(c.name.toLowerCase())) ?? null;
+    return clients.find((c: any) => c.name.toLowerCase().includes(lower) || lower.includes(c.name.toLowerCase())) ?? null;
   }, [clients]);
 
   const findUser = useCallback((name: string | null | undefined) => {

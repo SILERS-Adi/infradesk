@@ -67,7 +67,7 @@ export function PortalTicketDetailPage() {
 
       <Card title="Opis zgłoszenia">
         <p className="text-sm text-gray-700 whitespace-pre-wrap">{descText}</p>
-        {allPhotoUrls && <AttachmentGallery urls={allPhotoUrls} />}
+        {allPhotoUrls && <AttachmentGallery urls={allPhotoUrls} secure />}
         {ticket.resolutionSummary && (
           <div className="mt-4 pt-4 border-t border-gray-100">
             <div className="text-xs font-semibold text-gray-500 mb-1">Rozwiązanie</div>

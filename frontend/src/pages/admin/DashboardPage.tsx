@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useEffect, useState, useRef, useCallback } from 'react';

@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { getStoredToken, getStoredRefreshToken } from '../store/authStore';
 import { getCurrentWorkspaceId } from '../store/workspaceStore';
 
 const BASE_URL = import.meta.env.VITE_API_URL || '/api';
@@ -7,15 +6,10 @@ const BASE_URL = import.meta.env.VITE_API_URL || '/api';
 export const apiClient = axios.create({
   baseURL: BASE_URL,
   headers: { 'Content-Type': 'application/json' },
-  withCredentials: true,
+  withCredentials: true, // Always send httpOnly cookies
 });
 
 apiClient.interceptors.request.use(config => {
-  const token = getStoredToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-
   // Inject workspace context header
   let wsId = getCurrentWorkspaceId();
   if (!wsId) {
@@ -23,6 +17,14 @@ apiClient.interceptors.request.use(config => {
   }
   if (wsId) {
     config.headers['X-Workspace-Id'] = wsId;
+  }
+
+  // CSRF token — read from cookie, send as header (Double Submit Cookie pattern)
+  if (config.method && !['get', 'head', 'options'].includes(config.method.toLowerCase())) {
+    const csrfToken = document.cookie.split('; ').find(c => c.startsWith('infradesk_csrf='))?.split('=')[1];
+    if (csrfToken) {
+      config.headers['X-CSRF-Token'] = csrfToken;
+    }
   }
 
   return config;
@@ -34,21 +36,13 @@ apiClient.interceptors.response.use(
     const originalRequest = error.config;
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      const refreshToken = getStoredRefreshToken();
-      if (refreshToken) {
-        try {
-          const { data } = await axios.post(`${BASE_URL}/auth/refresh`, { refreshToken });
-          localStorage.setItem('infradesk_access_token', data.accessToken);
-          localStorage.setItem('infradesk_refresh_token', data.refreshToken);
-          originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
-          return apiClient(originalRequest);
-        } catch {
-          localStorage.removeItem('infradesk_access_token');
-          localStorage.removeItem('infradesk_refresh_token');
-          localStorage.removeItem('infradesk_user');
-          window.location.href = '/login';
-        }
-      } else {
+      try {
+        // Refresh via httpOnly cookie — no token in body needed
+        await axios.post(`${BASE_URL}/auth/refresh`, {}, { withCredentials: true });
+        // Retry original request — new cookies are set automatically
+        return apiClient(originalRequest);
+      } catch {
+        localStorage.removeItem('infradesk_user');
         window.location.href = '/login';
       }
     }
@@ -57,3 +51,7 @@ apiClient.interceptors.response.use(
 );
 
 export default apiClient;
+
+// Legacy exports — kept for backward compatibility, return null (auth is cookie-based now)
+export function getStoredToken(): string | null { return null; }
+export function getStoredRefreshToken(): string | null { return null; }

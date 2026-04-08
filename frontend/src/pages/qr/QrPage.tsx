@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { devicesApi } from '../../api/devices';

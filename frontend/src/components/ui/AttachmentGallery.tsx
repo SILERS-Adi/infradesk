@@ -3,6 +3,7 @@ import { X, ChevronLeft, ChevronRight, Download, FileText, Image } from 'lucide-
 
 interface Props {
   urls: string; // comma-separated
+  secure?: boolean; // Use /api/files/ instead of /uploads/ for authenticated access
 }
 
 function getFilename(url: string) {
@@ -29,12 +30,18 @@ interface AttachItem {
   isImg: boolean; // determined at render time via onError
 }
 
-export function AttachmentGallery({ urls }: Props) {
+/** Convert /uploads/file.jpg → /api/files/file.jpg for authenticated access */
+function toSecureUrl(url: string): string {
+  if (url.startsWith('/uploads/')) return '/api/files/' + url.slice(9);
+  return url;
+}
+
+export function AttachmentGallery({ urls, secure }: Props) {
   const items: AttachItem[] = urls
     .split(',')
     .map(u => u.trim())
     .filter(Boolean)
-    .map(url => ({ url, name: getFilename(url), isImg: true }));
+    .map(url => ({ url: secure ? toSecureUrl(url) : url, name: getFilename(url), isImg: true }));
 
   const [imgFailed, setImgFailed] = useState<Record<number, boolean>>({});
   const [lightbox, setLightbox] = useState<number | null>(null);
