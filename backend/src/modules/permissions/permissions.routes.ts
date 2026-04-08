@@ -1,10 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import { authenticate } from '../../middleware/auth';
-import { withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
+import { requireWorkspace, withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
 import prisma from '../../lib/prisma';
 
 const router = Router();
-router.use(authenticate);
+router.use(authenticate, requireWorkspace);
 
 /**
  * Permission tree definition — maps nodeId to human-readable labels.
@@ -116,15 +117,29 @@ router.get('/:membershipId', withWorkspaceMembership, authorizeWorkspace('OWNER'
   } catch (err) { next(err); }
 });
 
+// Zod schema for permission updates
+const updatePermissionsSchema = z.object({
+  accountType: z.enum(['ADMIN', 'USER']).optional(),
+  accessScope: z.enum(['FULL', 'RESTRICTED']).optional(),
+  overrides: z.array(z.object({
+    nodeId: z.string().min(1).max(100),
+    level: z.enum(['FULL', 'VIEW', 'NONE']),
+    canDelete: z.boolean().optional(),
+  })).optional(),
+});
+
 // PUT /api/permissions/:membershipId — save overrides for a member
 router.put('/:membershipId', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { membershipId } = req.params;
-    const { accountType, accessScope, overrides } = req.body as {
-      accountType?: string;
-      accessScope?: string;
-      overrides?: { nodeId: string; level: string; canDelete?: boolean }[];
-    };
+
+    // Validate request body
+    const parseResult = updatePermissionsSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      res.status(422).json({ error: 'Validation error', details: parseResult.error.flatten().fieldErrors });
+      return;
+    }
+    const { accountType, accessScope, overrides } = parseResult.data;
 
     // Verify same workspace
     const target = await prisma.workspaceMembership.findUnique({ where: { id: membershipId }, select: { workspaceId: true, role: true } });

@@ -2,6 +2,7 @@ import './config'; // Load env first
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
+import helmet from 'helmet';
 import path from 'path';
 import fs from 'fs';
 import { config } from './config';
@@ -83,6 +84,29 @@ import { getDeviceByQr } from './modules/devices/devices.controller';
 import cookieParser from 'cookie-parser';
 
 const app = express();
+
+// ── Security headers (helmet) ──
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      connectSrc: ["'self'", "wss:", "https:"],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false, // Allow cross-origin images (logos, avatars)
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true,
+  },
+}));
 
 // CORS — strict origin whitelist
 const baseDomain = process.env.BASE_DOMAIN || 'infradesk.pl';
@@ -217,8 +241,9 @@ app.post('/api/speedtest/upload', express.raw({ limit: '50mb', type: '*/*' }), (
   res.json({ received: size, timestamp: new Date().toISOString() });
 });
 
-// Public QR code resolve endpoint (no auth required)
-app.get('/api/qr/:qrCodeValue', getDeviceByQr);
+// Public QR code resolve endpoint (no auth required, rate-limited)
+import { publicTicketLimiter, qrLookupLimiter } from './middleware/rateLimit';
+app.get('/api/qr/:qrCodeValue', qrLookupLimiter, getDeviceByQr);
 
 // ── Auth (public + protected mix) ──
 app.use('/api/auth', authRoutes);
@@ -328,7 +353,7 @@ app.get('/api/agent/faq',     getFaqHandler);
 import { resolveTicketProvider } from './utils/ticketRouting';
 import { createTicket as createTicketService } from './modules/tickets/tickets.service';
 
-app.get('/api/public/tickets/:workspaceSlug', async (req, res, next) => {
+app.get('/api/public/tickets/:workspaceSlug', publicTicketLimiter, async (req, res, next) => {
   try {
     const workspace = await prisma.workspace.findUnique({
       where: { slug: req.params.workspaceSlug },
@@ -356,7 +381,7 @@ app.get('/api/public/tickets/:workspaceSlug', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-app.post('/api/public/tickets/:workspaceSlug', async (req, res, next) => {
+app.post('/api/public/tickets/:workspaceSlug', publicTicketLimiter, async (req, res, next) => {
   try {
     const workspace = await prisma.workspace.findUnique({
       where: { slug: req.params.workspaceSlug },

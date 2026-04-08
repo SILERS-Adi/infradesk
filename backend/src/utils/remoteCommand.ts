@@ -21,14 +21,13 @@ import { logActivity } from './activityLogger';
 // ── Whitelisted Commands ──────────────────────────────────────
 
 export const ALLOWED_COMMANDS = new Set([
+  // Handled by remote_commands.py (request-response via requestId)
   'scan_databases',
   'test_db_connection',
   'scan_system',
   'get_services',
+  // Handled inline by agent WebSocket handler (fire-and-forget via mtype)
   'restart_service',
-  'windows_update_scan',
-  'windows_update_install',
-  'get_event_logs',
   'system_reboot',
   'backup_run',
 ]);
