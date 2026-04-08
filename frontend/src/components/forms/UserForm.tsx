@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,6 +12,7 @@ import { usersApi } from '../../api/users';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { getErrorMessage } from '../../utils/helpers';
+import { useClientSearch } from '../../hooks/useClientSearch';
 import type { User } from '../../types';
 import apiClient from '../../api/client';
 
@@ -441,7 +441,7 @@ export function UserForm({ user, defaultClientId, defaultRole, onSuccess, onCanc
                 {selectedClientId && (
                   <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center justify-between">
                     <p className="text-sm font-medium text-indigo-700">
-                      {filteredClients.find(c => c.id === selectedClientId)?.name ?? 'Wybrana firma'}
+                      {filteredClients.find((c: any) => c.id === selectedClientId)?.name ?? 'Wybrana firma'}
                     </p>
                     <button onClick={() => setSelectedClientId('')}
                       className="text-indigo-400 hover:text-indigo-600">
@@ -451,7 +451,7 @@ export function UserForm({ user, defaultClientId, defaultRole, onSuccess, onCanc
                 )}
 
                 <div className="space-y-1.5 max-h-56 overflow-y-auto">
-                  {filteredClients.map(c => (
+                  {filteredClients.map((c: any) => (
                     <button key={c.id}
                       onClick={() => setSelectedClientId(c.id)}
                       className={clsx(

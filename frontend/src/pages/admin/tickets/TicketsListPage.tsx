@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
@@ -459,7 +458,7 @@ export function TicketsListPage() {
         return (
           <span style={{ display: 'inline-flex', gap: 1 }}>
             {[1, 2, 3].map(s => (
-              <span key={s} style={{ fontSize: 12, lineHeight: 1 }}>{s <= t.rating ? '⭐' : ''}</span>
+              <span key={s} style={{ fontSize: 12, lineHeight: 1 }}>{s <= (t.rating ?? 0) ? '⭐' : ''}</span>
             ))}
           </span>
         );
