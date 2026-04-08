@@ -15,7 +15,7 @@ from PIL import Image, ImageGrab, ImageDraw
 # ─── Config ──────────────────────────────────────────────────────────────────
 
 APP_NAME    = "InfraDesk Server Agent"
-APP_VERSION = "4.3.1"
+APP_VERSION = "3.0.0"
 INSTALL_DIR = os.path.join(os.environ.get("APPDATA", ""), "InfraDesk Server")
 INSTALL_EXE = os.path.join(INSTALL_DIR, "InfraDesk Server Agent.exe")
 CONFIG_FILE = os.path.join(INSTALL_DIR, "config.json")
@@ -67,21 +67,61 @@ def res(name: str) -> str:
     return name
 
 
-# ─── Config I/O ──────────────────────────────────────────────────────────────
+# ─── Config I/O (with DPAPI token encryption on Windows) ─────────────────────
+
+def _dpapi_encrypt(plaintext: str) -> str:
+    """Encrypt a string using Windows DPAPI (current user scope). Returns base64."""
+    try:
+        import win32crypt
+        blob = win32crypt.CryptProtectData(
+            plaintext.encode("utf-8"), "InfraDesk Agent Token",
+            None, None, None, 0
+        )
+        import base64
+        return "dpapi:" + base64.b64encode(blob).decode("ascii")
+    except Exception as e:
+        log.warning("DPAPI unavailable — token saved as plaintext: %s", e)
+        return plaintext  # Fallback: store unencrypted (better than crash)
+
+def _dpapi_decrypt(encrypted: str) -> str:
+    """Decrypt a DPAPI-encrypted string. Returns plaintext."""
+    if not encrypted.startswith("dpapi:"):
+        return encrypted  # Already plaintext (legacy config migration)
+    try:
+        import win32crypt, base64
+        blob = base64.b64decode(encrypted[6:])
+        _, data = win32crypt.CryptUnprotectData(blob, None, None, None, 0)
+        return data.decode("utf-8")
+    except Exception as e:
+        log.warning("DPAPI decrypt failed: %s — returning raw value", e)
+        return encrypted
 
 def load_config() -> dict:
     try:
         with open(CONFIG_FILE, encoding="utf-8") as f:
-            return json.load(f)
+            cfg = json.load(f)
+        # Decrypt token if DPAPI-encrypted
+        if cfg.get("token"):
+            cfg["token"] = _dpapi_decrypt(cfg["token"])
+        # Migrate: if token was plaintext, re-save with encryption
+        if cfg.get("token") and not cfg.get("_encrypted"):
+            cfg["_encrypted"] = True
+            save_config(cfg)
+        return cfg
     except Exception:
         return {}
 
 
 def save_config(data: dict):
     os.makedirs(INSTALL_DIR, exist_ok=True)
+    # Encrypt token before saving
+    to_save = dict(data)
+    if to_save.get("token") and not to_save.get("token", "").startswith("dpapi:"):
+        to_save["token"] = _dpapi_encrypt(to_save["token"])
+    to_save["_encrypted"] = True
     tmp = CONFIG_FILE + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+        json.dump(to_save, f, indent=2)
         f.flush()
         os.fsync(f.fileno())
     # Atomic replace
@@ -94,7 +134,7 @@ def save_config(data: dict):
         shutil.copy2(tmp, CONFIG_FILE)
         try: os.remove(tmp)
         except Exception: pass
-    log.info("Config SAVED: %s (size=%d keys=%s)", CONFIG_FILE, os.path.getsize(CONFIG_FILE), list(data.keys()))
+    log.info("Config SAVED: %s (size=%d keys=%s)", CONFIG_FILE, os.path.getsize(CONFIG_FILE), list(to_save.keys()))
 
 
 # ─── Instalacja ──────────────────────────────────────────────────────────────
@@ -573,8 +613,6 @@ def install_rustdesk(notify_fn=None) -> bool:
         _notify("Pobieranie SILERS… (może potrwać chwilę)")
         import ssl
         ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
         with urllib.request.urlopen(SILERS_MSI_URL, context=ctx, timeout=120) as resp:
             with open(msi, "wb") as f:
                 f.write(resp.read())
@@ -609,24 +647,40 @@ def install_rustdesk(notify_fn=None) -> bool:
 # ─── Auto-update ──────────────────────────────────────────────────────────────
 
 def check_for_update():
-    """Zwraca (version, url) jeśli dostępna nowsza wersja, inaczej None."""
+    """Zwraca (version, url, sha256) jeśli dostępna nowsza wersja, inaczej None."""
     try:
         import ssl
         ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
         with urllib.request.urlopen(VERSION_URL, context=ctx, timeout=10) as r:
             data = json.loads(r.read())
         remote = data.get("version", "0.0.0")
         if tuple(int(x) for x in remote.split(".")) > tuple(int(x) for x in APP_VERSION.split(".")):
-            return remote, data.get("url", f"https://infradesk.pl/downloads/InfraDesk%20Agent.exe")
+            return remote, data.get("url", f"https://infradesk.pl/downloads/InfraDesk%20Agent.exe"), data.get("sha256", "")
     except Exception as e:
         log.debug("Update check failed: %s", e)
     return None
 
 
-def do_self_update(download_url, notify_fn=None):
-    """Pobiera nową wersję i uruchamia skrypt zastępujący EXE, potem kończy bieżący proces."""
+def _verify_sha256(filepath: str, expected: str) -> bool:
+    """Verify SHA256 hash of a file. Returns True if matches or no hash provided."""
+    if not expected:
+        log.warning("No SHA256 hash provided — skipping verification")
+        return True
+    import hashlib
+    sha = hashlib.sha256()
+    with open(filepath, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            sha.update(chunk)
+    actual = sha.hexdigest()
+    if actual.lower() != expected.lower():
+        log.error("SHA256 mismatch! Expected: %s, Got: %s", expected, actual)
+        return False
+    log.info("SHA256 verified OK: %s", actual[:16])
+    return True
+
+
+def do_self_update(download_url, notify_fn=None, expected_sha256=""):
+    """Pobiera nową wersję, weryfikuje SHA256, uruchamia i kończy bieżący proces."""
     def _notify(msg):
         log.info(msg)
         if notify_fn:
@@ -638,16 +692,19 @@ def do_self_update(download_url, notify_fn=None):
         _notify("Pobieranie aktualizacji…")
         import ssl
         ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
         with urllib.request.urlopen(download_url, context=ctx, timeout=120) as resp:
             with open(new_exe, "wb") as f:
                 f.write(resp.read())
         log.info("Update downloaded: %d bytes", os.path.getsize(new_exe))
 
+        # Verify integrity before executing
+        if not _verify_sha256(new_exe, expected_sha256):
+            _notify("Błąd: plik aktualizacji uszkodzony (SHA256 mismatch). Aktualizacja anulowana.")
+            try: os.remove(new_exe)
+            except Exception: pass
+            return
+
         _notify("Restartuję agenta…")
-        # Uruchom nowy exe bezpośrednio z temp — sam się zainstaluje przez install_and_restart()
-        # Ten sam mechanizm co ręczne uruchomienie z Downloads — wiemy że działa
         subprocess.Popen([new_exe], close_fds=True, creationflags=_NO_WINDOW)
         os._exit(0)
     except Exception as e:
@@ -753,21 +810,47 @@ def _send_wol(mac: str):
 # ─── WebSocket ────────────────────────────────────────────────────────────────
 
 class WS:
+    _BACKOFF_MIN = 5
+    _BACKOFF_MAX = 300
+
     def __init__(self, token, on_msg):
-        self.token = token; self.cb = on_msg
+        self.token = token; self.cb = on_msg; self._sock = None; self._backoff = self._BACKOFF_MIN
     def start(self):
         threading.Thread(target=self._run, daemon=True).start()
+    def send(self, data):
+        try:
+            s = self._sock
+            if s:
+                from websocket import ABNF
+                s.send(data, ABNF.OPCODE_TEXT)
+        except Exception as e:
+            log.error("WS send error: %s", e)
     def _run(self):
+        import random
         while True:
             try:
-                ws = websocket.WebSocketApp(f"{WS_BASE}?token={self.token}",
-                    on_message=lambda _ws, m: self._on(m))
+                ws = websocket.WebSocketApp(WS_BASE,
+                    header=[f"Authorization: Bearer {self.token}"],
+                    on_open=lambda _ws: self._on_open(_ws),
+                    on_message=lambda _ws, m: self._on(m),
+                    on_close=lambda _ws, *a: setattr(self, '_sock', None))
                 ws.run_forever(ping_interval=30)
-            except Exception: pass
-            time.sleep(10)
+            except Exception as e:
+                log.warning("WS connection error: %s", e)
+            self._sock = None
+            jitter = random.uniform(0, self._backoff * 0.3)
+            delay = self._backoff + jitter
+            log.debug("WS reconnect in %.1fs (backoff=%.0fs)", delay, self._backoff)
+            time.sleep(delay)
+            self._backoff = min(self._backoff * 2, self._BACKOFF_MAX)
+    def _on_open(self, ws):
+        self._sock = ws
+        self._backoff = self._BACKOFF_MIN
+        log.info("WS connected")
     def _on(self, raw):
         try: self.cb(json.loads(raw))
-        except Exception: pass
+        except Exception as e:
+            log.warning("WS message parse error: %s", e)
 
 
 # ─── UI helpers ──────────────────────────────────────────────────────────────
@@ -1821,18 +1904,55 @@ class BackupScheduler:
             self._last_runs[cfg_id] = now
             threading.Thread(target=self._run_backup, args=(cfg,), daemon=True).start()
 
+    @staticmethod
+    def _cron_field_matches(field: str, value: int) -> bool:
+        """Check if a cron field matches a value. Supports: *, N, N,M, */N, N-M."""
+        if field == "*":
+            return True
+        for part in field.split(","):
+            if "/" in part:
+                base, step = part.split("/", 1)
+                step = int(step)
+                if base == "*":
+                    if value % step == 0:
+                        return True
+                elif "-" in base:
+                    lo, hi = int(base.split("-")[0]), int(base.split("-")[1])
+                    if lo <= value <= hi and (value - lo) % step == 0:
+                        return True
+            elif "-" in part:
+                lo, hi = int(part.split("-")[0]), int(part.split("-")[1])
+                if lo <= value <= hi:
+                    return True
+            else:
+                if int(part) == value:
+                    return True
+        return False
+
     def _should_run(self, cron_str, cfg_id, now):
-        """Prosty parser crona — sprawdza godzinę i minutę."""
+        """Full cron parser — minute, hour, day-of-month, month, day-of-week."""
         try:
             parts = cron_str.split()
-            minute, hour = int(parts[0]), int(parts[1])
-            if now.hour != hour or now.minute != minute:
+            if len(parts) < 5:
+                parts += ["*"] * (5 - len(parts))
+            minute, hour, dom, month, dow = parts[:5]
+            if not self._cron_field_matches(minute, now.minute):
+                return False
+            if not self._cron_field_matches(hour, now.hour):
+                return False
+            if not self._cron_field_matches(dom, now.day):
+                return False
+            if not self._cron_field_matches(month, now.month):
+                return False
+            cron_dow = now.isoweekday() % 7  # 0=Sunday for cron compatibility
+            if not self._cron_field_matches(dow, cron_dow):
                 return False
             last = self._last_runs.get(cfg_id)
             if last and (now - last).total_seconds() < 3500:
                 return False
             return True
-        except Exception:
+        except Exception as e:
+            log.warning("Cron parse error for '%s': %s", cron_str, e)
             return False
 
     def run_single(self, config_id):
@@ -1868,7 +1988,31 @@ class BackupScheduler:
             if drive_folder:
                 drive_id = self._upload_gdrive(path, drive_folder)
 
+            # Upload to InfraDesk Cloud if enabled
+            if cfg.get("useInfradeskCloud"):
+                try:
+                    self._upload_infradesk_cloud(path, cfg.get("id", ""))
+                    log.info("Uploaded to InfraDesk Cloud: %s", os.path.basename(path))
+                except Exception as ue:
+                    log.error("InfraDesk Cloud upload failed: %s", ue)
+
+            # Copy to local/network path if configured
+            local_path = cfg.get("localBackupPath")
+            if local_path:
+                try:
+                    os.makedirs(local_path, exist_ok=True)
+                    import shutil
+                    shutil.copy2(path, os.path.join(local_path, os.path.basename(path)))
+                    log.info("Copied to local path: %s", local_path)
+                except Exception as le:
+                    log.error("Local copy failed: %s", le)
+
             file_size = os.path.getsize(path) if os.path.exists(path) else 0
+
+            # Retention policy — clean old local backups
+            retention_days = int(cfg.get("retentionDays", 30))
+            if local_path and retention_days > 0:
+                self._cleanup_old_backups(local_path, retention_days)
 
             # Report success
             api_post("/agent/backup/complete", {
@@ -1891,64 +2035,93 @@ class BackupScheduler:
                 pass
 
     def _backup_sql(self, cfg):
-        """Wykonaj backup SQL — mysqldump / pg_dump / sqlcmd."""
-        import subprocess, gzip
+        """Wykonaj backup SQL — mysqldump / pg_dump / sqlcmd. Bezpieczne listy argumentów."""
         btype = cfg["type"]
-        host = cfg.get("sqlHost", "localhost")
-        port = cfg.get("sqlPort", 3306)
-        user = cfg.get("sqlUser", "root")
-        # Decrypt password
-        pwd = cfg.get("sqlPassEnc", "")
-        if pwd and ":" in pwd:
-            try:
-                from cryptography.fernet import Fernet
-                # Simple AES — for now just use as-is from server
-            except Exception:
-                pass
+        host = str(cfg.get("sqlHost", "localhost"))
+        port = str(cfg.get("sqlPort", 3306))
+        user = str(cfg.get("sqlUser", ""))
+        pwd = str(cfg.get("sqlPassword", "") or cfg.get("sqlPassEnc", ""))
         dbs = cfg.get("sqlDatabases", "").split(",")
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         results = []
 
+        backup_dir = os.path.join(os.environ.get("ProgramData", "C:\\ProgramData"), "InfraDesk", "backups")
+        os.makedirs(backup_dir, exist_ok=True)
+
         for db in dbs:
             db = db.strip()
-            if not db: continue
-            output = os.path.join(tempfile.gettempdir(), f"backup_{db}_{timestamp}.sql")
+            if not db:
+                continue
+            output = os.path.join(backup_dir, f"backup_{db}_{timestamp}.sql")
 
             if btype == "SQL_MYSQL":
-                cmd = f'mysqldump -h {host} -P {port} -u {user} -p{pwd} {db}'
-            elif btype == "SQL_POSTGRES":
-                os.environ["PGPASSWORD"] = pwd
-                cmd = f'pg_dump -h {host} -p {port} -U {user} {db}'
-            elif btype == "SQL_MSSQL":
-                cmd = f'sqlcmd -S {host},{port} -U {user} -P {pwd} -Q "BACKUP DATABASE [{db}] TO DISK=\'{output}.bak\' WITH FORMAT"'
+                env = os.environ.copy()
+                if pwd:
+                    env["MYSQL_PWD"] = pwd
+                cmd = ["mysqldump", f"--host={host}", f"--port={port}", f"--user={user}", db]
                 try:
-                    subprocess.run(cmd, shell=True, check=True, capture_output=True, timeout=3600)
-                    results.append(f"{output}.bak")
+                    with open(output, "w") as f:
+                        subprocess.run(cmd, check=True, stdout=f, stderr=subprocess.PIPE, timeout=3600, env=env, creationflags=_NO_WINDOW)
+                    results.append(output)
+                except Exception as e:
+                    raise RuntimeError(f"MySQL backup failed for {db}: {e}")
+
+            elif btype == "SQL_POSTGRES":
+                env = os.environ.copy()
+                if pwd:
+                    env["PGPASSWORD"] = pwd
+                cmd = ["pg_dump", "-h", host, "-p", port, "-U", user, db]
+                try:
+                    with open(output, "w") as f:
+                        subprocess.run(cmd, check=True, stdout=f, stderr=subprocess.PIPE, timeout=3600, env=env, creationflags=_NO_WINDOW)
+                    results.append(output)
+                except Exception as e:
+                    raise RuntimeError(f"PostgreSQL backup failed for {db}: {e}")
+
+            elif btype == "SQL_MSSQL":
+                env = os.environ.copy()
+                bak_path = f"{output}.bak"
+                sql_query = f"BACKUP DATABASE [{db}] TO DISK=N'{bak_path}' WITH FORMAT, COMPRESSION"
+                if user and pwd:
+                    env["SQLCMDPASSWORD"] = pwd
+                    cmd = ["sqlcmd", "-S", f"{host},{port}", "-U", user, "-Q", sql_query]
+                else:
+                    cmd = ["sqlcmd", "-S", f"{host},{port}", "-E", "-Q", sql_query]
+                try:
+                    subprocess.run(cmd, check=True, capture_output=True, timeout=3600, env=env, creationflags=_NO_WINDOW)
+                    results.append(bak_path)
                 except Exception as e:
                     raise RuntimeError(f"MSSQL backup failed for {db}: {e}")
-                continue
-            else:
-                continue
-
-            try:
-                with open(output, "w") as f:
-                    subprocess.run(cmd, shell=True, check=True, stdout=f, stderr=subprocess.PIPE, timeout=3600)
-                results.append(output)
-            except Exception as e:
-                raise RuntimeError(f"SQL backup failed for {db}: {e}")
 
         if not results:
             raise RuntimeError("No databases to backup")
 
-        # Compress all into one .tar.gz
         import tarfile
-        archive = os.path.join(tempfile.gettempdir(), f"backup_sql_{timestamp}.tar.gz")
+        archive = os.path.join(backup_dir, f"backup_sql_{timestamp}.tar.gz")
         with tarfile.open(archive, "w:gz") as tar:
             for r in results:
                 tar.add(r, arcname=os.path.basename(r))
                 try: os.remove(r)
                 except Exception: pass
         return archive
+
+    @staticmethod
+    def _cleanup_old_backups(directory: str, retention_days: int):
+        """Remove backup files older than retention_days from directory."""
+        import glob
+        cutoff = time.time() - (retention_days * 86400)
+        patterns = ["backup_*.tar.gz", "backup_*.zip", "backup_*.bak", "backup_*.sql"]
+        removed = 0
+        for pattern in patterns:
+            for f in glob.glob(os.path.join(directory, pattern)):
+                try:
+                    if os.path.getmtime(f) < cutoff:
+                        os.remove(f)
+                        removed += 1
+                except Exception:
+                    pass
+        if removed:
+            log.info("Retention cleanup: removed %d old backups from %s (>%d days)", removed, directory, retention_days)
 
     def _backup_folder(self, cfg):
         """Backup folder as ZIP."""
@@ -2044,9 +2217,6 @@ class App:
                 threading.Thread(target=self._install_rd, daemon=True).start()
             if self._open_ticket_on_start:
                 self.root.after(800, self._open_ticket)
-            else:
-                # Open full desktop panel in webview
-                self.root.after(500, self._open_main_window)
         else:
             show_waiting(self.root, token, self._on_activated, self._on_cancel)
 
@@ -2062,9 +2232,6 @@ class App:
         if result["status"] == "ACTIVE":
             self.root.withdraw()
             self._start_bg()
-            if not is_rustdesk_installed():
-                threading.Thread(target=self._install_rd, daemon=True).start()
-            self.root.after(500, self._open_main_window)
         else:
             show_waiting(self.root, result["token"], self._on_activated, self._on_cancel)
 
@@ -2085,7 +2252,6 @@ class App:
         self._start_bg()
         if self.cfg.get("allowRustdesk") and not is_rustdesk_installed():
             threading.Thread(target=self._install_rd, daemon=True).start()
-        self.root.after(500, self._open_main_window)
 
     def _on_cancel(self):
         save_config({})
@@ -2163,6 +2329,7 @@ class App:
             bs.check_and_run()
 
     def _metrics_loop(self):
+        import random
         token = self.cfg.get("token", "")
         try:
             requests.post(f"{API_BASE}/agent/metrics", json=full_inventory(),
@@ -2170,7 +2337,7 @@ class App:
         except Exception: pass
         cycle = 0
         while True:
-            time.sleep(60)
+            time.sleep(60 + random.uniform(0, 15))
             try:
                 data = metrics()
                 if cycle % 5 == 0:
@@ -2198,18 +2365,14 @@ class App:
             result = check_for_update()
             if result and result != self._update_info:
                 self._update_info = result
-                ver, _ = result
+                ver, _, _sha = result
                 log.info("Update available: %s", ver)
-                if self._tray:
-                    try: self._tray.notify(f"Dostępna aktualizacja {ver} — otwórz menu agenta aby zaktualizować.", APP_NAME)
-                    except Exception: pass
             time.sleep(6 * 3600)
 
     def _on_ws(self, msg):
         mtype = msg.get("type")
-        if mtype in ("notification", "status_update") and self._tray:
-            try: self._tray.notify(msg.get("body", ""), msg.get("title", APP_NAME))
-            except Exception: pass
+        if mtype in ("notification", "status_update"):
+            log.debug("WS notification (silent): %s", msg.get("title", ""))
         elif mtype == "update":
             # Admin wcisnął "Wyślij aktualizację" w panelu
             threading.Thread(target=self._start_update, daemon=True).start()
@@ -2312,11 +2475,10 @@ class App:
                 except Exception: pass
         info = self._update_info
         if not info:
-            # Wymuś sprawdzenie wersji przed aktualizacją
             info = check_for_update()
         if info:
-            _, url = info
-            do_self_update(url, notify_fn=_tray_notify)
+            _, url, sha = info
+            do_self_update(url, notify_fn=_tray_notify, expected_sha256=sha)
         else:
             _tray_notify("Brak aktualizacji — masz najnowszą wersję.")
 
@@ -2462,8 +2624,6 @@ def _check_internet(timeout=5):
     try:
         import urllib.request, ssl
         ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
         urllib.request.urlopen("https://infradesk.pl/health", context=ctx, timeout=timeout)
         return True
     except Exception:
@@ -2599,13 +2759,14 @@ class _BackgroundServices:
             time.sleep(AutoDiagnostics.CHECK_INTERVAL)
 
     def _metrics_loop(self):
+        import random
         try:
             requests.post(f"{API_BASE}/agent/metrics", json=full_inventory(),
                           headers={"Authorization": f"Bearer {self.token}"}, timeout=15)
         except Exception: pass
         cycle = 0
         while True:
-            time.sleep(60)
+            time.sleep(60 + random.uniform(0, 15))
             try:
                 data = metrics()
                 # Server metrics every 5 min
@@ -2634,7 +2795,8 @@ class _BackgroundServices:
     def _update_check_loop(self):
         while True:
             result = check_for_update()
-            if result: self._update_info = result
+            if result:
+                self._update_info = result
             time.sleep(6 * 3600)
 
     def _backup_loop(self):
@@ -2650,14 +2812,13 @@ class _BackgroundServices:
 
     def _on_ws(self, msg):
         mtype = msg.get("type")
-        if mtype in ("notification", "status_update") and self._tray:
-            try: self._tray.notify(msg.get("body", ""), msg.get("title", APP_NAME))
-            except Exception: pass
+        if mtype in ("notification", "status_update"):
+            log.debug("WS notification (silent): %s", msg.get("title", ""))
         elif mtype == "update":
             info = self._update_info or check_for_update()
             if info:
-                _, url = info
-                do_self_update(url)
+                _, url, sha = info
+                do_self_update(url, expected_sha256=sha)
         elif mtype == "backup_run":
             cid = msg.get("configId", "")
             if cid and self._backup_scheduler:
@@ -3183,8 +3344,8 @@ class ServerServiceLoop:
         elif mtype == "update":
             info = check_for_update()
             if info:
-                _, url = info
-                threading.Thread(target=do_self_update, args=(url,), daemon=True).start()
+                _, url, sha = info
+                threading.Thread(target=do_self_update, args=(url,), kwargs={"expected_sha256": sha}, daemon=True).start()
         elif mtype == "backup_run":
             cid = msg.get("configId", "")
             if cid and hasattr(self, '_backup') and self._backup:

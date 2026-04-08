@@ -16,7 +16,7 @@ from PIL import Image, ImageGrab, ImageDraw
 # --- Config ---------------------------------------------------------------
 
 APP_NAME    = "Asystent Business"
-APP_VERSION = "1.1.5"
+APP_VERSION = "3.0.0"
 _OLD_INSTALL_DIR = os.path.join(os.environ.get("APPDATA", ""), "InfraDesk")
 INSTALL_DIR = os.path.join(os.environ.get("APPDATA", ""), "SILERS", "Asystent Business")
 INSTALL_EXE = os.path.join(INSTALL_DIR, "Asystent Business.exe")
@@ -108,8 +108,9 @@ def _dpapi_encrypt(plaintext: str) -> str:
         blob = win32crypt.CryptProtectData(
             plaintext.encode("utf-8"), "InfraDesk Agent Token", None, None, None, 0)
         return "dpapi:" + base64.b64encode(blob).decode("ascii")
-    except Exception:
-        return plaintext
+    except Exception as e:
+        log.warning("DPAPI unavailable — token saved as plaintext: %s", e)
+        return plaintext  # Fallback: store unencrypted (better than crash)
 
 def _dpapi_decrypt(encrypted: str) -> str:
     if not encrypted.startswith("dpapi:"):
@@ -703,13 +704,31 @@ def check_for_update():
             data = json.loads(r.read())
         remote = data.get("version", "0.0.0")
         if tuple(int(x) for x in remote.split(".")) > tuple(int(x) for x in APP_VERSION.split(".")):
-            return remote, data.get("url", "https://infradesk.pl/downloads/AsystentBusiness.exe")
+            return remote, data.get("url", "https://infradesk.pl/downloads/AsystentBusiness.exe"), data.get("sha256", "")
     except Exception as e:
         log.debug("Update check failed: %s", e)
     return None
 
 
-def do_self_update(download_url, notify_fn=None):
+def _verify_sha256(filepath: str, expected: str) -> bool:
+    """Verify SHA256 hash of a file. Returns True if matches or no hash provided."""
+    if not expected:
+        log.warning("No SHA256 hash provided — skipping verification")
+        return True
+    import hashlib
+    sha = hashlib.sha256()
+    with open(filepath, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            sha.update(chunk)
+    actual = sha.hexdigest()
+    if actual.lower() != expected.lower():
+        log.error("SHA256 mismatch! Expected: %s, Got: %s", expected, actual)
+        return False
+    log.info("SHA256 verified OK: %s", actual[:16])
+    return True
+
+
+def do_self_update(download_url, notify_fn=None, expected_sha256=""):
     def _notify(msg):
         log.info(msg)
         if notify_fn:
@@ -725,6 +744,13 @@ def do_self_update(download_url, notify_fn=None):
             with open(tmp_exe, "wb") as f:
                 f.write(resp.read())
         log.info("Update downloaded: %d bytes", os.path.getsize(tmp_exe))
+
+        # Verify integrity before executing
+        if not _verify_sha256(tmp_exe, expected_sha256):
+            _notify("Błąd: plik aktualizacji uszkodzony (SHA256 mismatch). Aktualizacja anulowana.")
+            try: os.remove(tmp_exe)
+            except Exception: pass
+            return
 
         # Copy new EXE to install dir (replacing current)
         os.makedirs(INSTALL_DIR, exist_ok=True)
@@ -847,8 +873,11 @@ def _send_wol(mac: str):
 # --- WebSocket ------------------------------------------------------------
 
 class WS:
+    _BACKOFF_MIN = 5
+    _BACKOFF_MAX = 300
+
     def __init__(self, token, on_msg):
-        self.token = token; self.cb = on_msg; self._sock = None
+        self.token = token; self.cb = on_msg; self._sock = None; self._backoff = self._BACKOFF_MIN
     def start(self):
         threading.Thread(target=self._run, daemon=True).start()
     def send(self, data):
@@ -861,20 +890,32 @@ class WS:
         except Exception as e:
             log.error("WS send error: %s", e)
     def _run(self):
+        import random
         while True:
             try:
                 app = websocket.WebSocketApp(WS_BASE,
                     header=[f"Authorization: Bearer {self.token}"],
-                    on_open=lambda ws: setattr(self, '_sock', ws),
+                    on_open=lambda ws: self._on_open(ws),
                     on_message=lambda ws, m: self._on(m),
                     on_close=lambda ws, *a: setattr(self, '_sock', None))
                 app.run_forever(ping_interval=30)
-            except Exception: pass
+            except Exception as e:
+                log.warning("WS connection error: %s", e)
             self._sock = None
-            time.sleep(10)
+            # Exponential backoff with jitter
+            jitter = random.uniform(0, self._backoff * 0.3)
+            delay = self._backoff + jitter
+            log.debug("WS reconnect in %.1fs (backoff=%.0fs)", delay, self._backoff)
+            time.sleep(delay)
+            self._backoff = min(self._backoff * 2, self._BACKOFF_MAX)
+    def _on_open(self, ws):
+        self._sock = ws
+        self._backoff = self._BACKOFF_MIN
+        log.info("WS connected")
     def _on(self, raw):
         try: self.cb(json.loads(raw))
-        except Exception: pass
+        except Exception as e:
+            log.warning("WS message parse error: %s", e)
 
 
 # --- Server Metrics -------------------------------------------------------
@@ -1477,17 +1518,55 @@ class BackupScheduler:
             self._last_runs[cfg_id] = now
             threading.Thread(target=self._run_backup, args=(cfg,), daemon=True).start()
 
+    @staticmethod
+    def _cron_field_matches(field: str, value: int) -> bool:
+        """Check if a cron field matches a value. Supports: *, N, N,M, */N, N-M."""
+        if field == "*":
+            return True
+        for part in field.split(","):
+            if "/" in part:
+                base, step = part.split("/", 1)
+                step = int(step)
+                if base == "*":
+                    if value % step == 0:
+                        return True
+                elif "-" in base:
+                    lo, hi = int(base.split("-")[0]), int(base.split("-")[1])
+                    if lo <= value <= hi and (value - lo) % step == 0:
+                        return True
+            elif "-" in part:
+                lo, hi = int(part.split("-")[0]), int(part.split("-")[1])
+                if lo <= value <= hi:
+                    return True
+            else:
+                if int(part) == value:
+                    return True
+        return False
+
     def _should_run(self, cron_str, cfg_id, now):
         try:
             parts = cron_str.split()
-            minute, hour = int(parts[0]), int(parts[1])
-            if now.hour != hour or now.minute != minute:
+            if len(parts) < 5:
+                parts += ["*"] * (5 - len(parts))
+            minute, hour, dom, month, dow = parts[:5]
+            if not self._cron_field_matches(minute, now.minute):
+                return False
+            if not self._cron_field_matches(hour, now.hour):
+                return False
+            if not self._cron_field_matches(dom, now.day):
+                return False
+            if not self._cron_field_matches(month, now.month):
+                return False
+            # dow: 0=Sunday in cron, isoweekday: 1=Monday..7=Sunday
+            cron_dow = now.isoweekday() % 7  # convert to 0=Sunday
+            if not self._cron_field_matches(dow, cron_dow):
                 return False
             last = self._last_runs.get(cfg_id)
             if last and (now - last).total_seconds() < 3500:
                 return False
             return True
-        except Exception:
+        except Exception as e:
+            log.warning("Cron parse error for '%s': %s", cron_str, e)
             return False
 
     def run_single(self, config_id):
@@ -1539,6 +1618,11 @@ class BackupScheduler:
 
             file_size = os.path.getsize(path) if os.path.exists(path) else 0
 
+            # Retention policy — clean old local backups
+            retention_days = int(cfg.get("retentionDays", 30))
+            if local_path and retention_days > 0:
+                self._cleanup_old_backups(local_path, retention_days)
+
             api_post("/agent/backup/complete", {
                 "historyId": history_id,
                 "sizeBytes": file_size,
@@ -1558,58 +1642,92 @@ class BackupScheduler:
                 pass
 
     def _backup_sql(self, cfg):
-        import gzip
         btype = cfg["type"]
-        host = cfg.get("sqlHost", "localhost")
-        port = cfg.get("sqlPort", 3306)
-        user = cfg.get("sqlUser", "")
-        pwd = cfg.get("sqlPassword", "") or cfg.get("sqlPassEnc", "")
+        host = str(cfg.get("sqlHost", "localhost"))
+        port = str(cfg.get("sqlPort", 3306))
+        user = str(cfg.get("sqlUser", ""))
+        pwd = str(cfg.get("sqlPassword", "") or cfg.get("sqlPassEnc", ""))
         dbs = cfg.get("sqlDatabases", "").split(",")
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         results = []
 
+        backup_dir = os.path.join(os.environ.get("ProgramData", "C:\\ProgramData"), "InfraDesk", "backups")
+        os.makedirs(backup_dir, exist_ok=True)
+
         for db in dbs:
             db = db.strip()
-            if not db: continue
-            output = os.path.join(tempfile.gettempdir(), f"backup_{db}_{timestamp}.sql")
+            if not db:
+                continue
+            output = os.path.join(backup_dir, f"backup_{db}_{timestamp}.sql")
 
             if btype == "SQL_MYSQL":
-                cmd = f'mysqldump -h {host} -P {port} -u {user} -p{pwd} {db}'
-            elif btype == "SQL_POSTGRES":
-                os.environ["PGPASSWORD"] = pwd
-                cmd = f'pg_dump -h {host} -p {port} -U {user} {db}'
-            elif btype == "SQL_MSSQL":
-                if user and pwd:
-                    cmd = f'sqlcmd -S {host},{port} -U {user} -P {pwd} -Q "BACKUP DATABASE [{db}] TO DISK=\'{output}.bak\' WITH FORMAT"'
-                else:
-                    cmd = f'sqlcmd -S {host},{port} -E -Q "BACKUP DATABASE [{db}] TO DISK=\'{output}.bak\' WITH FORMAT"'
+                env = os.environ.copy()
+                if pwd:
+                    env["MYSQL_PWD"] = pwd
+                cmd = ["mysqldump", f"--host={host}", f"--port={port}", f"--user={user}", db]
                 try:
-                    subprocess.run(cmd, shell=True, check=True, capture_output=True, timeout=3600)
-                    results.append(f"{output}.bak")
+                    with open(output, "w") as f:
+                        subprocess.run(cmd, check=True, stdout=f, stderr=subprocess.PIPE, timeout=3600, env=env, creationflags=_NO_WINDOW)
+                    results.append(output)
+                except Exception as e:
+                    raise RuntimeError(f"MySQL backup failed for {db}: {e}")
+
+            elif btype == "SQL_POSTGRES":
+                env = os.environ.copy()
+                if pwd:
+                    env["PGPASSWORD"] = pwd
+                cmd = ["pg_dump", "-h", host, "-p", port, "-U", user, db]
+                try:
+                    with open(output, "w") as f:
+                        subprocess.run(cmd, check=True, stdout=f, stderr=subprocess.PIPE, timeout=3600, env=env, creationflags=_NO_WINDOW)
+                    results.append(output)
+                except Exception as e:
+                    raise RuntimeError(f"PostgreSQL backup failed for {db}: {e}")
+
+            elif btype == "SQL_MSSQL":
+                env = os.environ.copy()
+                bak_path = f"{output}.bak"
+                sql_query = f"BACKUP DATABASE [{db}] TO DISK=N'{bak_path}' WITH FORMAT, COMPRESSION"
+                if user and pwd:
+                    env["SQLCMDPASSWORD"] = pwd
+                    cmd = ["sqlcmd", "-S", f"{host},{port}", "-U", user, "-Q", sql_query]
+                else:
+                    cmd = ["sqlcmd", "-S", f"{host},{port}", "-E", "-Q", sql_query]
+                try:
+                    subprocess.run(cmd, check=True, capture_output=True, timeout=3600, env=env, creationflags=_NO_WINDOW)
+                    results.append(bak_path)
                 except Exception as e:
                     raise RuntimeError(f"MSSQL backup failed for {db}: {e}")
-                continue
-            else:
-                continue
-
-            try:
-                with open(output, "w") as f:
-                    subprocess.run(cmd, shell=True, check=True, stdout=f, stderr=subprocess.PIPE, timeout=3600)
-                results.append(output)
-            except Exception as e:
-                raise RuntimeError(f"SQL backup failed for {db}: {e}")
 
         if not results:
             raise RuntimeError("No databases to backup")
 
         import tarfile
-        archive = os.path.join(tempfile.gettempdir(), f"backup_sql_{timestamp}.tar.gz")
+        archive = os.path.join(backup_dir, f"backup_sql_{timestamp}.tar.gz")
         with tarfile.open(archive, "w:gz") as tar:
             for r in results:
                 tar.add(r, arcname=os.path.basename(r))
                 try: os.remove(r)
                 except Exception: pass
         return archive
+
+    @staticmethod
+    def _cleanup_old_backups(directory: str, retention_days: int):
+        """Remove backup files older than retention_days from directory."""
+        import glob
+        cutoff = time.time() - (retention_days * 86400)
+        patterns = ["backup_*.tar.gz", "backup_*.zip", "backup_*.bak", "backup_*.sql"]
+        removed = 0
+        for pattern in patterns:
+            for f in glob.glob(os.path.join(directory, pattern)):
+                try:
+                    if os.path.getmtime(f) < cutoff:
+                        os.remove(f)
+                        removed += 1
+                except Exception:
+                    pass
+        if removed:
+            log.info("Retention cleanup: removed %d old backups from %s (>%d days)", removed, directory, retention_days)
 
     def _backup_folder(self, cfg):
         import zipfile
@@ -1631,9 +1749,10 @@ class BackupScheduler:
         try:
             from cryptography.fernet import Fernet
             import hashlib
-            if len(key) < 32:
-                key = base64.urlsafe_b64encode(hashlib.sha256(key.encode()).digest()).decode()
-            f = Fernet(key.encode() if isinstance(key, str) else key)
+            # Always derive a valid 32-byte Fernet key from any input
+            raw = hashlib.sha256(key.encode() if isinstance(key, str) else key).digest()
+            fernet_key = base64.urlsafe_b64encode(raw)
+            f = Fernet(fernet_key)
             with open(path, "rb") as file:
                 data = file.read()
             encrypted = f.encrypt(data)
@@ -1649,6 +1768,8 @@ class BackupScheduler:
     def _upload_infradesk_cloud(self, path, config_id):
         """Upload backup file to InfraDesk Cloud storage."""
         url = f"{API_BASE}/backup/cloud/upload"
+        file_size = os.path.getsize(path)
+        log.info("Uploading to InfraDesk Cloud: %s (%d MB)", os.path.basename(path), file_size // (1024*1024))
         with open(path, "rb") as f:
             resp = requests.post(
                 url,
@@ -1657,7 +1778,7 @@ class BackupScheduler:
                     "x-agent-token": self.token,
                     "x-backup-config-id": config_id,
                 },
-                timeout=1800,
+                timeout=7200,  # 2h for large files
             )
         if resp.status_code != 200:
             raise RuntimeError(f"InfraDesk Cloud upload error {resp.status_code}: {resp.text[:200]}")
@@ -2076,7 +2197,7 @@ class BusinessAPI:
         try:
             result = check_for_update()
             if result:
-                ver, url = result
+                ver, url, sha = result
                 return {"available": True, "version": ver, "url": url}
             return {"available": False}
         except Exception as e:
@@ -2086,8 +2207,8 @@ class BusinessAPI:
         try:
             result = check_for_update()
             if result:
-                ver, url = result
-                do_self_update(url)
+                ver, url, sha = result
+                do_self_update(url, expected_sha256=sha)
                 return {"ok": True}
             return {"ok": False, "error": "Brak aktualizacji"}
         except Exception as e:
@@ -2140,13 +2261,14 @@ class _BackgroundServices:
             time.sleep(AutoDiagnostics.CHECK_INTERVAL)
 
     def _metrics_loop(self):
+        import random
         try:
             requests.post(f"{API_BASE}/agent/metrics", json=full_inventory(),
                           headers={"Authorization": f"Bearer {self.token}"}, timeout=15)
         except Exception: pass
         cycle = 0
         while True:
-            time.sleep(60)
+            time.sleep(60 + random.uniform(0, 15))
             try:
                 data = metrics()
                 if cycle % 5 == 0:
@@ -2175,10 +2297,10 @@ class _BackgroundServices:
             result = check_for_update()
             if result and result != self._update_info:
                 self._update_info = result
-                ver, url = result
+                ver, url, sha = result
                 log.info("Update available: %s — auto-updating", ver)
                 try:
-                    do_self_update(url, notify_fn=lambda m: None)
+                    do_self_update(url, notify_fn=lambda m: None, expected_sha256=sha)
                 except Exception as e:
                     log.error("Auto-update failed: %s", e)
             time.sleep(2 * 3600)
@@ -2199,14 +2321,13 @@ class _BackgroundServices:
         if mtype == "remote_command":
             threading.Thread(target=_handle_remote_command, args=(msg, self._ws.send), daemon=True).start()
             return
-        if mtype in ("notification", "status_update") and self._tray:
-            try: self._tray.notify(msg.get("body", ""), msg.get("title", APP_NAME))
-            except Exception: pass
+        if mtype in ("notification", "status_update"):
+            log.debug("WS notification (silent): %s", msg.get("title", ""))
         elif mtype == "update":
             info = self._update_info or check_for_update()
             if info:
-                _, url = info
-                do_self_update(url)
+                _, url, sha = info
+                do_self_update(url, expected_sha256=sha)
         elif mtype == "backup_run":
             cid = msg.get("configId", "")
             if cid and self._backup_scheduler:
@@ -2309,8 +2430,8 @@ class ServerServiceLoop:
         elif mtype == "update":
             info = check_for_update()
             if info:
-                _, url = info
-                threading.Thread(target=do_self_update, args=(url,), daemon=True).start()
+                _, url, sha = info
+                threading.Thread(target=do_self_update, args=(url,), kwargs={"expected_sha256": sha}, daemon=True).start()
         elif mtype == "backup_run":
             cid = msg.get("configId", "")
             if cid and hasattr(self, '_backup') and self._backup:
@@ -2419,9 +2540,9 @@ class ServerServiceLoop:
                 try:
                     info = check_for_update()
                     if info:
-                        ver, url = info
+                        ver, url, sha = info
                         log.info("Update available: %s — auto-updating", ver)
-                        do_self_update(url)
+                        do_self_update(url, expected_sha256=sha)
                 except Exception as e:
                     log.warning("Auto-update check failed: %s", e)
 
