@@ -518,6 +518,23 @@ export async function changeTicketStatus(
   const newStatus = data.status as TicketStatus;
   const now = new Date();
 
+  // State machine: validate allowed transitions
+  const allowedTransitions: Record<string, string[]> = {
+    NEW:                  ['ASSIGNED', 'IN_PROGRESS', 'CANCELLED'],
+    PENDING:              ['ASSIGNED', 'IN_PROGRESS', 'CANCELLED'],
+    ASSIGNED:             ['IN_PROGRESS', 'WAITING_FOR_CLIENT', 'RESOLVED', 'CANCELLED'],
+    IN_PROGRESS:          ['WAITING_FOR_CLIENT', 'RESOLVED', 'CANCELLED'],
+    WAITING_FOR_CLIENT:   ['IN_PROGRESS', 'RESOLVED', 'CANCELLED'],
+    RESOLVED:             ['CLOSED', 'IN_PROGRESS'], // reopen if not properly resolved
+    CLOSED:               [], // terminal state
+    COMPLETED:            [], // terminal state (legacy alias for CLOSED)
+    CANCELLED:            ['NEW'], // reopen
+  };
+  const allowed = allowedTransitions[previousStatus] || [];
+  if (allowed.length > 0 && !allowed.includes(newStatus)) {
+    throw new AppError(`Niedozwolona zmiana statusu: ${previousStatus} → ${newStatus}`, 400);
+  }
+
   const updateData: Record<string, unknown> = { status: newStatus };
 
   const updated = await prisma.ticket.update({

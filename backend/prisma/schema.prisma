@@ -694,6 +694,7 @@ model Device {
   workSessions  WorkSession[]
 
   @@index([workspaceId])
+  @@index([workspaceId, status])
 }
 
 model AccessType {
@@ -747,6 +748,7 @@ model Credential {
   user       User?       @relation("CredentialUser", fields: [userId], references: [id])
 
   @@index([workspaceId])
+  @@index([workspaceId, visibility])
 }
 
 model Ticket {
@@ -880,6 +882,7 @@ model CrmActivity {
   @@index([type])
   @@index([occurredAt])
   @@index([workspaceId])
+  @@index([linkedTicketId])
 }
 
 model WorkSession {
