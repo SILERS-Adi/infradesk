@@ -18,36 +18,28 @@ export async function loginService(data: LoginInput) {
   }
 
   // Account lockout check (5 failed attempts → 15 min lock)
-  const userAny = user as any;
-  if (userAny.lockedUntil && new Date(userAny.lockedUntil) > new Date()) {
-    const minutesLeft = Math.ceil((new Date(userAny.lockedUntil).getTime() - Date.now()) / 60000);
+  if (user.lockedUntil && new Date(user.lockedUntil) > new Date()) {
+    const minutesLeft = Math.ceil((new Date(user.lockedUntil).getTime() - Date.now()) / 60000);
     throw new AppError(`Konto zablokowane. Spróbuj za ${minutesLeft} min.`, 403);
   }
 
   const passwordMatch = await bcrypt.compare(data.password, user.passwordHash);
   if (!passwordMatch) {
     // Increment login attempts
-    const attempts = (userAny.loginAttempts ?? 0) + 1;
-    const lockData: any = { loginAttempts: attempts };
+    const attempts = (user.loginAttempts ?? 0) + 1;
+    const lockData: Record<string, unknown> = { loginAttempts: attempts };
     if (attempts >= 5) {
       lockData.lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 min lock
     }
-    try { await prisma.user.update({ where: { id: user.id }, data: lockData }); } catch { /* fields may not exist yet */ }
+    await prisma.user.update({ where: { id: user.id }, data: lockData });
     throw new AppError('Invalid email or password', 401);
   }
 
   // Reset lockout on successful login
-  try {
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date(), loginAttempts: 0, lockedUntil: null } as any,
-    });
-  } catch {
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
-    });
-  }
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { lastLoginAt: new Date(), loginAttempts: 0, lockedUntil: null },
+  });
 
   const payload: JwtPayload = {
     userId: user.id,
@@ -152,7 +144,11 @@ export async function forgotPasswordService(email: string) {
   const user = await prisma.user.findUnique({ where: { email } });
 
   // Always return success to prevent email enumeration
-  if (!user || !user.isActive) return { sent: true };
+  // Add constant-time delay to prevent timing-based enumeration
+  if (!user || !user.isActive) {
+    await new Promise(r => setTimeout(r, 200 + Math.random() * 300));
+    return { sent: true };
+  }
 
   const token = crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
