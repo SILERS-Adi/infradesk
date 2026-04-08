@@ -3,6 +3,7 @@ import { Navigate, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../store/authStore';
 import { useWorkspaceContext } from '../../hooks/useWorkspaceContext';
 import { useWorkspace } from '../../store/workspaceStore';
+import { ErrorBoundary } from '../ui/ErrorBoundary';
 import { NoWorkspacePage } from '../../pages/auth/NoWorkspacePage';
 import {
   LayoutDashboard, MapPin, Monitor, Ticket, Plus, LogOut, ShoppingCart, Menu, X, Receipt, KeyRound,
@@ -166,7 +167,9 @@ export function PortalLayout({ children }: { children: ReactNode }) {
       {/* Content */}
       <main className="flex-1 overflow-y-auto relative z-10">
         <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-5 md:py-6">
-          {children}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
         </div>
       </main>
     </div>

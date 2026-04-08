@@ -1,5 +1,6 @@
 import { ReactNode, useState, useCallback } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { ErrorBoundary } from '../ui/ErrorBoundary';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   LayoutDashboard, ListChecks, Monitor, ShoppingCart,
@@ -141,7 +142,7 @@ export function MobileLayout({ children }: Props) {
       </>)}
 
       {/* ── Content ─────────────────────────────────────────────────────── */}
-      <main className="flex-1 overflow-y-auto relative z-10" style={{ paddingBottom: 'calc(92px + env(safe-area-inset-bottom, 0px))', overflowX: 'hidden' }}>{children}</main>
+      <main className="flex-1 overflow-y-auto relative z-10" style={{ paddingBottom: 'calc(92px + env(safe-area-inset-bottom, 0px))', overflowX: 'hidden' }}><ErrorBoundary>{children}</ErrorBoundary></main>
 
       {/* ── ADD overlay ─────────────────────────────────────────────────── */}
       {showAdd && (<>

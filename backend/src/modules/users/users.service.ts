@@ -25,7 +25,8 @@ export async function listUsers(params: {
   limit?: number;
   workspaceId?: string | null;
 }) {
-  const { isActive, page = 1, limit = 20, workspaceId } = params;
+  const { isActive, page = 1, limit: rawLimit = 20, workspaceId } = params;
+  const limit = Math.min(rawLimit, 100);
   const skip = (page - 1) * limit;
 
   // If workspaceId is provided, list users who are members of that workspace
@@ -79,7 +80,13 @@ export async function listUsers(params: {
   };
 }
 
-export async function getUserById(id: string) {
+export async function getUserById(id: string, workspaceId: string) {
+  // Always verify workspace membership first to prevent cross-workspace access
+  const membership = await prisma.workspaceMembership.findUnique({
+    where: { userId_workspaceId: { userId: id, workspaceId } },
+  });
+  if (!membership) throw new AppError('User not found', 404);
+
   const user = await prisma.user.findUnique({
     where: { id },
     select: userSelect,
@@ -131,10 +138,17 @@ export async function createUser(data: CreateUserInput, performedByUserId: strin
   return user;
 }
 
-export async function updateUser(id: string, data: UpdateUserInput, performedByUserId: string) {
+export async function updateUser(id: string, data: UpdateUserInput, performedByUserId: string, workspaceId?: string) {
   const existing = await prisma.user.findUnique({ where: { id } });
   if (!existing) {
     throw new AppError('User not found', 404);
+  }
+
+  if (workspaceId) {
+    const membership = await prisma.workspaceMembership.findUnique({
+      where: { userId_workspaceId: { userId: id, workspaceId } },
+    });
+    if (!membership) throw new AppError('User not found', 404);
   }
 
   if (data.email && data.email !== existing.email) {
@@ -175,10 +189,17 @@ export async function updateUser(id: string, data: UpdateUserInput, performedByU
   return user;
 }
 
-export async function deleteUser(id: string, performedByUserId: string) {
+export async function deleteUser(id: string, performedByUserId: string, workspaceId?: string) {
   const existing = await prisma.user.findUnique({ where: { id } });
   if (!existing) {
     throw new AppError('User not found', 404);
+  }
+
+  if (workspaceId) {
+    const membership = await prisma.workspaceMembership.findUnique({
+      where: { userId_workspaceId: { userId: id, workspaceId } },
+    });
+    if (!membership) throw new AppError('User not found', 404);
   }
 
   // Soft delete - deactivate instead of deleting

@@ -7,6 +7,7 @@ import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { VoiceAssistant } from '../VoiceAssistant';
 import { NoWorkspacePage } from '../../pages/auth/NoWorkspacePage';
+import { ErrorBoundary } from '../ui/ErrorBoundary';
 
 export function OperationsLayout({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -54,7 +55,9 @@ export function OperationsLayout({ children }: { children: ReactNode }) {
       <div className="main">
         <TopBar onMenuClick={() => setMobileOpen(true)} />
         <div className="content">
-          {children}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
         </div>
       </div>
 
