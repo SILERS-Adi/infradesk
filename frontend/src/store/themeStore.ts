@@ -12,6 +12,12 @@ interface ThemeStore {
 }
 
 function getAutoTheme(): 'light' | 'dark' {
+  // Prefer system preference if available
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+    if (prefersDark.media !== 'not all') return prefersDark.matches ? 'dark' : 'light';
+  }
+  // Fallback to time-based
   const hour = new Date().getHours();
   return hour >= 6 && hour < 20 ? 'light' : 'dark';
 }
@@ -68,6 +74,18 @@ setInterval(() => {
     }
   }
 }, 60_000);
+
+// Listen for system preference changes (instant switch in auto mode)
+if (typeof window !== 'undefined' && window.matchMedia) {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    const state = useTheme.getState();
+    if (state.mode === 'auto') {
+      const resolved = getAutoTheme();
+      applyTheme(resolved);
+      useTheme.setState({ resolved });
+    }
+  });
+}
 
 export const ACCENT_PRESETS: { id: AccentPreset; label: string; color: string }[] = [
   { id: 'violet', label: 'Royal Violet', color: '#7C3AED' },
