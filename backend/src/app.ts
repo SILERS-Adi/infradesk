@@ -223,6 +223,9 @@ app.get('/health', (_req, res) => {
 app.get('/health/deep', async (_req, res) => {
   try {
     const health = await deepHealthCheck();
+    // Add Redis status
+    const { isRedisConnected } = require('./lib/redis');
+    (health as any).redis = isRedisConnected() ? 'connected' : 'disconnected';
     const status = health.status === 'ok' ? 200 : health.status === 'degraded' ? 200 : 503;
     res.status(status).json(health);
   } catch (e: any) {
@@ -913,6 +916,13 @@ function gracefulShutdown(signal: string) {
       ws.close(1001, 'Server shutting down');
     }
     console.log('[SHUTDOWN] WebSocket connections closed');
+
+    // Close Redis
+    try {
+      const { closeRedis } = await import('./lib/redis');
+      await closeRedis();
+      console.log('[SHUTDOWN] Redis disconnected');
+    } catch {}
 
     // Close database connection
     try {

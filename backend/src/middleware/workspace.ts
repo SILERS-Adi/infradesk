@@ -73,10 +73,22 @@ const CACHE_TTL_MS = 60_000; // 1 minute
 const slugCache = new Map<string, CacheEntry>();
 
 async function findWorkspaceBySlug(slug: string): Promise<{ id: string; slug: string; type: string } | null> {
+  // L1: in-memory cache
   const cached = slugCache.get(slug);
   if (cached && cached.expiresAt > Date.now()) {
     return { id: cached.id, slug: cached.slug, type: cached.type };
   }
+
+  // L2: Redis cache (if available)
+  try {
+    const { cacheGet, cacheSet } = require('../lib/redis');
+    const redisKey = `ws:slug:${slug}`;
+    const redisCached = await cacheGet<{ id: string; slug: string; type: string }>(redisKey);
+    if (redisCached) {
+      slugCache.set(slug, { ...redisCached, expiresAt: Date.now() + CACHE_TTL_MS });
+      return redisCached;
+    }
+  } catch { /* Redis not available — continue to DB */ }
 
   const ws = await prisma.workspace.findUnique({
     where: { slug },
@@ -85,12 +97,11 @@ async function findWorkspaceBySlug(slug: string): Promise<{ id: string; slug: st
 
   if (!ws || !ws.isActive) return null;
 
-  slugCache.set(slug, {
-    id: ws.id,
-    slug: ws.slug,
-    type: ws.type,
-    expiresAt: Date.now() + CACHE_TTL_MS,
-  });
+  const entry = { id: ws.id, slug: ws.slug, type: ws.type };
+  slugCache.set(slug, { ...entry, expiresAt: Date.now() + CACHE_TTL_MS });
+
+  // Write to Redis (120s TTL — longer than L1)
+  try { const { cacheSet } = require('../lib/redis'); await cacheSet(`ws:slug:${slug}`, entry, 120); } catch { /* silent */ }
 
   return ws;
 }

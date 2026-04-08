@@ -17,6 +17,19 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: infradesk-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   backend:
     build:
       context: ./backend
@@ -25,13 +38,16 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://infradesk:infradesk@db:5432/infradesk
-      JWT_SECRET: super-secret-jwt-key-change-in-production-min32chars!!
-      JWT_REFRESH_SECRET: super-secret-refresh-key-change-in-production-min32!!
-      ENCRYPTION_KEY: 12345678901234567890123456789032
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
       PORT: 3000
       NODE_ENV: production
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     command: sh -c "npx prisma db push --accept-data-loss && node dist/app.js"
 
@@ -50,3 +66,4 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
