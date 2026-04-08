@@ -311,6 +311,14 @@ model Workspace {
   /// Canonical module activation — replaces enabledModules[] flat array.
   modules              WorkspaceModule[]
 
+  // Relations added for workspace isolation completeness
+  notifications        Notification[]        @relation("NotificationWorkspace")
+  pushSubscriptions    PushSubscription[]    @relation("PushWorkspace")
+  techPositions        TechPosition[]        @relation("TechPositionWorkspace")
+  subscriptions        Subscription[]        @relation("SubscriptionWorkspace")
+  trustedContacts      TrustedContact[]      @relation("TrustedContactWorkspace")
+  downloadPinRequests  DownloadPinRequest[]  @relation("DownloadPinWorkspace")
+
   @@index([type])
   @@index([isActive])
 }
@@ -594,15 +602,19 @@ model User {
 }
 
 model TechPosition {
-  id              String   @id @default(uuid())
-  userId          String   @unique
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  workspaceId     String?
   latitude        Float
   longitude       Float
   accuracy        Float?
   nearLocationIds Json?
-  updatedAt       DateTime @updatedAt
+  updatedAt       DateTime  @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation("TechPositionWorkspace", fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
 }
 
 model Location {
@@ -1060,12 +1072,17 @@ model BackupHistory {
 }
 
 model DownloadPinRequest {
-  id        String    @id @default(uuid())
-  email     String
-  pin       String
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime  @default(now())
+  id          String    @id @default(uuid())
+  email       String
+  pin         String
+  workspaceId String?
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  workspace Workspace? @relation("DownloadPinWorkspace", fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
 }
 
 model PasswordResetToken {
@@ -1121,16 +1138,19 @@ model AppSetting {
 }
 
 model PushSubscription {
-  id        String   @id @default(uuid())
-  userId    String
-  endpoint  String   @unique
-  p256dh    String
-  auth      String
-  createdAt DateTime @default(now())
+  id          String   @id @default(uuid())
+  userId      String
+  workspaceId String?
+  endpoint    String   @unique
+  p256dh      String
+  auth        String
+  createdAt   DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation("PushWorkspace", fields: [workspaceId], references: [id], onDelete: SetNull)
 
   @@index([userId])
+  @@index([workspaceId])
 }
 
 enum TaskStatus {
@@ -1231,25 +1251,29 @@ model Delegation {
 
 // ── In-app notifications ────────────────────────────────────────────
 model Notification {
-  id         String    @id @default(uuid())
-  userId     String
-  fromUserId String?
-  title      String
-  message    String
-  readAt     DateTime?
-  createdAt  DateTime  @default(now())
+  id          String    @id @default(uuid())
+  userId      String
+  fromUserId  String?
+  workspaceId String?
+  title       String
+  message     String
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
 
-  user     User  @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
-  fromUser User? @relation("NotificationSender", fields: [fromUserId], references: [id])
+  user      User       @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  fromUser  User?      @relation("NotificationSender", fields: [fromUserId], references: [id])
+  workspace Workspace? @relation("NotificationWorkspace", fields: [workspaceId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([createdAt])
+  @@index([workspaceId])
 }
 
 // ── Abonamenty (Netflix, telefon, ubezpieczenie itd.) ────────────────
 model Subscription {
   id           String    @id @default(uuid())
   userId       String
+  workspaceId  String?
   name         String
   category     String    @default("OTHER")
   amount       Decimal?  @db.Decimal(12, 2)
@@ -1266,15 +1290,18 @@ model Subscription {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation("SubscriptionWorkspace", fields: [workspaceId], references: [id], onDelete: SetNull)
 
   @@index([userId])
+  @@index([workspaceId])
 }
 
 // ── Zaufana osoba (na wypadek śmierci / niedostępności) ──────────────
 model TrustedContact {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   userId       String
+  workspaceId  String?
   firstName    String
   lastName     String
   email        String
@@ -1286,9 +1313,11 @@ model TrustedContact {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation("TrustedContactWorkspace", fields: [workspaceId], references: [id], onDelete: SetNull)
 
   @@index([userId])
+  @@index([workspaceId])
 }
 
 // ── Invoicing Module ────────────────────────────────────────────────
