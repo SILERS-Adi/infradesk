@@ -14,6 +14,8 @@ import { Button } from '../../../components/ui/Button';
 import { Badge } from '../../../components/ui/Badge';
 import { Modal } from '../../../components/ui/Modal';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
+import { ErrorState } from '../../../components/ui/ErrorState';
+import { ScopedAccessBanner } from '../../../components/ui/ScopedAccessBanner';
 import { CredentialForm } from '../../../components/forms/CredentialForm';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { copyToClipboard, getErrorMessage } from '../../../utils/helpers';
@@ -236,7 +238,7 @@ export function CredentialsPage() {
 
   useEffect(() => { saveColumns(visibleKeys); }, [visibleKeys]);
 
-  const { data: credentials = [], isLoading } = useQuery({
+  const { data: credentials = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['credentials', { category }],
     queryFn: () => credentialsApi.getAll({
       category:  category  || undefined,
@@ -345,11 +347,13 @@ export function CredentialsPage() {
         })}
       </div>
 
+      <ScopedAccessBanner />
       {/* Loading */}
-      {isLoading && <div className="text-center py-12 text-sm" style={{ color: 'var(--td)' }}>Ladowanie...</div>}
-
+      {isLoading && <div className="text-center py-12 text-sm" style={{ color: 'var(--td)' }}>Ładowanie...</div>}
+      {/* Error */}
+      {!isLoading && isError && <ErrorState onRetry={() => refetch()} />}
       {/* Empty */}
-      {!isLoading && filtered.length === 0 && (
+      {!isLoading && !isError && filtered.length === 0 && (
         <div className="rounded-2xl p-12 text-center" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
           <KeyRound className="h-10 w-10 mx-auto mb-3" style={{ color: 'var(--td)' }} />
           <p className="font-medium" style={{ color: 'var(--tm)' }}>Brak danych dostepowych</p>

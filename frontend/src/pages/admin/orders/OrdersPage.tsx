@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { ordersApi } from '../../../api/orders';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { formatDate, getErrorMessage } from '../../../utils/helpers';
+import { ErrorState } from '../../../components/ui/ErrorState';
 import type { Order, OrderStatus } from '../../../types';
 import { Package, Settings2, Eye, EyeOff, GripVertical, X } from 'lucide-react';
 
@@ -111,7 +112,7 @@ export function OrdersPage() {
 
   useEffect(() => { saveColumns(visibleKeys); }, [visibleKeys]);
 
-  const { data: orders = [], isLoading } = useQuery({
+  const { data: orders = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['orders-all', filterStatus],
     queryFn: () => ordersApi.getAll(filterStatus ? { status: filterStatus } : undefined),
     refetchInterval: 30_000,
@@ -171,6 +172,8 @@ export function OrdersPage() {
 
       {isLoading ? (
         <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500" /></div>
+      ) : isError ? (
+        <ErrorState onRetry={() => refetch()} />
       ) : orders.length === 0 ? (
         <div className="text-center py-12" style={{ color: 'var(--tm)' }}><Package className="h-12 w-12 mx-auto mb-3 opacity-30" /><p>Brak zamówień</p></div>
       ) : (

@@ -14,6 +14,7 @@ import { Button } from '../../../components/ui/Button';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import { UnifiedTicketWizard } from '../../../components/wizard/UnifiedTicketWizard';
 import { getErrorMessage } from '../../../utils/helpers';
+import { ErrorState } from '../../../components/ui/ErrorState';
 import type { CrmActivity, CrmActivityType, QuoteStatus } from '../../../types';
 
 export const CRM_TYPE_CONFIG: Record<CrmActivityType, {
@@ -177,7 +178,7 @@ export function CrmPage() {
 
   useEffect(() => { saveColumns(visibleKeys); }, [visibleKeys]);
 
-  const { data: activities = [], isLoading } = useQuery({
+  const { data: activities = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['crm', filter],
     queryFn: () => crmApi.getAll(filter !== 'ALL' ? { type: filter } : {}),
   });
@@ -240,6 +241,8 @@ export function CrmPage() {
       {/* Table */}
       {isLoading ? (
         <div className="rounded-2xl p-8 text-center text-sm" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--tm)' }}>Ładowanie...</div>
+      ) : isError ? (
+        <ErrorState onRetry={() => refetch()} />
       ) : activities.length === 0 ? (
         <div className="rounded-2xl p-8 text-center text-sm" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--tm)' }}>Brak wpisów CRM</div>
       ) : (

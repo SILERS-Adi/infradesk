@@ -22,6 +22,7 @@ import { Modal } from '../../../components/ui/Modal';
 import { Input } from '../../../components/ui/Input';
 import { Textarea } from '../../../components/ui/Textarea';
 import { Button } from '../../../components/ui/Button';
+import { ErrorState } from '../../../components/ui/ErrorState';
 import { useAuth } from '../../../store/authStore';
 import { useWorkspaceContext } from '../../../hooks/useWorkspaceContext';
 import { formatDate, formatDateTime, getErrorMessage } from '../../../utils/helpers';
@@ -357,7 +358,7 @@ export function TasksPage() {
   // Persist column visibility
   useEffect(() => { saveColumns(visibleCols); }, [visibleCols]);
 
-  const { data: tasks = [], isLoading } = useQuery({ queryKey: ['tasks', { all: isAdmin }], queryFn: () => tasksApi.getAll({ all: isAdmin }), refetchInterval: 15_000 });
+  const { data: tasks = [], isLoading, isError, refetch } = useQuery({ queryKey: ['tasks', { all: isAdmin }], queryFn: () => tasksApi.getAll({ all: isAdmin }), refetchInterval: 15_000 });
   const { data: activeSessions = [] } = useQuery({ queryKey: ['session-active'], queryFn: async () => { const s = await sessionsApi.getActive(); return s ? [s] : []; }, refetchInterval: 5_000 });
   const { data: agents = [] } = useQuery({ queryKey: ['agents'], queryFn: () => agentsApi.getAll(), staleTime: 15_000, refetchInterval: 15_000 });
   const { data: allUsers = [] } = useQuery({ queryKey: ['users'], queryFn: () => usersApi.getAll(), enabled: showCreate });
@@ -414,6 +415,8 @@ export function TasksPage() {
       <div className="page-card" style={{ padding: 0, borderTopLeftRadius: 0, borderTopRightRadius: 0, borderTop: 'none' }}>
         {isLoading ? (
           <div style={{ padding: 40, textAlign: 'center' }}><Loader2 className="animate-spin" style={{ width: 24, height: 24, color: 'var(--tm)', margin: '0 auto' }} /></div>
+        ) : isError ? (
+          <ErrorState onRetry={() => refetch()} />
         ) : tabTasks.length === 0 ? (
           <div style={{ padding: 40, textAlign: 'center', fontSize: 13, color: 'var(--tm)' }}>Brak zadań w tej kategorii</div>
         ) : (

@@ -3,11 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import { delegationsApi } from '../../../api/delegations';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { Card } from '../../../components/ui/Card';
+import { ErrorState } from '../../../components/ui/ErrorState';
 import { formatDateTime } from '../../../utils/helpers';
 import { Plane } from 'lucide-react';
 
 export function DelegationsPage() {
-  const { data: delegations = [], isLoading } = useQuery({
+  const { data: delegations = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['delegations-all'],
     queryFn: () => delegationsApi.getAll(),
   });
@@ -17,6 +18,8 @@ export function DelegationsPage() {
       <PageHeader title="Delegacje" subtitle={`${delegations.length} delegacji`} />
       {isLoading ? (
         <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500" /></div>
+      ) : isError ? (
+        <ErrorState onRetry={() => refetch()} />
       ) : delegations.length === 0 ? (
         <div className="text-center py-12" style={{ color: 'var(--tm)' }}><Plane className="h-12 w-12 mx-auto mb-3 opacity-30" /><p>Brak delegacji</p></div>
       ) : (
