@@ -325,12 +325,15 @@ function LocationAddress({ address, label }: { address: string; label?: string }
   );
 }
 
-type TabId = 'info' | 'security' | 'network';
+type TabId = 'info' | 'remote' | 'vault' | 'metrics' | 'backup' | 'history';
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'info', label: 'Informacje' },
-  { id: 'security', label: 'Bezpieczeństwo' },
-  { id: 'network', label: 'Sieć' },
+const TABS: { id: TabId; label: string; icon?: string }[] = [
+  { id: 'info', label: 'Przegląd' },
+  { id: 'remote', label: 'Zdalny dostęp' },
+  { id: 'vault', label: 'Hasła' },
+  { id: 'metrics', label: 'Metryki' },
+  { id: 'backup', label: 'Backup' },
+  { id: 'history', label: 'Historia' },
 ];
 
 export function DeviceDetailPage() {
@@ -380,7 +383,7 @@ export function DeviceDetailPage() {
       const agent = agents.find(a => a.deviceId === id);
       return agent;
     },
-    enabled: !!id && (tab === 'security' || tab === 'network'),
+    enabled: !!id && (tab === 'metrics'),
   });
   const securityAudit = (agentData as any)?.serverMetrics?.securityAudit;
   const networkScan = (agentData as any)?.serverMetrics?.networkScan;
@@ -831,8 +834,161 @@ export function DeviceDetailPage() {
       </div>
       )}
 
-      {tab === 'security' && (
+      {/* ═══ REMOTE TAB ═══ */}
+      {tab === 'remote' && (
         <div className="space-y-5">
+          {/* Remote tools */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {REMOTE_TOOLS.map(tool => {
+              const val = (device as any)[tool.key];
+              if (!val) return null;
+              return (
+                <div key={tool.key} className="rounded-[16px] p-4" style={{ ...tool.colorStyle, border: `1px solid ${tool.colorStyle.borderColor}` }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-sm font-bold ${tool.labelColor}`}>{tool.label}</span>
+                    <CopyButton value={val} label={`${tool.label} ID`} />
+                  </div>
+                  <p className="text-xs font-mono mb-3" style={{ color: 'var(--ts)' }}>{val}</p>
+                  <a href={tool.href(val)} target="_blank" rel="noreferrer"
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white ${tool.btnColor}`}>
+                    <ExternalLink className="h-3 w-3" /> {tool.connectLabel}
+                  </a>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Quick actions */}
+          {agentData && (
+            <div className="rounded-[18px] p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+              <h3 className="text-sm font-bold mb-4" style={{ color: 'var(--t)' }}>Akcje zdalne</h3>
+              <div className="flex flex-wrap gap-2">
+                <RemoteActionBtn label="Restart drukarki" command="restart_print_spooler" agentId={(agentData as any).id} />
+                <RemoteActionBtn label="Restart systemu" command="system_reboot" agentId={(agentData as any).id} confirmMsg="Na pewno chcesz zrestartować ten serwer?" />
+                <RemoteActionBtn label="Wake-on-LAN" command="wake" agentId={(agentData as any).id} isWol />
+                <RemoteActionBtn label="Windows Update" command="windows_update" agentId={(agentData as any).id} />
+              </div>
+            </div>
+          )}
+
+          {/* Work sessions */}
+          <div className="rounded-[18px] p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+            <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--t)' }}>Sesje pracy na tym urządzeniu</h3>
+            {tickets.filter(t => t.status !== 'CANCELLED').length === 0 ? (
+              <p className="text-xs" style={{ color: 'var(--tm)' }}>Brak sesji pracy</p>
+            ) : (
+              <p className="text-xs" style={{ color: 'var(--tm)' }}>Sesje pracy wyświetlane w zakładce Historia</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ VAULT TAB ═══ */}
+      {tab === 'vault' && (
+        <div className="space-y-3">
+          {credentials.length === 0 ? (
+            <div className="text-center py-12 rounded-[18px]" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+              <Shield className="h-10 w-10 mx-auto mb-3" style={{ color: 'var(--td)' }} />
+              <p className="text-sm font-medium" style={{ color: 'var(--tm)' }}>Brak haseł przypisanych do tego urządzenia</p>
+              {canSeeInternal && (
+                <Link to="/vault" className="inline-flex items-center gap-1 mt-3 text-xs font-medium text-violet-400">
+                  <Plus className="h-3 w-3" /> Dodaj hasło w Sejfie
+                </Link>
+              )}
+            </div>
+          ) : (
+            credentials.map((cred: Credential) => (
+              <div key={cred.id} className="rounded-[16px] p-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <span className="text-sm font-bold" style={{ color: 'var(--t)' }}>{cred.name}</span>
+                    <span className="ml-2"><Badge color="blue">{cred.category}</Badge></span>
+                  </div>
+                </div>
+                {cred.username && (
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs" style={{ color: 'var(--tm)' }}>Login:</span>
+                    <span className="text-xs font-mono" style={{ color: 'var(--ts)' }}>{cred.username}</span>
+                    <CopyButton value={cred.username} label="Login skopiowany" />
+                  </div>
+                )}
+                <PasswordRevealField onReveal={async () => { const r = await credentialsApi.reveal(cred.id); return r.password || ''; }} credentialName={cred.name} />
+                {cred.urlOrHost && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs" style={{ color: 'var(--tm)' }}>Host:</span>
+                    <span className="text-xs font-mono" style={{ color: 'var(--ts)' }}>{cred.urlOrHost}</span>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* ═══ METRICS TAB (old security + network merged) ═══ */}
+      {tab === 'metrics' && (
+        <div className="space-y-5">
+          {/* Live agent stats */}
+          {(device as any).agentInfo && <AgentStatsBox agent={(device as any).agentInfo} />}
+
+          {/* Remote data panels */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <RemoteDataPanel title="Procesy" command="get_processes" agentId={(agentData as any)?.id} renderFn={(data: any) => (
+              <div className="max-h-64 overflow-y-auto">
+                {(data.processes || []).slice(0, 15).map((p: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between text-xs py-1 px-2" style={{ borderBottom: '1px solid var(--border)' }}>
+                    <span className="truncate max-w-[160px]" style={{ color: 'var(--ts)' }}>{p.name}</span>
+                    <div className="flex gap-3" style={{ color: 'var(--tm)' }}>
+                      <span>CPU: {p.cpu?.toFixed(1)}%</span>
+                      <span>RAM: {p.memMb?.toFixed(0)} MB</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )} />
+
+            <RemoteDataPanel title="Oprogramowanie" command="get_installed_software" agentId={(agentData as any)?.id} renderFn={(data: any) => (
+              <div className="max-h-64 overflow-y-auto">
+                {(data.software || []).slice(0, 20).map((s: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between text-xs py-1 px-2" style={{ borderBottom: '1px solid var(--border)' }}>
+                    <span className="truncate max-w-[200px]" style={{ color: 'var(--ts)' }}>{s.name}</span>
+                    <span style={{ color: 'var(--tm)' }}>{s.version}</span>
+                  </div>
+                ))}
+                <p className="text-[10px] text-center mt-2" style={{ color: 'var(--td)' }}>{data.count ?? 0} programów</p>
+              </div>
+            )} />
+
+            <RemoteDataPanel title="Usługi Windows" command="get_services" agentId={(agentData as any)?.id} renderFn={(data: any) => (
+              <div className="max-h-64 overflow-y-auto">
+                {(data.services || []).slice(0, 20).map((s: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between text-xs py-1 px-2" style={{ borderBottom: '1px solid var(--border)' }}>
+                    <span className="truncate max-w-[200px]" style={{ color: 'var(--ts)' }}>{s.display_name || s.name}</span>
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${s.status === 'running' ? 'text-emerald-400' : 'text-red-400'}`}
+                      style={{ background: s.status === 'running' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)' }}>
+                      {s.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )} />
+
+            <RemoteDataPanel title="Dziennik zdarzeń" command="get_event_log" agentId={(agentData as any)?.id} payload={{ log_name: 'System', level: 'Error', limit: 20 }} renderFn={(data: any) => (
+              <div className="max-h-64 overflow-y-auto">
+                {(data.events || []).map((e: any, i: number) => (
+                  <div key={i} className="text-xs py-1.5 px-2" style={{ borderBottom: '1px solid var(--border)' }}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono" style={{ color: 'var(--td)' }}>{e.TimeCreated ? new Date(e.TimeCreated).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' }) : ''}</span>
+                      <span className="font-medium truncate" style={{ color: 'var(--ts)' }}>{e.ProviderName}</span>
+                    </div>
+                    <p className="truncate mt-0.5" style={{ color: 'var(--tm)' }}>{e.Message?.slice(0, 120)}</p>
+                  </div>
+                ))}
+              </div>
+            )} />
+          </div>
+
+          {/* Security audit */}
           {securityAudit ? (
             <>
               <div className="flex items-center gap-6 p-6 rounded-[18px]" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
@@ -902,24 +1058,79 @@ export function DeviceDetailPage() {
               <p className="text-[11px] mt-1" style={{ color: 'var(--td)' }}>Agent zbiera dane — pojawią się w ciągu godziny</p>
             </div>
           )}
+      </div>
+      )}
+
+      {/* ═══ BACKUP TAB ═══ */}
+      {tab === 'backup' && (
+        <div className="space-y-4">
+          <div className="text-center py-12 rounded-[18px]" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+            <HardDrive className="h-10 w-10 mx-auto mb-3" style={{ color: 'var(--td)' }} />
+            <p className="text-sm font-medium" style={{ color: 'var(--tm)' }}>Konfiguracje backupu</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--td)' }}>Zarządzaj backupami w sekcji Backup</p>
+            <Link to="/backups" className="inline-flex items-center gap-1 mt-3 text-xs font-medium text-violet-400">
+              <ExternalLink className="h-3 w-3" /> Otwórz Backup
+            </Link>
+          </div>
         </div>
       )}
 
-      {tab === 'network' && (
-        <div className="space-y-5">
-          {networkScan && networkScan.devices?.length > 0 ? (
-            <>
-              <div className="flex items-center gap-4 p-4 rounded-[18px]" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                <Wifi className="h-5 w-5" style={{ color: '#A78BFA' }} />
-                <div>
-                  <p className="text-[14px] font-semibold text-white/80">Sieć: {networkScan.subnet}</p>
-                  <p className="text-[12px]" style={{ color: 'var(--tm)' }}>
-                    {networkScan.devices.length} urządzeń · Brama: {networkScan.gateway} · Skan: {networkScan.scannedAt}
-                  </p>
-                </div>
+      {/* ═══ HISTORY TAB ═══ */}
+      {tab === 'history' && (
+        <div className="space-y-3">
+          {/* Tickets for this device */}
+          <div className="rounded-[18px] p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+            <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--t)' }}>Zgłoszenia ({tickets.length})</h3>
+            {tickets.length === 0 ? (
+              <p className="text-xs" style={{ color: 'var(--tm)' }}>Brak zgłoszeń dla tego urządzenia</p>
+            ) : (
+              <div className="space-y-2">
+                {tickets.slice(0, 10).map((t: Ticket) => (
+                  <Link key={t.id} to={`/tickets/${t.id}`} className="flex items-center justify-between p-2 rounded-lg hover:bg-white/[0.02] transition-colors">
+                    <div className="flex items-center gap-2">
+                      <TicketStatusBadge status={t.status} />
+                      <span className="text-xs font-mono" style={{ color: 'var(--tm)' }}>{t.ticketNumber}</span>
+                      <span className="text-xs truncate max-w-[200px]" style={{ color: 'var(--ts)' }}>{t.title}</span>
+                    </div>
+                    <span className="text-[10px]" style={{ color: 'var(--td)' }}>{formatDate(t.createdAt)}</span>
+                  </Link>
+                ))}
               </div>
+            )}
+          </div>
 
-              <div className="rounded-[18px] overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+          {/* Activity logs */}
+          <div className="rounded-[18px] p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+            <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--t)' }}>Dziennik aktywności ({logs.length})</h3>
+            {logs.length === 0 ? (
+              <p className="text-xs" style={{ color: 'var(--tm)' }}>Brak wpisów</p>
+            ) : (
+              <div className="space-y-2">
+                {(logs as any[]).slice(0, 20).map((log: any) => (
+                  <div key={log.id} className="flex items-start gap-3 py-1.5" style={{ borderBottom: '1px solid var(--border)' }}>
+                    <span className="text-[10px] font-mono flex-shrink-0 mt-0.5" style={{ color: 'var(--td)' }}>
+                      {log.createdAt ? formatDateTime(log.createdAt) : ''}
+                    </span>
+                    <div>
+                      <span className="text-xs" style={{ color: 'var(--ts)' }}>{log.description}</span>
+                      {log.performedBy && (
+                        <span className="text-[10px] ml-2" style={{ color: 'var(--tm)' }}>
+                          — {log.performedBy.firstName} {log.performedBy.lastName}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Network scan (moved from old tab) */}
+          {networkScan && networkScan.devices?.length > 0 && (
+            <div className="rounded-[18px] p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+              <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--t)' }}>Skan sieci — {networkScan.subnet}</h3>
+              <p className="text-xs mb-3" style={{ color: 'var(--tm)' }}>{networkScan.devices.length} urządzeń · Brama: {networkScan.gateway}</p>
+              <div className="rounded-[18px] overflow-hidden" style={{ border: '1px solid var(--border)' }}>
                 <table className="w-full text-sm">
                   <thead>
                     <tr style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }}>
@@ -948,12 +1159,6 @@ export function DeviceDetailPage() {
                   </tbody>
                 </table>
               </div>
-            </>
-          ) : (
-            <div className="text-center py-16 rounded-[18px]" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-              <Wifi className="h-10 w-10 mx-auto mb-3" style={{ color: 'var(--td)' }} />
-              <p className="text-[13px]" style={{ color: 'var(--tm)' }}>Brak danych skanowania sieci</p>
-              <p className="text-[11px] mt-1" style={{ color: 'var(--td)' }}>Agent skanuje sieć co 30 minut</p>
             </div>
           )}
         </div>
@@ -969,6 +1174,82 @@ export function DeviceDetailPage() {
           onCancel={() => setShowEdit(false)}
         />
       </Modal>
+    </div>
+  );
+}
+
+/* ═══ Remote Action Button ═══ */
+function RemoteActionBtn({ label, command, agentId, confirmMsg, isWol }: {
+  label: string; command: string; agentId: string; confirmMsg?: string; isWol?: boolean;
+}) {
+  const [loading, setLoading] = useState(false);
+
+  const execute = async () => {
+    if (confirmMsg && !window.confirm(confirmMsg)) return;
+    setLoading(true);
+    try {
+      if (isWol) {
+        await agentsApi.wake(agentId);
+      } else if (command === 'windows_update') {
+        await agentsApi.windowsUpdate(agentId);
+      } else if (command === 'system_reboot') {
+        await agentsApi.systemReboot(agentId, 60);
+      } else if (command === 'restart_print_spooler') {
+        await agentsApi.restartService(agentId, 'Spooler');
+      }
+      toast.success(`${label} — wysłano`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || `Błąd: ${label}`);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <button onClick={execute} disabled={loading}
+      className="px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:scale-[1.02]"
+      style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', color: '#A78BFA', opacity: loading ? 0.6 : 1 }}>
+      {loading ? 'Wysyłanie...' : label}
+    </button>
+  );
+}
+
+/* ═══ Remote Data Panel (fetch on-demand via remote command) ═══ */
+function RemoteDataPanel({ title, command, agentId, payload, renderFn }: {
+  title: string; command: string; agentId?: string; payload?: any;
+  renderFn: (data: any) => React.ReactNode;
+}) {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = async () => {
+    if (!agentId) { setError('Agent nie przypisany'); return; }
+    setLoading(true);
+    setError(null);
+    try {
+      const apiClient = (await import('../../../api/client')).default;
+      const res = await apiClient.post(`/agent/${agentId}/command`, { command, payload: payload || {} });
+      setData(res.data?.data || res.data);
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Agent offline lub brak odpowiedzi');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="rounded-[16px] p-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-xs font-bold" style={{ color: 'var(--t)' }}>{title}</h4>
+        <button onClick={fetch} disabled={loading}
+          className="text-[10px] font-semibold px-2 py-1 rounded-md" style={{ background: 'rgba(139,92,246,0.1)', color: '#A78BFA' }}>
+          {loading ? '...' : data ? 'Odśwież' : 'Pobierz'}
+        </button>
+      </div>
+      {error && <p className="text-xs text-red-400">{error}</p>}
+      {data && renderFn(data)}
+      {!data && !loading && !error && (
+        <p className="text-xs" style={{ color: 'var(--td)' }}>Kliknij "Pobierz" aby pobrać dane z agenta</p>
+      )}
     </div>
   );
 }
