@@ -34,6 +34,7 @@ export default function RegisterPage() {
   const [companyShortName, setCompanyShortName] = useState('');
   const [taxId, setTaxId] = useState('');
   const [loading, setLoading] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [slugPreview, setSlugPreview] = useState('');
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
   const slugCheckTimeout = useRef<ReturnType<typeof setTimeout>>();
@@ -67,6 +68,12 @@ export default function RegisterPage() {
 
     // Anti-bot: honeypot
     if (honeypot) return;
+
+    // Terms acceptance required
+    if (!termsAccepted) {
+      toast.error('Musisz zaakceptować regulamin');
+      return;
+    }
     // Anti-bot: time trap (form submitted too fast = bot)
     if (Date.now() - loadedAt < 3000) {
       toast.error('Proszę poczekać chwilę przed wysłaniem formularza');
@@ -283,6 +290,18 @@ export default function RegisterPage() {
               );
             })()}
           </div>
+
+          {/* Terms acceptance */}
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', fontSize: 13, color: 'var(--tm)', lineHeight: 1.5 }}>
+            <input type="checkbox" checked={termsAccepted} onChange={e => setTermsAccepted(e.target.checked)}
+              style={{ marginTop: 3, accentColor: '#6D28D9', width: 16, height: 16, flexShrink: 0 }} />
+            <span>
+              Akceptuję{' '}
+              <a href="/regulamin" target="_blank" style={{ color: '#A78BFA', textDecoration: 'underline' }}>regulamin</a>{' '}
+              oraz{' '}
+              <a href="/prywatnosc" target="_blank" style={{ color: '#A78BFA', textDecoration: 'underline' }}>politykę prywatności</a>
+            </span>
+          </label>
 
           {/* Honeypot — invisible to users, bots fill it */}
           <div style={{ position: 'absolute', left: -9999, top: -9999, opacity: 0, height: 0, overflow: 'hidden' }} aria-hidden="true">

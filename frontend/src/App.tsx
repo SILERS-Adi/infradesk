@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
+import { CookieConsent } from './components/CookieConsent';
 import { AuthProvider, useAuth } from './store/authStore';
 import { useWorkspace } from './store/workspaceStore';
 import { workspacesApi } from './api/workspaces';
@@ -398,6 +399,7 @@ export default function App() {
               style: { fontSize: '14px' },
             }}
           />
+          <CookieConsent />
           <AutoLoginHandler />
           <UserRefresher />
           <WorkspaceResolver />
