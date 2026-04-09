@@ -36,12 +36,12 @@ services:
       dockerfile: Dockerfile
     container_name: infradesk-backend
     restart: unless-stopped
+    env_file:
+      - ./backend/.env
     environment:
       DATABASE_URL: postgresql://infradesk:infradesk@db:5432/infradesk
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+      RUSTDESK_API_URL: http://172.18.0.1:21114
       PORT: 3000
       NODE_ENV: production
     depends_on:
