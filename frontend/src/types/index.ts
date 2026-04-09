@@ -301,6 +301,18 @@ export interface DashboardStats {
   myTickets: number;
   recentTickets: Ticket[];
   recentDevices: Device[];
+  ratingAvg?: number | null;
+  ratingCount?: number;
+  onboarding?: {
+    completed: boolean;
+    steps: {
+      company: boolean;
+      location: boolean;
+      device: boolean;
+      agent: boolean;
+      ticket: boolean;
+    };
+  };
 }
 
 /** Stub — Client model removed in workspace migration. Used by legacy wizard. */
