@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -352,6 +352,7 @@ export function TasksPage() {
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [showColEditor, setShowColEditor] = useState(false);
   const [visibleCols, setVisibleCols] = useState<string[]>(loadColumns);
+  const [groupByDevice, setGroupByDevice] = useState(false);
   const isAdmin = useWorkspaceContext().isAdmin;
 
   // Persist column visibility
@@ -407,6 +408,18 @@ export function TasksPage() {
               </button>
             );
           })}
+          <div style={{ marginLeft: 'auto', padding: '6px 12px' }}>
+            <button onClick={() => setGroupByDevice(g => !g)}
+              style={{
+                fontSize: 11, fontWeight: 600, padding: '5px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: groupByDevice ? 'var(--accent-g, rgba(139,92,246,0.15))' : 'var(--hover-bg)',
+                color: groupByDevice ? 'var(--accent, #A78BFA)' : 'var(--tm)',
+                transition: 'all 0.15s',
+              }}>
+              <Monitor style={{ width: 12, height: 12, display: 'inline', verticalAlign: -2, marginRight: 4 }} />
+              Grupuj po urządzeniu
+            </button>
+          </div>
         </div>
       </div>
 
@@ -428,7 +441,39 @@ export function TasksPage() {
               </tr>
             </thead>
             <tbody>
-              {tabTasks.map(task => (
+              {groupByDevice ? (
+                // Group by device name
+                (() => {
+                  const groups = new Map<string, typeof tabTasks>();
+                  tabTasks.forEach(task => {
+                    const key = (task as any).ticket?.device?.name || 'Bez urządzenia';
+                    if (!groups.has(key)) groups.set(key, []);
+                    groups.get(key)!.push(task);
+                  });
+                  return Array.from(groups.entries()).map(([deviceName, deviceTasks]) => (
+                    <React.Fragment key={deviceName}>
+                      <tr>
+                        <td colSpan={ALL_COLUMNS.filter(c => visibleCols.includes(c.key)).length}
+                          style={{ padding: '10px 16px', fontSize: 12, fontWeight: 700, color: 'var(--accent, #A78BFA)', background: 'rgba(139,92,246,0.04)', borderBottom: '1px solid var(--border)' }}>
+                          <Monitor style={{ width: 13, height: 13, display: 'inline', verticalAlign: -2, marginRight: 6 }} />
+                          {deviceName}
+                          <span style={{ fontWeight: 500, color: 'var(--tm)', marginLeft: 8 }}>({deviceTasks.length})</span>
+                        </td>
+                      </tr>
+                      {deviceTasks.map(task => (
+                        <TaskRow key={task.id} task={task} agents={agents} activeSessions={activeSessions} visibleCols={visibleCols}
+                          onStatus={(id, s) => statusMut.mutate({ id, status: s })}
+                          onStartSession={t => startMut.mutate(t)}
+                          onPauseSession={id => pauseMut.mutate(id)}
+                          onResumeSession={id => resumeMut.mutate(id)}
+                          onEndSession={id => endMut.mutate(id)}
+                          onEdit={t => setEditTask(t)} />
+                      ))}
+                    </React.Fragment>
+                  ));
+                })()
+              ) : (
+              tabTasks.map(task => (
                 <TaskRow key={task.id} task={task} agents={agents} activeSessions={activeSessions} visibleCols={visibleCols}
                   onStatus={(id, s) => statusMut.mutate({ id, status: s })}
                   onStartSession={t => startMut.mutate(t)}
@@ -436,7 +481,8 @@ export function TasksPage() {
                   onResumeSession={id => resumeMut.mutate(id)}
                   onEndSession={id => endMut.mutate(id)}
                   onEdit={t => setEditTask(t)} />
-              ))}
+              ))
+              )}
             </tbody>
           </table>
         )}
