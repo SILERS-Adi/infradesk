@@ -50,6 +50,9 @@ services:
       redis:
         condition: service_healthy
     command: sh -c "npx prisma db push --accept-data-loss && node dist/app.js"
+    networks:
+      default:
+        ipv4_address: 172.18.0.100
 
   frontend:
     build:
@@ -63,6 +66,12 @@ services:
       - ./downloads:/downloads:ro
     depends_on:
       - backend
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.18.0.0/16
 
 volumes:
   postgres_data:
