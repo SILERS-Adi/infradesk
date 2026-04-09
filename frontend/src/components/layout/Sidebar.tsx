@@ -1,9 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, X, Sun, Moon, SunMoon, SlidersHorizontal } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { useTheme } from '../../store/themeStore';
 import { useMenuStore } from '../../store/menuStore';
 import { clsx } from 'clsx';
 import { SidebarNav } from './sidebar/SidebarNav';
+import { OnboardingChecklist } from '../onboarding/OnboardingChecklist';
+import { dashboardApi } from '../../api/dashboard';
 
 interface SidebarProps {
   collapsed: boolean;
@@ -45,6 +48,9 @@ export function Sidebar({ collapsed, onToggle, mobile, onClose }: SidebarProps) 
 
       {/* Nav — registry-driven with customization support */}
       <SidebarNav collapsed={collapsed} mobile={mobile} onMobileClose={onClose} />
+
+      {/* Onboarding checklist */}
+      {!collapsed && <SidebarOnboarding />}
 
       {/* Theme switcher */}
       <ThemeSwitcher collapsed={collapsed} />
@@ -110,5 +116,19 @@ function ThemeSwitcher({ collapsed }: { collapsed: boolean }) {
         ))}
       </div>
     </div>
+  );
+}
+
+function SidebarOnboarding() {
+  const [dismissed, setDismissed] = useState(() => localStorage.getItem('infradesk_onboarding_checklist_dismissed') === 'true');
+  const { data: stats } = useQuery({ queryKey: ['dashboard'], queryFn: dashboardApi.getStats, staleTime: 60_000 });
+
+  if (dismissed || !stats?.onboarding || stats.onboarding.completed) return null;
+
+  return (
+    <OnboardingChecklist
+      steps={stats.onboarding.steps}
+      onDismiss={() => { setDismissed(true); localStorage.setItem('infradesk_onboarding_checklist_dismissed', 'true'); }}
+    />
   );
 }

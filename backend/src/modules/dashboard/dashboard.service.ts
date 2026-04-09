@@ -70,6 +70,28 @@ export async function getAdminDashboard(workspaceId?: string | null) {
     ? Math.round((ratedTickets.reduce((sum, t) => sum + (t.rating ?? 0), 0) / ratingCount) * 10) / 10
     : null;
 
+  // Onboarding status — check if workspace completed setup
+  let onboarding = { completed: true, steps: { company: true, location: true, device: true, agent: true, ticket: true } };
+  if (workspaceId) {
+    const ws = await prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { name: true, legalName: true, taxId: true },
+    });
+    const hasAgents = await prisma.agentRegistration.count({ where: { workspaceId, status: 'ACTIVE' } });
+    const hasTickets = await prisma.ticket.count({ where: { workspaceId }, take: 1 });
+
+    onboarding = {
+      completed: totalLocations > 0 && totalDevices > 0,
+      steps: {
+        company: !!(ws?.legalName || ws?.taxId),
+        location: totalLocations > 0,
+        device: totalDevices > 0,
+        agent: hasAgents > 0,
+        ticket: hasTickets > 0,
+      },
+    };
+  }
+
   return {
     totalLocations,
     totalDevices,
@@ -81,6 +103,7 @@ export async function getAdminDashboard(workspaceId?: string | null) {
     recentDevices,
     ratingAvg,
     ratingCount,
+    onboarding,
   };
 }
 

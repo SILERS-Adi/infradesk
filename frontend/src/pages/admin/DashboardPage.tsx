@@ -9,6 +9,7 @@ import {
 import toast from 'react-hot-toast';
 import { dashboardApi } from '../../api/dashboard';
 import { useAuth } from '../../store/authStore';
+import { OnboardingWizard } from '../../components/onboarding/OnboardingWizard';
 import { useTheme } from '../../store/themeStore';
 import { TicketStatusBadge } from '../../components/ui/StatusBadge';
 import { ticketsApi } from '../../api/tickets';
@@ -134,7 +135,17 @@ export function DashboardPage() {
   const qc = useQueryClient();
   const ringRef = useRef<HTMLCanvasElement>(null);
 
-  const { data: stats, isLoading } = useQuery({ queryKey: ['dashboard'], queryFn: dashboardApi.getStats });
+  const { data: stats, isLoading, refetch: refetchDashboard } = useQuery({ queryKey: ['dashboard'], queryFn: dashboardApi.getStats });
+
+  // Onboarding wizard
+  const [showWizard, setShowWizard] = useState(false);
+  const [wizardDismissed, setWizardDismissed] = useState(() => localStorage.getItem('infradesk_onboarding_dismissed') === 'true');
+
+  useEffect(() => {
+    if (stats?.onboarding && !stats.onboarding.completed && !wizardDismissed) {
+      setShowWizard(true);
+    }
+  }, [stats?.onboarding, wizardDismissed]);
   const { data: myTasks = [] } = useQuery({ queryKey: ['dashboard-tasks'], queryFn: () => tasksApi.getAll({ all: false }), refetchInterval: 30_000 });
   const { data: pendingTickets = [] } = useQuery({ queryKey: ['dashboard-pending'], queryFn: () => ticketsApi.getAll({ status: 'PENDING' }), refetchInterval: 30_000 });
   const { data: ses, refetch: rSes } = useQuery({ queryKey: ['desktop-active-session'], queryFn: () => sessionsApi.getActive(), refetchInterval: 30_000 });
@@ -171,6 +182,14 @@ export function DashboardPage() {
 
   return (
     <div className="ids-v3">
+
+      {/* Onboarding Wizard */}
+      {showWizard && (
+        <OnboardingWizard
+          onComplete={() => { setShowWizard(false); setWizardDismissed(true); localStorage.setItem('infradesk_onboarding_dismissed', 'true'); refetchDashboard(); }}
+          onSkip={() => { setShowWizard(false); setWizardDismissed(true); localStorage.setItem('infradesk_onboarding_dismissed', 'true'); }}
+        />
+      )}
 
       {/* ═══ HERO ═══ */}
       <section className="ids-v3-hero fade-in">
