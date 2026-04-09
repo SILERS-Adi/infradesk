@@ -92,6 +92,23 @@ export async function getAdminDashboard(workspaceId?: string | null) {
     };
   }
 
+  // SLA compliance
+  let sla = { compliancePct: 100, breached: 0, nearBreach: 0 };
+  if (workspaceId) {
+    const [slaTotal, slaBreach, slaNear] = await Promise.all([
+      prisma.ticket.count({ where: { ...wf, status: { in: ['RESOLVED', 'CLOSED', 'COMPLETED'] }, dueAt: { not: null } } }),
+      prisma.ticket.count({ where: { ...wf, slaBreached: true } }),
+      prisma.ticket.count({
+        where: { ...wf, status: { in: ['NEW', 'PENDING', 'ASSIGNED', 'IN_PROGRESS'] }, dueAt: { not: null, lt: new Date(Date.now() + 4 * 3600000) } },
+      }),
+    ]);
+    sla = {
+      compliancePct: slaTotal > 0 ? Math.round(((slaTotal - slaBreach) / slaTotal) * 100) : 100,
+      breached: slaBreach,
+      nearBreach: slaNear,
+    };
+  }
+
   return {
     totalLocations,
     totalDevices,
@@ -104,6 +121,7 @@ export async function getAdminDashboard(workspaceId?: string | null) {
     ratingAvg,
     ratingCount,
     onboarding,
+    sla,
   };
 }
 

@@ -319,6 +319,8 @@ model Workspace {
   trustedContacts      TrustedContact[]      @relation("TrustedContactWorkspace")
   downloadPinRequests  DownloadPinRequest[]  @relation("DownloadPinWorkspace")
 
+  slaPolicies          SlaPolicy[]           @relation("SlaPolicyWorkspace")
+
   @@index([type])
   @@index([isActive])
 }
@@ -794,6 +796,10 @@ model Ticket {
   reporterName      String?
   reporterPhone     String?
 
+  // SLA tracking
+  firstResponseAt   DateTime?      // When first comment/assignment happened
+  slaBreached       Boolean        @default(false) // True if resolved after dueAt
+
   // Customer satisfaction rating (1-3 stars)
   rating            Int?
   ratingComment     String?
@@ -819,6 +825,23 @@ model Ticket {
   @@index([workspaceId])
   @@index([requesterWorkspaceId])
   @@index([providerWorkspaceId])
+}
+
+model SlaPolicy {
+  id            String         @id @default(uuid())
+  workspaceId   String
+  name          String
+  priority      TicketPriority
+  responseTimeH Int            // Max hours for first response
+  resolveTimeH  Int            // Max hours for resolution
+  isDefault     Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  workspace Workspace @relation("SlaPolicyWorkspace", fields: [workspaceId], references: [id])
+
+  @@unique([workspaceId, priority])
+  @@index([workspaceId])
 }
 
 model TicketComment {

@@ -59,6 +59,12 @@ export async function startJobScheduler() {
       removeOnFail: 20,
     });
 
+    await queue.add('sla-check', {}, {
+      repeat: { every: 5 * 60 * 1000 }, // every 5 minutes
+      removeOnComplete: 5,
+      removeOnFail: 20,
+    });
+
     // Worker processes jobs
     const worker = new Worker('infradesk-jobs', async (job) => {
       switch (job.name) {
@@ -80,6 +86,11 @@ export async function startJobScheduler() {
           const { checkAndAlert } = await import('../utils/monitoring');
           await checkAndAlert();
           return { checked: true };
+        }
+
+        case 'sla-check': {
+          const { checkSlaBreaches } = await import('../utils/slaChecker');
+          return await checkSlaBreaches();
         }
 
         default:
@@ -133,6 +144,14 @@ function startLegacyJobs() {
   }, 10_000);
 
   setInterval(() => checkAndAlert().catch((e: Error) => console.error('Alert check error:', e)), 5 * 60 * 1000);
+
+  // SLA breach check every 5 minutes
+  setInterval(async () => {
+    try {
+      const { checkSlaBreaches } = await import('../utils/slaChecker');
+      await checkSlaBreaches();
+    } catch { /* silent */ }
+  }, 5 * 60 * 1000);
 
   schedulerStarted = true;
   console.log('[Jobs] Legacy setInterval scheduler started');

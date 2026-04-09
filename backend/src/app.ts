@@ -70,6 +70,7 @@ import helpdeskSettingsRouter from './modules/helpdesk-settings/helpdesk-setting
 import operatorRouter from './modules/operator/operator.routes';
 import workspaceConfigRouter from './modules/workspace-config/workspace-config.routes';
 import eventsRouter from './modules/events/events.routes';
+import slaRouter from './modules/sla/sla.routes';
 
 // Middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -348,6 +349,7 @@ app.use('/api/helpdesk-settings', helpdeskSettingsRouter);
 app.use('/api/operator', operatorRouter);
 app.use('/api/workspace-config', workspaceConfigRouter);
 app.use('/api/events', eventsRouter);
+app.use('/api/sla', slaRouter);
 app.use('/api/service/vehicles', authenticate, requireModule('skp'), serviceVehiclesRouter);
 app.use('/api/service/inspections', authenticate, requireModule('skp'), serviceInspectionsRouter);
 // Public agent endpoints (no auth)
