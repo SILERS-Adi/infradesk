@@ -41,7 +41,22 @@ export async function getDevices(req: Request, res: Response, next: NextFunction
 
 export async function getDevice(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const device = await getDeviceById(req.params.id, req.user!, req.workspaceId!);
+    // MSP: try current workspace first, then expand to client workspaces
+    const { getMspWorkspaceIds } = require('../../utils/mspScope');
+    const wsIds: string[] = req.workspaceId ? await getMspWorkspaceIds(req.workspaceId) : [req.workspaceId!];
+
+    let device = null;
+    for (const wsId of wsIds) {
+      try {
+        device = await getDeviceById(req.params.id, req.user!, wsId);
+        if (device) break;
+      } catch { /* not in this workspace — try next */ }
+    }
+
+    if (!device) {
+      res.status(404).json({ error: 'Device not found' });
+      return;
+    }
 
     // Enforce scope on detail endpoint
     if (req.membership && !isDeviceAccessible(req.membership, device.id, device.locationId)) {
