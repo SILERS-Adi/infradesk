@@ -383,7 +383,7 @@ export function DeviceDetailPage() {
       const agent = agents.find(a => a.deviceId === id);
       return agent;
     },
-    enabled: !!id && (tab === 'metrics'),
+    enabled: !!id,
   });
   const securityAudit = (agentData as any)?.serverMetrics?.securityAudit;
   const networkScan = (agentData as any)?.serverMetrics?.networkScan;
@@ -1231,7 +1231,9 @@ function RemoteDataPanel({ title, command, agentId, payload, renderFn }: {
       const res = await apiClient.post(`/agent/${agentId}/command`, { command, payload: payload || {} });
       setData(res.data?.data || res.data);
     } catch (err: any) {
-      setError(err?.response?.data?.error || 'Agent offline lub brak odpowiedzi');
+      const msg = err?.response?.data?.error || 'Brak odpowiedzi';
+      const code = err?.response?.data?.code;
+      setError(code === 'AGENT_OFFLINE' ? 'Agent nie ma aktywnego połączenia WebSocket — komendy zdalne niedostępne. Agent wysyła metryki ale nie obsługuje komend w czasie rzeczywistym.' : msg);
     }
     setLoading(false);
   };
