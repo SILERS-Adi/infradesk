@@ -96,6 +96,7 @@ import { PublicDownloadsPage } from './pages/public/PublicDownloadsPage';
 import LandingPage from './pages/public/LandingPage';
 import LegalPage from './pages/public/LegalPage';
 import ContactPage from './pages/public/ContactPage';
+const ChangelogPage = React.lazy(() => import('./pages/public/ChangelogPage'));
 import AiPanelPage from './pages/public/AiPanelPage';
 import ConfiguratorPage from './pages/public/ConfiguratorPage';
 import RenewalPage from './pages/public/RenewalPage';
@@ -416,6 +417,7 @@ export default function App() {
             <Route path="/prywatnosc" element={<LegalPage />} />
             <Route path="/rodo" element={<LegalPage />} />
             <Route path="/kontakt" element={<ContactPage />} />
+            <Route path="/changelog" element={<React.Suspense fallback={null}><ChangelogPage /></React.Suspense>} />
             <Route path="/pobieranie" element={<PublicDownloadsPage />} />
             <Route path="/zgloszenie/:workspaceSlug" element={<React.Suspense fallback={null}><PublicTicketForm /></React.Suspense>} />
             <Route path="/ai-panel" element={<AiPanelPage />} />
