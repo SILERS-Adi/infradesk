@@ -65,6 +65,12 @@ export async function startJobScheduler() {
       removeOnFail: 20,
     });
 
+    await queue.add('trial-check', {}, {
+      repeat: { every: 60 * 60 * 1000 }, // every 1 hour
+      removeOnComplete: 5,
+      removeOnFail: 10,
+    });
+
     // Worker processes jobs
     const worker = new Worker('infradesk-jobs', async (job) => {
       switch (job.name) {
@@ -91,6 +97,11 @@ export async function startJobScheduler() {
         case 'sla-check': {
           const { checkSlaBreaches } = await import('../utils/slaChecker');
           return await checkSlaBreaches();
+        }
+
+        case 'trial-check': {
+          const { checkTrialExpiry } = await import('../utils/trialChecker');
+          return await checkTrialExpiry();
         }
 
         default:
@@ -152,6 +163,14 @@ function startLegacyJobs() {
       await checkSlaBreaches();
     } catch { /* silent */ }
   }, 5 * 60 * 1000);
+
+  // Trial expiry check every hour
+  setInterval(async () => {
+    try {
+      const { checkTrialExpiry } = await import('../utils/trialChecker');
+      await checkTrialExpiry();
+    } catch { /* silent */ }
+  }, 60 * 60 * 1000);
 
   schedulerStarted = true;
   console.log('[Jobs] Legacy setInterval scheduler started');

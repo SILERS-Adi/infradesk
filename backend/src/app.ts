@@ -61,7 +61,7 @@ import pakCustomersRouter from './modules/packaging/customers.routes';
 import pakDashboardRouter from './modules/packaging/dashboard.routes';
 import wavesRouter from './modules/packaging/waves.routes';
 import shippingRouter from './modules/packaging/shipping.routes';
-import billingRouter from './modules/billing/billing.routes';
+import billingRouter, { billingWebhookRouter } from './modules/billing/billing.routes';
 import sharingRouter from './modules/sharing/sharing.routes';
 import menuPreferencesRouter from './modules/menu-preferences/menu-preferences.routes';
 import permissionsRouter from './modules/permissions/permissions.routes';
@@ -340,6 +340,7 @@ app.use('/api/packaging/customers', authenticate, requireModule('packaging'), pa
 app.use('/api/packaging/dashboard', authenticate, requireModule('packaging'), pakDashboardRouter);
 app.use('/api/packaging/waves', authenticate, requireModule('packaging'), wavesRouter);
 app.use('/api/packaging/shipping', authenticate, requireModule('packaging'), shippingRouter);
+app.use('/api/billing/webhook', billingWebhookRouter); // Public webhook (verified by secret)
 app.use('/api/billing', billingRouter);
 app.use('/api/sharing', sharingRouter);
 app.use('/api/menu-preferences', menuPreferencesRouter);
