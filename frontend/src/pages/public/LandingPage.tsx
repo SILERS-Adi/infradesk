@@ -25,6 +25,7 @@ export default function LandingPage() {
           <a href="tel:+48575662664" className="hidden md:flex items-center gap-1.5 text-sm transition-colors" style={{ color: 'var(--tm)' }}>
             <Phone className="h-3.5 w-3.5" /> +48 575 662 664
           </a>
+          <a href="#cennik" className="px-3 py-2 text-sm font-medium transition-colors" style={{ color: 'var(--tm)' }}>Cennik</a>
           <Link to="/konfigurator" className="px-3 py-2 text-sm font-medium transition-colors" style={{ color: 'var(--tm)' }}>Konfigurator</Link>
           <Link to="/kontakt" className="px-3 py-2 text-sm font-medium transition-colors" style={{ color: 'var(--tm)' }}>Kontakt</Link>
           <Link to="/login" className="px-4 py-2 text-sm font-medium transition-colors" style={{ color: 'var(--ts)' }}>Zaloguj się</Link>
@@ -89,8 +90,8 @@ export default function LandingPage() {
                 <Server className="h-5 w-5 text-violet-400" />
               </div>
               <div>
-                <div className="text-sm font-semibold" style={{ color: 'var(--t)', opacity: 0.85 }}>Asystent Business</div>
-                <div className="text-[11px]" style={{ color: 'var(--tm)' }}>v1.0.0 · Windows</div>
+                <div className="text-sm font-semibold" style={{ color: 'var(--t)', opacity: 0.85 }}>InfraDesk Business</div>
+                <div className="text-[11px]" style={{ color: 'var(--tm)' }}>v3.0.0 · Windows</div>
               </div>
             </div>
             <p className="text-xs mb-3" style={{ color: 'var(--tm)' }}>Dla firm. Monitoring, zgloszenia, backup, S.M.A.R.T., RAID, pomoc zdalna, diagnostyka.</p>
@@ -118,27 +119,65 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Pricing → Configurator CTA */}
+      {/* Pricing */}
+      <section id="cennik" className="px-6 md:px-12 py-16 max-w-7xl mx-auto">
+        <h2 className="text-2xl md:text-3xl font-bold text-center mb-3">Prosty cennik</h2>
+        <p className="text-center mb-10" style={{ color: 'var(--ts)' }}>14 dni za darmo. Bez karty kredytowej.</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-5xl mx-auto">
+          {[
+            { name: 'Starter', price: '49', desc: 'Dla małych firm IT', features: ['Do 10 urządzeń', 'Zgłoszenia + portal klienta', 'Monitoring 24/7', 'Zdalne połączenia RustDesk', 'CRM + sesje pracy', '1 technik'] },
+            { name: 'Professional', price: '149', desc: 'Dla firm obsługujących klientów', features: ['Do 50 urządzeń', 'Wszystko ze Starter +', 'Backup zarządzany', 'Billing + delegacje', 'Branding + własne logo', '5 techników'], popular: true },
+            { name: 'Enterprise', price: '299', desc: 'Dla dużych operatorów IT', features: ['Bez limitu urządzeń', 'Wszystko z Professional +', 'Asystent AI', 'API + webhooks', 'Custom domain', 'Bez limitu techników'] },
+          ].map(plan => (
+            <div key={plan.name} className="rounded-2xl p-6 relative transition-all hover:scale-[1.02]"
+              style={{
+                background: 'var(--bg-card)', border: plan.popular ? '2px solid #6366F1' : '1px solid var(--border)',
+                boxShadow: plan.popular ? '0 0 40px rgba(99,102,241,0.15)' : undefined,
+              }}>
+              {plan.popular && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-bold text-white"
+                  style={{ background: 'linear-gradient(135deg, #4F46E5, #6D28D9)' }}>
+                  Najpopularniejszy
+                </div>
+              )}
+              <h3 className="text-lg font-bold mb-1" style={{ color: 'var(--t)' }}>{plan.name}</h3>
+              <p className="text-xs mb-4" style={{ color: 'var(--tm)' }}>{plan.desc}</p>
+              <div className="mb-5">
+                <span className="text-3xl font-bold" style={{ color: 'var(--t)' }}>{plan.price}</span>
+                <span className="text-sm" style={{ color: 'var(--tm)' }}> zł/mies netto</span>
+              </div>
+              <ul className="space-y-2 mb-6">
+                {plan.features.map(f => (
+                  <li key={f} className="flex items-center gap-2 text-sm" style={{ color: 'var(--ts)' }}>
+                    <ChevronRight className="h-3 w-3 text-violet-400 flex-shrink-0" /> {f}
+                  </li>
+                ))}
+              </ul>
+              <Link to="/register" className="block text-center px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                style={{
+                  background: plan.popular ? 'linear-gradient(135deg, #4F46E5, #6D28D9)' : 'transparent',
+                  color: plan.popular ? '#fff' : 'var(--ts)',
+                  border: plan.popular ? 'none' : '1px solid var(--border)',
+                }}>
+                Wypróbuj za darmo
+              </Link>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Configurator CTA */}
       <section className="px-6 md:px-12 py-16 max-w-7xl mx-auto">
         <div className="rounded-3xl p-8 md:p-12 text-center"
           style={{ background: 'linear-gradient(145deg, rgba(79,70,229,0.06), rgba(139,92,246,0.04))', border: '1px solid rgba(99,102,241,0.15)' }}>
-          <h2 className="text-2xl md:text-3xl font-bold mb-4" style={{ color: 'var(--t)' }}>Skonfiguruj system pod siebie</h2>
-          <p className="max-w-xl mx-auto mb-3" style={{ color: 'var(--ts)' }}>
-            Wybierz moduły, ustaw liczbę stanowisk, sprawdź cenę — i zacznij 14-dniowy trial za darmo.
+          <h2 className="text-2xl md:text-3xl font-bold mb-4" style={{ color: 'var(--t)' }}>Potrzebujesz niestandardowej konfiguracji?</h2>
+          <p className="max-w-xl mx-auto mb-8" style={{ color: 'var(--ts)' }}>
+            Skonfiguruj moduły, liczbę stanowisk i połączeń — otrzymasz cenę dopasowaną do Twoich potrzeb.
           </p>
-          <p className="max-w-xl mx-auto mb-8 text-sm" style={{ color: 'var(--tm)' }}>
-            Zarządzanie IT · Sprzedaż · Pakowanie · Stacje diagnostyczne · Integracje API
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link to="/konfigurator" className="flex items-center gap-2 px-8 py-4 rounded-xl text-base font-bold text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
-              style={{ background: 'linear-gradient(135deg, #4F46E5 0%, #6D28D9 100%)', boxShadow: '0 6px 24px rgba(79,70,229,0.35)' }}>
-              Otwórz konfigurator <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link to="/register" className="flex items-center gap-2 px-7 py-3.5 rounded-xl text-sm font-semibold transition-all hover:scale-[1.02]"
-              style={{ background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)', color: 'var(--ts)', border: '1px solid var(--border)' }}>
-              Rozpocznij od razu
-            </Link>
-          </div>
+          <Link to="/konfigurator" className="inline-flex items-center gap-2 px-8 py-4 rounded-xl text-base font-bold text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
+            style={{ background: 'linear-gradient(135deg, #4F46E5 0%, #6D28D9 100%)', boxShadow: '0 6px 24px rgba(79,70,229,0.35)' }}>
+            Otwórz konfigurator <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
       </section>
 
