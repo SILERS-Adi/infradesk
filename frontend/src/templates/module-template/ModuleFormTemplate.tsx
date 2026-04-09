@@ -104,7 +104,6 @@ export function ModuleFormTemplate() {
       // Replace with real API call:
       // const { data } = await api.post('/module/items', payload);
       // navigate(`../items/${data.id}`);
-      console.log('Payload:', payload);
       toast.success(draft ? 'Szkic zapisany' : 'Element utworzony');
       navigate('..');
     } catch (err: any) {

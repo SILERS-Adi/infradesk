@@ -27,14 +27,20 @@ export async function loginService(data: LoginInput) {
   const passwordMatch = await bcrypt.compare(data.password, user.passwordHash);
   if (!passwordMatch) {
     // Increment login attempts (graceful if fields don't exist yet)
+    const attempts = (userAny.loginAttempts ?? 0) + 1;
     try {
-      const attempts = (userAny.loginAttempts ?? 0) + 1;
       const lockData: Record<string, unknown> = { loginAttempts: attempts };
       if (attempts >= 5) {
         lockData.lockedUntil = new Date(Date.now() + 15 * 60 * 1000);
       }
       await prisma.user.update({ where: { id: user.id }, data: lockData });
-    } catch { /* loginAttempts/lockedUntil fields may not exist yet — migration pending */ }
+    } catch (err) {
+      console.warn('[SECURITY] Login attempt tracking failed (migration pending?):', (err as Error).message);
+    }
+    // Enforce lockout even if DB update failed
+    if (attempts >= 5) {
+      throw new AppError('Konto zablokowane. Spróbuj za 15 min.', 403);
+    }
     throw new AppError('Invalid email or password', 401);
   }
 

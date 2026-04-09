@@ -9,7 +9,10 @@ export const createDeviceSchema = z.object({
   model: z.string().optional().nullable(),
   serialNumber: z.string().optional().nullable(),
   hostname: z.string().optional().nullable(),
-  ipAddress: z.string().regex(/^(\d{1,3}\.){3}\d{1,3}$/, 'Nieprawidłowy format adresu IP').optional().nullable(),
+  ipAddress: z.string().regex(/^(\d{1,3}\.){3}\d{1,3}$/, 'Nieprawidłowy format adresu IP').refine(
+    (val) => !val || val.split('.').every(o => parseInt(o) >= 0 && parseInt(o) <= 255),
+    { message: 'Każdy oktet IP musi być 0-255' }
+  ).optional().nullable(),
   macAddress: z.string().regex(/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/, 'Nieprawidłowy format adresu MAC').optional().nullable(),
   operatingSystem: z.string().optional().nullable(),
   osVersion: z.string().optional().nullable(),

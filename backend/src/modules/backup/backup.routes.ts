@@ -25,7 +25,10 @@ function verifyOAuthState(state: string): any | null {
   if (dotIdx === -1) return null;
   const payload = state.slice(0, dotIdx);
   const sig = state.slice(dotIdx + 1);
+  // Validate hex format and length before timing-safe compare
+  if (!/^[0-9a-f]+$/i.test(sig)) return null;
   const expected = crypto.createHmac('sha256', config.jwtSecret).update(payload).digest('hex');
+  if (sig.length !== expected.length) return null;
   if (!crypto.timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'))) return null;
   try { return JSON.parse(Buffer.from(payload, 'base64').toString()); }
   catch { return null; }

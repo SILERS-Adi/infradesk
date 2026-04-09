@@ -20,9 +20,7 @@ export default function VerifyEmailPage() {
     apiClient.post('/auth/verify-email', { token })
       .then(r => {
         const data = r.data;
-        // Save auth
-        localStorage.setItem('infradesk_access_token', data.accessToken);
-        localStorage.setItem('infradesk_refresh_token', data.refreshToken);
+        // Auth is cookie-based — only save user info for UI
         localStorage.setItem('infradesk_user', JSON.stringify(data.user));
         if (data.workspace?.id) localStorage.setItem('infradesk_workspace', data.workspace.id);
         setWorkspace(data.workspace);

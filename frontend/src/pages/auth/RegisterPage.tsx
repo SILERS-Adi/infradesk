@@ -88,9 +88,7 @@ export default function RegisterPage() {
         taxId: isCompany ? taxId : undefined,
       });
 
-      // Save auth to localStorage — AuthProvider will pick it up on reload
-      localStorage.setItem('infradesk_access_token', result.accessToken);
-      localStorage.setItem('infradesk_refresh_token', result.refreshToken);
+      // Auth is cookie-based (httpOnly) — only save user info and workspace for UI
       localStorage.setItem('infradesk_user', JSON.stringify(result.user));
       localStorage.setItem('infradesk_workspace', result.workspace.id);
 

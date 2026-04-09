@@ -29,7 +29,7 @@ export async function getDevices(req: Request, res: Response, next: NextFunction
       criticality: criticality as DeviceCriticality | undefined,
       search,
       page: page ? parseInt(page, 10) : 1,
-      limit: limit ? parseInt(limit, 10) : (wsIds.length > 1 ? 500 : 20),
+      limit: Math.min(limit ? parseInt(limit, 10) : (wsIds.length > 1 ? 500 : 20), 500),
       scopeFilter: deviceScopeFilter(req.membership),
       requestingUser: req.user!,
     });
@@ -41,7 +41,7 @@ export async function getDevices(req: Request, res: Response, next: NextFunction
 
 export async function getDevice(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const device = await getDeviceById(req.params.id, req.user!);
+    const device = await getDeviceById(req.params.id, req.user!, req.workspaceId!);
 
     // Enforce scope on detail endpoint
     if (req.membership && !isDeviceAccessible(req.membership, device.id, device.locationId)) {
@@ -66,7 +66,7 @@ export async function getDeviceByQr(req: Request, res: Response, next: NextFunct
 
 export async function getDeviceQrCode(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const qrDataUrl = await generateDeviceQrCode(req.params.id);
+    const qrDataUrl = await generateDeviceQrCode(req.params.id, req.workspaceId!);
     res.status(200).json({ qrCode: qrDataUrl });
   } catch (err) {
     next(err);
@@ -75,7 +75,7 @@ export async function getDeviceQrCode(req: Request, res: Response, next: NextFun
 
 export async function postDevice(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const device = await createDevice(req.body, req.user!.userId);
+    const device = await createDevice({ ...req.body, workspaceId: req.workspaceId! }, req.user!.userId);
     res.status(201).json(device);
   } catch (err) {
     next(err);
@@ -84,7 +84,7 @@ export async function postDevice(req: Request, res: Response, next: NextFunction
 
 export async function patchDevice(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const device = await updateDevice(req.params.id, req.body, req.user!.userId);
+    const device = await updateDevice(req.params.id, req.body, req.user!.userId, req.workspaceId!);
     res.status(200).json(device);
   } catch (err) {
     next(err);
@@ -93,7 +93,7 @@ export async function patchDevice(req: Request, res: Response, next: NextFunctio
 
 export async function removeDevice(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    await deleteDevice(req.params.id, req.user!.userId);
+    await deleteDevice(req.params.id, req.user!.userId, req.workspaceId!);
     res.status(204).send();
   } catch (err) {
     next(err);
