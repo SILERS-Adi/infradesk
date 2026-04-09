@@ -82,7 +82,7 @@ export default function LandingPage() {
               <Download className="h-3.5 w-3.5" /> Pobierz · ~40 MB
             </div>
           </a>
-          <a href="/downloads/Asystent%20Business.exe"
+          <a href="/downloads/InfraDesk%20Business%203.0.exe"
             className="group rounded-2xl p-5 text-left transition-all hover:scale-[1.02] active:scale-[0.98]"
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
             <div className="flex items-center gap-3 mb-3">
