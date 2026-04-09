@@ -20,7 +20,7 @@ export function useEventStream() {
     if (eventSourceRef.current) return;
 
     try {
-      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const baseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/api\/?$/, '');
       const es = new EventSource(`${baseUrl}/api/events/stream`, { withCredentials: true });
 
       es.addEventListener('connected', () => {
