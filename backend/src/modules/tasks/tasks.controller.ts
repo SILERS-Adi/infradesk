@@ -9,7 +9,7 @@ export async function createTask(req: Request, res: Response, next: NextFunction
     const task = await tasksService.createTask(data, {
       id:   req.user!.userId,
       role: 'ADMIN',
-    });
+    }, req.workspaceId!);
     res.status(201).json(task);
   } catch (err) { next(err); }
 }

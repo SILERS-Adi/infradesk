@@ -419,7 +419,7 @@ export function BillingPage() {
 
   return (
     <div>
-      <PageHeader title="Rozliczenia" subtitle={`${MONTHS[month]} ${year}`} />
+      <PageHeader title="Rozliczenia" helpKey="billing" subtitle={`${MONTHS[month]} ${year}`} />
 
       {/* Month picker */}
       <div className="flex items-center gap-3 mb-5">

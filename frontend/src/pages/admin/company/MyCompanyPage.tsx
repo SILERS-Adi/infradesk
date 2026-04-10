@@ -61,6 +61,7 @@ export function MyCompanyPage() {
     <div className="space-y-6 max-w-3xl">
       <PageHeader
         title="Dane firmy"
+        helpKey="myCompany"
         subtitle="Zarządzaj danymi i ustawieniami kontaktowymi Twojej firmy"
       />
 

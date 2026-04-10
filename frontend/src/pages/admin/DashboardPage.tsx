@@ -10,6 +10,8 @@ import toast from 'react-hot-toast';
 import { dashboardApi } from '../../api/dashboard';
 import { useAuth } from '../../store/authStore';
 import { OnboardingWizard } from '../../components/onboarding/OnboardingWizard';
+import { HelpPanel } from '../../components/ui/HelpPanel';
+import { helpContent } from '../../config/helpContent';
 import { useTheme } from '../../store/themeStore';
 import { TicketStatusBadge } from '../../components/ui/StatusBadge';
 import { ticketsApi } from '../../api/tickets';
@@ -182,6 +184,8 @@ export function DashboardPage() {
 
   return (
     <div className="ids-v3">
+
+      {helpContent.dashboard && <HelpPanel {...helpContent.dashboard} />}
 
       {/* Onboarding Wizard */}
       {showWizard && (

@@ -77,7 +77,7 @@ export default function TicketNewPage() {
 
   return (
     <div style={{ maxWidth: 640 }}>
-      <PageHeader title="Nowe zgłoszenie" subtitle="Utwórz nowe zgłoszenie serwisowe" back="/tickets" />
+      <PageHeader title="Nowe zgłoszenie" subtitle="Utwórz nowe zgłoszenie serwisowe" back="/tickets" helpKey="portalNewRequest" />
 
       <form onSubmit={handleSubmit}>
         <div className="page-card" style={{ padding: 24 }}>

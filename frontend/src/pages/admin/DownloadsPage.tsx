@@ -177,7 +177,7 @@ function CompareModal({ open, onClose }: { open: boolean; onClose: () => void })
         <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4" style={{ background: '#0E1527', borderBottom: '1px solid var(--border)' }}>
           <div className="flex items-center gap-3">
             <GitCompareArrows className="h-5 w-5" style={{ color: '#818CF8' }} />
-            <h3 className="text-[16px] font-semibold text-white/90">Asystent Home vs Asystent Business</h3>
+            <h3 className="text-[16px] font-semibold text-white/90">Asystent Home vs InfraDesk Business</h3>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg transition-colors hover:bg-white/10">
             <X className="h-5 w-5 text-white/40" />
@@ -247,11 +247,11 @@ export function DownloadsPage() {
     },
     {
       icon: <Server className="h-7 w-7" />,
-      name: 'Asystent Business',
+      name: 'InfraDesk Business',
       description: 'Dla firm. Monitoring sprzętu, S.M.A.R.T., RAID, Event Log, zgłoszenia serwisowe, pomoc zdalna.',
       color: 'indigo',
       files: [
-        { label: 'Asystent Business — Windows', url: '/downloads/Asystent%20Business%203.0.exe', badge: versionBadge, primary: true, size: '~40 MB' },
+        { label: 'InfraDesk Business — Windows', url: '/downloads/InfraDesk%20Business%203.0.exe', badge: versionBadge, primary: true, size: '~40 MB' },
       ],
       notes: [
         'Wymaga Windows 10 lub nowszego',
@@ -296,6 +296,7 @@ export function DownloadsPage() {
     <div className="space-y-6 max-w-4xl">
       <PageHeader
         title="Pobieranie"
+        helpKey="downloads"
         subtitle="Aplikacje i narzędzia dla klientów i techników InfraDesk"
       />
 

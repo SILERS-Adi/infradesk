@@ -380,7 +380,7 @@ export function TasksPage() {
 
   return (
     <div>
-      <PageHeader title="Zadania" subtitle={`${tasks.filter(t => t.status !== 'DONE').length} aktywnych`}
+      <PageHeader title="Zadania" helpKey="tasks" subtitle={`${tasks.filter(t => t.status !== 'DONE').length} aktywnych`}
         actions={<div style={{ display: 'flex', gap: 8 }}>
           <button onClick={() => setShowColEditor(e => !e)}
             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, background: 'transparent', border: '1px solid var(--border)', color: 'var(--tm)', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>

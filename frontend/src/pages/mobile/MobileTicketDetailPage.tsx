@@ -115,7 +115,7 @@ export function MobileTicketDetailPage() {
         <div className="space-y-2">
           {[
             { icon: Building2, label: 'Lokalizacja', value: ticket.location?.name },
-            { icon: MapPin, label: 'Lokalizacja', value: ticket.location?.name },
+            { icon: MapPin, label: 'Urządzenie', value: ticket.device?.name },
             { icon: User, label: 'Technik', value: ticket.assignedTo ? `${ticket.assignedTo.firstName} ${ticket.assignedTo.lastName}` : null },
             { icon: Clock, label: 'Zgłoszono', value: new Date(ticket.reportedAt ?? ticket.createdAt).toLocaleString('pl-PL') },
           ].filter(i => i.value).map(item => (

@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -32,6 +33,7 @@ function fmtEst(min?: number | null): string {
 
 export function CalendarPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const calendarRef = useRef<any>(null);
   const unscheduledRef = useRef<HTMLDivElement>(null);
@@ -126,7 +128,7 @@ export function CalendarPage() {
 
   return (
     <div>
-      <PageHeader title="Kalendarz" subtitle="Przeciągnij zadania z panelu na kalendarz" />
+      <PageHeader title="Kalendarz" helpKey="calendar" subtitle="Przeciągnij zadania z panelu na kalendarz" />
 
       <div className="flex gap-4">
         {/* -- Left: Unscheduled tasks panel -- */}
@@ -247,7 +249,7 @@ export function CalendarPage() {
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="secondary" onClick={() => setSelectedTask(null)}>Zamknij</Button>
-              <Button onClick={() => { window.location.href = '/tasks'; }}>Otwórz zadania</Button>
+              <Button onClick={() => { navigate('/tasks'); }}>Otwórz zadania</Button>
             </div>
           </div>
         </Modal>

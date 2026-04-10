@@ -45,7 +45,7 @@ export function PortalTicketDetailPage() {
   });
 
   if (isLoading) return <LoadingSpinner />;
-  if (!ticket) return <p className="text-sm text-gray-500">Nie znaleziono zgłoszenia</p>;
+  if (!ticket) return <p className="text-sm" style={{ color: 'var(--tm)' }}>Nie znaleziono zgłoszenia</p>;
 
   const { text: descText, photoUrls } = parseDescription(ticket.description);
   const allPhotoUrls = [photoUrls, ticket.attachmentUrls].filter(Boolean).join(',');
@@ -66,47 +66,48 @@ export function PortalTicketDetailPage() {
       />
 
       <Card title="Opis zgłoszenia">
-        <p className="text-sm text-gray-700 whitespace-pre-wrap">{descText}</p>
+        <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--ts)' }}>{descText}</p>
         {allPhotoUrls && <AttachmentGallery urls={allPhotoUrls} secure />}
         {ticket.resolutionSummary && (
-          <div className="mt-4 pt-4 border-t border-gray-100">
-            <div className="text-xs font-semibold text-gray-500 mb-1">Rozwiązanie</div>
-            <p className="text-sm text-gray-700 whitespace-pre-wrap">{ticket.resolutionSummary}</p>
+          <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
+            <div className="text-xs font-semibold mb-1" style={{ color: 'var(--tm)' }}>Rozwiązanie</div>
+            <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--ts)' }}>{ticket.resolutionSummary}</p>
           </div>
         )}
       </Card>
 
       <Card title="Szczegóły">
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div><span className="text-xs text-gray-500">Lokalizacja</span><br />{ticket.location?.name}</div>
-          {ticket.device && <div><span className="text-xs text-gray-500">Urządzenie</span><br />{ticket.device.name}</div>}
-          <div><span className="text-xs text-gray-500">Zgłoszono</span><br />{formatDateTime(ticket.reportedAt)}</div>
-          {ticket.assignedTo && <div><span className="text-xs text-gray-500">Technik</span><br />{ticket.assignedTo.firstName} {ticket.assignedTo.lastName}</div>}
+        <div className="grid grid-cols-2 gap-3 text-sm" style={{ color: 'var(--t)' }}>
+          <div><span className="text-xs" style={{ color: 'var(--tm)' }}>Lokalizacja</span><br />{ticket.location?.name ?? '—'}</div>
+          {ticket.device && <div><span className="text-xs" style={{ color: 'var(--tm)' }}>Urządzenie</span><br />{ticket.device.name}</div>}
+          <div><span className="text-xs" style={{ color: 'var(--tm)' }}>Zgłoszono</span><br />{formatDateTime(ticket.reportedAt)}</div>
+          {ticket.assignedTo && <div><span className="text-xs" style={{ color: 'var(--tm)' }}>Technik</span><br />{ticket.assignedTo.firstName} {ticket.assignedTo.lastName}</div>}
         </div>
       </Card>
 
       <Card title={`Komentarze (${publicComments.length})`}>
         <div className="space-y-4 mb-5">
           {publicComments.length === 0 ? (
-            <p className="text-sm text-gray-500">Brak komentarzy</p>
+            <p className="text-sm" style={{ color: 'var(--tm)' }}>Brak komentarzy</p>
           ) : publicComments.map(c => (
             <div key={c.id} className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center justify-center flex-shrink-0">
+              <div className="w-8 h-8 rounded-full text-xs font-semibold flex items-center justify-center flex-shrink-0"
+                style={{ background: 'rgba(139,92,246,0.12)', color: '#A78BFA' }}>
                 {c.user ? getInitials(c.user.firstName, c.user.lastName) : '?'}
               </div>
               <div>
                 <div className="flex gap-2 items-center mb-1">
-                  <span className="text-sm font-medium text-gray-900">
+                  <span className="text-sm font-medium" style={{ color: 'var(--t)' }}>
                     {c.user ? `${c.user.firstName} ${c.user.lastName}` : 'Użytkownik'}
                   </span>
-                  <span className="text-xs text-gray-400">{formatDateTime(c.createdAt)}</span>
+                  <span className="text-xs" style={{ color: 'var(--td)' }}>{formatDateTime(c.createdAt)}</span>
                 </div>
-                <p className="text-sm text-gray-700">{c.comment}</p>
+                <p className="text-sm" style={{ color: 'var(--ts)' }}>{c.comment}</p>
               </div>
             </div>
           ))}
         </div>
-        <div className="border-t border-gray-100 pt-4">
+        <div className="pt-4" style={{ borderTop: '1px solid var(--border)' }}>
           <Textarea
             placeholder="Dodaj komentarz..."
             value={comment}

@@ -11,7 +11,7 @@ import {
   removeTicket,
 } from './tickets.controller';
 import { authenticate } from '../../middleware/auth';
-import { withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
+import { requireWorkspace, withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
 import { validate } from '../../middleware/validate';
 import {
   createTicketSchema,
@@ -19,11 +19,12 @@ import {
   addCommentSchema,
   assignTicketSchema,
   changeStatusSchema,
+  rateTicketSchema,
 } from './tickets.validation';
 
 const router = Router();
 
-router.use(authenticate);
+router.use(authenticate, requireWorkspace);
 
 router.get('/', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'), getTickets);
 router.get('/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'), getTicket);
@@ -37,19 +38,16 @@ router.delete('/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMI
 
 // Rate ticket (any authenticated member — typically client)
 import prisma from '../../lib/prisma';
-router.post('/:id/rate', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'), async (req, res, next) => {
+import { AppError } from '../../middleware/errorHandler';
+router.post('/:id/rate', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'), validate(rateTicketSchema), async (req, res, next) => {
   try {
     const { id } = req.params;
     const { rating, ratingComment } = req.body;
 
-    if (!rating || ![1, 2, 3].includes(rating)) {
-      res.status(400).json({ error: 'Rating musi być 1, 2 lub 3' }); return;
-    }
-
-    const ticket = await prisma.ticket.findUnique({ where: { id }, select: { status: true, rating: true } });
-    if (!ticket) { res.status(404).json({ error: 'Zgłoszenie nie znalezione' }); return; }
+    const ticket = await prisma.ticket.findFirst({ where: { id, workspaceId: req.workspaceId! }, select: { status: true, rating: true } });
+    if (!ticket) throw new AppError('Zgłoszenie nie znalezione', 404);
     if (!['COMPLETED', 'RESOLVED', 'CLOSED'].includes(ticket.status)) {
-      res.status(400).json({ error: 'Można oceniać tylko zakończone zgłoszenia' }); return;
+      throw new AppError('Można oceniać tylko zakończone zgłoszenia', 400);
     }
 
     const updated = await prisma.ticket.update({

@@ -78,7 +78,7 @@ export function TicketReportsPage() {
 
   return (
     <>
-      <PageHeader title="Raporty zgłoszeń" subtitle="Statystyki i analiza zgłoszeń" />
+      <PageHeader title="Raporty zgłoszeń" helpKey="ticketReports" subtitle="Statystyki i analiza zgłoszeń" />
       <div style={{ padding: '0 24px 24px' }}>
         {/* KPI */}
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>

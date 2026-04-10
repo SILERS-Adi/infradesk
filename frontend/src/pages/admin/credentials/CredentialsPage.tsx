@@ -16,6 +16,8 @@ import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import { ErrorState } from '../../../components/ui/ErrorState';
 import { ScopedAccessBanner } from '../../../components/ui/ScopedAccessBanner';
 import { CredentialForm } from '../../../components/forms/CredentialForm';
+import { FormModeToggle, useFormMode } from '../../../components/ui/FormModeToggle';
+import { QuickCredentialForm } from '../../../components/forms/QuickCredentialForm';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { copyToClipboard, getErrorMessage } from '../../../utils/helpers';
 import type { Credential } from '../../../types';
@@ -233,6 +235,7 @@ export function CredentialsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Credential | null>(null);
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [visibleKeys, setVisibleKeys] = useState<string[]>(loadColumns);
+  const [formMode, setFormMode] = useFormMode();
   const debouncedSearch = useDebounce(search);
 
   useEffect(() => { saveColumns(visibleKeys); }, [visibleKeys]);
@@ -274,9 +277,11 @@ export function CredentialsPage() {
     <div>
       <PageHeader
         title="Dostepy"
+        helpKey="vault"
         subtitle={`${filtered.length} wpisow`}
         actions={
           <div className="flex items-center gap-2">
+            <FormModeToggle mode={formMode} onChange={setFormMode} />
             <button onClick={() => setShowColumnEditor(v => !v)}
               className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl transition-all duration-200 active:scale-[0.97]"
               style={{
@@ -424,12 +429,21 @@ export function CredentialsPage() {
         />
       )}
 
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} size="xl" noPadding>
-        <CredentialForm
-          onSuccess={() => { setShowCreate(false); qc.invalidateQueries({ queryKey: ['credentials'] }); }}
-          onCancel={() => setShowCreate(false)}
-        />
-      </Modal>
+      {formMode === 'wizard' ? (
+        <Modal open={showCreate} onClose={() => setShowCreate(false)} size="xl" noPadding>
+          <CredentialForm
+            onSuccess={() => { setShowCreate(false); qc.invalidateQueries({ queryKey: ['credentials'] }); }}
+            onCancel={() => setShowCreate(false)}
+          />
+        </Modal>
+      ) : (
+        <Modal open={showCreate} onClose={() => setShowCreate(false)} size="xl">
+          <QuickCredentialForm
+            onSuccess={() => { setShowCreate(false); qc.invalidateQueries({ queryKey: ['credentials'] }); }}
+            onCancel={() => setShowCreate(false)}
+          />
+        </Modal>
+      )}
 
       {editTarget && (
         <Modal open={!!editTarget} onClose={() => setEditTarget(null)} size="xl" noPadding>

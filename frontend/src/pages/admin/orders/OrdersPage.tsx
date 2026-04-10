@@ -132,6 +132,7 @@ export function OrdersPage() {
     <div>
       <PageHeader
         title="Zamówienia"
+        helpKey="orders"
         subtitle={`${orders.length} pozycji`}
         actions={
           <div className="flex items-center gap-2">
@@ -248,16 +249,16 @@ export function OrdersPage() {
                       <span className="text-xs" style={{ color: 'var(--tm)' }}>{order.location?.name || '—'}</span>
                     </div>
                     <div className="space-y-1">
-                      {order.items.map(item => (
+                      {(order.items ?? []).map(item => (
                         <div key={item.id} className="flex items-center gap-3 text-sm">
                           <span className="font-medium" style={{ color: 'var(--t)' }}>{item.name}</span>
                           <span style={{ color: 'var(--tm)' }}>x{item.quantity}</span>
-                          {item.price && <span style={{ color: 'var(--tm)' }}>{item.price.toFixed(2)} zl</span>}
+                          {item.price && <span style={{ color: 'var(--tm)' }}>{item.price.toFixed(2)} zł</span>}
                         </div>
                       ))}
                     </div>
                     {order.notes && <p className="text-xs mt-2" style={{ color: 'var(--tm)' }}>{order.notes}</p>}
-                    <p className="text-xs mt-2" style={{ color: 'var(--tm)' }}>{formatDate(order.createdAt)} · {order.createdBy?.firstName} {order.createdBy?.lastName}</p>
+                    <p className="text-xs mt-2" style={{ color: 'var(--tm)' }}>{formatDate(order.createdAt)}{order.createdBy ? ` · ${order.createdBy.firstName} ${order.createdBy.lastName}` : ''}</p>
                   </div>
                   <div className="flex flex-col gap-2 flex-shrink-0">
                     {STATUS_NEXT[order.status] && (

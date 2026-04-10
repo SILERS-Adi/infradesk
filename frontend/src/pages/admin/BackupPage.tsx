@@ -423,6 +423,7 @@ export function BackupPage() {
     <div className="space-y-6 max-w-5xl">
       <PageHeader
         title="Kopie zapasowe"
+        helpKey="backups"
         subtitle="Zarządzanie konfiguracjami backupów baz danych i folderów"
         actions={
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>

@@ -21,6 +21,9 @@ import { ErrorState } from '../../../components/ui/ErrorState';
 import { ScopedAccessBanner } from '../../../components/ui/ScopedAccessBanner';
 import { useWorkspaceContext } from '../../../hooks/useWorkspaceContext';
 import { UnifiedTicketWizard } from '../../../components/wizard/UnifiedTicketWizard';
+import { FormModeToggle, useFormMode } from '../../../components/ui/FormModeToggle';
+import { QuickTicketForm } from '../../../components/forms/QuickTicketForm';
+import { Modal } from '../../../components/ui/Modal';
 import { formatDate } from '../../../utils/helpers';
 import type { Ticket } from '../../../types';
 
@@ -309,6 +312,7 @@ export function TicketsListPage() {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [visibleKeys, setVisibleKeys] = useState<string[]>(loadColumns);
   const [showColumnEditor, setShowColumnEditor] = useState(false);
+  const [formMode, setFormMode] = useFormMode();
 
   useEffect(() => { saveColumns(visibleKeys); }, [visibleKeys]);
 
@@ -529,9 +533,11 @@ export function TicketsListPage() {
     <div>
       <PageHeader
         title="Zgłoszenia"
+        helpKey="tickets"
         subtitle={`${allTickets.length} zgłoszeń`}
         actions={
           <div className="flex items-center gap-2">
+            <FormModeToggle mode={formMode} onChange={setFormMode} />
             <button onClick={() => setShowColumnEditor(v => !v)}
               className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl transition-all duration-200 active:scale-[0.97]"
               style={{
@@ -663,13 +669,23 @@ export function TicketsListPage() {
         />
       )}
 
-      <UnifiedTicketWizard
-        open={showCreate}
-        onClose={() => setShowCreate(false)}
-        onSuccess={() => {
-          qc.invalidateQueries({ queryKey: ['tickets-all'] });
-        }}
-      />
+      {formMode === 'wizard' ? (
+        <UnifiedTicketWizard
+          open={showCreate}
+          onClose={() => setShowCreate(false)}
+          onSuccess={() => {
+            setShowCreate(false);
+            qc.invalidateQueries({ queryKey: ['tickets-all'] });
+          }}
+        />
+      ) : (
+        <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Nowe zgłoszenie" size="2xl" noPadding>
+          <QuickTicketForm
+            onSuccess={() => { setShowCreate(false); }}
+            onCancel={() => setShowCreate(false)}
+          />
+        </Modal>
+      )}
     </div>
   );
 }

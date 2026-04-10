@@ -15,6 +15,8 @@ import { EmptyState } from '../../../components/ui/EmptyState';
 import { ErrorState } from '../../../components/ui/ErrorState';
 import { ScopedAccessBanner } from '../../../components/ui/ScopedAccessBanner';
 import { LocationForm } from '../../../components/forms/LocationForm';
+import { FormModeToggle, useFormMode } from '../../../components/ui/FormModeToggle';
+import { QuickLocationForm } from '../../../components/forms/QuickLocationForm';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { getErrorMessage } from '../../../utils/helpers';
 import type { Location } from '../../../types';
@@ -82,6 +84,7 @@ export function LocationsListPage() {
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [visibleKeys, setVisibleKeys] = useState<string[]>(loadColumns);
   const [deleteTarget, setDeleteTarget] = useState<Location | null>(null);
+  const [formMode, setFormMode] = useFormMode();
   const debouncedSearch = useDebounce(search);
 
   useEffect(() => { saveColumns(visibleKeys); }, [visibleKeys]);
@@ -118,9 +121,11 @@ export function LocationsListPage() {
     <div>
       <PageHeader
         title="Lokalizacje"
+        helpKey="locations"
         subtitle={`${filtered.length} lokalizacji`}
         actions={
           <div className="flex items-center gap-2">
+            <FormModeToggle mode={formMode} onChange={setFormMode} />
             <button onClick={() => setShowColumnEditor(v => !v)}
               className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl transition-all"
               style={{
@@ -238,12 +243,21 @@ export function LocationsListPage() {
         />
       )}
 
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Nowa lokalizacja" size="xl">
-        <LocationForm
-          onSuccess={() => { setShowCreate(false); qc.invalidateQueries({ queryKey: ['locations'] }); toast.success('Lokalizacja dodana'); }}
-          onCancel={() => setShowCreate(false)}
-        />
-      </Modal>
+      {formMode === 'wizard' ? (
+        <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Nowa lokalizacja" size="xl">
+          <LocationForm
+            onSuccess={() => { setShowCreate(false); qc.invalidateQueries({ queryKey: ['locations'] }); toast.success('Lokalizacja dodana'); }}
+            onCancel={() => setShowCreate(false)}
+          />
+        </Modal>
+      ) : (
+        <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Nowa lokalizacja" size="xl">
+          <QuickLocationForm
+            onSuccess={() => { setShowCreate(false); qc.invalidateQueries({ queryKey: ['locations'] }); toast.success('Lokalizacja dodana'); }}
+            onCancel={() => setShowCreate(false)}
+          />
+        </Modal>
+      )}
 
       <ConfirmDialog
         open={!!deleteTarget}

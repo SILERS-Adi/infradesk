@@ -16,6 +16,8 @@ import { EmptyState } from '../../../components/ui/EmptyState';
 import { ErrorState } from '../../../components/ui/ErrorState';
 import { ScopedAccessBanner } from '../../../components/ui/ScopedAccessBanner';
 import { DeviceForm } from '../../../components/forms/DeviceForm';
+import { FormModeToggle, useFormMode } from '../../../components/ui/FormModeToggle';
+import { QuickDeviceForm } from '../../../components/forms/QuickDeviceForm';
 import { useDebounce } from '../../../hooks/useDebounce';
 import type { Device } from '../../../types';
 import { useWorkspaceContext } from '../../../hooks/useWorkspaceContext';
@@ -161,6 +163,7 @@ export function DevicesListPage() {
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [visibleKeys, setVisibleKeys] = useState(loadDeviceCols);
   const [showColumnEditor, setShowColumnEditor] = useState(false);
+  const [formMode, setFormMode] = useFormMode();
 
   useEffect(() => { saveDeviceCols(visibleKeys); }, [visibleKeys]);
   const debouncedSearch = useDebounce(search);
@@ -345,9 +348,11 @@ export function DevicesListPage() {
     <div>
       <PageHeader
         title="Urządzenia"
+        helpKey="devices"
         subtitle={`${devices.length} urządzeń`}
         actions={
           <div className="flex items-center gap-2">
+            <FormModeToggle mode={formMode} onChange={setFormMode} />
             <button onClick={() => setShowColumnEditor(v => !v)}
               className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl transition-all duration-200 active:scale-[0.97]"
               style={{
@@ -494,15 +499,27 @@ export function DevicesListPage() {
         />
       )}
 
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} size="2xl" noPadding>
-        <DeviceForm
-          onSuccess={() => {
-            setShowCreate(false);
-            qc.invalidateQueries({ queryKey: ['devices'] });
-          }}
-          onCancel={() => setShowCreate(false)}
-        />
-      </Modal>
+      {formMode === 'wizard' ? (
+        <Modal open={showCreate} onClose={() => setShowCreate(false)} size="2xl" noPadding>
+          <DeviceForm
+            onSuccess={() => {
+              setShowCreate(false);
+              qc.invalidateQueries({ queryKey: ['devices'] });
+            }}
+            onCancel={() => setShowCreate(false)}
+          />
+        </Modal>
+      ) : (
+        <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Nowe urządzenie" size="2xl" noPadding>
+          <QuickDeviceForm
+            onSuccess={() => {
+              setShowCreate(false);
+              qc.invalidateQueries({ queryKey: ['devices'] });
+            }}
+            onCancel={() => setShowCreate(false)}
+          />
+        </Modal>
+      )}
     </div>
   );
 }

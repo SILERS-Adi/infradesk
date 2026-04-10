@@ -276,7 +276,7 @@ function GoogleDriveCard() {
     try {
       await apiClient.put('/workspaces/settings/google-drive', { google_client_id: clientId, google_client_secret: clientSecret });
       toast.success('Zapisano klucze Google Drive');
-    } catch { toast.error('Blad zapisu'); }
+    } catch { toast.error('Błąd zapisu'); }
     setSaving(false);
   };
 
@@ -325,6 +325,7 @@ export function SettingsPage() {
     <div className="space-y-6 max-w-4xl">
       <PageHeader
         title="Ustawienia"
+        helpKey="settings"
         subtitle="Konfiguracja systemu InfraDesk"
       />
       <OrganizationTypeCard />

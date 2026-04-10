@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
 export const createTicketSchema = z.object({
-  workspaceId: z.string().uuid().optional(),
   locationId: z.string().uuid().optional(),
   deviceId: z.string().uuid().optional().nullable(),
   type: z.enum(['INCIDENT', 'REQUEST', 'MAINTENANCE', 'INSTALLATION', 'REKLAMACJA', 'OTHER']).default('INCIDENT'),
@@ -42,6 +41,11 @@ export const assignTicketSchema = z.object({
 export const changeStatusSchema = z.object({
   status: z.enum(['NEW', 'IN_PROGRESS', 'WAITING_FOR_CLIENT', 'RESOLVED', 'CLOSED']),
   resolutionSummary: z.string().optional().nullable(),
+});
+
+export const rateTicketSchema = z.object({
+  rating: z.number().int().min(1).max(3),
+  ratingComment: z.string().max(1000).optional().nullable(),
 });
 
 export type CreateTicketInput = z.infer<typeof createTicketSchema>;

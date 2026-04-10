@@ -48,7 +48,7 @@ export function ActivityLogsPage() {
 
   return (
     <div>
-      <PageHeader title="Logi aktywności" subtitle={`${logs.length} wpisów`} />
+      <PageHeader title="Logi aktywności" helpKey="activityLogs" subtitle={`${logs.length} wpisów`} />
 
       <div className="rounded-lg" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
         <div className="p-4 flex flex-wrap gap-3" style={{ borderBottom: '1px solid var(--border)' }}>

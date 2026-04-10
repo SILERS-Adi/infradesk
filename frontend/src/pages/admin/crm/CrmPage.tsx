@@ -195,6 +195,7 @@ export function CrmPage() {
     <div>
       <PageHeader
         title="CRM"
+        helpKey="crm"
         subtitle="Historia kontaktów i zapytania ofertowe"
         actions={
           <div className="flex items-center gap-2">

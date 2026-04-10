@@ -54,7 +54,8 @@ export async function generateTaskNumber(): Promise<string> {
 
 export async function createTask(
   data: CreateTaskInput,
-  requestingUser: { id: string; role: string }
+  requestingUser: { id: string; role: string },
+  workspaceId: string,
 ) {
   const taskNumber = await generateTaskNumber();
   const task = await prisma.task.create({
@@ -64,11 +65,12 @@ export async function createTask(
       description:      data.description,
       assignedToUserId: data.assignedToUserId,
       createdByUserId:  requestingUser.id,
+      workspaceId,
       dueAt:            data.dueAt ? new Date(data.dueAt) : undefined,
       notes:            data.notes,
-      estimatedMinutes: (data as any).estimatedMinutes ?? null,
+      estimatedMinutes: data.estimatedMinutes ?? null,
       status:           TaskStatus.NEW,
-    } as any,
+    },
     select: taskSelect,
   });
 
@@ -195,7 +197,7 @@ export async function updateTask(
   if (data.notes !== undefined) updateData.notes = data.notes;
   if (data.dueAt !== undefined) updateData.dueAt = data.dueAt ? new Date(data.dueAt) : null;
   if (data.travelKm !== undefined) updateData.travelKm = data.travelKm;
-  if ((data as any).estimatedMinutes !== undefined) updateData.estimatedMinutes = (data as any).estimatedMinutes;
+  if (data.estimatedMinutes !== undefined) updateData.estimatedMinutes = data.estimatedMinutes;
 
   const updated = await prisma.task.update({
     where: { id },

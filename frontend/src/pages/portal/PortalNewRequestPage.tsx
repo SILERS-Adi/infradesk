@@ -20,7 +20,6 @@ import { getErrorMessage } from '../../utils/helpers';
 const TICKET_TYPE_OPTIONS = [
   { value: 'REQUEST', label: 'Zgłoszenie serwisowe' },
   { value: 'INCIDENT', label: 'Awaria / Incydent' },
-  { value: 'REKLAMACJA', label: 'Reklamacja' },
   { value: 'MAINTENANCE', label: 'Konserwacja' },
   { value: 'OTHER', label: 'Inne' },
 ];
@@ -73,7 +72,7 @@ export function PortalNewRequestPage() {
 
   return (
     <div className="max-w-xl">
-      <PageHeader title="Nowe zgłoszenie" back="/portal" />
+      <PageHeader title="Nowe zgłoszenie" back="/portal" helpKey="portalNewRequest" />
       <Card>
         <form onSubmit={handleSubmit(d => mutation.mutate(d))} className="space-y-4">
           <Select

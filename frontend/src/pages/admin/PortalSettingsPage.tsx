@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Settings, FileText, ListChecks, Route, Clock, Share2, Eye, Bell } from 'lucide-react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useWorkspaceContext } from '../../hooks/useWorkspaceContext';
@@ -34,13 +34,15 @@ export default function PortalSettingsPage() {
   const visibleTabs = TABS.filter(t => !t.wsTypes || t.wsTypes.includes(wsType));
 
   // If active tab was hidden, fallback to first
-  if (!visibleTabs.find(t => t.id === activeTab)) {
-    setActiveTab(visibleTabs[0]?.id ?? 'general');
-  }
+  useEffect(() => {
+    if (!visibleTabs.find(t => t.id === activeTab)) {
+      setActiveTab(visibleTabs[0]?.id ?? 'general');
+    }
+  }, [wsType]);
 
   return (
     <div style={{ padding: '0 0 40px' }}>
-      <PageHeader title="Portal i obsługa" subtitle="Konfiguracja zgłoszeń, formularzy, SLA i udostępniania" />
+      <PageHeader title="Portal i obsługa" helpKey="portalSettings" subtitle="Konfiguracja zgłoszeń, formularzy, SLA i udostępniania" />
 
       {/* Tabs */}
       <div style={{

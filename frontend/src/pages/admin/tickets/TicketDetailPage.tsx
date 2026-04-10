@@ -191,7 +191,7 @@ export function TicketDetailPage() {
 
   return (
     <div>
-      <PageHeader title={ticket.title} back="/tickets" subtitle={ticket.ticketNumber}
+      <PageHeader title={ticket.title} helpKey="ticketDetail" back="/tickets" subtitle={ticket.ticketNumber}
         actions={<div className="flex items-center gap-2"><PriorityBadge priority={ticket.priority} /><TicketStatusBadge status={ticket.status} /></div>} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -351,7 +351,7 @@ export function TicketDetailPage() {
 
 /* ── Rating Section ──────────────────────────────────────────────────────── */
 
-function TicketRatingSection({ ticket }: { ticket: any }) {
+function TicketRatingSection({ ticket }: { ticket: { id: string; status: string; rating?: number | null; ratingComment?: string | null } }) {
   const qc = useQueryClient();
   const [hover, setHover] = useState(0);
   const [comment, setComment] = useState('');
@@ -362,7 +362,7 @@ function TicketRatingSection({ ticket }: { ticket: any }) {
       ticketsApi.rate(ticket.id, data),
     onSuccess: () => {
       toast.success('Dziękujemy za ocenę!');
-      qc.invalidateQueries({ queryKey: ['ticket'] });
+      qc.invalidateQueries({ queryKey: ['tickets', ticket.id] });
     },
     onError: () => toast.error('Błąd zapisu oceny'),
   });
@@ -381,7 +381,7 @@ function TicketRatingSection({ ticket }: { ticket: any }) {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: ticket.ratingComment ? 8 : 0 }}>
             {[1, 2, 3].map(s => (
-              <Star key={s} size={22} fill={s <= ticket.rating ? '#F59E0B' : 'none'} color={s <= ticket.rating ? '#F59E0B' : 'var(--border)'} strokeWidth={s <= ticket.rating ? 0 : 1.5} />
+              <Star key={s} size={22} fill={s <= (ticket.rating ?? 0) ? '#F59E0B' : 'none'} color={s <= (ticket.rating ?? 0) ? '#F59E0B' : 'var(--border)'} strokeWidth={s <= (ticket.rating ?? 0) ? 0 : 1.5} />
             ))}
             <span style={{ fontSize: 13, color: 'var(--tm)', marginLeft: 4 }}>{ticket.rating}/3</span>
           </div>

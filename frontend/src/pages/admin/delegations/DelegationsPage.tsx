@@ -14,7 +14,7 @@ export function DelegationsPage() {
 
   return (
     <div>
-      <PageHeader title="Delegacje" subtitle={`${delegations.length} delegacji`} />
+      <PageHeader title="Delegacje" helpKey="delegations" subtitle={`${delegations.length} delegacji`} />
       {isLoading ? (
         <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500" /></div>
       ) : isError ? (
