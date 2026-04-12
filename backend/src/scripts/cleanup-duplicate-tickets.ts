@@ -27,13 +27,7 @@ async function main() {
       deletedAt: null,
     },
     orderBy: { createdAt: 'asc' },
-    select: {
-      id: true,
-      ticketNumber: true,
-      workspaceId: true,
-      deviceId: true,
-      title: true,
-      createdAt: true,
+    include: {
       _count: {
         select: { comments: true, tasks: true, orders: true, workSessions: true },
       },
@@ -57,9 +51,10 @@ async function main() {
     console.log(`\n"${keep.title}" (${tickets.length} tickets) — keeping ${keep.ticketNumber}`);
 
     for (const dup of duplicates) {
-      const hasWork = dup._count.comments > 0 || dup._count.tasks > 0 || dup._count.orders > 0 || dup._count.workSessions > 0;
+      const c = dup._count;
+      const hasWork = c.comments > 0 || c.tasks > 0 || c.orders > 0 || c.workSessions > 0;
       if (hasWork) {
-        console.log(`  SKIP ${dup.ticketNumber} — has work (${dup._count.comments}c ${dup._count.tasks}t ${dup._count.orders}o ${dup._count.workSessions}s)`);
+        console.log(`  SKIP ${dup.ticketNumber} — has work (${c.comments}c ${c.tasks}t ${c.orders}o ${c.workSessions}s)`);
         continue;
       }
 
