@@ -401,6 +401,22 @@ export async function createAgentTicket(token: string, data: AgentTicketInput) {
     throw new AppError('Agent not active or not linked to workspace', 403);
   }
 
+  // ── Deduplication: skip if an open ticket with the same title exists for this agent ──
+  const existingTicket = await prisma.ticket.findFirst({
+    where: {
+      workspaceId: reg.workspaceId!,
+      deviceId: reg.deviceId ?? undefined,
+      source: 'AGENT' as any,
+      title: data.title,
+      status: { in: ['PENDING', 'IN_PROGRESS', 'WAITING'] },
+    },
+    select: { id: true, ticketNumber: true },
+  });
+
+  if (existingTicket) {
+    return existingTicket;
+  }
+
   let location: { id: string } | null = reg.device?.locationId
     ? { id: reg.device.locationId }
     : await prisma.location.findFirst({ where: { workspaceId: reg.workspaceId! }, select: { id: true } });

@@ -4,7 +4,7 @@ import { sessionScopeFilter } from '../../middleware/workspace';
 
 export async function postStart(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const techId = (req as any).user.id as string;
+    const techId = req.user!.userId;
     const { agentRegId } = req.body as { agentRegId: string };
     if (!agentRegId) { res.status(400).json({ error: 'agentRegId required' }); return; }
     const session = await startSession(techId, agentRegId);
@@ -14,7 +14,7 @@ export async function postStart(req: Request, res: Response, next: NextFunction)
 
 export async function patchEnd(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const techId = (req as any).user.id as string;
+    const techId = req.user!.userId;
     const { notes } = req.body as { notes?: string };
     const session = await endSession(req.params.id, techId, notes);
     res.json(session);
