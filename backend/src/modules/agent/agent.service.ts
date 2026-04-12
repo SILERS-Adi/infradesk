@@ -408,7 +408,7 @@ export async function createAgentTicket(token: string, data: AgentTicketInput) {
       deviceId: reg.deviceId ?? undefined,
       source: 'AGENT' as any,
       title: data.title,
-      status: { in: ['PENDING', 'IN_PROGRESS', 'WAITING'] },
+      status: { in: ['NEW', 'PENDING', 'ASSIGNED', 'IN_PROGRESS', 'WAITING_FOR_CLIENT'] },
     },
     select: { id: true, ticketNumber: true },
   });

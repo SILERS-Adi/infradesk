@@ -23,7 +23,7 @@ async function main() {
   const allAgentTickets = await prisma.ticket.findMany({
     where: {
       source: 'AGENT' as any,
-      status: { in: ['PENDING', 'IN_PROGRESS', 'WAITING'] },
+      status: { in: ['NEW', 'PENDING', 'ASSIGNED', 'IN_PROGRESS', 'WAITING_FOR_CLIENT'] },
       deletedAt: null,
     },
     orderBy: { createdAt: 'asc' },
@@ -62,7 +62,7 @@ async function main() {
       if (!DRY_RUN) {
         await prisma.ticket.update({
           where: { id: dup.id },
-          data: { deletedAt: new Date(), status: 'CLOSED' as any },
+          data: { deletedAt: new Date(), status: 'CLOSED' },
         });
       }
       totalDeleted++;
