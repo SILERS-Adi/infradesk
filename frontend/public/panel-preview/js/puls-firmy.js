@@ -1,8 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════════
-   Puls Firmy v2 — 3D AI Core Visualization
-   True 3D-projected particle sphere with neural mesh, dataflow streams,
-   Fresnel edge, volumetric plasma nucleus, holographic scanlines.
-   Signature element of ID PANEL — the "o kurwa co to" moment.
+   Puls Firmy v3 — Precision Tech Core
+   No floating particles. No organic motion. Hard-edge 3D polyhedron,
+   chronograph rings, hexagonal grid, digital readouts.
+   Inspired by F-35 HUD, Iron Man Jarvis, Tron disc, SpaceX flight computer.
    ═══════════════════════════════════════════════════════════════════ */
 
 class PulsFirmy {
@@ -17,39 +17,56 @@ class PulsFirmy {
     this.t = 0;
     this.motionReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    /* 3D particle sphere — each has θ, φ (spherical coords) + speed */
-    this.particles = this._buildSphere(240);
-    /* Dataflow streams — inbound particles with trails */
-    this.streams = [];
-    /* Neural mesh — pairs of nearby particles (recomputed each frame) */
-    this.meshBuffer = [];
-    /* Device segments (outer ring) */
+    /* Icosahedron vertices (12 nodes) */
+    this.icosaVerts = this._buildIcosahedron();
+    /* Hexagonal grid coords (flat) */
+    this.hexCells = this._buildHexGrid(7);
+    /* Device states for outer ring */
     this.deviceStates = opts.deviceStates ?? this._defaultDeviceStates();
-    /* Rotation axes — 3 rings rotating at different rates */
-    this.rot = { x: 0, y: 0, z: 0 };
+    /* Scan line state */
+    this.lastScan = 0;
 
     this._resize();
     window.addEventListener('resize', () => this._resize());
     this._loop();
   }
 
-  _buildSphere(n) {
-    /* Fibonacci sphere distribution — even coverage */
-    const out = [];
-    const phi = Math.PI * (3 - Math.sqrt(5));
-    for (let i = 0; i < n; i++) {
-      const y = 1 - (i / (n - 1)) * 2;
-      const r = Math.sqrt(1 - y * y);
-      const theta = phi * i;
-      out.push({
-        x: Math.cos(theta) * r,
-        y: y,
-        z: Math.sin(theta) * r,
-        baseBright: 0.5 + Math.random() * 0.5,
-        twinkle: Math.random() * Math.PI * 2,
-      });
+  _buildIcosahedron() {
+    /* Standard icosahedron vertices (12 points) */
+    const phi = (1 + Math.sqrt(5)) / 2;
+    const raw = [
+      [-1,  phi,  0], [ 1,  phi,  0], [-1, -phi,  0], [ 1, -phi,  0],
+      [ 0, -1,  phi], [ 0,  1,  phi], [ 0, -1, -phi], [ 0,  1, -phi],
+      [ phi,  0, -1], [ phi,  0,  1], [-phi,  0, -1], [-phi,  0,  1],
+    ];
+    /* Normalize to unit sphere */
+    const norm = Math.sqrt(1 + phi * phi);
+    return raw.map(([x, y, z]) => ({ x: x / norm, y: y / norm, z: z / norm }));
+  }
+
+  _icosaEdges() {
+    /* Connect vertices that are close enough (icosahedron edges) */
+    const edges = [];
+    const threshold = 1.1; /* empirical for unit-sphere icosa */
+    for (let i = 0; i < this.icosaVerts.length; i++) {
+      for (let j = i + 1; j < this.icosaVerts.length; j++) {
+        const a = this.icosaVerts[i], b = this.icosaVerts[j];
+        const d = Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + (a.z-b.z)**2);
+        if (d < threshold) edges.push([i, j]);
+      }
     }
-    return out;
+    return edges;
+  }
+
+  _buildHexGrid(rings) {
+    /* Axial coords for a hex grid with `rings` rings */
+    const cells = [];
+    for (let q = -rings; q <= rings; q++) {
+      const r1 = Math.max(-rings, -q - rings);
+      const r2 = Math.min(rings, -q + rings);
+      for (let r = r1; r <= r2; r++) cells.push({ q, r });
+    }
+    return cells;
   }
 
   _defaultDeviceStates() {
@@ -65,9 +82,10 @@ class PulsFirmy {
   }
 
   _accent() {
-    if (this.state === 'ok')   return { a: [139, 92, 246], b: [34, 211, 238], glow: [124, 160, 255] };  /* violet-cyan */
-    if (this.state === 'warn') return { a: [251, 146, 60], b: [234, 179, 8],   glow: [254, 215, 117] };  /* amber */
-    return { a: [244, 63, 94], b: [239, 68, 68],  glow: [252, 165, 165] };                               /* rose-red */
+    if (this.state === 'ok')   return { a: [139, 92, 246], b: [34, 211, 238], glow: [167, 139, 250], text: [226, 232, 240], shield: [52, 211, 153], shieldEdge: [16, 185, 129] };
+    if (this.state === 'warn') return { a: [251, 146, 60], b: [234, 88, 12],  glow: [253, 186, 116], text: [254, 243, 199], shield: [251, 146, 60], shieldEdge: [234, 88, 12] };
+    /* BAD: deep crimson core (still visible) + black shield (breach look) */
+    return { a: [190, 30, 30], b: [127, 15, 15], glow: [248, 113, 113], text: [254, 226, 226], shield: [12, 12, 14], shieldEdge: [220, 38, 38] };
   }
 
   _rgba(c, a) { return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`; }
@@ -80,43 +98,12 @@ class PulsFirmy {
     this.size = size;
   }
 
-  setScore(score) {
-    this.score = score;
-    this.state = this._stateFromScore(score);
-  }
+  setScore(score) { this.score = score; this.state = this._stateFromScore(score); }
+  pulse() { this.lastScan = this.t; /* trigger single scan */ }
 
-  _emitStream() {
-    /* A dataflow particle entering from outside, heading toward the sphere */
-    const angle = Math.random() * Math.PI * 2;
-    const startR = 1.8;
-    this.streams.push({
-      x: Math.cos(angle) * startR,
-      y: (Math.random() - 0.5) * 2,
-      z: Math.sin(angle) * startR,
-      vx: -Math.cos(angle) * 0.015,
-      vz: -Math.sin(angle) * 0.015,
-      vy: -((Math.random() - 0.5) * 0.01),
-      life: 1,
-      trail: [],
-    });
-  }
-
-  _project(x, y, z, cx, cy, R) {
-    /* Simple perspective projection */
-    const focal = 2.4;
-    const scale = focal / (focal + z);
-    return {
-      x: cx + x * R * scale,
-      y: cy + y * R * scale,
-      scale,
-      z,
-    };
-  }
-
-  _rotate3(p) {
-    /* Apply rotY then rotX */
-    const cy = Math.cos(this.rot.y), sy = Math.sin(this.rot.y);
-    const cx = Math.cos(this.rot.x * 0.4), sx = Math.sin(this.rot.x * 0.4);
+  _rotate(p, rx, ry) {
+    const cy = Math.cos(ry), sy = Math.sin(ry);
+    const cx = Math.cos(rx), sx = Math.sin(rx);
     let x = p.x * cy - p.z * sy;
     let z = p.x * sy + p.z * cy;
     let y = p.y * cx - z * sx;
@@ -124,341 +111,418 @@ class PulsFirmy {
     return { x, y, z };
   }
 
+  _project(x, y, z, cx, cy, R) {
+    const focal = 3.2;
+    const scale = focal / (focal + z);
+    return { x: cx + x * R * scale, y: cy + y * R * scale, scale, z };
+  }
+
   _loop() {
     requestAnimationFrame(() => this._loop());
-    if (!this.motionReduced) {
-      this.t += 0.016;
-      this.rot.y += 0.0025;
-      this.rot.x = Math.sin(this.t * 0.18) * 0.4;
-      /* Emit streams occasionally */
-      if (Math.random() < 0.06) this._emitStream();
-    }
+    if (!this.motionReduced) this.t += 0.016;
     this._draw();
   }
 
   _draw() {
     const ctx = this.ctx, W = this.W, cx = W / 2, cy = W / 2, t = this.t;
     const acc = this._accent();
-    const R = W * 0.28; /* sphere projection radius */
-    const bpm = this.state === 'ok' ? 72 : this.state === 'warn' ? 100 : 140;
-    const pulse = Math.sin(t * (bpm / 60) * Math.PI * 2) * 0.5 + 0.5;
+    const R = W * 0.26; /* polyhedron radius */
 
     ctx.clearRect(0, 0, W, W);
 
-    /* ═════ LAYER 1: Ambient floor glow — soft deep backdrop ═════ */
-    const ambR = W * 0.5;
-    const ambG = ctx.createRadialGradient(cx, cy, 0, cx, cy, ambR);
-    ambG.addColorStop(0,   this._rgba(acc.a, 0.18));
-    ambG.addColorStop(0.4, this._rgba(acc.b, 0.10));
-    ambG.addColorStop(1,   'rgba(0,0,0,0)');
+    /* ── LAYER 1: Soft ambient backdrop ── */
+    const ambR = W * 0.55;
+    const ambG = ctx.createRadialGradient(cx, cy, R * 0.4, cx, cy, ambR);
+    ambG.addColorStop(0, this._rgba(acc.a, 0.14));
+    ambG.addColorStop(0.5, this._rgba(acc.b, 0.06));
+    ambG.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = ambG;
     ctx.fillRect(0, 0, W, W);
 
-    /* ═════ LAYER 2: Outer device ring — one arc segment per device ═════ */
-    const outerR = W * 0.46;
-    const n = this.devicesCount;
-    const gap = 0.014;
-    const segSize = (Math.PI * 2) / n - gap;
-    for (let i = 0; i < n; i++) {
-      const a0 = -Math.PI / 2 + i * ((Math.PI * 2) / n);
-      const a1 = a0 + segSize;
-      const ds = this.deviceStates[i] || 'ok';
-      let col;
-      if (ds === 'ok')   col = 'rgba(52, 211, 153, 0.55)';
-      else if (ds === 'warn') col = 'rgba(251, 191, 36, 0.65)';
-      else col = 'rgba(248, 113, 113, 0.7)';
+    /* ── LAYER 2: Hexagonal grid (subtle background, flat) ── */
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    const hexSize = R * 0.11;
+    const hexH = hexSize * Math.sqrt(3);
+    for (const { q, r } of this.hexCells) {
+      const x = cx + hexSize * 1.5 * q;
+      const y = cy + hexH * (r + q / 2);
+      const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
+      if (dist > R * 1.1) continue;
+      const alpha = (1 - dist / (R * 1.1)) * 0.4;
       ctx.beginPath();
-      ctx.strokeStyle = col;
-      ctx.lineWidth = 5 * this.dpr;
-      ctx.lineCap = 'round';
-      ctx.arc(cx, cy, outerR, a0, a1);
+      ctx.strokeStyle = this._rgba([255, 255, 255], alpha * 0.18);
+      ctx.lineWidth = 0.5 * this.dpr;
+      for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI / 3) * i + Math.PI / 6;
+        const hx = x + hexSize * Math.cos(angle);
+        const hy = y + hexSize * Math.sin(angle);
+        if (i === 0) ctx.moveTo(hx, hy);
+        else ctx.lineTo(hx, hy);
+      }
+      ctx.closePath();
       ctx.stroke();
     }
+    ctx.restore();
 
-    /* ═════ LAYER 3: Sweep indicator on outer ring (data scan) ═════ */
-    if (!this.motionReduced) {
-      const sweepA = (-Math.PI / 2 + (t * 0.6) % (Math.PI * 2));
-      const sweepG = ctx.createLinearGradient(
-        cx + Math.cos(sweepA - 0.1) * outerR,
-        cy + Math.sin(sweepA - 0.1) * outerR,
-        cx + Math.cos(sweepA + 0.1) * outerR,
-        cy + Math.sin(sweepA + 0.1) * outerR
-      );
-      sweepG.addColorStop(0, 'rgba(255,255,255,0)');
-      sweepG.addColorStop(0.5, this._rgba(acc.glow, 0.9));
-      sweepG.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.beginPath();
-      ctx.strokeStyle = sweepG;
-      ctx.lineWidth = 7 * this.dpr;
-      ctx.arc(cx, cy, outerR, sweepA - 0.18, sweepA + 0.18);
-      ctx.stroke();
-    }
-
-    /* ═════ LAYER 4: Score ring (filled arc) ═════ */
-    const scoreR = W * 0.40;
+    /* ── LAYER 3: Crosshair (precise measurement feel) ── */
+    ctx.save();
+    ctx.strokeStyle = this._rgba([255, 255, 255], 0.06);
+    ctx.lineWidth = 0.5 * this.dpr;
+    /* Horizontal axis with gap in middle */
     ctx.beginPath();
-    ctx.strokeStyle = this._rgba(acc.a, 0.08);
-    ctx.lineWidth = 2.5 * this.dpr;
-    ctx.arc(cx, cy, scoreR, 0, Math.PI * 2);
+    ctx.moveTo(cx - R * 1.15, cy);
+    ctx.lineTo(cx - R * 0.35, cy);
+    ctx.moveTo(cx + R * 0.35, cy);
+    ctx.lineTo(cx + R * 1.15, cy);
+    /* Vertical axis with gap */
+    ctx.moveTo(cx, cy - R * 1.15);
+    ctx.lineTo(cx, cy - R * 0.35);
+    ctx.moveTo(cx, cy + R * 0.35);
+    ctx.lineTo(cx, cy + R * 1.15);
     ctx.stroke();
 
+    /* Tiny cross at center would clash with score — omit */
+    ctx.restore();
+
+    /* ── LAYER 4: Outer chronograph ring — 360 tick marks ── */
+    const chronoR = W * 0.44;
+    ctx.save();
+    for (let deg = 0; deg < 360; deg += 1) {
+      const rad = (deg - 90) * Math.PI / 180;
+      const isMajor = deg % 30 === 0;
+      const isMinor = deg % 5 === 0;
+      const len = isMajor ? 10 : isMinor ? 6 : 3;
+      const alpha = isMajor ? 0.55 : isMinor ? 0.3 : 0.12;
+      const x1 = cx + Math.cos(rad) * chronoR;
+      const y1 = cy + Math.sin(rad) * chronoR;
+      const x2 = cx + Math.cos(rad) * (chronoR - len * this.dpr);
+      const y2 = cy + Math.sin(rad) * (chronoR - len * this.dpr);
+      ctx.beginPath();
+      ctx.strokeStyle = this._rgba([255, 255, 255], alpha);
+      ctx.lineWidth = (isMajor ? 1.5 : 0.8) * this.dpr;
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    /* ── LAYER 5: Device segments (12 discrete indicators on chrono ring) ── */
+    const devR = W * 0.47;
+    const n = this.devicesCount;
+    for (let i = 0; i < n; i++) {
+      const a0 = -Math.PI / 2 + (i / n) * Math.PI * 2 - 0.02;
+      const a1 = a0 + (Math.PI * 2) / n - 0.06;
+      const ds = this.deviceStates[i] || 'ok';
+      let col;
+      if (ds === 'ok') col = this._rgba([52, 211, 153], 0.75);
+      else if (ds === 'warn') col = this._rgba([251, 191, 36], 0.85);
+      else col = this._rgba([248, 113, 113], 0.9);
+      ctx.beginPath();
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 3 * this.dpr;
+      ctx.lineCap = 'butt';
+      ctx.arc(cx, cy, devR, a0, a1);
+      ctx.stroke();
+    }
+
+    /* ── LAYER 5.5: SHIELD ring — 24 hexagonal protection cells ──
+       Subtle outlines (not filled), slow rotation sweep carries the brightness.
+       State-driven: green=safe, orange=warn, black=breach. Tasteful restraint:
+       thin strokes, gaps between cells, muted default alpha. */
+    const shieldR = W * 0.33;
+    const shieldCells = 24;
+    const hexRad = W * 0.022;
+    const sweepPhase = (t * 0.25) % 1; /* full rotation per 4s */
+    for (let i = 0; i < shieldCells; i++) {
+      const cellAngle = -Math.PI / 2 + (i / shieldCells) * Math.PI * 2;
+      const cx2 = cx + Math.cos(cellAngle) * shieldR;
+      const cy2 = cy + Math.sin(cellAngle) * shieldR;
+      /* Distance along ring from sweep head */
+      const sweepHead = sweepPhase * shieldCells;
+      let sweepDist = (i - sweepHead + shieldCells) % shieldCells;
+      if (sweepDist > shieldCells / 2) sweepDist = shieldCells - sweepDist;
+      /* Brightness falls off with distance from sweep (only leads 4 cells) */
+      const sweepBright = Math.max(0, 1 - sweepDist / 4);
+      /* Base alpha varies by state */
+      let baseAlpha = 0.18;
+      let edgeAlpha = 0.25;
+      let fillAlpha = 0;
+      if (this.state === 'warn') { baseAlpha = 0.22; edgeAlpha = 0.35; }
+      if (this.state === 'bad')  { baseAlpha = 0.14; edgeAlpha = 0.45; fillAlpha = 0.92; }
+      /* Broken cells for bad state — deterministic, every 3rd */
+      const isBroken = this.state === 'bad' && (i % 3 === 0);
+
+      ctx.save();
+      ctx.translate(cx2, cy2);
+      ctx.rotate(cellAngle + Math.PI / 2);
+      /* Hex path (flat-top) */
+      ctx.beginPath();
+      for (let v = 0; v < 6; v++) {
+        const a = (v / 6) * Math.PI * 2;
+        const hx = Math.cos(a) * hexRad;
+        const hy = Math.sin(a) * hexRad;
+        if (v === 0) ctx.moveTo(hx, hy);
+        else ctx.lineTo(hx, hy);
+      }
+      ctx.closePath();
+
+      /* Fill (only for bad state — black void look) */
+      if (fillAlpha > 0 && !isBroken) {
+        ctx.fillStyle = this._rgba(acc.shield, fillAlpha);
+        ctx.fill();
+      }
+
+      /* Stroke with sweep brightness */
+      if (!isBroken) {
+        const edgeColor = acc.shieldEdge;
+        const finalAlpha = edgeAlpha + sweepBright * 0.6;
+        ctx.strokeStyle = this._rgba(edgeColor, Math.min(finalAlpha, 0.95));
+        ctx.lineWidth = (1 + sweepBright * 1.5) * this.dpr;
+        if (sweepBright > 0.5) {
+          ctx.shadowColor = this._rgba(edgeColor, 0.8);
+          ctx.shadowBlur = 10 * this.dpr * sweepBright;
+        }
+        ctx.stroke();
+      } else {
+        /* Broken cell — short flickering gap lines only */
+        ctx.strokeStyle = this._rgba(acc.shieldEdge, 0.25 + Math.random() * 0.1);
+        ctx.lineWidth = 0.6 * this.dpr;
+        ctx.setLineDash([2 * this.dpr, 3 * this.dpr]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      ctx.restore();
+    }
+
+    /* ── LAYER 6: Score progress ring — inner chronograph with fill ── */
+    const scoreR = W * 0.39;
+    /* Background track with tick marks every 5% */
+    for (let i = 0; i <= 100; i += 5) {
+      const rad = -Math.PI / 2 + (i / 100) * Math.PI * 2;
+      const isMajor = i % 25 === 0;
+      ctx.beginPath();
+      ctx.strokeStyle = this._rgba([255, 255, 255], isMajor ? 0.25 : 0.10);
+      ctx.lineWidth = (isMajor ? 1.2 : 0.7) * this.dpr;
+      const len = isMajor ? 7 : 4;
+      ctx.moveTo(cx + Math.cos(rad) * (scoreR + 2 * this.dpr), cy + Math.sin(rad) * (scoreR + 2 * this.dpr));
+      ctx.lineTo(cx + Math.cos(rad) * (scoreR + (2 + len) * this.dpr), cy + Math.sin(rad) * (scoreR + (2 + len) * this.dpr));
+      ctx.stroke();
+    }
+    /* Track base */
+    ctx.beginPath();
+    ctx.strokeStyle = this._rgba(acc.a, 0.1);
+    ctx.lineWidth = 2 * this.dpr;
+    ctx.arc(cx, cy, scoreR, 0, Math.PI * 2);
+    ctx.stroke();
+    /* Score arc filled */
     const scoreAngle = (this.score / 100) * Math.PI * 2;
     const sg = ctx.createLinearGradient(cx - scoreR, cy, cx + scoreR, cy);
-    sg.addColorStop(0, this._rgba(acc.a, 0.95));
-    sg.addColorStop(1, this._rgba(acc.b, 0.95));
+    sg.addColorStop(0, this._rgba(acc.a, 1));
+    sg.addColorStop(1, this._rgba(acc.b, 1));
+    ctx.save();
+    ctx.shadowColor = this._rgba(acc.glow, 0.6);
+    ctx.shadowBlur = 16 * this.dpr;
     ctx.beginPath();
     ctx.strokeStyle = sg;
     ctx.lineWidth = 3 * this.dpr;
     ctx.lineCap = 'round';
     ctx.arc(cx, cy, scoreR, -Math.PI / 2, -Math.PI / 2 + scoreAngle);
     ctx.stroke();
-
-    /* Glow on score ring */
-    ctx.save();
-    ctx.shadowColor = this._rgba(acc.glow, 0.6);
-    ctx.shadowBlur = 20 * this.dpr;
-    ctx.beginPath();
-    ctx.strokeStyle = this._rgba(acc.b, 0.4);
-    ctx.lineWidth = 2 * this.dpr;
-    ctx.arc(cx, cy, scoreR, -Math.PI / 2, -Math.PI / 2 + scoreAngle);
-    ctx.stroke();
     ctx.restore();
 
-    /* ═════ LAYER 5: Three orbital rings at different axes (3D illusion) ═════ */
+    /* ── LAYER 7: 3D Icosahedron — rotate slowly, hard edges ── */
+    const rotY = this.motionReduced ? 0 : t * 0.18;
+    const rotX = this.motionReduced ? 0.3 : Math.sin(t * 0.13) * 0.2 + 0.4;
+    const rotated = this.icosaVerts.map(v => this._rotate(v, rotX, rotY));
+    const projected = rotated.map(v => this._project(v.x, v.y, v.z, cx, cy, R));
+
+    /* Edges — only draw if both verts on front hemisphere for clarity */
+    const edges = this._icosaEdges();
     ctx.save();
-    for (let axis = 0; axis < 3; axis++) {
-      const phase = t * (0.2 + axis * 0.15) + axis * Math.PI / 3;
-      const axisTilt = (axis / 3) * Math.PI;
+    for (const [i, j] of edges) {
+      const a = projected[i], b = projected[j];
+      const isBack = a.z > 0.3 && b.z > 0.3;
+      const alpha = isBack ? 0.15 : 0.65;
+      /* Gradient per edge */
+      const eg = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+      eg.addColorStop(0, this._rgba(acc.a, alpha));
+      eg.addColorStop(1, this._rgba(acc.b, alpha));
       ctx.beginPath();
-      ctx.strokeStyle = this._rgba(acc.a, 0.15 + axis * 0.05);
-      ctx.lineWidth = 1 * this.dpr;
-      ctx.setLineDash([2 * this.dpr, 6 * this.dpr]);
-      ctx.lineDashOffset = -phase * 20;
-      const r1 = R * (0.95 + axis * 0.02);
-      /* Draw ellipse at skewed angle */
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(axisTilt);
-      ctx.scale(1, 0.25 + axis * 0.2);
-      ctx.arc(0, 0, r1, 0, Math.PI * 2);
-      ctx.restore();
+      ctx.strokeStyle = eg;
+      ctx.lineWidth = (isBack ? 1 : 1.5) * this.dpr;
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
       ctx.stroke();
-      ctx.setLineDash([]);
     }
     ctx.restore();
 
-    /* ═════ LAYER 6: 3D projected particle sphere — prep pass for neural mesh ═════ */
-    const projected = [];
-    for (const p of this.particles) {
-      const twinkle = 0.7 + 0.3 * Math.sin(t * 2 + p.twinkle);
-      const rot = this._rotate3(p);
-      const proj = this._project(rot.x, rot.y, rot.z, cx, cy, R);
-      projected.push({ ...proj, p, twinkle });
-    }
-
-    /* ═════ LAYER 7: Neural mesh — lines between close-by particles ═════ */
-    ctx.save();
-    const meshThreshold = R * 0.22;
-    for (let i = 0; i < projected.length; i++) {
-      const a = projected[i];
-      if (a.z > 0.6) continue; /* skip back hemisphere */
-      for (let j = i + 1; j < projected.length; j++) {
-        const b = projected[j];
-        if (b.z > 0.6) continue;
-        const dx = a.x - b.x, dy = a.y - b.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < meshThreshold) {
-          const alpha = (1 - dist / meshThreshold) * 0.35 * Math.min(a.scale, b.scale);
-          ctx.beginPath();
-          ctx.strokeStyle = this._rgba(acc.glow, alpha);
-          ctx.lineWidth = 0.5 * this.dpr;
-          ctx.moveTo(a.x, a.y);
-          ctx.lineTo(b.x, b.y);
-          ctx.stroke();
-        }
-      }
-    }
-    ctx.restore();
-
-    /* ═════ LAYER 8: Volumetric nucleus — plasma core ═════ */
-    const nucR = R * 0.4 * (0.94 + pulse * 0.06);
-    /* Outer glow layer */
-    const nucOuter = ctx.createRadialGradient(cx, cy, nucR * 0.5, cx, cy, nucR * 1.6);
-    nucOuter.addColorStop(0, this._rgba(acc.a, 0.55));
-    nucOuter.addColorStop(0.5, this._rgba(acc.b, 0.25));
-    nucOuter.addColorStop(1, this._rgba(acc.a, 0));
-    ctx.fillStyle = nucOuter;
-    ctx.beginPath();
-    ctx.arc(cx, cy, nucR * 1.6, 0, Math.PI * 2);
-    ctx.fill();
-
-    /* Hot core */
-    const hotG = ctx.createRadialGradient(cx, cy, 0, cx, cy, nucR);
-    hotG.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
-    hotG.addColorStop(0.25, this._rgba(acc.glow, 0.85));
-    hotG.addColorStop(0.65, this._rgba(acc.a, 0.55));
-    hotG.addColorStop(1, this._rgba(acc.b, 0));
-    ctx.fillStyle = hotG;
-    ctx.beginPath();
-    ctx.arc(cx, cy, nucR, 0, Math.PI * 2);
-    ctx.fill();
-
-    /* Plasma ripples inside nucleus */
-    if (!this.motionReduced) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'screen';
-      for (let i = 0; i < 3; i++) {
-        const rippleR = nucR * (0.4 + i * 0.2 + Math.sin(t * 1.5 + i) * 0.08);
-        const rippleA = 0.15 * (1 - i / 3);
-        ctx.beginPath();
-        ctx.strokeStyle = this._rgba(acc.glow, rippleA);
-        ctx.lineWidth = 1 * this.dpr;
-        ctx.arc(cx + Math.sin(t * 0.8 + i) * 3, cy + Math.cos(t * 0.6 + i) * 3, rippleR, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-
-    /* ═════ LAYER 9: Particle sphere — draw with depth-based size & alpha ═════ */
-    projected.sort((a, b) => a.z - b.z); /* back to front */
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
+    /* ── LAYER 8: Vertex nodes (12 static dots on icosahedron vertices) ── */
     for (const pp of projected) {
-      /* Skip if behind nucleus */
-      const distFromCenter = Math.sqrt((pp.x - cx) ** 2 + (pp.y - cy) ** 2);
-      const isFront = pp.z <= 0;
-      /* Depth-based size: near = big, far = tiny */
-      const size = (1.4 + pp.scale * 1.8) * this.dpr;
-      /* Fresnel-like brightness — edges brighter */
-      const edgeBoost = 1 + Math.max(0, (distFromCenter - R * 0.65) / (R * 0.3));
-      const a = pp.p.baseBright * pp.twinkle * (isFront ? 1 : 0.35) * Math.min(edgeBoost, 1.8) * 0.7;
-      const color = isFront ? acc.glow : acc.a;
-      ctx.fillStyle = this._rgba(color, a);
+      const isFront = pp.z < 0;
+      const size = (isFront ? 2.5 : 1.5) * this.dpr * pp.scale;
+      const alpha = isFront ? 0.9 : 0.4;
+      /* Outer glow */
+      ctx.save();
+      ctx.shadowColor = this._rgba(acc.glow, 0.8);
+      ctx.shadowBlur = 8 * this.dpr;
+      ctx.fillStyle = this._rgba(acc.glow, alpha);
       ctx.beginPath();
       ctx.arc(pp.x, pp.y, size, 0, Math.PI * 2);
       ctx.fill();
-    }
-    ctx.restore();
-
-    /* ═════ LAYER 10: Fresnel edge highlight — bright rim on sphere ═════ */
-    const fresnelG = ctx.createRadialGradient(cx, cy, R * 0.88, cx, cy, R * 1.05);
-    fresnelG.addColorStop(0, 'rgba(255,255,255,0)');
-    fresnelG.addColorStop(0.5, this._rgba(acc.glow, 0.3));
-    fresnelG.addColorStop(0.85, this._rgba(acc.b, 0.5));
-    fresnelG.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = fresnelG;
-    ctx.beginPath();
-    ctx.arc(cx, cy, R * 1.05, 0, Math.PI * 2);
-    ctx.fill();
-
-    /* Top-left specular highlight (simulated light source) */
-    const specG = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.4, 0, cx - R * 0.3, cy - R * 0.4, R * 0.4);
-    specG.addColorStop(0, 'rgba(255,255,255,0.22)');
-    specG.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = specG;
-    ctx.beginPath();
-    ctx.arc(cx, cy, R * 0.95, 0, Math.PI * 2);
-    ctx.fill();
-
-    /* ═════ LAYER 11: Dataflow streams (inbound particles with trails) ═════ */
-    for (let i = this.streams.length - 1; i >= 0; i--) {
-      const s = this.streams[i];
-      s.trail.push({ x: s.x, y: s.y, z: s.z });
-      if (s.trail.length > 14) s.trail.shift();
-      s.x += s.vx; s.y += s.vy; s.z += s.vz;
-      const distToCore = Math.sqrt(s.x * s.x + s.y * s.y + s.z * s.z);
-      if (distToCore < 0.35 || s.trail.length > 50) { this.streams.splice(i, 1); continue; }
-      /* Draw trail */
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      for (let k = 0; k < s.trail.length; k++) {
-        const tr = s.trail[k];
-        const rot = this._rotate3(tr);
-        const proj = this._project(rot.x, rot.y, rot.z, cx, cy, R);
-        const a = (k / s.trail.length) * 0.9;
-        const size = (k / s.trail.length) * 3 * this.dpr + 0.5;
-        ctx.fillStyle = this._rgba(acc.glow, a);
-        ctx.beginPath();
-        ctx.arc(proj.x, proj.y, size, 0, Math.PI * 2);
-        ctx.fill();
-      }
       ctx.restore();
     }
 
-    /* ═════ LAYER 12: Alert orbitals (outside sphere) ═════ */
-    const orbitR = R * 1.08;
-    for (let i = 0; i < Math.min(this.alertsCount, 6); i++) {
-      const a = t * 0.4 + (i / Math.max(this.alertsCount, 1)) * Math.PI * 2;
-      const x = cx + Math.cos(a) * orbitR;
-      const y = cy + Math.sin(a) * orbitR * 0.6; /* flatten for 3D feel */
-      /* Alert marker */
-      const g = ctx.createRadialGradient(x, y, 0, x, y, 16 * this.dpr);
-      g.addColorStop(0, 'rgba(248,113,113,0.95)');
-      g.addColorStop(0.3, 'rgba(248,113,113,0.6)');
-      g.addColorStop(1, 'rgba(248,113,113,0)');
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(x, y, 16 * this.dpr, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#FCA5A5';
-      ctx.beginPath();
-      ctx.arc(x, y, 3 * this.dpr, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    /* ═════ LAYER 13: Holographic scanline — sweeps vertically ═════ */
-    if (!this.motionReduced) {
-      const scanY = cy + (Math.sin(t * 0.35) * R * 0.9);
-      ctx.save();
-      const scanG = ctx.createLinearGradient(0, scanY - 6 * this.dpr, 0, scanY + 6 * this.dpr);
-      scanG.addColorStop(0, 'rgba(255,255,255,0)');
-      scanG.addColorStop(0.5, this._rgba(acc.glow, 0.12));
-      scanG.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.fillStyle = scanG;
-      /* Only over sphere */
-      ctx.beginPath();
-      ctx.arc(cx, cy, R, 0, Math.PI * 2);
-      ctx.clip();
-      ctx.fillRect(cx - R, scanY - 6 * this.dpr, R * 2, 12 * this.dpr);
-      ctx.restore();
-    }
-
-    /* ═════ LAYER 14: Score number (gradient text + glow) ═════ */
+    /* ── LAYER 9: Central score — gradient number with glow ── */
     ctx.save();
-    /* Glow halo behind number */
+    /* Halo */
+    const haloG = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 0.6);
+    haloG.addColorStop(0, this._rgba(acc.a, 0.25));
+    haloG.addColorStop(0.5, this._rgba(acc.b, 0.12));
+    haloG.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = haloG;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+
+    /* Score number */
     ctx.shadowColor = this._rgba(acc.glow, 0.7);
-    ctx.shadowBlur = 24 * this.dpr;
-    /* Gradient fill */
-    const numG = ctx.createLinearGradient(cx - 40 * this.dpr, cy - 30 * this.dpr, cx + 40 * this.dpr, cy + 30 * this.dpr);
+    ctx.shadowBlur = 22 * this.dpr;
+    const numG = ctx.createLinearGradient(cx - 50 * this.dpr, cy - 40 * this.dpr, cx + 50 * this.dpr, cy + 40 * this.dpr);
     numG.addColorStop(0, '#FFFFFF');
-    numG.addColorStop(0.6, '#E8ECFF');
+    numG.addColorStop(0.5, this._rgba(acc.text, 1));
     numG.addColorStop(1, this._rgba(acc.glow, 1));
     ctx.fillStyle = numG;
-    ctx.font = `800 ${64 * this.dpr}px Inter, ui-sans-serif`;
+    ctx.font = `800 ${72 * this.dpr}px Inter, ui-sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(String(Math.round(this.score)), cx, cy - 4 * this.dpr);
+    ctx.fillText(String(Math.round(this.score)), cx, cy - 6 * this.dpr);
+    ctx.shadowBlur = 0;
+
+    /* Unit "/100" */
+    ctx.fillStyle = this._rgba(acc.glow, 0.4);
+    ctx.font = `500 ${14 * this.dpr}px 'JetBrains Mono', monospace`;
+    ctx.fillText('/ 100', cx, cy + 32 * this.dpr);
+
+    /* Divider line under score */
+    const divW = 40 * this.dpr;
+    const divY = cy + 52 * this.dpr;
+    const divG = ctx.createLinearGradient(cx - divW, divY, cx + divW, divY);
+    divG.addColorStop(0, 'rgba(255,255,255,0)');
+    divG.addColorStop(0.5, this._rgba(acc.glow, 0.5));
+    divG.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.beginPath();
+    ctx.strokeStyle = divG;
+    ctx.lineWidth = 1 * this.dpr;
+    ctx.moveTo(cx - divW, divY);
+    ctx.lineTo(cx + divW, divY);
+    ctx.stroke();
+
+    /* Bottom label */
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.font = `700 ${9 * this.dpr}px Inter, ui-sans-serif`;
+    ctx.textAlign = 'center';
+    /* Letter spacing hack — space individually */
+    const lbl = 'P U L S   F I R M Y';
+    ctx.fillText(lbl, cx, cy + 66 * this.dpr);
     ctx.restore();
 
-    /* Label */
+    /* ── LAYER 10: Corner digital readouts (HUD-style) ── */
     ctx.save();
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.font = `600 ${10 * this.dpr}px Inter, ui-sans-serif`;
-    ctx.letterSpacing = '0.2em';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('PULS FIRMY', cx, cy + 42 * this.dpr);
-
-    /* Secondary metric under */
-    ctx.fillStyle = this._rgba(acc.glow, 0.7);
+    ctx.fillStyle = this._rgba(acc.glow, 0.55);
     ctx.font = `500 ${10 * this.dpr}px 'JetBrains Mono', monospace`;
-    ctx.fillText(`${this.devicesCount} URZĄDZEŃ · ${this.alertsCount} ALERTÓW`, cx, cy + 58 * this.dpr);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+
+    const pad = 18 * this.dpr;
+    const lh = 14 * this.dpr;
+
+    /* Top-left */
+    ctx.fillText('SYS.OPERATIONAL', pad, pad);
+    ctx.fillStyle = this._rgba([255, 255, 255], 0.25);
+    ctx.font = `500 ${9 * this.dpr}px 'JetBrains Mono', monospace`;
+    ctx.fillText(`T+${this._formatUptime(t)}`, pad, pad + lh);
+
+    /* Top-right */
+    ctx.textAlign = 'right';
+    ctx.fillStyle = this._rgba(acc.glow, 0.55);
+    ctx.font = `500 ${10 * this.dpr}px 'JetBrains Mono', monospace`;
+    ctx.fillText('ID.CORE · v2.1', W - pad, pad);
+    ctx.fillStyle = this._rgba([255, 255, 255], 0.25);
+    ctx.font = `500 ${9 * this.dpr}px 'JetBrains Mono', monospace`;
+    ctx.fillText(`DEV ${String(this.devicesCount).padStart(3, '0')}`, W - pad, pad + lh);
+
+    /* Bottom-left */
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    ctx.fillStyle = this._rgba(acc.glow, 0.55);
+    ctx.font = `500 ${10 * this.dpr}px 'JetBrains Mono', monospace`;
+    ctx.fillText(this._fmt2(this.score) + '.00', pad, W - pad - lh);
+    ctx.fillStyle = this._rgba([255, 255, 255], 0.25);
+    ctx.font = `500 ${9 * this.dpr}px 'JetBrains Mono', monospace`;
+    ctx.fillText('SCORE', pad, W - pad);
+
+    /* Bottom-right */
+    ctx.textAlign = 'right';
+    ctx.fillStyle = this._rgba(acc.glow, 0.55);
+    ctx.font = `500 ${10 * this.dpr}px 'JetBrains Mono', monospace`;
+    const alertText = this.alertsCount > 0 ? `${this.alertsCount} ALERT` : 'ALL CLEAR';
+    ctx.fillText(alertText, W - pad, W - pad - lh);
+    ctx.fillStyle = this._rgba([255, 255, 255], 0.25);
+    ctx.font = `500 ${9 * this.dpr}px 'JetBrains Mono', monospace`;
+    ctx.fillText('STATUS', W - pad, W - pad);
     ctx.restore();
+
+    /* ── LAYER 11: Scan line — runs once every ~5s, top to bottom ── */
+    if (!this.motionReduced) {
+      const scanPhase = (t % 5) / 5; /* 0..1 per 5s */
+      if (scanPhase < 0.4) {
+        const scanY = cy - R * 1.1 + (scanPhase / 0.4) * (R * 2.2);
+        ctx.save();
+        const scanG = ctx.createLinearGradient(0, scanY - 4 * this.dpr, 0, scanY + 4 * this.dpr);
+        scanG.addColorStop(0, 'rgba(255,255,255,0)');
+        scanG.addColorStop(0.5, this._rgba(acc.glow, 0.22));
+        scanG.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = scanG;
+        /* Clip to circle */
+        ctx.beginPath();
+        ctx.arc(cx, cy, R * 1.1, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.fillRect(cx - R * 1.2, scanY - 4 * this.dpr, R * 2.4, 8 * this.dpr);
+        ctx.restore();
+      }
+    }
+
+    /* ── LAYER 12: Alerts — precision markers on outer ring ── */
+    for (let i = 0; i < Math.min(this.alertsCount, 6); i++) {
+      /* Place alerts at specific angles, NOT rotating */
+      const angle = -Math.PI / 2 + (i * Math.PI / 3) + Math.PI / 6;
+      const ax = cx + Math.cos(angle) * (chronoR + 12 * this.dpr);
+      const ay = cy + Math.sin(angle) * (chronoR + 12 * this.dpr);
+      /* Triangle marker pointing inward */
+      ctx.save();
+      ctx.translate(ax, ay);
+      ctx.rotate(angle + Math.PI / 2);
+      ctx.beginPath();
+      ctx.moveTo(0, -6 * this.dpr);
+      ctx.lineTo(-5 * this.dpr, 4 * this.dpr);
+      ctx.lineTo(5 * this.dpr, 4 * this.dpr);
+      ctx.closePath();
+      ctx.fillStyle = this._rgba([248, 113, 113], 0.9);
+      ctx.shadowColor = 'rgba(248,113,113,0.8)';
+      ctx.shadowBlur = 8 * this.dpr;
+      ctx.fill();
+      ctx.restore();
+    }
   }
 
-  /* Event pulse — visible burst */
-  pulse() {
-    for (let i = 0; i < 8; i++) this._emitStream();
+  _fmt2(n) { return Math.round(n * 100) / 100; }
+  _formatUptime(t) {
+    const sec = Math.floor(t);
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   }
 }
 
