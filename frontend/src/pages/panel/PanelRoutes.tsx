@@ -14,6 +14,7 @@ const PanelTicketsPage  = React.lazy(() => import('./PanelTicketsPage'));
 const PanelVaultPage    = React.lazy(() => import('./PanelVaultPage'));
 const PanelIdoPage      = React.lazy(() => import('./PanelIdoPage'));
 const PanelBillingPage  = React.lazy(() => import('./PanelBillingPage'));
+const PanelActivityPage = React.lazy(() => import('./PanelActivityPage'));
 
 function ComingSoon({ title, phase }: { title: string; phase?: string }) {
   return (
@@ -78,6 +79,12 @@ export default function PanelRoutes() {
         <Route path="ido" element={
           <RoleGate capability="use_ido_chat" fallback={<ComingSoon title="Brak dostępu" />}>
             <Lazy><PanelIdoPage /></Lazy>
+          </RoleGate>
+        } />
+
+        <Route path="activity" element={
+          <RoleGate capability="view_today" fallback={<ComingSoon title="Brak dostępu" />}>
+            <Lazy><PanelActivityPage /></Lazy>
           </RoleGate>
         } />
 

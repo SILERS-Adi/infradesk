@@ -37,6 +37,7 @@ const NAV: NavItem[] = [
   { to: '/panel/devices',    label: 'Urządzenia',    icon: '▣', capability: 'view_devices' },
   { to: '/panel/tickets',    label: 'Zgłoszenia',    icon: '✎', capability: 'view_tickets' },
   { to: '/panel/vault',      label: 'Sejf',          icon: '⚿', capability: 'view_vault' },
+  { to: '/panel/activity',   label: 'Aktywność',    icon: '⌘', capability: 'view_today' },
   { to: '/panel/billing',    label: 'Rozliczenia',   icon: '§', capability: 'view_billing' },
 ];
 
