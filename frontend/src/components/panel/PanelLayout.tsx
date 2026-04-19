@@ -20,6 +20,7 @@ import React from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../store/authStore';
 import { useWorkspace } from '../../store/workspaceStore';
+import { useTheme } from '../../store/themeStore';
 import { useRole, type Capability } from './RoleGate';
 import '../../styles/panel/index.css';
 
@@ -41,6 +42,7 @@ const NAV: NavItem[] = [
 
 export function PanelLayout() {
   const { user } = useAuth();
+  const resolved = useTheme(st => st.resolved);
   const currentWs = useWorkspace(s => s.current);
   const { role, can, isPreview } = useRole();
   const location = useLocation();
@@ -53,7 +55,7 @@ export function PanelLayout() {
   }, [collapsed]);
 
   return (
-    <div className="panel-scope" data-theme="dark">
+    <div className="panel-scope" data-theme={resolved}>
       <style>{`
         .panel-shell { display: grid; grid-template-columns: auto 1fr; grid-template-rows: 56px 1fr; min-height: 100vh; }
         .panel-topbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 16px; padding: 0 20px; border-bottom: 1px solid var(--glass-border); background: var(--bg-overlay); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); position: sticky; top: 0; z-index: 20; }
