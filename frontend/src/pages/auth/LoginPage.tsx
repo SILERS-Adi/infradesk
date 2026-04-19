@@ -272,7 +272,7 @@ export function LoginPage() {
       const userRole = currentWs?.role;
       const isSuperAdmin = response.user?.isSuperAdmin;
       const isPortalUser = (userRole === 'MEMBER' || userRole === 'VIEWER') && !isSuperAdmin;
-      const defaultRoute = isPortalUser ? '/portal' : '/dashboard';
+      const defaultRoute = isPortalUser ? '/panel' : '/dashboard';
 
       if (isMobile && !isPortalUser) setShowVersionPicker(true);
       else navigate(defaultRoute);
