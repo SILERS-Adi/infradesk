@@ -49,9 +49,12 @@ export function PanelLayout() {
       <div className="ip-shell">
         {/* ─── Sidebar ─── */}
         <aside className="ip-sidebar">
-          <div className="ip-sidebar__logo">
+          <div className="ip-sidebar__logo" title="InfraDesk by SILERS">
             <span className="ip-sidebar__logo-mark">ID</span>
-            <span>INFRADESK</span>
+            <div className="ip-sidebar__brand-wrap">
+              <span className="ip-sidebar__brand-main">INFRA DESK</span>
+              <span className="ip-sidebar__brand-sub">by SILERS</span>
+            </div>
           </div>
 
           <div className="ip-sidebar__section-label">Nawigacja</div>

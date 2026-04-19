@@ -11,6 +11,7 @@ import { panelApi, type PanelPulse, type PanelTiles, type PanelActivityItem } fr
 import { devicesApi } from '../../api/devices';
 import apiClient from '../../api/client';
 import { IdCore, idCoreMessage, type IdCoreStatus } from '../../components/panel/IdCore';
+import { useCountUp } from '../../hooks/useCountUp';
 import { Ticket, MonitorUp, HardDrive, RefreshCw, Printer, KeyRound, Zap, Bot, CheckCircle2, AlertTriangle, Shield, Wifi, Globe, Server } from 'lucide-react';
 
 interface MiniDevice { id: string; name: string; status: string }
@@ -98,8 +99,14 @@ export default function PanelTodayPage() {
             </span>
           </div>
 
-          <div className="ip-status-card__title">
-            {status === 'critical' ? 'Wymagana interwencja' : status === 'warning' ? 'Wykryto uwagi' : 'System działa poprawnie'}
+          <div className="ip-status-card__heading-wrap">
+            <span className={`ip-status-card__heading-icon ip-status-card__heading-icon--${status === 'critical' ? 'bad' : status === 'warning' ? 'warn' : 'ok'}`}>
+              <Shield size={18} strokeWidth={2.2} />
+            </span>
+            <div className="ip-status-card__title" style={{ marginTop: 0, marginBottom: 0 }}>
+              <span className={`ip-status-dot-big ip-status-dot-big--${status === 'critical' ? 'bad' : status === 'warning' ? 'warn' : status === 'offline' ? 'gray' : 'ok'}`} />
+              {status === 'critical' ? 'Wymagana interwencja' : status === 'warning' ? 'Wykryto uwagi' : 'System działa poprawnie'}
+            </div>
           </div>
           <div className="ip-status-card__desc">
             {status === 'ok' && 'Wszystkie systemy są stabilne i zabezpieczone. Ostatnia synchronizacja ' + fmt(lastUpdate?.toISOString())}
@@ -153,7 +160,7 @@ export default function PanelTodayPage() {
               aiActive={aiActive}
               alerts={activeAlerts}
               devicesOnline={devicesOnline}
-              size={220}
+              size={280}
             />
           </div>
 
@@ -247,8 +254,14 @@ export default function PanelTodayPage() {
           </div>
           <div style={{ flex: 1, overflow: 'hidden' }}>
             {activity.length === 0 ? (
-              <div style={{ padding: 30, textAlign: 'center', color: 'var(--ip-text-3)', fontSize: 13 }}>
-                Brak ostatnich zdarzeń
+              <div className="ip-feed-empty">
+                <div className="ip-feed-empty__dots">
+                  <span className="ip-feed-empty__dot" />
+                  <span className="ip-feed-empty__dot" />
+                  <span className="ip-feed-empty__dot" />
+                </div>
+                <div className="ip-feed-empty__text">AI monitoruje system</div>
+                <div className="ip-feed-empty__sub">Skanowanie w tle — zdarzenia pojawią się tutaj</div>
               </div>
             ) : (
               activity.slice(0, 6).map(a => (

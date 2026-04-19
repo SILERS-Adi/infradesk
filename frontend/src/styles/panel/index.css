@@ -807,3 +807,224 @@
       inset 0 1px 0 rgba(255, 255, 255, 0.3);
   }
 }
+/* ═══════════════════════════════════════════════════════════
+   ID PANEL — Level 3 appendix (depth refinement + branding + AI alive)
+   Appends to panel.css. Previous rules stay as baseline.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── Sidebar branding: "INFRA DESK / by SILERS" ─── */
+.id-panel .ip-sidebar__logo {
+  flex-direction: row; align-items: center;
+  gap: 12px;
+  padding: 4px 8px 24px;
+}
+.id-panel .ip-sidebar__brand-wrap { display: flex; flex-direction: column; gap: 2px; line-height: 1; }
+.id-panel .ip-sidebar__brand-main {
+  font-size: 14px; font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--ip-text);
+  text-transform: uppercase;
+}
+.id-panel .ip-sidebar__brand-sub {
+  font-family: var(--ip-font-mono);
+  font-size: 9px; font-weight: 600;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--ip-text-3);
+  opacity: 0.7;
+  transition: opacity 260ms var(--ip-ease), color 260ms var(--ip-ease), text-shadow 260ms var(--ip-ease);
+}
+.id-panel .ip-sidebar__logo:hover .ip-sidebar__brand-sub {
+  opacity: 1;
+  color: var(--ip-blue-hi);
+  text-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+}
+.id-panel .ip-sidebar__logo:hover .ip-sidebar__logo-mark {
+  box-shadow:
+    0 2px 8px rgba(59, 130, 246, 0.55),
+    0 0 24px rgba(59, 130, 246, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transform: scale(1.04);
+}
+.id-panel .ip-sidebar__logo-mark { transition: transform 240ms var(--ip-ease), box-shadow 240ms var(--ip-ease); }
+
+/* ─── ID CORE card — bigger, more spacing, stronger spotlight ─── */
+.id-panel .ip-core-card {
+  min-height: 330px;              /* +50px vs default */
+  padding: 28px 24px;             /* +8px */
+}
+.id-panel .ip-core-card__body {
+  padding: 14px 0;
+}
+
+/* ─── Status card — icon next to heading + bigger status dot ─── */
+.id-panel .ip-status-card__heading-wrap {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 8px;
+  margin-top: 6px;
+}
+.id-panel .ip-status-card__heading-icon {
+  width: 36px; height: 36px; border-radius: 10px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.18), rgba(59, 130, 246, 0.06));
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: var(--ip-blue-hi);
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  position: relative;
+}
+.id-panel .ip-status-card__heading-icon::before {
+  content: '';
+  position: absolute; inset: -4px;
+  border-radius: inherit;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.25), transparent 65%);
+  filter: blur(6px);
+  z-index: -1;
+  opacity: 0.7;
+  animation: ipIconBreath 3s ease-in-out infinite;
+}
+@keyframes ipIconBreath {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50%      { opacity: 0.9; transform: scale(1.08); }
+}
+.id-panel .ip-status-card__heading-icon--ok { background: linear-gradient(180deg, rgba(34, 197, 94, 0.18), rgba(34, 197, 94, 0.06)); border-color: rgba(34, 197, 94, 0.3); color: var(--ip-ok); }
+.id-panel .ip-status-card__heading-icon--ok::before { background: radial-gradient(circle, rgba(34, 197, 94, 0.25), transparent 65%); }
+.id-panel .ip-status-card__heading-icon--warn { background: linear-gradient(180deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.06)); border-color: rgba(245, 158, 11, 0.35); color: var(--ip-warn); }
+.id-panel .ip-status-card__heading-icon--warn::before { background: radial-gradient(circle, rgba(245, 158, 11, 0.3), transparent 65%); }
+.id-panel .ip-status-card__heading-icon--bad { background: linear-gradient(180deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.06)); border-color: rgba(239, 68, 68, 0.35); color: var(--ip-bad); }
+.id-panel .ip-status-card__heading-icon--bad::before { background: radial-gradient(circle, rgba(239, 68, 68, 0.3), transparent 65%); }
+
+/* ─── AI activity EMPTY STATE — "AI monitoruje system" + pulsing dots ─── */
+.id-panel .ip-feed-empty {
+  padding: 28px 16px;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  color: var(--ip-text-2);
+  text-align: center;
+}
+.id-panel .ip-feed-empty__dots {
+  display: inline-flex; gap: 8px;
+}
+.id-panel .ip-feed-empty__dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--ip-blue-hi);
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+  animation: ipFeedDot 1.4s ease-in-out infinite;
+  opacity: 0.3;
+}
+.id-panel .ip-feed-empty__dot:nth-child(1) { animation-delay: 0s; }
+.id-panel .ip-feed-empty__dot:nth-child(2) { animation-delay: 0.2s; }
+.id-panel .ip-feed-empty__dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes ipFeedDot {
+  0%, 80%, 100% { transform: scale(0.7); opacity: 0.3; }
+  40%           { transform: scale(1.15); opacity: 1; }
+}
+.id-panel .ip-feed-empty__text { font-size: 13px; font-weight: 500; color: var(--ip-text); }
+.id-panel .ip-feed-empty__sub  { font-size: 11px; color: var(--ip-text-3); font-family: var(--ip-font-mono); letter-spacing: 0.08em; }
+
+/* ─── Count-up number animation (smooth appearance) ─── */
+.id-panel .ip-countup {
+  font-variant-numeric: tabular-nums;
+  display: inline-block;
+}
+
+/* ─── Light mode REFINEMENT — cooler blue-gray, stronger shadows ─── */
+.id-panel[data-theme="light"],
+[data-theme="light"] .id-panel {
+  --ip-bg:            #EFF3FB;             /* cooler blue-gray base */
+  --ip-bg-sidebar:    #FFFFFF;
+  --ip-surface:       #FFFFFF;
+  --ip-surface-hi:    #F3F6FC;
+  --ip-border:        rgba(30, 41, 59, 0.08);
+  --ip-border-hi:     rgba(30, 41, 59, 0.14);
+  --ip-text:          #0F172A;
+  --ip-text-2:        #334155;
+  --ip-text-3:        #64748B;
+  --ip-shadow-sm:
+    0 1px 2px rgba(15, 23, 42, 0.05),
+    0 2px 6px rgba(15, 23, 42, 0.05);
+  --ip-shadow-md:
+    0 2px 4px rgba(15, 23, 42, 0.06),
+    0 12px 32px rgba(15, 23, 42, 0.08);
+}
+[data-theme="light"] .id-panel .ip-card,
+.id-panel[data-theme="light"] .ip-card {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(37, 99, 235, 0.025) 0%, transparent 55%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.7) 0%, transparent 45%),
+    #FFFFFF;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 4px 14px rgba(15, 23, 42, 0.06),
+    0 12px 40px rgba(30, 41, 59, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+[data-theme="light"] .id-panel .ip-core-card,
+.id-panel[data-theme="light"] .ip-core-card {
+  background:
+    radial-gradient(circle at 50% 60%, rgba(37, 99, 235, 0.12) 0%, rgba(37, 99, 235, 0.03) 40%, transparent 70%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.85) 0%, transparent 40%),
+    #FFFFFF;
+  box-shadow:
+    0 2px 4px rgba(15, 23, 42, 0.05),
+    0 12px 32px rgba(37, 99, 235, 0.08),
+    0 40px 80px rgba(37, 99, 235, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+[data-theme="light"] .id-panel .ip-sidebar,
+.id-panel[data-theme="light"] .ip-sidebar {
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.02) 0%, #FFFFFF 20%);
+  border-right: 1px solid rgba(30, 41, 59, 0.06);
+}
+
+/* ─── Action tiles — refined hover + count-up feel ─── */
+.id-panel .ip-action-tile {
+  transition: transform 180ms var(--ip-ease),
+              border-color 180ms var(--ip-ease),
+              background 180ms var(--ip-ease),
+              box-shadow 240ms var(--ip-ease);
+}
+.id-panel .ip-action-tile:hover {
+  transform: translateY(-2px) scale(1.01);
+}
+
+/* ─── Sec ring value count-up glow ─── */
+.id-panel .ip-sec-ring-val { position: absolute; inset: 0; }
+
+/* ─── Feed item icons — more distinctive per action ─── */
+.id-panel .ip-feed-item__icon--security { background: rgba(245, 158, 11, 0.14); color: var(--ip-warn); }
+.id-panel .ip-feed-item__icon--device { background: rgba(34, 197, 94, 0.14); color: var(--ip-ok); }
+.id-panel .ip-feed-item__icon--ticket { background: rgba(59, 130, 246, 0.14); color: var(--ip-blue-hi); }
+
+/* ─── Primary button extra bloom on focus ─── */
+.id-panel .ip-btn--primary:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 3px rgba(59, 130, 246, 0.25),
+    0 2px 6px rgba(0, 0, 0, 0.15),
+    0 10px 30px rgba(59, 130, 246, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* ─── Status dot next to status heading (big) ─── */
+.id-panel .ip-status-dot-big {
+  display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+  margin-right: 8px;
+  position: relative;
+  vertical-align: middle;
+}
+.id-panel .ip-status-dot-big--ok { background: var(--ip-ok); box-shadow: 0 0 10px rgba(34, 197, 94, 0.6); }
+.id-panel .ip-status-dot-big--warn { background: var(--ip-warn); box-shadow: 0 0 10px rgba(245, 158, 11, 0.6); }
+.id-panel .ip-status-dot-big--bad { background: var(--ip-bad); box-shadow: 0 0 10px rgba(239, 68, 68, 0.7); }
+.id-panel .ip-status-dot-big--gray { background: var(--ip-gray); }
+.id-panel .ip-status-dot-big::after {
+  content: '';
+  position: absolute; inset: -3px;
+  border-radius: 50%;
+  background: inherit;
+  opacity: 0.4;
+  filter: blur(2px);
+  animation: ipDotPulse 1.8s ease-in-out infinite;
+}
+@keyframes ipDotPulse {
+  0%, 100% { transform: scale(1); opacity: 0.4; }
+  50%      { transform: scale(1.8); opacity: 0.1; }
+}

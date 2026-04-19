@@ -1,13 +1,15 @@
 /**
- * IdCore v5 — 3-layer living system core.
+ * IdCore v6 — LEVEL 3 premium living core.
  *
- * LAYER 1 · OUTER RING   · cienki + drifting micro-dashes + subtle pulse
- * LAYER 2 · MIDDLE RING  · grubszy + score fill + tick marks + glow
- * LAYER 3 · INNER CORE   · neural network (25 nodes, k-nearest edges,
- *                         energy packets traveling along connections)
- * + ambient radial glow (card-wide) + bloom on score number
+ * Per spec:
+ *   OUTER RING  — 30 distinct segments with small gaps (not 60 dashes).
+ *                 One ENERGY WAVE travels around it (brighter arc moving).
+ *   MIDDLE RING — score fill arc with head dot + tick marks + glow.
+ *   INNER CORE  — 8 nodes + 10-12 edges + 2-3 energy packets flowing.
+ *                 Asymmetric top-left light source (specular highlight).
+ *   CENTER      — eased score number + label + alert.
  *
- * Target feel: żywy system, rdzeń energii, AI pracuje. Nie disco — premium.
+ * ⅓ reduction in noise vs v5. Iconic, not chaotic.
  */
 
 import React from 'react';
@@ -43,10 +45,10 @@ function colorsFor(status: IdCoreStatus, aiActive: boolean): ColorSet {
 const rgba = (c: RGB, a: number) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 
 interface Node {
-  x: number; y: number;               /* unit -1..1 (actual drawn within inner radius) */
+  x: number; y: number;
   vx: number; vy: number;
   phase: number;
-  pulseIntensity: number;
+  pulse: number;
 }
 
 interface Edge {
@@ -57,50 +59,39 @@ interface Packet {
   edge: number;
   progress: number;
   speed: number;
-  startNode: number;
+  forward: boolean;
 }
 
-function buildNetwork(n: number): { nodes: Node[]; edges: Edge[] } {
+/** Build a smaller, iconic neural network: 8 nodes, ~10-12 edges. */
+function buildNetwork(): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = [];
-  /* Distribute with golden angle but jittered for organic look */
-  const golden = Math.PI * (3 - Math.sqrt(5));
-  for (let i = 0; i < n; i++) {
-    const r = Math.sqrt((i + 0.5) / n) * 0.62 + (Math.random() - 0.5) * 0.08;
-    const theta = i * golden + (Math.random() - 0.5) * 0.3;
+  /* 1 center node + 7 satellites arranged in slightly irregular ring */
+  nodes.push({ x: 0, y: 0, vx: 0, vy: 0, phase: 0, pulse: 0 });
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * Math.PI * 2 + 0.2;
+    const r = 0.48 + (i % 2 === 0 ? 0.06 : -0.03);
     nodes.push({
-      x: Math.cos(theta) * r,
-      y: Math.sin(theta) * r,
-      vx: (Math.random() - 0.5) * 0.00015,
-      vy: (Math.random() - 0.5) * 0.00015,
+      x: Math.cos(a) * r,
+      y: Math.sin(a) * r,
+      vx: (Math.random() - 0.5) * 0.00012,
+      vy: (Math.random() - 0.5) * 0.00012,
       phase: Math.random() * Math.PI * 2,
-      pulseIntensity: 0,
+      pulse: 0,
     });
   }
 
-  /* Connect each node to 2-3 nearest neighbors (undirected, dedup) */
+  /* Center connects to all 7 (hub), plus ring connections between neighbors */
   const edges: Edge[] = [];
-  const seen = new Set<string>();
-  for (let i = 0; i < n; i++) {
-    const neighbors = nodes
-      .map((p, j) => ({ j, d: Math.hypot(p.x - nodes[i].x, p.y - nodes[i].y) }))
-      .filter(nn => nn.j !== i)
-      .sort((a, b) => a.d - b.d)
-      .slice(0, 2 + (i % 2));
-    for (const nn of neighbors) {
-      const key = i < nn.j ? `${i}-${nn.j}` : `${nn.j}-${i}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        edges.push({ a: Math.min(i, nn.j), b: Math.max(i, nn.j) });
-      }
-    }
-  }
+  for (let i = 1; i <= 7; i++) edges.push({ a: 0, b: i });                 /* hub spokes */
+  for (let i = 1; i <= 7; i++) edges.push({ a: i, b: i === 7 ? 1 : i + 1 }); /* ring */
+
   return { nodes, edges };
 }
 
-export function IdCore({ score, status, aiActive = false, alerts = 0, size = 240 }: Props) {
+export function IdCore({ score, status, aiActive = false, alerts = 0, size = 260 }: Props) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const stateRef = React.useRef({ score, status, aiActive, alerts });
-  const networkRef = React.useRef(buildNetwork(25));
+  const netRef = React.useRef(buildNetwork());
   const packetsRef = React.useRef<Packet[]>([]);
   const startRef = React.useRef(performance.now());
   const lastPacketRef = React.useRef(0);
@@ -130,29 +121,26 @@ export function IdCore({ score, status, aiActive = false, alerts = 0, size = 240
     ro.observe(canvas);
 
     let running = true;
-    let lastDrawTs = 0;
+    let lastTs = performance.now();
 
     function draw(now: number) {
       if (!running || !ctx) return;
       requestAnimationFrame(draw);
-      const dt = Math.min(60, now - lastDrawTs);
-      lastDrawTs = now;
-
+      const dt = Math.min(60, now - lastTs); lastTs = now;
       const t = reduced ? 0 : (now - startRef.current) / 1000;
-      const { score: tgt, status, aiActive, alerts } = stateRef.current;
+      const { score: _s, status, aiActive, alerts } = stateRef.current;
       const W = canvas!.width;
       const cx = W / 2, cy = W / 2;
       const c = colorsFor(status, aiActive);
 
-      /* Radii for 3 layers (relative to W) */
-      const rOuter  = W * 0.445;     /* thin outer ring */
-      const rMiddle = W * 0.385;     /* score ring */
-      const rCore   = W * 0.31;      /* inner network boundary */
+      /* Radii */
+      const rOuter  = W * 0.445;
+      const rMiddle = W * 0.38;
+      const rCore   = W * 0.28;
 
-      /* Eased score animation */
+      /* Eased score */
       if (!reduced) {
-        const delta = scoreAnimRef.current.target - scoreAnimRef.current.current;
-        scoreAnimRef.current.current += delta * 0.08;
+        scoreAnimRef.current.current += (scoreAnimRef.current.target - scoreAnimRef.current.current) * 0.08;
       } else {
         scoreAnimRef.current.current = scoreAnimRef.current.target;
       }
@@ -160,101 +148,112 @@ export function IdCore({ score, status, aiActive = false, alerts = 0, size = 240
 
       ctx.clearRect(0, 0, W, W);
 
-      /* ═════ AMBIENT: large soft halo behind everything (spotlight) ═════ */
-      const ambR = W * 0.55;
-      const amb = ctx.createRadialGradient(cx, cy, rCore * 0.5, cx, cy, ambR);
+      /* ═ Ambient backdrop radial (subtle) ═ */
+      const amb = ctx.createRadialGradient(cx, cy, rCore * 0.4, cx, cy, W * 0.55);
       if (status === 'offline') {
-        amb.addColorStop(0, 'rgba(107,114,128,0.04)');
+        amb.addColorStop(0, 'rgba(107,114,128,0.05)');
         amb.addColorStop(1, 'rgba(0,0,0,0)');
       } else {
-        amb.addColorStop(0, rgba(c.primary, 0.12));
-        amb.addColorStop(0.45, rgba(c.primary, 0.04));
+        amb.addColorStop(0, rgba(c.primary, 0.14));
+        amb.addColorStop(0.5, rgba(c.primary, 0.04));
         amb.addColorStop(1, 'rgba(0,0,0,0)');
       }
       ctx.fillStyle = amb;
       ctx.fillRect(0, 0, W, W);
 
-      /* ═════ LAYER 1: OUTER RING — thin dashed drift + pulse ═════ */
-      const pulseRate = status === 'critical' ? 0.55 : status === 'warning' ? 0.40 : 0.30;
-      const pulse = status === 'offline' ? 0.5 : 0.5 + 0.5 * Math.sin(t * Math.PI * 2 * pulseRate);
+      /* ═════ LAYER 1: OUTER RING — 30 segments + traveling energy wave ═════ */
+      const SEG = 30;
+      const gapAngle = 0.015;
+      const segArc = (Math.PI * 2) / SEG - gapAngle;
 
-      /* Base outer ring (very faint) */
-      ctx.beginPath();
-      ctx.strokeStyle = rgba(c.primary, 0.05 + pulse * 0.04);
-      ctx.lineWidth = 1 * dpr;
-      ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
-      ctx.stroke();
+      /* Pulse breath (2.5s period for OK, faster for critical) */
+      const breathPeriod = status === 'critical' ? 1.0 : status === 'warning' ? 1.8 : 2.5;
+      const breath = status === 'offline' ? 0.5 : 0.5 + 0.5 * Math.sin(t * Math.PI * 2 / breathPeriod);
 
-      /* Drifting dashes on outer ring */
-      const dashCount = 60;
-      const drift = (t * 0.12) % 1;
-      const dashStep = (Math.PI * 2) / dashCount;
-      for (let i = 0; i < dashCount; i++) {
-        const a = -Math.PI / 2 + (i + drift) * dashStep;
-        const a2 = a + dashStep * 0.35;
+      /* Energy wave position (one continuous bright arc traveling around) */
+      const waveSpeed = status === 'critical' ? 0.7 : status === 'warning' ? 0.45 : 0.3;
+      const waveHead = reduced ? 0 : (-Math.PI / 2 + t * waveSpeed) % (Math.PI * 2);
+      const waveSpan = Math.PI * 0.45; /* ~80° tail */
+
+      for (let i = 0; i < SEG; i++) {
+        const a0 = -Math.PI / 2 + i * ((Math.PI * 2) / SEG);
+        const a1 = a0 + segArc;
+        const segCenter = (a0 + a1) / 2;
+
+        /* Calculate distance to wave head (negative direction = behind wave) */
+        let dToWave = segCenter - waveHead;
+        while (dToWave > Math.PI) dToWave -= Math.PI * 2;
+        while (dToWave < -Math.PI) dToWave += Math.PI * 2;
+        /* Only segments behind the wave head are brightened */
+        const waveIntensity = (dToWave <= 0 && dToWave > -waveSpan)
+          ? Math.pow(1 - Math.abs(dToWave) / waveSpan, 1.5)
+          : 0;
+
+        const baseAlpha = status === 'offline' ? 0.18 : 0.20 + breath * 0.12;
+        const totalAlpha = Math.min(0.95, baseAlpha + waveIntensity * 0.7);
+
         ctx.beginPath();
-        ctx.strokeStyle = rgba(c.primary, 0.18 + pulse * 0.22);
-        ctx.lineWidth = 1 * dpr;
-        ctx.arc(cx, cy, rOuter, a, a2);
+        ctx.strokeStyle = rgba(c.primary, totalAlpha);
+        ctx.lineWidth = (1 + waveIntensity * 1.2) * dpr;
+        ctx.lineCap = 'butt';
+        ctx.arc(cx, cy, rOuter, a0, a1);
         ctx.stroke();
       }
 
-      /* Outer ring glow halo (subtle bloom) */
-      if (status !== 'offline') {
-        ctx.save();
-        ctx.shadowColor = rgba(c.glow, 0.55 + pulse * 0.3);
-        ctx.shadowBlur = (8 + pulse * 6) * dpr;
+      /* Bright wave head — small bloom dot at wave front */
+      if (status !== 'offline' && !reduced) {
+        const hx = cx + Math.cos(waveHead) * rOuter;
+        const hy = cy + Math.sin(waveHead) * rOuter;
+        const g = ctx.createRadialGradient(hx, hy, 0, hx, hy, 8 * dpr);
+        g.addColorStop(0, rgba(c.glow, 0.9));
+        g.addColorStop(0.5, rgba(c.accent, 0.5));
+        g.addColorStop(1, rgba(c.accent, 0));
+        ctx.fillStyle = g;
         ctx.beginPath();
-        ctx.strokeStyle = rgba(c.primary, 0.3);
-        ctx.lineWidth = 1.2 * dpr;
-        ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
+        ctx.arc(hx, hy, 8 * dpr, 0, Math.PI * 2);
+        ctx.fill();
       }
 
-      /* ═════ LAYER 2: MIDDLE RING — score fill + tick marks + glow ═════ */
-      /* Tick marks (4 major, 16 minor) just outside middle ring */
-      for (let i = 0; i < 40; i++) {
-        const a = -Math.PI / 2 + (i / 40) * Math.PI * 2;
-        const isMajor = i % 10 === 0;
+      /* ═════ LAYER 2: MIDDLE RING — score fill + ticks + head ═════ */
+      /* Tick marks outside middle ring (4 major, 12 minor = 16 total) */
+      for (let i = 0; i < 16; i++) {
+        const a = -Math.PI / 2 + (i / 16) * Math.PI * 2;
+        const isMajor = i % 4 === 0;
         const len = isMajor ? 5 : 2.5;
-        const x1 = cx + Math.cos(a) * (rMiddle + 8 * dpr);
-        const y1 = cy + Math.sin(a) * (rMiddle + 8 * dpr);
-        const x2 = cx + Math.cos(a) * (rMiddle + (8 + len) * dpr);
-        const y2 = cy + Math.sin(a) * (rMiddle + (8 + len) * dpr);
+        const innerPt = rMiddle + 7 * dpr;
+        const outerPt = innerPt + len * dpr;
         ctx.beginPath();
-        ctx.strokeStyle = rgba(c.primary, isMajor ? 0.4 : 0.15);
+        ctx.strokeStyle = rgba(c.primary, isMajor ? 0.45 : 0.18);
         ctx.lineWidth = (isMajor ? 1 : 0.6) * dpr;
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
+        ctx.moveTo(cx + Math.cos(a) * innerPt, cy + Math.sin(a) * innerPt);
+        ctx.lineTo(cx + Math.cos(a) * outerPt, cy + Math.sin(a) * outerPt);
         ctx.stroke();
       }
 
-      /* Middle ring base track */
+      /* Base track */
       ctx.beginPath();
       ctx.strokeStyle = rgba(c.primary, 0.08);
       ctx.lineWidth = 6 * dpr;
       ctx.arc(cx, cy, rMiddle, 0, Math.PI * 2);
       ctx.stroke();
 
-      /* Score progress arc with gradient + glow */
       if (status !== 'offline') {
         const pct = Math.max(0, Math.min(100, displayScore)) / 100;
         const endAngle = -Math.PI / 2 + pct * Math.PI * 2;
 
         /* Glow pass */
         ctx.save();
-        ctx.shadowColor = rgba(c.glow, 0.75);
-        ctx.shadowBlur = 14 * dpr;
+        ctx.shadowColor = rgba(c.glow, 0.7 + breath * 0.2);
+        ctx.shadowBlur = (12 + breath * 6) * dpr;
         ctx.beginPath();
-        ctx.strokeStyle = rgba(c.accent, 0.9);
+        ctx.strokeStyle = rgba(c.accent, 0.85);
         ctx.lineWidth = 5 * dpr;
         ctx.lineCap = 'round';
         ctx.arc(cx, cy, rMiddle, -Math.PI / 2, endAngle);
         ctx.stroke();
         ctx.restore();
 
-        /* Top highlight pass (brighter line inside the arc) */
+        /* Sharp top line */
         const grad = ctx.createLinearGradient(cx - rMiddle, cy, cx + rMiddle, cy);
         grad.addColorStop(0, rgba(c.primary, 1));
         grad.addColorStop(1, rgba(c.accent, 1));
@@ -265,183 +264,192 @@ export function IdCore({ score, status, aiActive = false, alerts = 0, size = 240
         ctx.arc(cx, cy, rMiddle, -Math.PI / 2, endAngle);
         ctx.stroke();
 
-        /* Leading head — bright dot at current position */
+        /* Leading head dot */
         if (pct > 0.02) {
           const hx = cx + Math.cos(endAngle) * rMiddle;
           const hy = cy + Math.sin(endAngle) * rMiddle;
-          const hg = ctx.createRadialGradient(hx, hy, 0, hx, hy, 8 * dpr);
-          hg.addColorStop(0, rgba(c.glow, 1));
-          hg.addColorStop(0.5, rgba(c.accent, 0.55));
+          const hg = ctx.createRadialGradient(hx, hy, 0, hx, hy, 9 * dpr);
+          hg.addColorStop(0, 'rgba(255,255,255,0.95)');
+          hg.addColorStop(0.35, rgba(c.glow, 0.8));
           hg.addColorStop(1, rgba(c.accent, 0));
           ctx.fillStyle = hg;
           ctx.beginPath();
-          ctx.arc(hx, hy, 8 * dpr, 0, Math.PI * 2);
+          ctx.arc(hx, hy, 9 * dpr, 0, Math.PI * 2);
           ctx.fill();
         }
       }
 
-      /* ═════ LAYER 3: INNER CORE — NEURAL NETWORK ═════ */
-      const net = networkRef.current;
+      /* ═════ LAYER 3: INNER CORE — 8 nodes + 14 edges + packets ═════ */
+      const net = netRef.current;
 
-      /* Drift nodes gently */
+      /* Drift center + satellites */
       if (!reduced && status !== 'offline') {
-        for (const n of net.nodes) {
-          n.x += n.vx * (aiActive ? 1.6 : 1);
-          n.y += n.vy * (aiActive ? 1.6 : 1);
-          n.pulseIntensity *= 0.92;
-          /* soft boundary */
+        for (let i = 1; i < net.nodes.length; i++) {
+          const n = net.nodes[i];
+          n.x += n.vx * (aiActive ? 1.8 : 1);
+          n.y += n.vy * (aiActive ? 1.8 : 1);
+          n.pulse *= 0.92;
           const rr = Math.hypot(n.x, n.y);
-          if (rr > 0.72) { n.vx *= -1; n.vy *= -1; n.x *= 0.99; n.y *= 0.99; }
+          if (rr > 0.58 || rr < 0.3) { n.vx *= -1; n.vy *= -1; }
         }
       }
 
-      /* Spawn energy packets occasionally */
+      /* Spawn packet */
       if (!reduced && status !== 'offline') {
-        const interval = aiActive ? 220 : status === 'critical' ? 140 : status === 'warning' ? 450 : 600;
-        if (now - lastPacketRef.current > interval + Math.random() * 250) {
+        const baseInterval = aiActive ? 320 : status === 'critical' ? 180 : status === 'warning' ? 550 : 700;
+        if (now - lastPacketRef.current > baseInterval && packetsRef.current.length < 3) {
           lastPacketRef.current = now;
-          if (net.edges.length > 0 && packetsRef.current.length < 12) {
-            const ei = Math.floor(Math.random() * net.edges.length);
-            const edge = net.edges[ei];
-            const startNode = Math.random() > 0.5 ? edge.a : edge.b;
-            packetsRef.current.push({
-              edge: ei,
-              progress: 0,
-              speed: 0.008 + Math.random() * 0.012,
-              startNode,
-            });
-          }
+          const ei = Math.floor(Math.random() * net.edges.length);
+          packetsRef.current.push({
+            edge: ei,
+            progress: 0,
+            speed: 0.010 + Math.random() * 0.010,
+            forward: Math.random() > 0.5,
+          });
         }
       }
 
-      /* Draw network edges — base layer */
+      /* Draw edges (base) */
       if (status !== 'offline') {
-        ctx.save();
-        ctx.lineCap = 'round';
         for (const e of net.edges) {
           const a = net.nodes[e.a], b = net.nodes[e.b];
           const ax = cx + a.x * rCore, ay = cy + a.y * rCore;
           const bx = cx + b.x * rCore, by = cy + b.y * rCore;
           ctx.beginPath();
-          ctx.strokeStyle = rgba(c.primary, 0.12);
-          ctx.lineWidth = 0.6 * dpr;
+          ctx.strokeStyle = rgba(c.primary, 0.14);
+          ctx.lineWidth = 0.7 * dpr;
           ctx.moveTo(ax, ay);
           ctx.lineTo(bx, by);
           ctx.stroke();
         }
-        ctx.restore();
       }
 
-      /* Advance + draw packets (energy flowing along edges) */
+      /* Draw packets + trails */
       if (status !== 'offline') {
         const remaining: Packet[] = [];
         for (const p of packetsRef.current) {
           p.progress += p.speed * (dt / 16);
           if (p.progress >= 1) {
-            /* On arrival, pulse the end node */
             const e = net.edges[p.edge];
-            const endNode = p.startNode === e.a ? e.b : e.a;
-            net.nodes[endNode].pulseIntensity = Math.min(1, net.nodes[endNode].pulseIntensity + 0.8);
+            const endIdx = p.forward ? e.b : e.a;
+            net.nodes[endIdx].pulse = Math.min(1, net.nodes[endIdx].pulse + 0.9);
             continue;
           }
           remaining.push(p);
+
           const e = net.edges[p.edge];
-          const startN = net.nodes[p.startNode === e.a ? e.a : e.b];
-          const endN = net.nodes[p.startNode === e.a ? e.b : e.a];
+          const startN = p.forward ? net.nodes[e.a] : net.nodes[e.b];
+          const endN   = p.forward ? net.nodes[e.b] : net.nodes[e.a];
           const px = cx + (startN.x + (endN.x - startN.x) * p.progress) * rCore;
           const py = cy + (startN.y + (endN.y - startN.y) * p.progress) * rCore;
 
-          /* Packet glow + dot */
-          ctx.save();
-          ctx.shadowColor = rgba(c.glow, 0.85);
-          ctx.shadowBlur = 6 * dpr;
-          ctx.fillStyle = rgba(c.glow, 0.95);
-          ctx.beginPath();
-          ctx.arc(px, py, 1.8 * dpr, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-
-          /* Trail — brighten segment behind packet */
-          const trailStart = Math.max(0, p.progress - 0.18);
+          /* Trail */
+          const trailStart = Math.max(0, p.progress - 0.22);
           const tsx = cx + (startN.x + (endN.x - startN.x) * trailStart) * rCore;
           const tsy = cy + (startN.y + (endN.y - startN.y) * trailStart) * rCore;
-          const trailGrad = ctx.createLinearGradient(tsx, tsy, px, py);
-          trailGrad.addColorStop(0, rgba(c.accent, 0));
-          trailGrad.addColorStop(1, rgba(c.accent, 0.55));
+          const tg = ctx.createLinearGradient(tsx, tsy, px, py);
+          tg.addColorStop(0, rgba(c.accent, 0));
+          tg.addColorStop(1, rgba(c.accent, 0.65));
           ctx.beginPath();
-          ctx.strokeStyle = trailGrad;
-          ctx.lineWidth = 1.2 * dpr;
+          ctx.strokeStyle = tg;
+          ctx.lineWidth = 1.3 * dpr;
           ctx.moveTo(tsx, tsy);
           ctx.lineTo(px, py);
           ctx.stroke();
+
+          /* Head dot */
+          ctx.save();
+          ctx.shadowColor = rgba(c.glow, 0.85);
+          ctx.shadowBlur = 8 * dpr;
+          ctx.fillStyle = rgba(c.glow, 0.95);
+          ctx.beginPath();
+          ctx.arc(px, py, 2 * dpr, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
         }
         packetsRef.current = remaining;
       }
 
-      /* Draw nodes (on top of edges & packets) */
+      /* Draw nodes */
       if (status !== 'offline') {
         for (let i = 0; i < net.nodes.length; i++) {
           const n = net.nodes[i];
-          const breath = 0.6 + 0.4 * Math.sin(t * 1.2 + n.phase);
+          const breath2 = 0.55 + 0.45 * Math.sin(t * 1.5 + n.phase);
+          const isCenter = i === 0;
           const nx = cx + n.x * rCore, ny = cy + n.y * rCore;
-          const intensity = Math.min(1, breath * 0.6 + n.pulseIntensity);
+          const intensity = Math.min(1, breath2 * 0.65 + n.pulse);
 
-          /* Outer soft halo */
-          ctx.fillStyle = rgba(c.glow, 0.12 * intensity);
+          /* Soft halo */
+          ctx.fillStyle = rgba(c.glow, 0.14 * intensity);
           ctx.beginPath();
-          ctx.arc(nx, ny, 4 * dpr, 0, Math.PI * 2);
+          ctx.arc(nx, ny, (isCenter ? 7 : 5) * dpr, 0, Math.PI * 2);
           ctx.fill();
 
-          /* Inner bright dot */
-          ctx.fillStyle = rgba(c.glow, 0.55 + intensity * 0.4);
+          /* Bright dot */
+          ctx.fillStyle = rgba(c.glow, 0.6 + intensity * 0.4);
           ctx.beginPath();
-          ctx.arc(nx, ny, 1.6 * dpr, 0, Math.PI * 2);
+          ctx.arc(nx, ny, (isCenter ? 2.4 : 1.8) * dpr, 0, Math.PI * 2);
           ctx.fill();
 
-          /* Active node flare (when recently hit by packet) */
-          if (n.pulseIntensity > 0.1) {
+          /* Pulse flare */
+          if (n.pulse > 0.08) {
             ctx.save();
-            ctx.shadowColor = rgba(c.glow, 0.8);
-            ctx.shadowBlur = 10 * dpr * n.pulseIntensity;
-            ctx.fillStyle = rgba(c.glow, 0.9);
+            ctx.shadowColor = rgba(c.glow, 0.85);
+            ctx.shadowBlur = 12 * dpr * n.pulse;
+            ctx.fillStyle = rgba(c.glow, 0.95);
             ctx.beginPath();
-            ctx.arc(nx, ny, (2.2 + 1.5 * n.pulseIntensity) * dpr, 0, Math.PI * 2);
+            ctx.arc(nx, ny, ((isCenter ? 3 : 2.2) + 1.5 * n.pulse) * dpr, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
           }
         }
       }
 
-      /* ═════ INNER CORE BLOOM — central glow under score ═════ */
+      /* ═════ ASYMMETRIC LIGHT (top-left spec highlight on core) ═════ */
       if (status !== 'offline') {
-        const bloomR = rCore * 0.6;
-        const bloom = ctx.createRadialGradient(cx, cy, 0, cx, cy, bloomR);
-        const bloomAlpha = 0.16 + pulse * 0.08;
-        bloom.addColorStop(0, rgba(c.glow, bloomAlpha));
-        bloom.addColorStop(0.5, rgba(c.primary, bloomAlpha * 0.5));
-        bloom.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = bloom;
+        const lightR = rMiddle * 0.95;
+        const lg = ctx.createRadialGradient(
+          cx - lightR * 0.35, cy - lightR * 0.4, 0,
+          cx - lightR * 0.35, cy - lightR * 0.4, lightR * 0.9,
+        );
+        lg.addColorStop(0, 'rgba(255,255,255,0.10)');
+        lg.addColorStop(0.35, 'rgba(255,255,255,0.03)');
+        lg.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = lg;
+        ctx.beginPath();
+        ctx.arc(cx, cy, rMiddle, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      /* ═════ CENTER bloom + score ═════ */
+      if (status !== 'offline') {
+        const bloomR = rCore * 0.75;
+        const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, bloomR);
+        bg.addColorStop(0, rgba(c.glow, 0.18 + breath * 0.08));
+        bg.addColorStop(0.5, rgba(c.primary, 0.08));
+        bg.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = bg;
         ctx.beginPath();
         ctx.arc(cx, cy, bloomR, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      /* ═════ CENTER: Score number + label (with breathing bloom) ═════ */
+      /* Score number */
       ctx.save();
       if (status !== 'offline') {
-        ctx.shadowColor = rgba(c.glow, 0.5 + pulse * 0.35);
-        ctx.shadowBlur = (14 + pulse * 8) * dpr;
+        ctx.shadowColor = rgba(c.glow, 0.55 + breath * 0.3);
+        ctx.shadowBlur = (14 + breath * 8) * dpr;
       }
-      ctx.fillStyle = status === 'offline' ? rgba(c.primary, 0.65) : '#FFFFFF';
-      ctx.font = `800 ${Math.round(W / 6)}px Inter, ui-sans-serif`;
+      ctx.fillStyle = status === 'offline' ? rgba(c.primary, 0.6) : '#FFFFFF';
+      ctx.font = `800 ${Math.round(W / 5)}px Inter, ui-sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(String(Math.round(displayScore)), cx, cy - W * 0.008);
+      ctx.fillText(String(Math.round(displayScore)), cx, cy - W * 0.01);
       ctx.shadowBlur = 0;
 
       ctx.fillStyle = status === 'offline' ? rgba(c.primary, 0.45) : rgba(c.glow, 0.55);
       ctx.font = `600 ${Math.round(W / 32)}px 'JetBrains Mono', ui-monospace, monospace`;
-      ctx.fillText('SCORE / 100', cx, cy + W * 0.08);
+      ctx.fillText('SCORE / 100', cx, cy + W * 0.085);
 
       if (alerts > 0 && status !== 'offline') {
         ctx.fillStyle = rgba([239, 68, 68], 0.9);
@@ -456,14 +464,7 @@ export function IdCore({ score, status, aiActive = false, alerts = 0, size = 240
   }, [size]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      style={{
-        width: size, height: size,
-        maxWidth: '100%', maxHeight: '100%',
-        display: 'block',
-      }}
-    />
+    <canvas ref={canvasRef} style={{ width: size, height: size, maxWidth: '100%', maxHeight: '100%', display: 'block' }} />
   );
 }
 
