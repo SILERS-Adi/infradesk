@@ -28,6 +28,9 @@ const OperatorSharing = React.lazy(() => import('./pages/operator/OperatorSharin
 
 // Helpdesk Settings
 const PortalSettingsPage = React.lazy(() => import('./pages/admin/PortalSettingsPage'));
+
+// ID Panel (Phase 1 — fundament obok /portal, zero zmian w starym UI)
+const PanelRoutes = React.lazy(() => import('./pages/panel/PanelRoutes'));
 const TicketNewPage = React.lazy(() => import('./pages/admin/tickets/TicketNewPage'));
 
 // Public
@@ -445,6 +448,9 @@ export default function App() {
 
             {/* Portal (CLIENT) */}
             <Route path="/portal/*" element={<PortalRoutes />} />
+
+            {/* ID Panel (next-gen portal, Phase 1 fundament — lives alongside /portal) */}
+            <Route path="/panel/*" element={<React.Suspense fallback={null}><PanelRoutes /></React.Suspense>} />
 
             {/* Mobile (ADMIN / TECHNICIAN) */}
             <Route path="/m/*" element={<MobileRoutes />} />

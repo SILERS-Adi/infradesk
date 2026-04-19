@@ -1,0 +1,61 @@
+/* ═══════════════════════════════════════════════════════════
+   ID PANEL — entry styles
+   Imports design tokens (CSS custom properties on :root).
+   Component classes are scoped under .panel-scope to avoid
+   collisions with existing portal/operator styles.
+   ═══════════════════════════════════════════════════════════ */
+
+@import './tokens.css';
+
+/* Base scope — opt-in wrapper for panel pages */
+.panel-scope {
+  background: var(--bg-floor, #05070E);
+  color: var(--text-primary, #F5F7FB);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  min-height: 100vh;
+}
+
+.panel-scope * {
+  box-sizing: border-box;
+}
+
+/* Glass primitive — primary visual language of the panel */
+.panel-glass {
+  background: var(--glass-bg, hsla(222, 32%, 13%, 0.78));
+  backdrop-filter: blur(var(--glass-blur, 28px)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 28px)) saturate(1.4);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.10));
+  box-shadow: var(--shadow-md), var(--glass-inset-hl);
+  border-radius: 20px;
+}
+
+.panel-glass--hi {
+  background: var(--glass-bg-hi);
+  border-color: var(--glass-border-hi);
+}
+
+/* Brand gradient text */
+.panel-text-brand {
+  background: var(--brand-gradient-vivid);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Status chip */
+.panel-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid;
+}
+.panel-chip--ok   { color: var(--status-ok);   background: var(--status-ok-soft);   border-color: var(--status-ok-edge); }
+.panel-chip--warn { color: var(--status-warn); background: var(--status-warn-soft); border-color: var(--status-warn-edge); }
+.panel-chip--bad  { color: var(--status-bad);  background: var(--status-bad-soft);  border-color: var(--status-bad-edge); }
+.panel-chip--info { color: var(--status-info); background: var(--status-info-soft); border-color: var(--status-info-edge); }

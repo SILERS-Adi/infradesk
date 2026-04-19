@@ -1,0 +1,289 @@
+/* ═══════════════════════════════════════════════════════════
+   ID PANEL — Design Tokens v2 (premium rebuild)
+   ═══════════════════════════════════════════════════════════ */
+
+:root,
+[data-theme="dark"] {
+  /* ─ Brand gradient (signature) ─ */
+  --brand-violet:     #8B5CF6;
+  --brand-violet-lo:  #6D28D9;
+  --brand-violet-hi:  #C4B5FD;
+  --brand-cyan:       #22D3EE;
+  --brand-cyan-lo:    #0891B2;
+  --brand-cyan-hi:    #A5F3FC;
+  --brand-gradient:   linear-gradient(135deg, #8B5CF6 0%, #22D3EE 100%);
+  --brand-gradient-vivid: linear-gradient(135deg, #A78BFA 0%, #22D3EE 50%, #7DD3FC 100%);
+  --brand-gradient-soft: linear-gradient(135deg, hsla(262, 83%, 68%, .14) 0%, hsla(189, 94%, 53%, .14) 100%);
+  --brand-gradient-edge: linear-gradient(135deg, rgba(139, 92, 246, .55) 0%, rgba(34, 211, 238, .55) 100%);
+
+  /* ─ Base (DEEPER) ─ */
+  --bg-base:          #05070E;
+  --bg-elevated:      hsla(222, 35%, 11%, 0.86);
+  --bg-overlay:       hsla(222, 35%, 5%, 0.92);
+  --bg-floor:         radial-gradient(ellipse 60vw 40vh at 15% -5%, hsla(262, 80%, 22%, .22) 0%, transparent 60%),
+                      radial-gradient(ellipse 50vw 35vh at 95% 110%, hsla(189, 80%, 22%, .18) 0%, transparent 60%),
+                      radial-gradient(ellipse 80vw 60vh at 50% 100%, hsla(222, 50%, 8%, .6) 0%, transparent 70%),
+                      #05070E;
+
+  /* ─ Glass (much more visible now) ─ */
+  --glass-bg:         hsla(222, 32%, 13%, 0.78);
+  --glass-bg-hi:      hsla(222, 32%, 16%, 0.88);
+  --glass-bg-vivid:   hsla(222, 38%, 18%, 0.92);
+  --glass-border:     rgba(255, 255, 255, 0.10);
+  --glass-border-hi:  rgba(255, 255, 255, 0.18);
+  --glass-blur:       28px;
+  --glass-inset-hl:   inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  --glass-inset-hl-hi: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  --glass-inner-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, transparent 30%);
+
+  /* ─ Text ─ */
+  --text-primary:     #F5F7FB;
+  --text-secondary:   #A6AEC4;
+  --text-tertiary:    #6E7894;
+  --text-quaternary:  #3D4660;
+  --text-on-brand:    #FFFFFF;
+
+  /* ─ Status semantic ─ */
+  --status-ok:        #34D399;
+  --status-ok-soft:   hsla(158, 64%, 52%, 0.14);
+  --status-ok-edge:   hsla(158, 64%, 52%, 0.35);
+  --status-warn:      #FBBF24;
+  --status-warn-soft: hsla(43, 96%, 56%, 0.14);
+  --status-warn-edge: hsla(43, 96%, 56%, 0.35);
+  --status-bad:       #F87171;
+  --status-bad-soft:  hsla(0, 91%, 71%, 0.14);
+  --status-bad-edge:  hsla(0, 91%, 71%, 0.35);
+  --status-info:      #22D3EE;
+  --status-info-soft: hsla(189, 94%, 53%, 0.14);
+  --status-info-edge: hsla(189, 94%, 53%, 0.35);
+
+  /* ─ Data palette ─ */
+  --data-1:           #A78BFA; /* violet */
+  --data-2:           #22D3EE; /* cyan */
+  --data-3:           #34D399; /* emerald */
+  --data-4:           #FBBF24; /* amber */
+  --data-5:           #FB7185; /* rose */
+
+  /* ─ Shadows (more dramatic) ─ */
+  --shadow-xs:
+    0 1px 2px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --shadow-sm:
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 4px 10px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --shadow-md:
+    0 2px 4px rgba(0, 0, 0, 0.3),
+    0 12px 28px rgba(0, 0, 0, 0.42),
+    0 30px 60px rgba(8, 10, 20, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  --shadow-lg:
+    0 4px 6px rgba(0, 0, 0, 0.3),
+    0 16px 40px rgba(0, 0, 0, 0.5),
+    0 40px 100px rgba(139, 92, 246, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --shadow-xl:
+    0 8px 14px rgba(0, 0, 0, 0.4),
+    0 32px 80px rgba(0, 0, 0, 0.55),
+    0 80px 180px rgba(139, 92, 246, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  --shadow-glow-brand:
+    0 0 60px rgba(139, 92, 246, 0.45),
+    0 0 140px rgba(34, 211, 238, 0.22);
+  --shadow-glow-ok:   0 0 40px hsla(158, 64%, 52%, 0.35);
+  --shadow-glow-warn: 0 0 40px hsla(43, 96%, 56%, 0.35);
+  --shadow-glow-bad:  0 0 40px hsla(0, 91%, 71%, 0.35);
+
+  /* ─ Color scheme for form controls ─ */
+  color-scheme: dark;
+}
+
+/* ─ Light theme ─────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg-base:          #F4F6FC;
+  --bg-elevated:      hsla(220, 30%, 100%, 0.82);
+  --bg-overlay:       hsla(220, 20%, 100%, 0.94);
+  --bg-floor:         radial-gradient(ellipse 60vw 40vh at 15% -5%, hsla(262, 100%, 92%, .8) 0%, transparent 55%),
+                      radial-gradient(ellipse 50vw 35vh at 95% 110%, hsla(189, 100%, 92%, .7) 0%, transparent 55%),
+                      radial-gradient(ellipse 80vw 60vh at 50% 100%, hsla(220, 60%, 97%, .9) 0%, transparent 70%),
+                      #FAFBFF;
+
+  --glass-bg:         hsla(220, 40%, 100%, 0.82);
+  --glass-bg-hi:      hsla(220, 40%, 100%, 0.94);
+  --glass-bg-vivid:   hsla(220, 40%, 100%, 0.98);
+  --glass-border:     rgba(15, 23, 42, 0.08);
+  --glass-border-hi:  rgba(15, 23, 42, 0.14);
+  --glass-inset-hl:   inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  --glass-inset-hl-hi: inset 0 1px 0 rgba(255, 255, 255, 1);
+  --glass-inner-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, transparent 40%);
+
+  --text-primary:     #0B1220;
+  --text-secondary:   #475569;
+  --text-tertiary:    #94A3B8;
+  --text-quaternary:  #CBD5E1;
+
+  --status-ok:        #16A34A;
+  --status-ok-soft:   hsla(142, 76%, 36%, 0.08);
+  --status-ok-edge:   hsla(142, 76%, 36%, 0.28);
+  --status-warn:      #D97706;
+  --status-warn-soft: hsla(32, 94%, 43%, 0.08);
+  --status-warn-edge: hsla(32, 94%, 43%, 0.28);
+  --status-bad:       #DC2626;
+  --status-bad-soft:  hsla(0, 72%, 51%, 0.08);
+  --status-bad-edge:  hsla(0, 72%, 51%, 0.28);
+  --status-info:      #0891B2;
+  --status-info-soft: hsla(189, 94%, 36%, 0.08);
+  --status-info-edge: hsla(189, 94%, 36%, 0.28);
+
+  --shadow-xs:
+    0 1px 1px rgba(15, 23, 42, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --shadow-sm:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 4px 10px rgba(15, 23, 42, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  --shadow-md:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 8px 20px rgba(15, 23, 42, 0.07),
+    0 20px 40px rgba(15, 23, 42, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+  --shadow-lg:
+    0 2px 4px rgba(15, 23, 42, 0.05),
+    0 16px 32px rgba(15, 23, 42, 0.09),
+    0 40px 80px rgba(139, 92, 246, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+  --shadow-xl:
+    0 4px 8px rgba(15, 23, 42, 0.06),
+    0 32px 64px rgba(15, 23, 42, 0.12),
+    0 80px 160px rgba(139, 92, 246, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+  --shadow-glow-brand:
+    0 0 50px rgba(139, 92, 246, 0.28),
+    0 0 120px rgba(34, 211, 238, 0.18);
+
+  color-scheme: light;
+}
+
+/* ─ Typography ────────────────────────────────────────────── */
+:root {
+  --font-sans:    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Inter', 'Inter Display', ui-sans-serif, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', 'Menlo', monospace;
+
+  /* Much bigger display sizes */
+  --text-xs:      11px;
+  --text-sm:      13px;
+  --text-base:    15px;
+  --text-md:      16px;
+  --text-lg:      17px;
+  --text-xl:      22px;
+  --text-2xl:     30px;
+  --text-3xl:     42px;
+  --text-4xl:     56px;
+  --text-5xl:     76px;
+  --text-6xl:     104px;
+  --text-7xl:     140px;
+
+  --leading-tight:  1.02;
+  --leading-snug:   1.2;
+  --leading-normal: 1.5;
+  --leading-loose:  1.7;
+
+  --tracking-tightest: -0.055em;
+  --tracking-tighter:  -0.035em;
+  --tracking-tight:    -0.02em;
+  --tracking-normal:   0;
+  --tracking-wide:     0.02em;
+  --tracking-wider:    0.08em;
+  --tracking-widest:   0.16em;
+}
+
+/* ─ Spacing 8pt grid ─ */
+:root {
+  --space-0:   0px;
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:   12px;
+  --space-4:   16px;
+  --space-5:   20px;
+  --space-6:   24px;
+  --space-7:   28px;
+  --space-8:   32px;
+  --space-10:  40px;
+  --space-12:  48px;
+  --space-14:  56px;
+  --space-16:  64px;
+  --space-20:  80px;
+  --space-24:  96px;
+  --space-32:  128px;
+}
+
+/* ─ Border radius ─ */
+:root {
+  --r-xs:   4px;
+  --r-sm:   6px;
+  --r-md:   10px;
+  --r-lg:   16px;
+  --r-xl:   22px;
+  --r-2xl:  32px;
+  --r-3xl:  40px;
+  --r-full: 9999px;
+}
+
+/* ─ Motion ─ */
+:root {
+  --dur-instant: 80ms;
+  --dur-fast:    160ms;
+  --dur-normal:  280ms;
+  --dur-slow:    480ms;
+  --dur-slower:  800ms;
+
+  --ease-out:     cubic-bezier(0.22, 0.82, 0.32, 1);
+  --ease-in-out:  cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring:  cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-bounce:  cubic-bezier(0.68, -0.55, 0.27, 1.55);
+  --ease-power:   cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-instant: 0ms;
+    --dur-fast:    0ms;
+    --dur-normal:  100ms;
+    --dur-slow:    100ms;
+    --dur-slower:  100ms;
+  }
+}
+
+/* ─ Density ─ */
+:root,
+[data-density="comfortable"] {
+  --density-pad-card: 28px;
+  --density-pad-cell: 16px;
+  --density-gap:      20px;
+  --density-row-h:    56px;
+}
+[data-density="compact"] {
+  --density-pad-card: 20px;
+  --density-pad-cell: 12px;
+  --density-gap:      14px;
+  --density-row-h:    44px;
+}
+[data-density="dense"] {
+  --density-pad-card: 14px;
+  --density-pad-cell: 8px;
+  --density-gap:      10px;
+  --density-row-h:    36px;
+}
+
+/* ─ Z-stack ─ */
+:root {
+  --z-base:       0;
+  --z-elevated:   10;
+  --z-sticky:     20;
+  --z-drawer:     40;
+  --z-modal:      50;
+  --z-toast:      60;
+  --z-palette:    70;
+  --z-tooltip:    80;
+}
