@@ -13,6 +13,7 @@ const PanelDevicesPage  = React.lazy(() => import('./PanelDevicesPage'));
 const PanelTicketsPage  = React.lazy(() => import('./PanelTicketsPage'));
 const PanelVaultPage    = React.lazy(() => import('./PanelVaultPage'));
 const PanelIdoPage      = React.lazy(() => import('./PanelIdoPage'));
+const PanelBillingPage  = React.lazy(() => import('./PanelBillingPage'));
 
 function ComingSoon({ title, phase }: { title: string; phase?: string }) {
   return (
@@ -82,7 +83,7 @@ export default function PanelRoutes() {
 
         <Route path="billing" element={
           <RoleGate capability="view_billing" fallback={<ComingSoon title="Brak dostępu" />}>
-            <ComingSoon title="Rozliczenia" phase="PHASE 9" />
+            <Lazy><PanelBillingPage /></Lazy>
           </RoleGate>
         } />
 
