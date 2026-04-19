@@ -32,7 +32,7 @@ export function OperationsLayout({ children }: { children: ReactNode }) {
   // Workspace resolved but empty — no workspace assigned (superadmin bypasses)
   if (!workspace && !user?.isSuperAdmin) return <NoWorkspacePage />;
   // MEMBER/VIEWER without admin/tech role go to portal (superadmin bypasses)
-  if ((isMember || isViewer) && !user?.isSuperAdmin) return <Navigate to="/portal" replace />;
+  if ((isMember || isViewer) && !user?.isSuperAdmin) return <Navigate to="/panel" replace />;
 
   return (
     <div className="app app-shell">

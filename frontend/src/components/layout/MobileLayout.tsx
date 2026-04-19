@@ -62,7 +62,7 @@ export function MobileLayout({ children }: Props) {
   if (!isAuthenticated || !user) return <Navigate to="/login" replace />;
   if (!wsResolved) return (<div className="min-h-screen flex items-center justify-center" style={{ background: '#040a16' }}><div className="animate-spin h-7 w-7 border-2 border-violet-500 border-t-transparent rounded-full" /></div>);
   if (!workspace && !user?.isSuperAdmin) return <NoWorkspacePage />;
-  if (isMember || isViewer) return <Navigate to="/portal" replace />;
+  if (isMember || isViewer) return <Navigate to="/panel" replace />;
 
   const isActiveTab = (tab: any) => tab.path && (tab.exact ? location.pathname === tab.path : location.pathname.startsWith(tab.path));
   const initials = `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase();

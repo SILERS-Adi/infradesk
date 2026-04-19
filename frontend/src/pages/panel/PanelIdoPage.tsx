@@ -1,97 +1,174 @@
 /**
- * PanelIdoPage — chat with IDO (ID Opiekun) client assistant.
- *
- * Phase 7 stub: static intro + capability list. Real backend integration
- * (workspace-scoped prompt + tool calling + WorkSession billing with
- * verify-before-bill) will replace this content.
+ * PanelIdoPage — real IDO chat (proxied to ID CORE with workspace context).
+ * Endpoint: POST /api/panel/ido/chat { message } → { response }
  */
 
 import React from 'react';
-import { MessageCircle, HardDrive, RefreshCw, Printer, Lock, Wifi, Terminal } from 'lucide-react';
+import apiClient from '../../api/client';
+import toast from 'react-hot-toast';
+import { Send, Loader2, RefreshCw, HardDrive, Printer, Lock, Wifi } from 'lucide-react';
+
+interface Msg {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  time: string;
+  duration?: number;
+}
+
+const SUGGESTIONS = [
+  { icon: <HardDrive size={14} />, label: 'Miejsce na dysku', prompt: 'Sprawdź ile mam wolnego miejsca na dysku i co mogę zwolnić' },
+  { icon: <RefreshCw size={14} />, label: 'Aktualizacje',     prompt: 'Jakie mam zaległe aktualizacje Windows?' },
+  { icon: <Printer size={14} />,   label: 'Drukarka',         prompt: 'Moja drukarka nie drukuje, pomóż' },
+  { icon: <Lock size={14} />,      label: 'Nowe hasło',       prompt: 'Wygeneruj mi silne hasło do nowego konta' },
+  { icon: <Wifi size={14} />,      label: 'Internet',         prompt: 'Internet działa wolno, co mogę zrobić?' },
+];
 
 export default function PanelIdoPage() {
+  const [messages, setMessages] = React.useState<Msg[]>([
+    {
+      id: 'welcome',
+      role: 'assistant',
+      text: 'Cześć! Jestem IDO — Twój asystent IT. W czym mogę pomóc? Możesz opisać problem słowami albo kliknąć jedną z sugestii poniżej.',
+      time: new Date().toISOString(),
+    },
+  ]);
   const [input, setInput] = React.useState('');
+  const [sending, setSending] = React.useState(false);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const inputRef = React.useRef<HTMLTextAreaElement>(null);
 
-  const capabilities = [
-    { icon: <HardDrive size={18} />,  title: 'Miejsce na dysku',        desc: 'Sprawdzę ile zajętego miejsca masz na dysku. Mogę zwolnić Temp + cache przeglądarki jeżeli potrzeba — rozmawiam z agentem Windows.' },
-    { icon: <RefreshCw size={18} />,  title: 'Aktualizacje Windows',    desc: 'Sprawdzę jakie są zaległe aktualizacje systemu i programów. Mogę uruchomić aktualizację jeżeli zgodzisz się na restart.' },
-    { icon: <Printer size={18} />,    title: 'Drukarka nie drukuje',    desc: 'Najczęstsze: restart Print Spooler, sprawdzenie kolejki zadań. Zrobię to i zweryfikuję że drukuje — jeżeli nie, zgłaszam serwis.' },
-    { icon: <Lock size={18} />,       title: 'Nowe hasło',              desc: 'Wygeneruję silne hasło, zapiszę w Twoim vaulcie, nie będę go pamiętać po powiedzeniu Ci go jeden raz.' },
-    { icon: <Wifi size={18} />,       title: 'Problemy z Internetem',   desc: 'Speed test, sprawdzenie DNS, restart karty sieciowej. Jak nie pomaga — ticket dla Mariusza z dokładną diagnozą.' },
-    { icon: <Terminal size={18} />,   title: 'Inne problemy',           desc: 'Napisz czego potrzebujesz. Zdiagnozuje sam albo od razu założę zgłoszenie dla technika. Nigdy nie naliczam czasu za rzeczy które się nie udały.' },
-  ];
+  React.useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+  }, [messages, sending]);
+
+  const send = async (text?: string) => {
+    const msg = (text ?? input).trim();
+    if (!msg || sending) return;
+    setInput('');
+    setMessages(prev => [...prev, { id: `u-${Date.now()}`, role: 'user', text: msg, time: new Date().toISOString() }]);
+    setSending(true);
+    try {
+      const { data } = await apiClient.post<{ response: string; durationMs: number }>('/panel/ido/chat', { message: msg });
+      setMessages(prev => [...prev, {
+        id: `a-${Date.now()}`, role: 'assistant',
+        text: data.response || '(IDO nie zwróciła odpowiedzi)',
+        time: new Date().toISOString(),
+        duration: data.durationMs,
+      }]);
+    } catch (e: any) {
+      const errText = e?.response?.data?.detail || e?.response?.data?.error || e?.message || 'Błąd połączenia';
+      toast.error(`IDO offline: ${errText}`);
+      setMessages(prev => [...prev, {
+        id: `e-${Date.now()}`, role: 'assistant',
+        text: `⚠️ Nie udało się połączyć z IDO (${errText}). Spróbuj za chwilę lub otwórz zgłoszenie ręcznie.`,
+        time: new Date().toISOString(),
+      }]);
+    } finally {
+      setSending(false);
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0, height: 'calc(100vh - 140px)', minHeight: 600 }}>
       <style>{`
-        .ido-hero { padding: 60px 48px; text-align: center; position: relative; overflow: hidden; }
-        .ido-orb-big { width: 140px; height: 140px; margin: 0 auto 28px; border-radius: 50%;
+        .ido-wrap { display: grid; grid-template-rows: auto 1fr auto; gap: 0; height: 100%; }
+        .ido-top { display: flex; align-items: center; gap: 16px; padding: 20px 28px; border-bottom: 1px solid var(--glass-border); }
+        .ido-top-orb { width: 48px; height: 48px; border-radius: 50%;
           background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0) 35%), radial-gradient(circle at 50% 50%, #A78BFA 0%, #8B5CF6 40%, #22D3EE 100%);
-          box-shadow: 0 0 80px rgba(139,92,246,.6), 0 0 180px rgba(34,211,238,.3), inset 0 -10px 32px rgba(14,22,40,.35), inset 0 2px 8px rgba(255,255,255,.25);
-          animation: orbPulse 3.5s ease-in-out infinite;
+          box-shadow: 0 0 30px rgba(139,92,246,.55), inset 0 -3px 10px rgba(14,22,40,.35), inset 0 2px 6px rgba(255,255,255,.25);
+          animation: idoOrbLive 3s ease-in-out infinite;
+          flex-shrink: 0;
         }
-        @keyframes orbPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
-        .ido-title { font-size: clamp(36px, 5vw, 56px); font-weight: 900; letter-spacing: -0.045em; line-height: 1.05; margin-bottom: 16px; background: linear-gradient(135deg, #A78BFA 0%, #22D3EE 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
-        .ido-sub { font-size: 17px; color: var(--text-secondary); max-width: 600px; margin: 0 auto 40px; line-height: 1.6; }
-        .ido-input-wrap { display: flex; gap: 12px; max-width: 720px; margin: 0 auto; padding: 6px; background: var(--glass-bg-hi); border: 1px solid var(--glass-border-hi); border-radius: 18px; box-shadow: 0 8px 32px rgba(0,0,0,.24); }
-        .ido-input { flex: 1; background: none; border: none; outline: none; padding: 14px 18px; color: var(--text-primary); font-size: 15px; font-family: inherit; }
-        .ido-input::placeholder { color: var(--text-tertiary); }
-        .ido-send { padding: 12px 24px; background: linear-gradient(135deg, #8B5CF6, #22D3EE); color: white; border: none; border-radius: 14px; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(139,92,246,.4); }
-        .ido-send:hover { filter: brightness(1.1); transform: translateY(-1px); }
-        .cap-title { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 4px; }
-        .cap-sub { font-size: 13px; color: var(--text-tertiary); margin-bottom: 20px; }
-        .cap-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
-        .cap-card { padding: 20px; }
-        .cap-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
-        .cap-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--brand-gradient-soft, rgba(139,92,246,0.12)); color: #22D3EE; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .cap-name { font-size: 15px; font-weight: 600; color: var(--text-primary); }
-        .cap-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.55; }
-        .promise { padding: 24px 28px; margin-top: 8px; border: 1px solid rgba(139,92,246,0.3); background: var(--brand-gradient-soft, rgba(139,92,246,0.08)); }
-        .promise-title { font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #A78BFA; margin-bottom: 8px; }
-        .promise-text { font-size: 14px; color: var(--text-primary); line-height: 1.6; }
+        @keyframes idoOrbLive { 0%,100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+        .ido-top-title { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; color: var(--text-primary); }
+        .ido-top-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+        .ido-top-chip { margin-left: auto; font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; padding: 6px 12px; border-radius: 9999px; background: rgba(52,211,153,0.14); color: #34D399; border: 1px solid rgba(52,211,153,0.3); }
+        .ido-msgs { overflow-y: auto; padding: 24px 28px; display: flex; flex-direction: column; gap: 16px; }
+        .ido-msg { display: flex; gap: 12px; max-width: 85%; }
+        .ido-msg--user { align-self: flex-end; flex-direction: row-reverse; }
+        .ido-msg-av { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+        .ido-msg--user .ido-msg-av { background: linear-gradient(135deg, #22D3EE, #0891B2); color: #FFF; }
+        .ido-msg--assistant .ido-msg-av {
+          background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 35%), radial-gradient(circle at 50% 50%, #A78BFA 0%, #8B5CF6 40%, #22D3EE 100%);
+          box-shadow: 0 0 14px rgba(139,92,246,.4);
+        }
+        .ido-msg-body { padding: 12px 16px; border-radius: 14px; font-size: 14px; line-height: 1.55; white-space: pre-wrap; word-wrap: break-word; }
+        .ido-msg--user .ido-msg-body { background: linear-gradient(135deg, #8B5CF6, #22D3EE); color: #fff; box-shadow: 0 4px 12px rgba(139,92,246,.3); border-bottom-right-radius: 4px; }
+        .ido-msg--assistant .ido-msg-body { background: var(--glass-bg-hi); border: 1px solid var(--glass-border); color: var(--text-primary); border-bottom-left-radius: 4px; }
+        .ido-msg-meta { font-size: 10px; color: var(--text-tertiary); margin-top: 4px; padding: 0 4px; font-family: var(--font-mono, monospace); }
+        .ido-typing { display: inline-flex; gap: 4px; padding: 14px 18px; background: var(--glass-bg-hi); border: 1px solid var(--glass-border); border-radius: 14px; border-bottom-left-radius: 4px; align-items: center; }
+        .ido-typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--text-secondary); opacity: 0.6; animation: idoDot 1.4s infinite ease-in-out; }
+        .ido-typing span:nth-child(2) { animation-delay: 0.2s; }
+        .ido-typing span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes idoDot { 0%,80%,100% { transform: scale(0.7); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
+        .ido-suggestions { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 28px 14px; }
+        .ido-suggest { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 9999px; background: var(--glass-bg); border: 1px solid var(--glass-border); color: var(--text-secondary); font-size: 12px; font-weight: 500; cursor: pointer; transition: all 150ms; font-family: inherit; }
+        .ido-suggest:hover { background: var(--glass-bg-hi); color: var(--text-primary); border-color: #22D3EE; }
+        .ido-bottom { padding: 16px 20px; border-top: 1px solid var(--glass-border); display: flex; gap: 12px; align-items: flex-end; background: var(--glass-bg); }
+        .ido-textarea { flex: 1; resize: none; padding: 14px 18px; background: var(--glass-bg-hi); border: 1px solid var(--glass-border-hi); border-radius: 14px; color: var(--text-primary); font-size: 14px; font-family: inherit; outline: none; max-height: 200px; line-height: 1.5; }
+        .ido-textarea:focus { border-color: #22D3EE; }
+        .ido-send-btn { padding: 14px 20px; background: linear-gradient(135deg, #8B5CF6, #22D3EE); color: #fff; border: none; border-radius: 14px; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 14px rgba(139,92,246,.35); transition: all 150ms; font-family: inherit; }
+        .ido-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .ido-send-btn:not(:disabled):hover { filter: brightness(1.1); transform: translateY(-1px); }
       `}</style>
 
-      <div className="panel-glass ido-hero">
-        <div className="ido-orb-big" />
-        <h1 className="ido-title">Jestem Twoim IDO</h1>
-        <p className="ido-sub">
-          ID Opiekun — asystent AI SILERS. Pomogę Ci z codziennymi problemami IT, szybciej niż telefon na helpdesk.
-          Rozwiązuje sama to co umie, a czego nie umie — zgłaszam technikowi i uprzedzam Cię co dalej.
-        </p>
-        <div className="ido-input-wrap">
-          <input
-            className="ido-input"
-            placeholder="Opisz co się dzieje…"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && input.trim()) { alert('IDO chat backend w Phase 7 — wkrótce'); } }}
-          />
-          <button className="ido-send" onClick={() => alert('IDO chat backend w Phase 7 — wkrótce')}>
-            <MessageCircle size={16} /> Wyślij
-          </button>
+      <div className="panel-glass ido-wrap">
+        <div className="ido-top">
+          <div className="ido-top-orb" />
+          <div>
+            <div className="ido-top-title">IDO</div>
+            <div className="ido-top-sub">ID Opiekun — Twój asystent AI SILERS</div>
+          </div>
+          <span className="ido-top-chip">Online</span>
         </div>
-      </div>
 
-      <div>
-        <div className="cap-title">Co umiem dla Ciebie zrobić</div>
-        <div className="cap-sub">Kliknij temat albo napisz sam(a)</div>
-        <div className="cap-grid">
-          {capabilities.map(c => (
-            <div key={c.title} className="panel-glass cap-card">
-              <div className="cap-head">
-                <div className="cap-icon">{c.icon}</div>
-                <div className="cap-name">{c.title}</div>
+        <div className="ido-msgs" ref={scrollRef}>
+          {messages.map(m => (
+            <div key={m.id} className={`ido-msg ido-msg--${m.role}`}>
+              <div className="ido-msg-av">{m.role === 'user' ? 'TY' : ''}</div>
+              <div>
+                <div className="ido-msg-body">{m.text}</div>
+                <div className="ido-msg-meta">
+                  {new Date(m.time).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
+                  {m.duration && ` · ${(m.duration / 1000).toFixed(1)}s`}
+                </div>
               </div>
-              <div className="cap-desc">{c.desc}</div>
             </div>
           ))}
+          {sending && (
+            <div className="ido-msg ido-msg--assistant">
+              <div className="ido-msg-av" />
+              <div className="ido-typing"><span /><span /><span /></div>
+            </div>
+          )}
         </div>
-      </div>
 
-      <div className="panel-glass promise">
-        <div className="promise-title">💡 Obietnica IDO</div>
-        <div className="promise-text">
-          Naliczam czas TYLKO wtedy, kiedy zweryfikuję że akcja naprawdę zadziałała. Próba bez skutku → bezpłatnie, wystawiam zgłoszenie dla Mariusza. Każda akcja co trwa &lt; 1 minuty liczy się jako 15 min (minimum rozliczeniowe).
+        {messages.length === 1 && (
+          <div className="ido-suggestions">
+            {SUGGESTIONS.map(s => (
+              <button key={s.label} className="ido-suggest" onClick={() => send(s.prompt)}>
+                {s.icon} {s.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="ido-bottom">
+          <textarea
+            ref={inputRef}
+            className="ido-textarea"
+            rows={1}
+            value={input}
+            placeholder="Napisz do IDO…"
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+          />
+          <button className="ido-send-btn" onClick={() => send()} disabled={!input.trim() || sending}>
+            {sending ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={16} />}
+            {sending ? '' : 'Wyślij'}
+          </button>
         </div>
       </div>
     </div>
