@@ -523,22 +523,37 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
 
   // Load ALL workspaces — two sources, use whichever works
   const { data: workspaces = [], isLoading: loadingWs } = useQuery({
-    queryKey: ['approve-workspaces'],
+    queryKey: ['approve-workspaces', reg.id],
+    staleTime: 0,
     queryFn: async () => {
-      // Try operator clients first
+      const byName = (a: any, b: any) => (a.name ?? '').localeCompare(b.name ?? '', 'pl');
+      // Try operator clients first (works if current workspace is MSP)
       try {
         const clients = await apiClient.get('/operator/clients').then(r => r.data);
-        if (clients?.length > 0) return clients.map((c: any) => ({ id: c.workspace?.id, name: c.workspace?.name, taxId: c.workspace?.taxId })).filter((w: any) => w.id);
+        if (clients?.length > 0) {
+          return clients
+            .map((c: any) => ({ id: c.workspace?.id, name: c.workspace?.name, taxId: c.workspace?.taxId }))
+            .filter((w: any) => w.id)
+            .sort(byName);
+        }
       } catch {}
-      // Fallback: all workspaces (superadmin or workspace list)
+      // Fallback: superadmin full list (works for superadmin in any context)
       try {
         const all = await apiClient.get('/superadmin/workspaces-list').then(r => r.data);
-        if (all?.length > 0) return all.map((w: any) => ({ id: w.id, name: w.name, taxId: w.taxId }));
+        if (all?.length > 0) {
+          return all
+            .map((w: any) => ({ id: w.id, name: w.name, taxId: w.taxId }))
+            .sort(byName);
+        }
       } catch {}
       // Last resort: workspace relations
       try {
         const rels = await apiClient.get('/workspace-relations').then(r => r.data);
-        if (rels?.length > 0) return rels.map((r: any) => ({ id: r.clientWorkspaceId ?? r.id, name: r.clientWorkspace?.name ?? r.name ?? '?', taxId: null }));
+        if (rels?.length > 0) {
+          return rels
+            .map((r: any) => ({ id: r.clientWorkspaceId ?? r.id, name: r.clientWorkspace?.name ?? r.name ?? '?', taxId: r.clientWorkspace?.taxId ?? null }))
+            .sort(byName);
+        }
       } catch {}
       return [];
     },

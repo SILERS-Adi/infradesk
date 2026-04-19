@@ -135,7 +135,7 @@ router.delete('/tenants/:id', async (req: Request, res: Response, next: NextFunc
 router.get('/workspaces-list', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const workspaces = await prisma.workspace.findMany({
-      select: { id: true, name: true, type: true },
+      select: { id: true, name: true, type: true, taxId: true, orgType: true, organizationType: true },
       orderBy: { name: 'asc' },
     });
     res.json(workspaces);
