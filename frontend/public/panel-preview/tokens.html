@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="pl" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A · Design Tokens — ID PANEL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/preview.css">
+</head>
+<body>
+<div class="ambient-floor"></div>
+
+<nav class="preview-nav">
+  <a href="index.html" class="preview-nav__back">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    Wróć
+  </a>
+  <div class="preview-nav__breadcrumb">ID PANEL preview · <strong>A · Design Tokens</strong></div>
+  <div style="margin-left:auto;display:flex;gap:10px;align-items:center">
+    <div class="theme-toggle" role="group" aria-label="Motyw">
+      <button class="theme-toggle__opt" data-theme-opt="light" aria-label="Jasny">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41"/></svg>
+      </button>
+      <button class="theme-toggle__opt" data-theme-opt="auto" aria-label="Auto">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 000 20z" fill="currentColor"/></svg>
+      </button>
+      <button class="theme-toggle__opt" data-theme-opt="dark" aria-label="Ciemny">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<main class="preview-main">
+
+  <!-- Brand gradient -->
+  <section class="preview-section">
+    <div class="preview-section__header">
+      <span class="preview-section__eyebrow">Brand</span>
+      <h2 class="preview-section__title">Signature gradient</h2>
+      <p class="preview-section__desc">Używany WYŁĄCZNIE na Pulsie Firmy i orbie IDO — żeby te miejsca świeciły jak bijące serce.</p>
+    </div>
+    <div class="glass glass--lg" style="padding:40px;display:flex;flex-direction:column;gap:20px">
+      <div style="height:160px;border-radius:20px;background:var(--brand-gradient);box-shadow:var(--shadow-glow-brand);position:relative;overflow:hidden">
+        <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.15),transparent 50%)"></div>
+        <div style="position:absolute;bottom:20px;left:24px;color:#fff;font-family:var(--font-display);font-size:24px;font-weight:700">linear-gradient(135deg, #7C3AED, #06B6D4)</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
+        <div class="swatch">
+          <div class="swatch__block" style="background:#7C3AED"></div>
+          <div class="swatch__meta"><div class="swatch__name">Violet 600</div><div class="swatch__value">#7C3AED</div></div>
+        </div>
+        <div class="swatch">
+          <div class="swatch__block" style="background:#06B6D4"></div>
+          <div class="swatch__meta"><div class="swatch__name">Cyan 500</div><div class="swatch__value">#06B6D4</div></div>
+        </div>
+        <div class="swatch">
+          <div class="swatch__block" style="background:#A78BFA"></div>
+          <div class="swatch__meta"><div class="swatch__name">Violet hi</div><div class="swatch__value">#A78BFA</div></div>
+        </div>
+        <div class="swatch">
+          <div class="swatch__block" style="background:#67E8F9"></div>
+          <div class="swatch__meta"><div class="swatch__name">Cyan hi</div><div class="swatch__value">#67E8F9</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Semantic -->
+  <section class="preview-section">
+    <div class="preview-section__header">
+      <span class="preview-section__eyebrow">Semantic</span>
+      <h2 class="preview-section__title">Status i dane</h2>
+      <p class="preview-section__desc">Zielone / żółte / czerwone — standard branżowy, nie tykamy. Data palette Ishihara-tested dla daltonistów.</p>
+    </div>
+    <div class="swatch-grid">
+      <div class="swatch"><div class="swatch__block" style="background:#22C55E"></div><div class="swatch__meta"><div class="swatch__name">OK</div><div class="swatch__value">#22C55E</div></div></div>
+      <div class="swatch"><div class="swatch__block" style="background:#EAB308"></div><div class="swatch__meta"><div class="swatch__name">Warn</div><div class="swatch__value">#EAB308</div></div></div>
+      <div class="swatch"><div class="swatch__block" style="background:#EF4444"></div><div class="swatch__meta"><div class="swatch__name">Bad</div><div class="swatch__value">#EF4444</div></div></div>
+      <div class="swatch"><div class="swatch__block" style="background:#06B6D4"></div><div class="swatch__meta"><div class="swatch__name">Info</div><div class="swatch__value">#06B6D4</div></div></div>
+      <div class="swatch"><div class="swatch__block" style="background:#A78BFA"></div><div class="swatch__meta"><div class="swatch__name">data-1 Violet</div><div class="swatch__value">charts</div></div></div>
+      <div class="swatch"><div class="swatch__block" style="background:#22D3EE"></div><div class="swatch__meta"><div class="swatch__name">data-2 Cyan</div><div class="swatch__value">charts</div></div></div>
+      <div class="swatch"><div class="swatch__block" style="background:#34D399"></div><div class="swatch__meta"><div class="swatch__name">data-3 Emerald</div><div class="swatch__value">charts</div></div></div>
+      <div class="swatch"><div class="swatch__block" style="background:#FBBF24"></div><div class="swatch__meta"><div class="swatch__name">data-4 Amber</div><div class="swatch__value">charts</div></div></div>
+      <div class="swatch"><div class="swatch__block" style="background:#FB7185"></div><div class="swatch__meta"><div class="swatch__name">data-5 Rose</div><div class="swatch__value">charts</div></div></div>
+    </div>
+  </section>
+
+  <!-- Typography -->
+  <section class="preview-section">
+    <div class="preview-section__header">
+      <span class="preview-section__eyebrow">Typografia</span>
+      <h2 class="preview-section__title">Inter — skala Major Third 1.25×</h2>
+      <p class="preview-section__desc">Display font dla liczb i nagłówków, body dla tekstu, JetBrains Mono dla kodu i ID.</p>
+    </div>
+    <div class="glass glass--lg glass--pad">
+      <div class="type-row"><span class="type-row__label">56px · display</span><span class="type-row__sample" style="font-family:var(--font-display);font-size:56px;font-weight:700;letter-spacing:-0.03em">Premium asystent IT</span></div>
+      <div class="type-row"><span class="type-row__label">40px · h1</span><span class="type-row__sample" style="font-family:var(--font-display);font-size:40px;font-weight:700;letter-spacing:-0.02em">Premium asystent IT</span></div>
+      <div class="type-row"><span class="type-row__label">28px · h2</span><span class="type-row__sample" style="font-family:var(--font-display);font-size:28px;font-weight:700;letter-spacing:-0.02em">Premium asystent IT</span></div>
+      <div class="type-row"><span class="type-row__label">20px · h3</span><span class="type-row__sample" style="font-size:20px;font-weight:600">Premium asystent IT</span></div>
+      <div class="type-row"><span class="type-row__label">16px · lg</span><span class="type-row__sample" style="font-size:16px">Premium asystent IT dla każdej firmy</span></div>
+      <div class="type-row"><span class="type-row__label">14px · base</span><span class="type-row__sample" style="font-size:14px">Premium asystent IT dla każdej firmy 2026</span></div>
+      <div class="type-row"><span class="type-row__label">12px · sm</span><span class="type-row__sample" style="font-size:12px;color:var(--text-secondary)">Premium asystent IT dla każdej firmy 2026</span></div>
+      <div class="type-row"><span class="type-row__label">11px · xs</span><span class="type-row__sample" style="font-size:11px;color:var(--text-tertiary)">Premium asystent IT dla każdej firmy 2026</span></div>
+      <div class="type-row"><span class="type-row__label">mono</span><span class="type-row__sample" style="font-family:var(--font-mono);font-size:13px;color:var(--brand-cyan-hi)">WS-METBUD-001 · tech@silers.pl · 2026-04-19T10:23</span></div>
+    </div>
+  </section>
+
+  <!-- Spacing -->
+  <section class="preview-section">
+    <div class="preview-section__header">
+      <span class="preview-section__eyebrow">Spacing · 8pt grid</span>
+      <h2 class="preview-section__title">Wielkości odstępów</h2>
+    </div>
+    <div class="glass glass--lg glass--pad">
+      <div class="space-demo">
+        <div class="space-demo__item"><div class="space-demo__block" style="width:4px;height:4px"></div><div class="space-demo__label">--space-1 · 4</div></div>
+        <div class="space-demo__item"><div class="space-demo__block" style="width:8px;height:8px"></div><div class="space-demo__label">--space-2 · 8</div></div>
+        <div class="space-demo__item"><div class="space-demo__block" style="width:12px;height:12px"></div><div class="space-demo__label">--space-3 · 12</div></div>
+        <div class="space-demo__item"><div class="space-demo__block" style="width:16px;height:16px"></div><div class="space-demo__label">--space-4 · 16</div></div>
+        <div class="space-demo__item"><div class="space-demo__block" style="width:24px;height:24px"></div><div class="space-demo__label">--space-6 · 24</div></div>
+        <div class="space-demo__item"><div class="space-demo__block" style="width:32px;height:32px"></div><div class="space-demo__label">--space-8 · 32</div></div>
+        <div class="space-demo__item"><div class="space-demo__block" style="width:48px;height:48px"></div><div class="space-demo__label">--space-12 · 48</div></div>
+        <div class="space-demo__item"><div class="space-demo__block" style="width:64px;height:64px"></div><div class="space-demo__label">--space-16 · 64</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Shadows -->
+  <section class="preview-section">
+    <div class="preview-section__header">
+      <span class="preview-section__eyebrow">Elevation · 4 warstwy</span>
+      <h2 class="preview-section__title">System cieni</h2>
+      <p class="preview-section__desc">Każdy cień to kompozycja: ambient glow + main drop + contact + inset highlight — daje "premium wielowarstwowy" look.</p>
+    </div>
+    <div class="shadow-demo">
+      <div class="shadow-demo__card" style="box-shadow:var(--shadow-xs)">
+        <div class="shadow-demo__label">--shadow-xs</div>
+        <div class="shadow-demo__title">Ledwo widoczny</div>
+        <div class="dim" style="margin-top:8px">Dla chipów, input borders</div>
+      </div>
+      <div class="shadow-demo__card" style="box-shadow:var(--shadow-sm)">
+        <div class="shadow-demo__label">--shadow-sm</div>
+        <div class="shadow-demo__title">Delikatny</div>
+        <div class="dim" style="margin-top:8px">Dla button secondary</div>
+      </div>
+      <div class="shadow-demo__card" style="box-shadow:var(--shadow-md)">
+        <div class="shadow-demo__label">--shadow-md</div>
+        <div class="shadow-demo__title">Standardowy</div>
+        <div class="dim" style="margin-top:8px">Dla glass cards domyślnie</div>
+      </div>
+      <div class="shadow-demo__card" style="box-shadow:var(--shadow-lg)">
+        <div class="shadow-demo__label">--shadow-lg</div>
+        <div class="shadow-demo__title">Wysoki</div>
+        <div class="dim" style="margin-top:8px">Dla hover state + modalne</div>
+      </div>
+      <div class="shadow-demo__card" style="box-shadow:var(--shadow-xl)">
+        <div class="shadow-demo__label">--shadow-xl</div>
+        <div class="shadow-demo__title">Maksymalny</div>
+        <div class="dim" style="margin-top:8px">Dla drawerów i palette</div>
+      </div>
+      <div class="shadow-demo__card" style="box-shadow:var(--shadow-glow-brand);background:var(--brand-gradient-soft)">
+        <div class="shadow-demo__label">--shadow-glow-brand</div>
+        <div class="shadow-demo__title">Bijące serce</div>
+        <div class="dim" style="margin-top:8px">Tylko Puls Firmy + IDO</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Motion -->
+  <section class="preview-section">
+    <div class="preview-section__header">
+      <span class="preview-section__eyebrow">Motion</span>
+      <h2 class="preview-section__title">Krzywe i czasy</h2>
+      <p class="preview-section__desc">Kliknij w kartę żeby zobaczyć animację. Reduced-motion respect włączone — jeśli masz ustawione w systemie, wszystko się skraca.</p>
+    </div>
+    <div class="glass glass--lg glass--pad">
+      <div class="motion-demo__row"><div class="motion-demo__label">150ms fast</div><div class="motion-demo__box" style="transition:transform 150ms var(--ease-out)" onclick="this.style.transform = this.style.transform === 'translateX(200px)' ? '' : 'translateX(200px)'"></div><div class="dim">--dur-fast · ease-out</div></div>
+      <div class="motion-demo__row"><div class="motion-demo__label">250ms normal</div><div class="motion-demo__box" style="transition:transform 250ms var(--ease-out)" onclick="this.style.transform = this.style.transform === 'translateX(200px)' ? '' : 'translateX(200px)'"></div><div class="dim">--dur-normal · ease-out</div></div>
+      <div class="motion-demo__row"><div class="motion-demo__label">400ms slow</div><div class="motion-demo__box" style="transition:transform 400ms var(--ease-spring)" onclick="this.style.transform = this.style.transform === 'translateX(200px)' ? '' : 'translateX(200px)'"></div><div class="dim">--dur-slow · ease-spring</div></div>
+      <div class="motion-demo__row"><div class="motion-demo__label">700ms slower</div><div class="motion-demo__box" style="transition:transform 700ms var(--ease-spring)" onclick="this.style.transform = this.style.transform === 'translateX(200px)' ? '' : 'translateX(200px)'"></div><div class="dim">--dur-slower · ease-spring</div></div>
+    </div>
+  </section>
+
+</main>
+
+<script src="js/preview.js"></script>
+</body>
+</html>

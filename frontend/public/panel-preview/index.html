@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pl" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ID PANEL — Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/preview.css">
+<link rel="icon" href="/favicon-32.png">
+</head>
+<body>
+<div class="ambient-floor"></div>
+
+<header class="topbar">
+  <div class="topbar__logo">
+    <img src="/logo-dark.png" alt="InfraDesk" style="height:28px;width:auto" data-logo-dark>
+    <img src="/logo.png" alt="InfraDesk" style="height:28px;width:auto;display:none" data-logo-light>
+  </div>
+  <span class="chip chip--brand" style="margin-left:10px">ID PANEL · Preview</span>
+
+  <div class="topbar__actions">
+    <button class="cmd-hint" data-cmd-trigger>
+      Szukaj akcji…
+      <span class="cmd-hint__key">⌘K</span>
+    </button>
+    <div class="theme-toggle" role="group" aria-label="Motyw">
+      <button class="theme-toggle__opt" data-theme-opt="light" aria-label="Jasny" title="Jasny">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41"/></svg>
+      </button>
+      <button class="theme-toggle__opt" data-theme-opt="auto" aria-label="Auto" title="Auto">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 000 20z" fill="currentColor"/></svg>
+      </button>
+      <button class="theme-toggle__opt" data-theme-opt="dark" aria-label="Ciemny" title="Ciemny">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="preview-main">
+  <section class="preview-hero">
+    <span class="preview-hero__eyebrow">Design Brief · v1 · 2026-04</span>
+    <h1 class="preview-hero__title">ID PANEL</h1>
+    <p class="preview-hero__sub">
+      Premium, role-aware panel dla klientów i operatorów InfraDesk.
+      Glass multi-layer, living visualizations, AI-first — zaprojektowany pod
+      <strong style="color:var(--text-primary)">Panią z biura</strong>,
+      nie pod admina IT.
+    </p>
+    <div class="preview-hero__version">
+      <span class="chip chip--live chip--ok"><span class="chip__dot"></span>preview online</span>
+      <span>·</span>
+      <span>do akceptacji przed faktyczną budową</span>
+    </div>
+  </section>
+
+  <nav class="preview-tabs" aria-label="Sekcje podglądu">
+    <a href="tokens.html" class="glass glass--lg glass--hover glass--clickable preview-tab fade-up fade-up-1">
+      <div class="preview-tab__letter">A</div>
+      <div class="preview-tab__title">Design tokens</div>
+      <p class="preview-tab__desc">
+        Kompletna paleta kolorów (dark/light/auto), typografia, spacing, cienie 4-warstwowe,
+        motion curves. Podstawa wszystkiego.
+      </p>
+    </a>
+    <a href="components.html" class="glass glass--lg glass--hover glass--clickable preview-tab fade-up fade-up-2">
+      <div class="preview-tab__letter">B</div>
+      <div class="preview-tab__title">Komponenty</div>
+      <p class="preview-tab__desc">
+        GlassCard, RadialGauge 12-warstwowy, StatTile, Buttons, Chips, Timeline, Role switcher.
+        Wszystkie stany, 3 tryby motywu.
+      </p>
+    </a>
+    <a href="panel.html" class="glass glass--lg glass--hover glass--clickable preview-tab fade-up fade-up-3">
+      <div class="preview-tab__letter">C</div>
+      <div class="preview-tab__title">"Dziś" — mockup</div>
+      <p class="preview-tab__desc">
+        Pierwszy ekran panelu. 4 warianty roli: MSP · Owner · Admin · Member.
+        Puls Firmy (canvas 12-layer) + kafelki + IDO + timeline.
+      </p>
+    </a>
+  </nav>
+
+  <section class="preview-section" style="margin-top:64px">
+    <div class="preview-section__header">
+      <span class="preview-section__eyebrow">Zasady projektu</span>
+      <h2 class="preview-section__title">Czego nie dotykamy w żadnym commicie</h2>
+    </div>
+    <div class="tile-grid">
+      <div class="glass glass--lg glass--pad">
+        <div class="stat-tile__label">Windows Agent</div>
+        <div style="margin-top:10px;color:var(--text-secondary);font-size:14px;line-height:1.6">
+          Asystent Business (Python+pywebview) pozostaje nietknięty w tym sprincie.
+          Osobna rebudowa w kolejnej fazie.
+        </div>
+      </div>
+      <div class="glass glass--lg glass--pad">
+        <div class="stat-tile__label">Stary /portal</div>
+        <div style="margin-top:10px;color:var(--text-secondary);font-size:14px;line-height:1.6">
+          10-stronicowy obecny portal klienta InfraDesk żyje obok nowego ID PANEL
+          aż do zmiany domyślnej po akceptacji.
+        </div>
+      </div>
+      <div class="glass glass--lg glass--pad">
+        <div class="stat-tile__label">/admin (MSP)</div>
+        <div style="margin-top:10px;color:var(--text-secondary);font-size:14px;line-height:1.6">
+          Panel operatora w InfraDesk bez zmian.
+          ID PANEL jest dla widoku klienta + skrócone MSP overview.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="preview-section">
+    <div class="preview-section__header">
+      <span class="preview-section__eyebrow">Architektura rol</span>
+      <h2 class="preview-section__title">Ten sam panel, 5 widoków</h2>
+      <p class="preview-section__desc">
+        Jedna baza kodu. Render różnicowany rolą użytkownika w workspace.
+        Nie duplikujemy — nie rozjechnie się projektowo.
+      </p>
+    </div>
+    <div class="tile-grid">
+      <div class="glass glass--lg glass--pad">
+        <div class="chip chip--brand">MSP admin</div>
+        <h3 class="h3" style="margin-top:10px;margin-bottom:8px">Ty + Mariusz</h3>
+        <p class="body" style="font-size:13px">Pełny panel, wszyscy klienci, globalne metryki, billing operator, workspace switcher.</p>
+      </div>
+      <div class="glass glass--lg glass--pad">
+        <div class="chip chip--ok">Klient OWNER</div>
+        <h3 class="h3" style="margin-top:10px;margin-bottom:8px">Szef firmy</h3>
+        <p class="body" style="font-size:13px">Cały workspace: pracownicy, urządzenia, vault, billing, polityki IDO.</p>
+      </div>
+      <div class="glass glass--lg glass--pad">
+        <div class="chip chip--info">Klient ADMIN</div>
+        <h3 class="h3" style="margin-top:10px;margin-bottom:8px">IT w firmie</h3>
+        <p class="body" style="font-size:13px">Wszystko w workspace oprócz billingu i członków firmy.</p>
+      </div>
+      <div class="glass glass--lg glass--pad">
+        <div class="chip chip--warn">Klient TECH</div>
+        <h3 class="h3" style="margin-top:10px;margin-bottom:8px">Zewn. technik</h3>
+        <p class="body" style="font-size:13px">Urządzenia + audit + vault wg przypisanych grantów.</p>
+      </div>
+      <div class="glass glass--lg glass--pad">
+        <div class="chip" style="background:var(--glass-bg-hi);color:var(--text-secondary);border-color:var(--glass-border)">Klient MEMBER</div>
+        <h3 class="h3" style="margin-top:10px;margin-bottom:8px">Pani z biura</h3>
+        <p class="body" style="font-size:13px">Minimalny: swoje zgłoszenia + swój komputer + swoje hasła + IDO.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="js/preview.js"></script>
+<script>
+/* Swap logo based on theme */
+const obs = new MutationObserver(() => {
+  const dark = document.documentElement.getAttribute('data-theme') !== 'light';
+  const dLogo = document.querySelector('[data-logo-dark]');
+  const lLogo = document.querySelector('[data-logo-light]');
+  if (dLogo && lLogo) { dLogo.style.display = dark ? '' : 'none'; lLogo.style.display = dark ? 'none' : ''; }
+});
+obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+</script>
+</body>
+</html>

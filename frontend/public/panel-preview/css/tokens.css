@@ -1,0 +1,254 @@
+/* ═══════════════════════════════════════════════════════════
+   ID PANEL — Design Tokens v1
+   Single source of truth. Nothing in ID PANEL overrides these.
+   ═══════════════════════════════════════════════════════════ */
+
+:root,
+[data-theme="dark"] {
+  /* ─ Brand gradient (signature — used ONLY on Puls firmy + IDO orb) ─ */
+  --brand-violet:     #7C3AED;
+  --brand-violet-lo:  #5B21B6;
+  --brand-violet-hi:  #A78BFA;
+  --brand-cyan:       #06B6D4;
+  --brand-cyan-lo:    #0891B2;
+  --brand-cyan-hi:    #67E8F9;
+  --brand-gradient:   linear-gradient(135deg, var(--brand-violet) 0%, var(--brand-cyan) 100%);
+  --brand-gradient-soft: linear-gradient(135deg, hsla(262, 83%, 58%, .12) 0%, hsla(189, 94%, 43%, .12) 100%);
+
+  /* ─ Surface ─ */
+  --bg-base:          #0A0E17;
+  --bg-elevated:      hsla(222, 30%, 14%, 0.60);
+  --bg-overlay:       hsla(222, 30%, 6%, 0.86);
+  --bg-floor:         radial-gradient(ellipse at top, hsla(262, 80%, 12%, .5) 0%, transparent 50%),
+                      radial-gradient(ellipse at bottom right, hsla(189, 80%, 12%, .35) 0%, transparent 60%),
+                      #050810;
+
+  /* ─ Glass ─ */
+  --glass-bg:         hsla(222, 30%, 14%, 0.55);
+  --glass-bg-hi:      hsla(222, 30%, 16%, 0.65);
+  --glass-border:     rgba(255, 255, 255, 0.08);
+  --glass-border-hi:  rgba(255, 255, 255, 0.14);
+  --glass-blur:       24px;
+  --glass-inset-hl:   inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --glass-inset-hl-hi: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+
+  /* ─ Text ─ */
+  --text-primary:     #E8EBF2;
+  --text-secondary:   #9CA3B8;
+  --text-tertiary:    #6B7490;
+  --text-quaternary:  #3D4660;
+  --text-on-brand:    #FFFFFF;
+
+  /* ─ Status semantic ─ */
+  --status-ok:        #22C55E;
+  --status-ok-soft:   hsla(142, 71%, 45%, 0.12);
+  --status-warn:      #EAB308;
+  --status-warn-soft: hsla(45, 93%, 47%, 0.12);
+  --status-bad:       #EF4444;
+  --status-bad-soft:  hsla(0, 84%, 60%, 0.12);
+  --status-info:      #06B6D4;
+  --status-info-soft: hsla(189, 94%, 43%, 0.12);
+
+  /* ─ Data palette (5-color, Ishihara-tested) ─ */
+  --data-1:           #A78BFA; /* violet */
+  --data-2:           #22D3EE; /* cyan */
+  --data-3:           #34D399; /* emerald */
+  --data-4:           #FBBF24; /* amber */
+  --data-5:           #FB7185; /* rose */
+
+  /* ─ Shadows (4 warstwy) ─ */
+  --shadow-xs:
+    0 1px 2px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-sm:
+    0 1px 3px rgba(0, 0, 0, 0.12),
+    0 2px 6px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --shadow-md:
+    0 2px 4px rgba(0, 0, 0, 0.14),
+    0 8px 24px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --shadow-lg:
+    0 2px 4px rgba(0, 0, 0, 0.14),
+    0 12px 36px rgba(0, 0, 0, 0.32),
+    0 40px 80px rgba(124, 58, 237, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --shadow-xl:
+    0 4px 8px rgba(0, 0, 0, 0.16),
+    0 24px 48px rgba(0, 0, 0, 0.36),
+    0 60px 120px rgba(124, 58, 237, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --shadow-glow-brand:
+    0 0 40px rgba(124, 58, 237, 0.30),
+    0 0 80px rgba(6, 182, 212, 0.18);
+  --shadow-glow-ok:   0 0 32px hsla(142, 71%, 45%, 0.22);
+  --shadow-glow-warn: 0 0 32px hsla(45,  93%, 47%, 0.22);
+  --shadow-glow-bad:  0 0 32px hsla(0,   84%, 60%, 0.22);
+}
+
+/* ─ Light theme ─────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg-base:          #F6F7FB;
+  --bg-elevated:      hsla(220, 20%, 100%, 0.72);
+  --bg-overlay:       hsla(220, 20%, 100%, 0.92);
+  --bg-floor:         radial-gradient(ellipse at top, hsla(262, 90%, 95%, .6) 0%, transparent 50%),
+                      radial-gradient(ellipse at bottom right, hsla(189, 90%, 94%, .5) 0%, transparent 60%),
+                      #FAFBFF;
+
+  --glass-bg:         hsla(220, 30%, 100%, 0.62);
+  --glass-bg-hi:      hsla(220, 30%, 100%, 0.78);
+  --glass-border:     rgba(15, 23, 42, 0.06);
+  --glass-border-hi:  rgba(15, 23, 42, 0.10);
+  --glass-inset-hl:   inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --glass-inset-hl-hi: inset 0 1px 0 rgba(255, 255, 255, 1);
+
+  --text-primary:     #0F172A;
+  --text-secondary:   #475569;
+  --text-tertiary:    #94A3B8;
+  --text-quaternary:  #CBD5E1;
+
+  --shadow-xs:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  --shadow-sm:
+    0 1px 2px rgba(15, 23, 42, 0.03),
+    0 2px 6px rgba(15, 23, 42, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --shadow-md:
+    0 1px 2px rgba(15, 23, 42, 0.03),
+    0 4px 12px rgba(15, 23, 42, 0.06),
+    0 12px 24px rgba(15, 23, 42, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  --shadow-lg:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 8px 24px rgba(15, 23, 42, 0.08),
+    0 32px 64px rgba(124, 58, 237, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+  --shadow-xl:
+    0 2px 4px rgba(15, 23, 42, 0.05),
+    0 16px 40px rgba(15, 23, 42, 0.10),
+    0 48px 100px rgba(124, 58, 237, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+/* ─ Typography ────────────────────────────────────────────── */
+:root {
+  --font-sans:    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Inter', 'Inter Display', ui-sans-serif, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', 'Menlo', monospace;
+
+  --text-xs:      11px;
+  --text-sm:      12px;
+  --text-base:    14px;
+  --text-md:      15px;
+  --text-lg:      16px;
+  --text-xl:      20px;
+  --text-2xl:     24px;
+  --text-3xl:     32px;
+  --text-4xl:     44px;
+  --text-5xl:     56px;
+  --text-6xl:     72px;
+
+  --leading-tight:  1.12;
+  --leading-snug:   1.3;
+  --leading-normal: 1.5;
+  --leading-loose:  1.7;
+
+  --tracking-tight:  -0.02em;
+  --tracking-normal:  0;
+  --tracking-wide:    0.02em;
+  --tracking-wider:   0.08em;
+  --tracking-widest:  0.14em;
+}
+
+/* ─ Spacing — 8pt grid ──────────────────────────────────── */
+:root {
+  --space-0:   0px;
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:   12px;
+  --space-4:   16px;
+  --space-5:   20px;
+  --space-6:   24px;
+  --space-7:   28px;
+  --space-8:   32px;
+  --space-10:  40px;
+  --space-12:  48px;
+  --space-16:  64px;
+  --space-20:  80px;
+  --space-24:  96px;
+  --space-32:  128px;
+}
+
+/* ─ Border radius ─────────────────────────────────────────── */
+:root {
+  --r-xs:   4px;
+  --r-sm:   6px;
+  --r-md:   10px;
+  --r-lg:   14px;
+  --r-xl:   20px;
+  --r-2xl:  28px;
+  --r-3xl:  36px;
+  --r-full: 9999px;
+}
+
+/* ─ Motion ────────────────────────────────────────────────── */
+:root {
+  --dur-instant: 80ms;
+  --dur-fast:    150ms;
+  --dur-normal:  250ms;
+  --dur-slow:    400ms;
+  --dur-slower:  700ms;
+
+  --ease-out:     cubic-bezier(0.22, 0.82, 0.32, 1);
+  --ease-in-out:  cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring:  cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-bounce:  cubic-bezier(0.68, -0.55, 0.27, 1.55);
+}
+
+/* Reduced motion — respect user preference (WCAG 2.2 AA) */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-instant: 0ms;
+    --dur-fast:    0ms;
+    --dur-normal:  100ms;
+    --dur-slow:    100ms;
+    --dur-slower:  100ms;
+  }
+}
+
+/* ─ Density toggle ────────────────────────────────────────── */
+:root,
+[data-density="comfortable"] {
+  --density-pad-card:    24px;
+  --density-pad-cell:    16px;
+  --density-gap:         20px;
+  --density-row-h:       56px;
+  --density-text-scale:  1;
+}
+[data-density="compact"] {
+  --density-pad-card:    16px;
+  --density-pad-cell:    12px;
+  --density-gap:         14px;
+  --density-row-h:       44px;
+  --density-text-scale:  0.95;
+}
+[data-density="dense"] {
+  --density-pad-card:    12px;
+  --density-pad-cell:    8px;
+  --density-gap:         10px;
+  --density-row-h:       36px;
+  --density-text-scale:  0.9;
+}
+
+/* ─ Z-stack ───────────────────────────────────────────────── */
+:root {
+  --z-base:       0;
+  --z-elevated:   10;
+  --z-sticky:     20;
+  --z-drawer:     40;
+  --z-modal:      50;
+  --z-toast:      60;
+  --z-palette:    70;
+  --z-tooltip:    80;
+}

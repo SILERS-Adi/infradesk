@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="pl" data-theme="dark" data-role="owner">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C · "Dziś" — ID PANEL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/preview.css">
+</head>
+<body>
+<div class="ambient-floor"></div>
+
+<!-- Topbar (app shell) -->
+<header class="topbar">
+  <div class="topbar__logo">
+    <img src="/logo-dark.png" alt="InfraDesk" style="height:24px;width:auto" data-logo-dark>
+    <img src="/logo.png" alt="InfraDesk" style="height:24px;width:auto;display:none" data-logo-light>
+  </div>
+  <div class="topbar__title" style="margin-left:12px">ID PANEL <span>· METBUD</span></div>
+
+  <nav class="topbar__nav">
+    <a class="topbar__link" aria-current="page">Dziś</a>
+    <a class="topbar__link" data-role-show="msp owner admin tech">Bezpieczeństwo</a>
+    <a class="topbar__link">Urządzenia</a>
+    <a class="topbar__link">Zgłoszenia</a>
+    <a class="topbar__link" data-role-show="msp owner admin">Hasła</a>
+    <a class="topbar__link" data-role-show="msp owner">Koszty</a>
+  </nav>
+
+  <div class="topbar__actions">
+    <button class="cmd-hint" data-cmd-trigger>
+      Szukaj akcji…
+      <span class="cmd-hint__key">⌘K</span>
+    </button>
+    <div class="theme-toggle">
+      <button class="theme-toggle__opt" data-theme-opt="light"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41"/></svg></button>
+      <button class="theme-toggle__opt" data-theme-opt="auto"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 000 20z" fill="currentColor"/></svg></button>
+      <button class="theme-toggle__opt" data-theme-opt="dark"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></button>
+    </div>
+    <div class="role-badge">
+      <div class="role-badge__avatar">JN</div>
+      <span data-role-label>Jan · Owner</span>
+    </div>
+  </div>
+</header>
+
+<main class="preview-main">
+  <div class="panel-layout">
+
+    <!-- HERO — Puls Firmy + greeting -->
+    <section class="glass glass--xl glass--brand panel-hero fade-up">
+      <div class="panel-hero__left">
+        <div class="panel-hero__greeting">Środa · 19 kwietnia 2026</div>
+        <h1 class="panel-hero__title" data-role-greet>Dzień dobry, <em>Jan</em></h1>
+        <p class="panel-hero__sub" data-role-sub>METBUD · 8 pracowników · 12 urządzeń</p>
+
+        <div class="panel-hero__status-line">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          W firmie wszystko działa stabilnie
+        </div>
+
+        <div class="panel-hero__actions">
+          <button class="btn btn--primary btn--lg">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            Zgłoś problem
+          </button>
+          <button class="btn btn--secondary btn--lg">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+            Zapytaj IDO
+          </button>
+        </div>
+      </div>
+      <div class="panel-hero__right">
+        <canvas class="puls-canvas" id="pulsCanvas"></canvas>
+      </div>
+    </section>
+
+    <!-- TILES -->
+    <section class="tile-grid">
+      <div class="glass glass--lg stat-tile fade-up fade-up-1">
+        <div class="stat-tile__header">
+          <span class="stat-tile__label">Aktywne zgłoszenia</span>
+          <div class="stat-tile__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div>
+        </div>
+        <div><span class="stat-tile__value" data-tile-tickets>2</span></div>
+        <div class="stat-tile__meta"><span class="chip chip--info" style="height:22px">Mariusz u Was o 14:30</span></div>
+      </div>
+
+      <div class="glass glass--lg stat-tile fade-up fade-up-2">
+        <div class="stat-tile__header">
+          <span class="stat-tile__label">Alerty bezpieczeństwa</span>
+          <div class="stat-tile__icon stat-tile__icon--warn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01"/></svg></div>
+        </div>
+        <div><span class="stat-tile__value" data-tile-alerts>3</span></div>
+        <div class="stat-tile__meta"><span style="color:var(--status-warn)">1 krytyczny</span> · 2 średnie</div>
+      </div>
+
+      <div class="glass glass--lg stat-tile fade-up fade-up-3">
+        <div class="stat-tile__header">
+          <span class="stat-tile__label">Urządzenia online</span>
+          <div class="stat-tile__icon stat-tile__icon--ok"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+        </div>
+        <div><span class="stat-tile__value" data-tile-devices-on>11</span><span class="stat-tile__unit" data-tile-devices-total>/ 12</span></div>
+        <div class="stat-spark">
+          <div class="stat-spark__bar" style="height:60%"></div>
+          <div class="stat-spark__bar" style="height:80%"></div>
+          <div class="stat-spark__bar" style="height:75%"></div>
+          <div class="stat-spark__bar" style="height:90%"></div>
+          <div class="stat-spark__bar" style="height:85%"></div>
+          <div class="stat-spark__bar" style="height:95%"></div>
+          <div class="stat-spark__bar" style="height:100%"></div>
+        </div>
+      </div>
+
+      <div class="glass glass--lg stat-tile fade-up fade-up-4" data-role-show="msp owner">
+        <div class="stat-tile__header">
+          <span class="stat-tile__label">Koszt tego miesiąca</span>
+          <div class="stat-tile__icon stat-tile__icon--brand"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
+        </div>
+        <div><span class="stat-tile__value">820</span><span class="stat-tile__unit"> zł</span></div>
+        <div class="stat-tile__meta">z czego <strong style="color:var(--brand-cyan-hi)">180 zł przez IDO</strong> (4.75h auto)</div>
+      </div>
+    </section>
+
+    <!-- BOTTOM two columns — timeline + IDO -->
+    <section class="panel-bottom">
+      <div class="glass glass--lg panel-timeline fade-up fade-up-5">
+        <div class="panel-timeline__head">
+          <div>
+            <h3 class="h3">Ostatnie w firmie</h3>
+            <p class="dim" style="margin-top:4px">Timeline wszystkiego co się zdarzyło</p>
+          </div>
+          <button class="btn btn--ghost btn--sm">Pokaż wszystko</button>
+        </div>
+
+        <div class="timeline-item">
+          <div class="timeline-item__dot timeline-item__dot--ok"></div>
+          <div>
+            <div class="timeline-item__title">IDO rozwiązała: "Drukarka w księgowości"</div>
+            <div class="timeline-item__meta">Restart Print Spooler · zweryfikowano ✓ · auto-naliczono 15 min</div>
+          </div>
+          <div class="timeline-item__time">12 min</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-item__dot"></div>
+          <div>
+            <div class="timeline-item__title">Mariusz przypisany do zgłoszenia #482</div>
+            <div class="timeline-item__meta">PC Anny nie startuje · ETA 14:30 · dojazd 15 min</div>
+          </div>
+          <div class="timeline-item__time">2h</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-item__dot timeline-item__dot--warn"></div>
+          <div>
+            <div class="timeline-item__title">Alert na SRV-METBUD-01: firewall wyłączony</div>
+            <div class="timeline-item__meta">IDO automatycznie otwarła zgłoszenie #483</div>
+          </div>
+          <div class="timeline-item__time">3h</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-item__dot"></div>
+          <div>
+            <div class="timeline-item__title">Kopia zapasowa SRV-METBUD-01</div>
+            <div class="timeline-item__meta">412 GB · powodzenie · następna jutro 03:00</div>
+          </div>
+          <div class="timeline-item__time">8h</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-item__dot timeline-item__dot--bad"></div>
+          <div>
+            <div class="timeline-item__title">PC-KAMIL offline od 4h</div>
+            <div class="timeline-item__meta">Brak heartbeatu · możliwe że wyłączono na noc</div>
+          </div>
+          <div class="timeline-item__time">wczoraj</div>
+        </div>
+      </div>
+
+      <div class="glass glass--lg glass--brand panel-ido-card fade-up fade-up-6">
+        <div class="panel-ido-card__orb"></div>
+        <div class="panel-ido-card__text">
+          <div class="panel-ido-card__hello">Jestem Twoim IDO</div>
+          <div class="panel-ido-card__sub">W czym mogę pomóc?</div>
+        </div>
+        <div class="panel-ido-card__quick">
+          <button>
+            <div style="font-weight:600;color:var(--text-primary);margin-bottom:2px">💾 Miejsce na dysku</div>
+            <div>sprawdź i zwolnij</div>
+          </button>
+          <button>
+            <div style="font-weight:600;color:var(--text-primary);margin-bottom:2px">🔄 Aktualizacje</div>
+            <div>status Windows i programów</div>
+          </button>
+          <button>
+            <div style="font-weight:600;color:var(--text-primary);margin-bottom:2px">🖨️ Drukarka</div>
+            <div>nie drukuje? przywróć</div>
+          </button>
+          <button>
+            <div style="font-weight:600;color:var(--text-primary);margin-bottom:2px">🔐 Nowe hasło</div>
+            <div>wygeneruj i zapisz w vault</div>
+          </button>
+        </div>
+        <button class="btn btn--primary" style="width:100%">Napisz do IDO</button>
+      </div>
+    </section>
+
+    <!-- MSP-only aggregated section (hidden for non-MSP) -->
+    <section class="preview-section" data-role-show="msp" style="display:none;margin-top:40px">
+      <div class="preview-section__header">
+        <span class="preview-section__eyebrow">MSP · cross-client</span>
+        <h2 class="preview-section__title">Widok operatora — wszyscy klienci</h2>
+        <p class="preview-section__desc">Sekcja widoczna tylko dla SILERS (MSP). Szybki przegląd stanu każdego klienta.</p>
+      </div>
+      <div class="tile-grid">
+        <div class="glass glass--lg glass--pad"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><strong>METBUD</strong><span class="chip chip--ok"><span class="chip__dot" style="background:var(--status-ok)"></span>88</span></div><div class="dim">12 urządzeń · 2 tickets</div></div>
+        <div class="glass glass--lg glass--pad"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><strong>PKS Garwolin</strong><span class="chip chip--warn"><span class="chip__dot" style="background:var(--status-warn)"></span>72</span></div><div class="dim">17 urządzeń · 5 tickets</div></div>
+        <div class="glass glass--lg glass--pad"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><strong>WISMONT</strong><span class="chip chip--ok"><span class="chip__dot" style="background:var(--status-ok)"></span>91</span></div><div class="dim">8 urządzeń · 0 tickets</div></div>
+        <div class="glass glass--lg glass--pad"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><strong>PC PLAST</strong><span class="chip chip--bad"><span class="chip__dot" style="background:var(--status-bad)"></span>54</span></div><div class="dim">6 urządzeń · 8 tickets</div></div>
+        <div class="glass glass--lg glass--pad"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><strong>DOMINEX</strong><span class="chip chip--ok"><span class="chip__dot" style="background:var(--status-ok)"></span>95</span></div><div class="dim">4 urządzeń · 0 tickets</div></div>
+        <div class="glass glass--lg glass--pad"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><strong>BHP Serwis</strong><span class="chip chip--ok"><span class="chip__dot" style="background:var(--status-ok)"></span>89</span></div><div class="dim">3 urządzeń · 0 tickets</div></div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<!-- ROLE SWITCHER (preview-only — pokazuje jak panel reaguje na rolę) -->
+<div class="preview-rolebar" role="group" aria-label="Podgląd ról">
+  <button class="preview-rolebar__opt" data-role-opt="msp">MSP admin</button>
+  <button class="preview-rolebar__opt" data-role-opt="owner" aria-pressed="true">Owner</button>
+  <button class="preview-rolebar__opt" data-role-opt="admin">Admin</button>
+  <button class="preview-rolebar__opt" data-role-opt="member">Member</button>
+</div>
+
+<script src="js/puls-firmy.js"></script>
+<script src="js/preview.js"></script>
+<script>
+const canvas = document.getElementById('pulsCanvas');
+const puls = new PulsFirmy(canvas, { score: 76, devices: 12, alerts: 3 });
+window.__pulsInstance = puls;
+
+/* Occasional pulse bursts for "living" feel */
+setInterval(() => puls.pulse(), 8000);
+
+/* Logo swap by theme */
+const obs = new MutationObserver(() => {
+  const dark = document.documentElement.getAttribute('data-theme') !== 'light';
+  const dLogo = document.querySelector('[data-logo-dark]');
+  const lLogo = document.querySelector('[data-logo-light]');
+  if (dLogo && lLogo) { dLogo.style.display = dark ? '' : 'none'; lLogo.style.display = dark ? 'none' : ''; }
+});
+obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+/* Update role label in top-right */
+const roleLabel = document.querySelector('[data-role-label]');
+const roleAvatar = document.querySelector('.role-badge__avatar');
+function updateRoleChrome() {
+  const r = document.documentElement.getAttribute('data-role');
+  const info = {
+    msp:    { name: 'Adrian · MSP',   initials: 'AB' },
+    owner:  { name: 'Jan · Owner',    initials: 'JN' },
+    admin:  { name: 'Marcin · Admin', initials: 'MA' },
+    member: { name: 'Anna · Member',  initials: 'AN' },
+  }[r] || { name: '—', initials: '?' };
+  if (roleLabel) roleLabel.textContent = info.name;
+  if (roleAvatar) roleAvatar.textContent = info.initials;
+
+  /* Update tiles to match role */
+  const tiles = {
+    msp:    { tickets: 15, alerts: 8, on: 178, total: 187 },
+    owner:  { tickets:  2, alerts: 3, on:  11, total:  12 },
+    admin:  { tickets:  2, alerts: 3, on:  11, total:  12 },
+    member: { tickets:  0, alerts: 0, on:   1, total:   1 },
+  }[r];
+  if (tiles) {
+    document.querySelector('[data-tile-tickets]')     && (document.querySelector('[data-tile-tickets]').textContent = tiles.tickets);
+    document.querySelector('[data-tile-alerts]')      && (document.querySelector('[data-tile-alerts]').textContent = tiles.alerts);
+    document.querySelector('[data-tile-devices-on]')  && (document.querySelector('[data-tile-devices-on]').textContent = tiles.on);
+    document.querySelector('[data-tile-devices-total]') && (document.querySelector('[data-tile-devices-total]').textContent = '/ ' + tiles.total);
+  }
+}
+new MutationObserver(updateRoleChrome).observe(document.documentElement, { attributes: true, attributeFilter: ['data-role'] });
+updateRoleChrome();
+</script>
+</body>
+</html>
