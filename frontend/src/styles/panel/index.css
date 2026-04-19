@@ -1747,3 +1747,662 @@
 .id-panel .tk-item:active,
 .id-panel .ip-action-tile:active,
 .id-panel .dev-card:active { transform: translateY(-1px) scale(1); transition-duration: 80ms; }
+/* ════════════════════════════════════════════════════════════════════════
+   ID PANEL — UNIFIED PREMIUM CARD SYSTEM (v9 — final global pass)
+   ────────────────────────────────────────────────────────────────────────
+   Jeden system materiału dla WSZYSTKICH kart we wszystkich widokach.
+   Target: dashboard / devices / tickets / activity / security / vault /
+           IDO / billing / sidebar panels / empty states.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ────────────────────────────────────────────────────────────────
+   1 · TOKENS — jeden system, używany w obu trybach
+   ──────────────────────────────────────────────────────────────── */
+
+.id-panel {
+  /* Card material — DARK */
+  --card-bg-dark:
+    linear-gradient(180deg, rgba(18, 26, 44, 1) 0%, rgba(12, 18, 32, 1) 100%);
+  --card-bg-dark-tile:
+    linear-gradient(180deg, rgba(22, 30, 50, 1) 0%, rgba(16, 22, 38, 1) 100%);
+  --card-border-dark: 1px solid rgba(255, 255, 255, 0.07);
+  --card-border-dark-hi: 1px solid rgba(59, 130, 246, 0.28);
+  --card-shadow-dark:
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 16px 40px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --card-shadow-dark-hi:
+    0 2px 4px rgba(0, 0, 0, 0.35),
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    0 0 32px rgba(59, 130, 246, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
+  /* Card material — LIGHT */
+  --card-bg-light:
+    linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
+  --card-bg-light-tile:
+    linear-gradient(180deg, #FFFFFF 0%, #F4F7FB 100%);
+  --card-border-light: 1px solid rgba(15, 23, 42, 0.06);
+  --card-border-light-hi: 1px solid rgba(59, 130, 246, 0.22);
+  --card-shadow-light:
+    0 1px 2px rgba(15, 23, 42, 0.03),
+    0 10px 30px rgba(15, 23, 42, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --card-shadow-light-hi:
+    0 2px 4px rgba(15, 23, 42, 0.04),
+    0 20px 50px rgba(15, 23, 42, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+
+  /* Active defaults (based on current theme) — dark default */
+  --card-bg:         var(--card-bg-dark);
+  --card-bg-tile:    var(--card-bg-dark-tile);
+  --card-border:     var(--card-border-dark);
+  --card-border-hi:  var(--card-border-dark-hi);
+  --card-shadow:     var(--card-shadow-dark);
+  --card-shadow-hi:  var(--card-shadow-dark-hi);
+
+  /* Spacing */
+  --card-pad-lg: 24px;
+  --card-pad-md: 20px;
+  --card-pad-sm: 16px;
+
+  /* Radius */
+  --card-r-lg: 20px;
+  --card-r-md: 16px;
+  --card-r-sm: 12px;
+
+  /* Transition */
+  --card-ease: cubic-bezier(0.22, 0.82, 0.32, 1);
+  --card-dur:  180ms;
+}
+
+.id-panel[data-theme="light"],
+[data-theme="light"] .id-panel {
+  --card-bg:         var(--card-bg-light);
+  --card-bg-tile:    var(--card-bg-light-tile);
+  --card-border:     var(--card-border-light);
+  --card-border-hi:  var(--card-border-light-hi);
+  --card-shadow:     var(--card-shadow-light);
+  --card-shadow-hi:  var(--card-shadow-light-hi);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   2 · BASE CARD — applied to ALL card classes (unified via !important)
+   ──────────────────────────────────────────────────────────────── */
+
+.id-panel .ip-card,
+.id-panel .panel-glass,
+.id-panel .dev-card,
+.id-panel .tk-item,
+.id-panel .alert-card,
+.id-panel .vt-card,
+.id-panel .sec-sum-tile,
+.id-panel .bill-sum-tile,
+.id-panel .bill-month,
+.id-panel .act-day,
+.id-panel .ip-sidebar__contact {
+  background: var(--card-bg) !important;
+  border: var(--card-border) !important;
+  border-radius: var(--card-r-lg) !important;
+  box-shadow: var(--card-shadow) !important;
+  outline: 1px solid transparent;
+  transition:
+    transform var(--card-dur) var(--card-ease),
+    box-shadow calc(var(--card-dur) + 40ms) var(--card-ease),
+    border-color var(--card-dur) var(--card-ease),
+    outline-color var(--card-dur) ease !important;
+  backdrop-filter: none !important;
+}
+
+/* Large cards get 24px padding */
+.id-panel .ip-card,
+.id-panel .panel-glass {
+  padding: var(--card-pad-lg) !important;
+}
+
+/* Medium cards */
+.id-panel .dev-card,
+.id-panel .vt-card,
+.id-panel .alert-card,
+.id-panel .sec-sum-tile,
+.id-panel .bill-sum-tile {
+  padding: var(--card-pad-md) !important;
+}
+
+/* Row/list cards */
+.id-panel .tk-item {
+  padding: 16px 20px !important;
+  border-radius: var(--card-r-md) !important;
+}
+
+/* Month card — larger radius */
+.id-panel .bill-month {
+  padding: var(--card-pad-lg) !important;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   3 · HOVER — unified physics on interactive cards
+   ──────────────────────────────────────────────────────────────── */
+
+.id-panel .ip-card:hover,
+.id-panel .dev-card:hover,
+.id-panel .tk-item:hover,
+.id-panel .alert-card:hover,
+.id-panel .vt-card:hover,
+.id-panel .sec-sum-tile:hover,
+.id-panel .bill-sum-tile:hover,
+.id-panel .bill-month__head:hover {
+  transform: translateY(-3px) scale(1.01);
+  box-shadow: var(--card-shadow-hi) !important;
+  border-color: rgba(59, 130, 246, 0.22) !important;
+  outline-color: rgba(59, 130, 246, 0.18);
+  outline-offset: -1px;
+}
+
+/* Don't scale the hero ID CORE card on hover — too jarring */
+.id-panel .ip-core-card:hover {
+  transform: translateY(-2px) !important;
+}
+
+/* Cursor feedback for clickable-looking cards */
+.id-panel .dev-card,
+.id-panel .tk-item,
+.id-panel .ip-action-tile,
+.id-panel .alert-card:not(.alert-card--no-click) {
+  cursor: pointer;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   4 · ACTIVE (pressed)
+   ──────────────────────────────────────────────────────────────── */
+
+.id-panel .ip-card:active,
+.id-panel .dev-card:active,
+.id-panel .tk-item:active,
+.id-panel .alert-card:active,
+.id-panel .vt-card:active,
+.id-panel .ip-action-tile:active {
+  transform: translateY(-1px) scale(0.995);
+  transition-duration: 80ms;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   5 · ID CORE card — emphasized blue ambient (still unified material)
+   ──────────────────────────────────────────────────────────────── */
+
+.id-panel .ip-core-card {
+  background:
+    radial-gradient(circle at 50% 55%, rgba(59, 130, 246, 0.18) 0%, rgba(59, 130, 246, 0.05) 40%, transparent 72%),
+    var(--card-bg) !important;
+  box-shadow:
+    var(--card-shadow),
+    0 30px 60px rgba(59, 130, 246, 0.18) !important;
+  min-height: 360px;
+  padding: 28px !important;
+}
+.id-panel[data-theme="light"] .ip-core-card,
+[data-theme="light"] .id-panel .ip-core-card {
+  background:
+    radial-gradient(circle at 50% 55%, rgba(59, 130, 246, 0.12) 0%, rgba(59, 130, 246, 0.03) 45%, transparent 72%),
+    var(--card-bg) !important;
+  box-shadow:
+    var(--card-shadow),
+    0 30px 60px rgba(59, 130, 246, 0.12) !important;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   6 · ACTION TILES — smaller sub-cards with same material DNA
+   ──────────────────────────────────────────────────────────────── */
+
+.id-panel .ip-action-tile {
+  background: var(--card-bg-tile) !important;
+  border: var(--card-border) !important;
+  border-radius: var(--card-r-sm) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 1px 2px rgba(0, 0, 0, 0.04) !important;
+  padding: 16px !important;
+  outline: 1px solid transparent;
+  transition: all var(--card-dur) var(--card-ease) !important;
+}
+.id-panel[data-theme="light"] .ip-action-tile,
+[data-theme="light"] .id-panel .ip-action-tile {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 1px 2px rgba(15, 23, 42, 0.04) !important;
+}
+.id-panel .ip-action-tile:hover {
+  transform: translateY(-3px) scale(1.02) !important;
+  border-color: rgba(59, 130, 246, 0.26) !important;
+  outline-color: rgba(59, 130, 246, 0.2);
+  outline-offset: -1px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 10px 24px rgba(0, 0, 0, 0.1),
+    0 0 18px rgba(59, 130, 246, 0.14) !important;
+}
+.id-panel[data-theme="light"] .ip-action-tile:hover,
+[data-theme="light"] .id-panel .ip-action-tile:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 12px 28px rgba(15, 23, 42, 0.1),
+    0 0 18px rgba(59, 130, 246, 0.18) !important;
+}
+
+/* Action tile icon — bigger, brighter, pop on hover */
+.id-panel .ip-action-tile__icon {
+  width: 40px !important; height: 40px !important;
+  border-radius: 12px !important;
+  background:
+    linear-gradient(180deg, rgba(59, 130, 246, 0.22), rgba(59, 130, 246, 0.08)) !important;
+  color: #60A5FA !important;
+  box-shadow:
+    0 0 0 1px rgba(59, 130, 246, 0.25) inset,
+    0 4px 10px rgba(59, 130, 246, 0.15) !important;
+}
+.id-panel[data-theme="light"] .ip-action-tile__icon,
+[data-theme="light"] .id-panel .ip-action-tile__icon {
+  background:
+    linear-gradient(180deg, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0.03)) !important;
+  color: #2563EB !important;
+  box-shadow:
+    0 0 0 1px rgba(59, 130, 246, 0.18) inset,
+    0 4px 10px rgba(59, 130, 246, 0.08) !important;
+}
+.id-panel .ip-action-tile:hover .ip-action-tile__icon {
+  transform: scale(1.08);
+  box-shadow:
+    0 0 0 1px rgba(59, 130, 246, 0.35) inset,
+    0 6px 16px rgba(59, 130, 246, 0.3),
+    0 0 20px rgba(59, 130, 246, 0.25) !important;
+}
+.id-panel .ip-action-tile__title { font-size: 14px !important; font-weight: 600 !important; color: var(--ip-text) !important; }
+.id-panel .ip-action-tile__sub { font-size: 12px !important; color: var(--ip-text-3) !important; }
+
+/* ────────────────────────────────────────────────────────────────
+   7 · INNER TILES — unified (metrics, stats, info rows)
+   ──────────────────────────────────────────────────────────────── */
+
+.id-panel .ip-status-card__metric,
+.id-panel .ip-contact-card__box,
+.id-panel .ip-contact-card__stat,
+.id-panel .ip-sec-stat,
+.id-panel .dev-sum,
+.id-panel .stat-tile,
+.id-panel .today-tile {
+  background: var(--card-bg-tile) !important;
+  border: var(--card-border) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 1px 2px rgba(0, 0, 0, 0.03) !important;
+  transition: transform 140ms var(--card-ease), border-color 140ms var(--card-ease);
+}
+.id-panel[data-theme="light"] .ip-status-card__metric,
+.id-panel[data-theme="light"] .ip-contact-card__box,
+.id-panel[data-theme="light"] .ip-contact-card__stat,
+.id-panel[data-theme="light"] .ip-sec-stat,
+.id-panel[data-theme="light"] .dev-sum,
+.id-panel[data-theme="light"] .stat-tile,
+.id-panel[data-theme="light"] .today-tile,
+[data-theme="light"] .id-panel .ip-status-card__metric,
+[data-theme="light"] .id-panel .ip-contact-card__box,
+[data-theme="light"] .id-panel .ip-contact-card__stat,
+[data-theme="light"] .id-panel .ip-sec-stat,
+[data-theme="light"] .id-panel .dev-sum,
+[data-theme="light"] .id-panel .stat-tile,
+[data-theme="light"] .id-panel .today-tile {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 1px 2px rgba(15, 23, 42, 0.03) !important;
+}
+.id-panel .ip-contact-card__stat:hover,
+.id-panel .ip-sec-stat:hover {
+  transform: translateX(2px);
+  border-color: rgba(59, 130, 246, 0.2) !important;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   8 · TICKETS ROW-CARD — number + title emphasis + badge glow
+   ──────────────────────────────────────────────────────────────── */
+
+.id-panel .tk-item__number {
+  font-family: var(--ip-font-mono);
+  font-weight: 700;
+  color: var(--ip-blue-hi);
+  letter-spacing: 0.02em;
+}
+.id-panel .tk-item__title {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.005em;
+}
+.id-panel .tk-item__meta { font-family: var(--ip-font-mono); }
+.id-panel .tk-badge {
+  font-family: var(--ip-font-mono);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 9px !important;
+  font-size: 10px !important;
+  box-shadow: 0 0 10px currentColor, 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   9 · DEVICE CARDS — premium list item
+   ──────────────────────────────────────────────────────────────── */
+
+.id-panel .dev-card {
+  display: flex; flex-direction: column;
+}
+.id-panel .dev-card__head {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ip-border);
+  margin-bottom: 12px;
+}
+.id-panel .dev-card__icon {
+  background:
+    linear-gradient(180deg, rgba(59, 130, 246, 0.18), rgba(59, 130, 246, 0.05)) !important;
+  border: 1px solid rgba(59, 130, 246, 0.22) !important;
+  color: var(--ip-blue-hi) !important;
+  box-shadow: 0 4px 10px rgba(59, 130, 246, 0.12) !important;
+}
+.id-panel .dev-card__name {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.005em;
+}
+.id-panel .dev-card__meta {
+  font-family: var(--ip-font-mono);
+  row-gap: 10px !important;
+  font-size: 11px !important;
+}
+.id-panel .dev-card__status {
+  box-shadow: 0 0 10px currentColor, inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   10 · ALERT CARDS (security) — subtle tension for critical, calm for low
+   ──────────────────────────────────────────────────────────────── */
+
+.id-panel .alert-card {
+  display: flex; align-items: flex-start; gap: 16px;
+}
+.id-panel .alert-card:has(.alert-chip--critical) {
+  box-shadow:
+    var(--card-shadow),
+    inset 3px 0 0 rgba(239, 68, 68, 0.65) !important;
+}
+.id-panel .alert-card:has(.alert-chip--high) {
+  box-shadow:
+    var(--card-shadow),
+    inset 3px 0 0 rgba(245, 158, 11, 0.65) !important;
+}
+.id-panel .alert-chip {
+  font-family: var(--ip-font-mono);
+  letter-spacing: 0.1em;
+  box-shadow: 0 0 10px currentColor, inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   11 · VAULT CARDS — secret material with subtle lock vibe
+   ──────────────────────────────────────────────────────────────── */
+
+.id-panel .vt-card__head {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ip-border);
+  margin-bottom: 12px;
+}
+.id-panel .vt-card__icon {
+  background:
+    linear-gradient(180deg, rgba(147, 139, 250, 0.18), rgba(147, 139, 250, 0.05)) !important;
+  border: 1px solid rgba(167, 139, 250, 0.22) !important;
+  color: #A78BFA !important;
+  box-shadow: 0 4px 10px rgba(139, 92, 246, 0.12) !important;
+}
+.id-panel .vt-card__name { font-size: 14px !important; font-weight: 600 !important; }
+.id-panel .vt-row {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid var(--ip-border) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.id-panel[data-theme="light"] .vt-row,
+[data-theme="light"] .id-panel .vt-row {
+  background: #F8FAFC !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   12 · BILLING cards & month headers
+   ──────────────────────────────────────────────────────────────── */
+
+.id-panel .bill-month__head {
+  padding: 4px 2px;
+  border-radius: var(--card-r-sm);
+  transition: background 150ms var(--card-ease);
+}
+.id-panel .bill-sum-val { letter-spacing: -0.03em !important; }
+.id-panel .bill-line {
+  transition: background 140ms var(--card-ease);
+  padding: 12px 4px !important;
+  border-radius: 8px;
+}
+.id-panel .bill-line:hover {
+  background: var(--ip-surface-hi);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   13 · ACTIVITY event tiles
+   ──────────────────────────────────────────────────────────────── */
+
+.id-panel .act-day { padding: 20px !important; }
+.id-panel .act-item {
+  padding: 12px 10px !important;
+  border-radius: 10px;
+  margin: 0 -10px;
+  transition: background 140ms var(--card-ease);
+  border-bottom: 1px solid var(--ip-border) !important;
+}
+.id-panel .act-item:last-child { border-bottom: 0 !important; }
+.id-panel .act-item:hover { background: var(--ip-surface-hi); }
+
+/* ────────────────────────────────────────────────────────────────
+   14 · UNIFIED CARD HEADER / BODY / FOOTER HELPERS
+   ──────────────────────────────────────────────────────────────── */
+
+.id-panel .ip-card > .ip-card__head,
+.id-panel .panel-glass > .panel-glass__head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--ip-border);
+}
+
+.id-panel .ip-card__title { font-size: 15px; font-weight: 600; color: var(--ip-text); letter-spacing: -0.005em; }
+.id-panel .ip-card__subtitle { font-size: 12px; color: var(--ip-text-3); margin-top: 3px; }
+
+/* ────────────────────────────────────────────────────────────────
+   15 · UNIFIED BADGES / CHIPS across all views
+   ──────────────────────────────────────────────────────────────── */
+
+.id-panel .ip-chip,
+.id-panel .alert-chip,
+.id-panel .tk-badge,
+.id-panel .dev-card__status,
+.id-panel .dev-sum {
+  font-family: var(--ip-font-mono);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   16 · EMPTY STATE SYSTEM — premium, never bare
+   ──────────────────────────────────────────────────────────────── */
+
+.id-panel .ip-empty,
+.id-panel .dev-empty,
+.id-panel .tk-empty,
+.id-panel .act-empty,
+.id-panel .vt-empty {
+  padding: 56px 24px !important;
+  text-align: center !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 14px !important;
+}
+.id-panel .ip-empty__icon {
+  width: 64px; height: 64px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.14), rgba(59, 130, 246, 0.04) 70%, transparent);
+  color: var(--ip-blue-hi);
+  position: relative;
+}
+.id-panel .ip-empty__icon::before {
+  content: '';
+  position: absolute; inset: -10px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.25), transparent 65%);
+  animation: ipEmptyHalo 2.4s ease-in-out infinite;
+  filter: blur(4px);
+  z-index: -1;
+}
+@keyframes ipEmptyHalo {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50%      { transform: scale(1.28); opacity: 1; }
+}
+.id-panel .ip-empty__title { font-size: 16px; font-weight: 600; color: var(--ip-text); }
+.id-panel .ip-empty__sub {
+  font-family: var(--ip-font-mono);
+  font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ip-text-3);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   17 · TYPOGRAPHY INSIDE CARDS — clear hierarchy
+   ──────────────────────────────────────────────────────────────── */
+
+.id-panel .ip-status-card__title { font-size: 22px !important; font-weight: 700 !important; letter-spacing: -0.02em !important; }
+.id-panel .ip-status-card__desc { color: var(--ip-text-2) !important; }
+
+.id-panel .ip-status-card__metric-label,
+.id-panel .ip-intel__stat-label,
+.id-panel .today-tile__label,
+.id-panel .stat-tile__label {
+  font-family: var(--ip-font-mono) !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.14em !important;
+  text-transform: uppercase !important;
+  color: var(--ip-text-3) !important;
+}
+
+.id-panel .ip-status-card__metric-val,
+.id-panel .ip-intel__stat-value,
+.id-panel .today-tile__value,
+.id-panel .stat-tile__value {
+  font-size: 28px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.03em !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+.id-panel .ip-status-card__metric-sub,
+.id-panel .today-tile__sub { font-size: 11px !important; color: var(--ip-text-3) !important; }
+
+/* ────────────────────────────────────────────────────────────────
+   18 · CORE BORDER-RADIUS CONSISTENCY — radius by size tier
+   ──────────────────────────────────────────────────────────────── */
+
+.id-panel .ip-card,
+.id-panel .ip-core-card,
+.id-panel .ip-status-card,
+.id-panel .ip-contact-card,
+.id-panel .panel-glass { border-radius: var(--card-r-lg) !important; }
+
+.id-panel .dev-card,
+.id-panel .vt-card,
+.id-panel .alert-card,
+.id-panel .sec-sum-tile,
+.id-panel .bill-sum-tile { border-radius: var(--card-r-md) !important; }
+
+.id-panel .tk-item,
+.id-panel .ip-action-tile,
+.id-panel .ip-status-card__metric,
+.id-panel .ip-contact-card__stat,
+.id-panel .ip-sec-stat { border-radius: var(--card-r-sm) !important; }
+
+/* ────────────────────────────────────────────────────────────────
+   19 · DEV-CARD STATUS DOT — pulsing online
+   ──────────────────────────────────────────────────────────────── */
+
+.id-panel .dev-card__status[style*="34, 211"]::before,
+.id-panel .dev-card__status[style*="52, 211, 153"]::before,
+.id-panel .dev-card__status[style*="#34"]::before {
+  content: ''; display: inline-block;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor;
+  margin-right: 6px; vertical-align: middle;
+  box-shadow: 0 0 8px currentColor;
+  animation: ipDotPulseSmall 2s ease-in-out infinite;
+}
+@keyframes ipDotPulseSmall {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(1.25); }
+}
+
+/* ────────────────────────────────────────────────────────────────
+   20 · IDO CARDS — a touch smarter material
+   ──────────────────────────────────────────────────────────────── */
+
+.id-panel .ido-msg--assistant .ido-msg-body {
+  background:
+    linear-gradient(180deg, rgba(59, 130, 246, 0.06) 0%, rgba(255, 255, 255, 0.01) 40%),
+    var(--card-bg-tile) !important;
+  border: var(--card-border) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 4px 10px rgba(59, 130, 246, 0.08) !important;
+}
+.id-panel[data-theme="light"] .ido-msg--assistant .ido-msg-body,
+[data-theme="light"] .id-panel .ido-msg--assistant .ido-msg-body {
+  background:
+    linear-gradient(180deg, rgba(59, 130, 246, 0.04) 0%, rgba(255, 255, 255, 1) 40%),
+    #FFFFFF !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 4px 10px rgba(59, 130, 246, 0.06) !important;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   21 · MAIN CONTENT SPACING — breathing room
+   ──────────────────────────────────────────────────────────────── */
+
+.id-panel .ip-main {
+  padding: 28px 32px 64px;
+  gap: 24px;
+}
+.id-panel .ip-grid-top,
+.id-panel .ip-grid-bot { gap: 24px !important; margin-bottom: 24px; }
+.id-panel .dev-grid,
+.id-panel .vt-grid { gap: 16px !important; }
+.id-panel .tk-list { gap: 12px !important; }
+
+@media (max-width: 768px) {
+  .id-panel .ip-main { padding: 20px 16px 40px; }
+  .id-panel .ip-grid-top, .id-panel .ip-grid-bot { gap: 16px !important; }
+}
+
+/* ────────────────────────────────────────────────────────────────
+   22 · CARD FOCUS RING (accessibility) — keyboard navigation
+   ──────────────────────────────────────────────────────────────── */
+
+.id-panel .ip-card:focus-visible,
+.id-panel .dev-card:focus-visible,
+.id-panel .tk-item:focus-visible,
+.id-panel .ip-action-tile:focus-visible,
+.id-panel .alert-card:focus-visible,
+.id-panel .vt-card:focus-visible {
+  outline: 2px solid var(--ip-blue);
+  outline-offset: 2px;
+}
