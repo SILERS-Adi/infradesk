@@ -559,3 +559,251 @@
   background: var(--ip-blue-soft);
   color: var(--ip-blue-hi);
 }
+/* ═══════════════════════════════════════════════════════════
+   ID PANEL — Depth & Premium overlays (v5)
+   Appended to panel.css to add layered feel: gradient backgrounds,
+   inner shadow highlights, spotlight behind ID CORE, refined hovers.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─ Cards: gradient depth + top highlight ─ */
+.id-panel .ip-card {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(59, 130, 246, 0.03) 0%, transparent 60%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018) 0%, transparent 30%),
+    var(--ip-surface);
+  box-shadow:
+    var(--ip-shadow-sm),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: transform 220ms var(--ip-ease),
+              border-color 180ms var(--ip-ease),
+              box-shadow 220ms var(--ip-ease);
+}
+.id-panel[data-theme="light"] .ip-card,
+[data-theme="light"] .id-panel .ip-card {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(37, 99, 235, 0.03) 0%, transparent 60%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, transparent 35%),
+    var(--ip-surface);
+  box-shadow:
+    var(--ip-shadow-sm),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* ─ ID CORE card — spotlight radial behind core (center of attention) ─ */
+.id-panel .ip-core-card {
+  background:
+    radial-gradient(circle at 50% 60%, rgba(59, 130, 246, 0.14) 0%, rgba(59, 130, 246, 0.05) 35%, transparent 65%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0%, transparent 25%),
+    var(--ip-surface);
+  box-shadow:
+    0 0 0 1px var(--ip-border),
+    0 20px 48px rgba(59, 130, 246, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  position: relative;
+}
+/* Outer ambient glow underneath the card */
+.id-panel .ip-core-card::before {
+  content: '';
+  position: absolute;
+  inset: -40px;
+  background: radial-gradient(circle at 50% 60%, rgba(59, 130, 246, 0.08), transparent 55%);
+  pointer-events: none;
+  z-index: -1;
+  border-radius: inherit;
+  filter: blur(14px);
+}
+.id-panel[data-theme="light"] .ip-core-card,
+[data-theme="light"] .id-panel .ip-core-card {
+  background:
+    radial-gradient(circle at 50% 60%, rgba(37, 99, 235, 0.10) 0%, rgba(37, 99, 235, 0.04) 35%, transparent 65%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.7) 0%, transparent 35%),
+    var(--ip-surface);
+}
+
+/* ─ Hover — subtle lift + glow ─ */
+.id-panel .ip-action-tile,
+.id-panel .ip-feed-item,
+.id-panel .ip-contact-card__stat,
+.id-panel .ip-sec-stat {
+  transition: transform 180ms var(--ip-ease),
+              border-color 160ms var(--ip-ease),
+              background 160ms var(--ip-ease),
+              box-shadow 200ms var(--ip-ease);
+}
+
+.id-panel .ip-action-tile {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 40%),
+    var(--ip-surface-hi);
+}
+.id-panel .ip-action-tile:hover {
+  transform: translateY(-2px);
+  border-color: var(--ip-blue-edge);
+  background:
+    linear-gradient(180deg, rgba(59, 130, 246, 0.04) 0%, transparent 50%),
+    var(--ip-surface);
+  box-shadow:
+    var(--ip-shadow-sm),
+    0 8px 24px rgba(59, 130, 246, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.id-panel .ip-action-tile__icon {
+  transition: transform 220ms var(--ip-ease), box-shadow 220ms var(--ip-ease);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2) inset;
+}
+.id-panel .ip-action-tile:hover .ip-action-tile__icon {
+  transform: scale(1.08);
+  box-shadow:
+    0 0 0 1px rgba(59, 130, 246, 0.3) inset,
+    0 0 18px rgba(59, 130, 246, 0.25);
+}
+
+/* Feed items hover */
+.id-panel .ip-feed-item {
+  border-radius: var(--ip-r-sm);
+  padding: 10px 8px;
+  border: 1px solid transparent;
+  border-bottom: 1px solid var(--ip-border);
+}
+.id-panel .ip-feed-item:hover {
+  background: var(--ip-surface-hi);
+  border-color: var(--ip-border);
+  border-bottom-color: var(--ip-border-hi);
+}
+
+/* Nav link active state — stronger glow */
+.id-panel .ip-nav-link--active {
+  background:
+    linear-gradient(90deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.06) 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(59, 130, 246, 0.25),
+    inset 3px 0 0 var(--ip-blue-hi);
+}
+.id-panel .ip-nav-link--active svg {
+  filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.5));
+}
+
+/* Primary button — refined glow on hover */
+.id-panel .ip-btn--primary {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, transparent 50%),
+    var(--ip-blue);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 4px 12px rgba(59, 130, 246, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: transform 160ms var(--ip-ease), box-shadow 200ms var(--ip-ease), background 200ms var(--ip-ease);
+}
+.id-panel .ip-btn--primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, transparent 50%),
+    var(--ip-blue-hi);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.25),
+    0 8px 20px rgba(59, 130, 246, 0.5),
+    0 0 32px rgba(59, 130, 246, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* ─ Status chip live dot — refined pulse (softer bloom) ─ */
+.id-panel .ip-chip--live .ip-chip__dot {
+  position: relative;
+  box-shadow: 0 0 8px currentColor;
+}
+.id-panel .ip-chip--live .ip-chip__dot::before {
+  content: '';
+  position: absolute; inset: -3px;
+  border-radius: 50%;
+  background: inherit;
+  opacity: 0.4;
+  filter: blur(2px);
+  animation: ipChipBreath 2s ease-in-out infinite;
+}
+@keyframes ipChipBreath {
+  0%, 100% { transform: scale(1); opacity: 0.4; }
+  50%      { transform: scale(1.6); opacity: 0.1; }
+}
+
+/* ─ Status card primary heading breathing (subtle) ─ */
+.id-panel .ip-status-card__title {
+  animation: ipHeadingBreath 4s ease-in-out infinite;
+}
+@keyframes ipHeadingBreath {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.92; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .id-panel .ip-status-card__title { animation: none; }
+}
+
+/* ─ Security ring soft backdrop ─ */
+.id-panel .ip-sec-ring-wrap {
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.06) 0%, transparent 65%);
+  border-radius: 50%;
+}
+
+/* ─ Sec stats hover ─ */
+.id-panel .ip-sec-stat:hover,
+.id-panel .ip-contact-card__stat:hover {
+  border-color: var(--ip-border-hi);
+  background: var(--ip-surface);
+}
+
+/* ─ Iconbtn (bell) — notification dot bloom ─ */
+.id-panel .ip-iconbtn__badge {
+  box-shadow: 0 0 0 2px var(--ip-bg), 0 0 8px rgba(239, 68, 68, 0.7);
+  animation: ipBadgeBreath 2.5s ease-in-out infinite;
+}
+@keyframes ipBadgeBreath {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.15); }
+}
+
+/* ─ Avatar — subtle ring on hover ─ */
+.id-panel .ip-avatar {
+  transition: box-shadow 200ms var(--ip-ease), transform 160ms var(--ip-ease);
+}
+.id-panel .ip-avatar:hover {
+  transform: scale(1.05);
+  box-shadow:
+    0 2px 8px rgba(59, 130, 246, 0.4),
+    0 0 0 3px rgba(59, 130, 246, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* ─ Search input focus glow ─ */
+.id-panel .ip-search:focus-within {
+  border-color: var(--ip-blue-edge);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08);
+}
+
+/* ─ Sidebar: gradient accent at the top (subtle brand presence) ─ */
+.id-panel .ip-sidebar {
+  background:
+    linear-gradient(180deg, rgba(59, 130, 246, 0.03) 0%, transparent 20%),
+    var(--ip-bg-sidebar);
+}
+
+/* Sidebar logo mark — glow pulse */
+.id-panel .ip-sidebar__logo-mark {
+  box-shadow:
+    0 2px 6px rgba(59, 130, 246, 0.4),
+    0 0 16px rgba(59, 130, 246, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  animation: ipLogoBreath 4s ease-in-out infinite;
+}
+@keyframes ipLogoBreath {
+  0%, 100% {
+    box-shadow:
+      0 2px 6px rgba(59, 130, 246, 0.4),
+      0 0 16px rgba(59, 130, 246, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    box-shadow:
+      0 2px 6px rgba(59, 130, 246, 0.5),
+      0 0 28px rgba(59, 130, 246, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  }
+}
