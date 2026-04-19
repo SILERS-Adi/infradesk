@@ -1031,7 +1031,7 @@
 
 /* ─── Sidebar brand image (real InfraDesk logo) ─── */
 .id-panel .ip-sidebar__brand-img {
-  height: 28px; width: auto; display: block;
+  height: 42px; width: auto; display: block; max-width: 180px;
   transition: filter 240ms var(--ip-ease), transform 240ms var(--ip-ease);
 }
 .id-panel .ip-sidebar__brand-img--light { display: none; }
