@@ -1,15 +1,19 @@
 /**
- * IdCore v6 — LEVEL 3 premium living core.
+ * IdCore v7 — FINAL LEVEL 4 premium living core.
  *
- * Per spec:
- *   OUTER RING  — 30 distinct segments with small gaps (not 60 dashes).
- *                 One ENERGY WAVE travels around it (brighter arc moving).
- *   MIDDLE RING — score fill arc with head dot + tick marks + glow.
- *   INNER CORE  — 8 nodes + 10-12 edges + 2-3 energy packets flowing.
- *                 Asymmetric top-left light source (specular highlight).
- *   CENTER      — eased score number + label + alert.
+ * 4 distinct layers per spec:
+ *   1. OUTER SEGMENTED RING  — 30 segments, random seed-based activation
+ *                               (not all at once — subtle shimmer of aliveness)
+ *   2. ENERGY FLOW LAYER     — single thin arc traveling full ring in 5s
+ *                               ease-in-out (slows at beginning/end per cycle)
+ *   3. SCORE RING            — thicker, score progress, SMALL GAP at bottom
+ *                               (tech feel, not closed circle)
+ *   4. INNER AI CORE         — 8 nodes (1 hub + 7 satellites) + ring/spoke edges
+ *                               + 2-3 energy packets flowing
  *
- * ⅓ reduction in noise vs v5. Iconic, not chaotic.
+ * ASYMMETRIC DIRECTIONAL LIGHT: top-left specular highlight (not radial-symmetric)
+ * AMBIENT: strong blue halo behind everything
+ * CENTER: eased score number + label + alert count
  */
 
 import React from 'react';
@@ -27,14 +31,9 @@ interface Props {
 }
 
 type RGB = [number, number, number];
+interface Colors { primary: RGB; accent: RGB; glow: RGB }
 
-interface ColorSet {
-  primary: RGB;
-  accent: RGB;
-  glow: RGB;
-}
-
-function colorsFor(status: IdCoreStatus, aiActive: boolean): ColorSet {
+function colorsFor(status: IdCoreStatus, aiActive: boolean): Colors {
   if (status === 'offline')  return { primary: [107, 114, 128], accent: [107, 114, 128], glow: [107, 114, 128] };
   if (status === 'warning')  return { primary: [245, 158, 11], accent: [251, 191, 36], glow: [252, 211, 77] };
   if (status === 'critical') return { primary: [239, 68, 68],  accent: [248, 113, 113], glow: [252, 165, 165] };
@@ -44,32 +43,20 @@ function colorsFor(status: IdCoreStatus, aiActive: boolean): ColorSet {
 
 const rgba = (c: RGB, a: number) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 
-interface Node {
-  x: number; y: number;
-  vx: number; vy: number;
-  phase: number;
-  pulse: number;
-}
+interface Node { x: number; y: number; vx: number; vy: number; phase: number; pulse: number; }
+interface Edge { a: number; b: number; }
+interface Packet { edge: number; progress: number; speed: number; forward: boolean; }
+interface SegmentSeed { baseOffset: number; freq: number; amp: number; }
 
-interface Edge {
-  a: number; b: number;
-}
+/** easeInOutCubic — slow at start + end for the flow wave */
+const easeInOut = (t: number) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
-interface Packet {
-  edge: number;
-  progress: number;
-  speed: number;
-  forward: boolean;
-}
-
-/** Build a smaller, iconic neural network: 8 nodes, ~10-12 edges. */
 function buildNetwork(): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = [];
-  /* 1 center node + 7 satellites arranged in slightly irregular ring */
   nodes.push({ x: 0, y: 0, vx: 0, vy: 0, phase: 0, pulse: 0 });
   for (let i = 0; i < 7; i++) {
-    const a = (i / 7) * Math.PI * 2 + 0.2;
-    const r = 0.48 + (i % 2 === 0 ? 0.06 : -0.03);
+    const a = (i / 7) * Math.PI * 2 + 0.25;
+    const r = 0.48 + (i % 2 === 0 ? 0.05 : -0.03);
     nodes.push({
       x: Math.cos(a) * r,
       y: Math.sin(a) * r,
@@ -79,20 +66,27 @@ function buildNetwork(): { nodes: Node[]; edges: Edge[] } {
       pulse: 0,
     });
   }
-
-  /* Center connects to all 7 (hub), plus ring connections between neighbors */
   const edges: Edge[] = [];
-  for (let i = 1; i <= 7; i++) edges.push({ a: 0, b: i });                 /* hub spokes */
-  for (let i = 1; i <= 7; i++) edges.push({ a: i, b: i === 7 ? 1 : i + 1 }); /* ring */
-
+  for (let i = 1; i <= 7; i++) edges.push({ a: 0, b: i });
+  for (let i = 1; i <= 7; i++) edges.push({ a: i, b: i === 7 ? 1 : i + 1 });
   return { nodes, edges };
 }
 
-export function IdCore({ score, status, aiActive = false, alerts = 0, size = 260 }: Props) {
+/** Build per-segment seeds so each segment has its own breathing pattern */
+function buildSegmentSeeds(n: number): SegmentSeed[] {
+  return Array.from({ length: n }, (_, i) => ({
+    baseOffset: (i * 0.7) % (Math.PI * 2),
+    freq: 0.18 + Math.random() * 0.32,      /* per-segment breath frequency */
+    amp: 0.25 + Math.random() * 0.35,       /* how much it breathes */
+  }));
+}
+
+export function IdCore({ score, status, aiActive = false, alerts = 0, size = 280 }: Props) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const stateRef = React.useRef({ score, status, aiActive, alerts });
   const netRef = React.useRef(buildNetwork());
   const packetsRef = React.useRef<Packet[]>([]);
+  const seedsRef = React.useRef<SegmentSeed[]>(buildSegmentSeeds(30));
   const startRef = React.useRef(performance.now());
   const lastPacketRef = React.useRef(0);
   const scoreAnimRef = React.useRef({ current: score, target: score });
@@ -128,94 +122,113 @@ export function IdCore({ score, status, aiActive = false, alerts = 0, size = 260
       requestAnimationFrame(draw);
       const dt = Math.min(60, now - lastTs); lastTs = now;
       const t = reduced ? 0 : (now - startRef.current) / 1000;
-      const { score: _s, status, aiActive, alerts } = stateRef.current;
+      const { score: _sTarget, status, aiActive, alerts } = stateRef.current;
       const W = canvas!.width;
       const cx = W / 2, cy = W / 2;
       const c = colorsFor(status, aiActive);
 
-      /* Radii */
-      const rOuter  = W * 0.445;
-      const rMiddle = W * 0.38;
-      const rCore   = W * 0.28;
+      const rOuter  = W * 0.455;
+      const rMiddle = W * 0.385;
+      const rCore   = W * 0.285;
 
-      /* Eased score */
-      if (!reduced) {
-        scoreAnimRef.current.current += (scoreAnimRef.current.target - scoreAnimRef.current.current) * 0.08;
-      } else {
-        scoreAnimRef.current.current = scoreAnimRef.current.target;
-      }
+      if (!reduced) scoreAnimRef.current.current += (scoreAnimRef.current.target - scoreAnimRef.current.current) * 0.08;
+      else scoreAnimRef.current.current = scoreAnimRef.current.target;
       const displayScore = scoreAnimRef.current.current;
 
       ctx.clearRect(0, 0, W, W);
 
-      /* ═ Ambient backdrop radial (subtle) ═ */
-      const amb = ctx.createRadialGradient(cx, cy, rCore * 0.4, cx, cy, W * 0.55);
+      /* ═ Ambient halo ═ */
+      const amb = ctx.createRadialGradient(cx, cy, rCore * 0.3, cx, cy, W * 0.55);
       if (status === 'offline') {
         amb.addColorStop(0, 'rgba(107,114,128,0.05)');
         amb.addColorStop(1, 'rgba(0,0,0,0)');
       } else {
-        amb.addColorStop(0, rgba(c.primary, 0.14));
-        amb.addColorStop(0.5, rgba(c.primary, 0.04));
+        amb.addColorStop(0, rgba(c.primary, 0.16));
+        amb.addColorStop(0.5, rgba(c.primary, 0.05));
         amb.addColorStop(1, 'rgba(0,0,0,0)');
       }
       ctx.fillStyle = amb;
       ctx.fillRect(0, 0, W, W);
 
-      /* ═════ LAYER 1: OUTER RING — 30 segments + traveling energy wave ═════ */
+      /* ═════ LAYER 1: OUTER SEGMENTED RING — seed-based random activation ═════ */
       const SEG = 30;
-      const gapAngle = 0.015;
+      const gapAngle = 0.017;
       const segArc = (Math.PI * 2) / SEG - gapAngle;
-
-      /* Pulse breath (2.5s period for OK, faster for critical) */
-      const breathPeriod = status === 'critical' ? 1.0 : status === 'warning' ? 1.8 : 2.5;
-      const breath = status === 'offline' ? 0.5 : 0.5 + 0.5 * Math.sin(t * Math.PI * 2 / breathPeriod);
-
-      /* Energy wave position (one continuous bright arc traveling around) */
-      const waveSpeed = status === 'critical' ? 0.7 : status === 'warning' ? 0.45 : 0.3;
-      const waveHead = reduced ? 0 : (-Math.PI / 2 + t * waveSpeed) % (Math.PI * 2);
-      const waveSpan = Math.PI * 0.45; /* ~80° tail */
+      const seeds = seedsRef.current;
 
       for (let i = 0; i < SEG; i++) {
         const a0 = -Math.PI / 2 + i * ((Math.PI * 2) / SEG);
         const a1 = a0 + segArc;
-        const segCenter = (a0 + a1) / 2;
+        const seed = seeds[i];
 
-        /* Calculate distance to wave head (negative direction = behind wave) */
-        let dToWave = segCenter - waveHead;
-        while (dToWave > Math.PI) dToWave -= Math.PI * 2;
-        while (dToWave < -Math.PI) dToWave += Math.PI * 2;
-        /* Only segments behind the wave head are brightened */
-        const waveIntensity = (dToWave <= 0 && dToWave > -waveSpan)
-          ? Math.pow(1 - Math.abs(dToWave) / waveSpan, 1.5)
-          : 0;
+        /* Each segment has its own breathing, NOT synchronized.
+           Some briefly light up brighter at independent times. */
+        const individualBreath = Math.sin(t * Math.PI * 2 * seed.freq + seed.baseOffset);
+        /* Only positive half of sine → segment is dark most of the time, brief flare */
+        const activation = Math.max(0, individualBreath) * seed.amp;
 
-        const baseAlpha = status === 'offline' ? 0.18 : 0.20 + breath * 0.12;
-        const totalAlpha = Math.min(0.95, baseAlpha + waveIntensity * 0.7);
+        const baseAlpha = status === 'offline' ? 0.2 : 0.16;
+        const totalAlpha = Math.min(0.9, baseAlpha + activation);
 
         ctx.beginPath();
         ctx.strokeStyle = rgba(c.primary, totalAlpha);
-        ctx.lineWidth = (1 + waveIntensity * 1.2) * dpr;
-        ctx.lineCap = 'butt';
+        ctx.lineWidth = (1 + activation * 1.5) * dpr;
         ctx.arc(cx, cy, rOuter, a0, a1);
         ctx.stroke();
+
+        /* Bright flare glow on highly-activated segments */
+        if (activation > 0.35 && status !== 'offline' && !reduced) {
+          ctx.save();
+          ctx.shadowColor = rgba(c.glow, activation);
+          ctx.shadowBlur = 6 * dpr * activation;
+          ctx.beginPath();
+          ctx.strokeStyle = rgba(c.accent, activation * 0.9);
+          ctx.lineWidth = 1.2 * dpr;
+          ctx.arc(cx, cy, rOuter, a0, a1);
+          ctx.stroke();
+          ctx.restore();
+        }
       }
 
-      /* Bright wave head — small bloom dot at wave front */
+      /* ═════ LAYER 2: ENERGY FLOW — ONE thin line, 5s ease-in-out loop ═════ */
       if (status !== 'offline' && !reduced) {
-        const hx = cx + Math.cos(waveHead) * rOuter;
-        const hy = cy + Math.sin(waveHead) * rOuter;
-        const g = ctx.createRadialGradient(hx, hy, 0, hx, hy, 8 * dpr);
-        g.addColorStop(0, rgba(c.glow, 0.9));
-        g.addColorStop(0.5, rgba(c.accent, 0.5));
-        g.addColorStop(1, rgba(c.accent, 0));
-        ctx.fillStyle = g;
+        const periodSec = status === 'critical' ? 3.5 : status === 'warning' ? 4.5 : 5.5;
+        const phase = (t % periodSec) / periodSec;       /* 0..1 */
+        const eased = easeInOut(phase);                  /* slow at start/end, fast mid */
+        const headAngle = -Math.PI / 2 + eased * Math.PI * 2;
+        const tailSpan = Math.PI * 0.55;                 /* ~100° tail */
+
+        /* Draw gradient arc from head backwards */
+        const steps = 40;
+        for (let k = 0; k < steps; k++) {
+          const kt = k / steps;
+          const segAngle = headAngle - kt * tailSpan;
+          const segA0 = segAngle - (tailSpan / steps) * 0.5;
+          const segA1 = segAngle + (tailSpan / steps) * 0.5;
+          const alpha = (1 - kt) * 0.75;
+
+          ctx.beginPath();
+          ctx.strokeStyle = rgba(c.glow, alpha);
+          ctx.lineWidth = 1.3 * dpr;
+          ctx.arc(cx, cy, rOuter + 1 * dpr, segA0, segA1);
+          ctx.stroke();
+        }
+
+        /* Bright head bloom */
+        const hx = cx + Math.cos(headAngle) * (rOuter + 1 * dpr);
+        const hy = cy + Math.sin(headAngle) * (rOuter + 1 * dpr);
+        const hg = ctx.createRadialGradient(hx, hy, 0, hx, hy, 10 * dpr);
+        hg.addColorStop(0, 'rgba(255,255,255,0.95)');
+        hg.addColorStop(0.4, rgba(c.glow, 0.8));
+        hg.addColorStop(1, rgba(c.accent, 0));
+        ctx.fillStyle = hg;
         ctx.beginPath();
-        ctx.arc(hx, hy, 8 * dpr, 0, Math.PI * 2);
+        ctx.arc(hx, hy, 10 * dpr, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      /* ═════ LAYER 2: MIDDLE RING — score fill + ticks + head ═════ */
-      /* Tick marks outside middle ring (4 major, 12 minor = 16 total) */
+      /* ═════ LAYER 3: SCORE RING — with GAP at bottom (tech feel) ═════ */
+      /* Small tick marks */
       for (let i = 0; i < 16; i++) {
         const a = -Math.PI / 2 + (i / 16) * Math.PI * 2;
         const isMajor = i % 4 === 0;
@@ -223,51 +236,60 @@ export function IdCore({ score, status, aiActive = false, alerts = 0, size = 260
         const innerPt = rMiddle + 7 * dpr;
         const outerPt = innerPt + len * dpr;
         ctx.beginPath();
-        ctx.strokeStyle = rgba(c.primary, isMajor ? 0.45 : 0.18);
+        ctx.strokeStyle = rgba(c.primary, isMajor ? 0.5 : 0.18);
         ctx.lineWidth = (isMajor ? 1 : 0.6) * dpr;
         ctx.moveTo(cx + Math.cos(a) * innerPt, cy + Math.sin(a) * innerPt);
         ctx.lineTo(cx + Math.cos(a) * outerPt, cy + Math.sin(a) * outerPt);
         ctx.stroke();
       }
 
+      /* Score ring: small gap at BOTTOM — ring sweeps from -90° - (span/2) to -90° + (span/2) counter-clockwise */
+      const SCORE_GAP = 0.15;                           /* ~8.6° gap at bottom */
+      const scoreStart = Math.PI / 2 + SCORE_GAP / 2;  /* just clockwise of bottom center */
+      const scoreEnd   = Math.PI / 2 - SCORE_GAP / 2 + Math.PI * 2;  /* wrap around */
+      const scoreSpan  = Math.PI * 2 - SCORE_GAP;
+
       /* Base track */
       ctx.beginPath();
       ctx.strokeStyle = rgba(c.primary, 0.08);
       ctx.lineWidth = 6 * dpr;
-      ctx.arc(cx, cy, rMiddle, 0, Math.PI * 2);
+      ctx.arc(cx, cy, rMiddle, scoreStart, scoreEnd);
       ctx.stroke();
 
       if (status !== 'offline') {
         const pct = Math.max(0, Math.min(100, displayScore)) / 100;
-        const endAngle = -Math.PI / 2 + pct * Math.PI * 2;
+        const fillEnd = scoreStart + pct * scoreSpan;
 
-        /* Glow pass */
+        /* Breath for score ring glow intensity */
+        const breathPeriod = status === 'critical' ? 1.0 : status === 'warning' ? 1.7 : 2.5;
+        const breath = 0.5 + 0.5 * Math.sin(t * Math.PI * 2 / breathPeriod);
+
         ctx.save();
         ctx.shadowColor = rgba(c.glow, 0.7 + breath * 0.2);
         ctx.shadowBlur = (12 + breath * 6) * dpr;
         ctx.beginPath();
-        ctx.strokeStyle = rgba(c.accent, 0.85);
+        ctx.strokeStyle = rgba(c.accent, 0.9);
         ctx.lineWidth = 5 * dpr;
         ctx.lineCap = 'round';
-        ctx.arc(cx, cy, rMiddle, -Math.PI / 2, endAngle);
+        ctx.arc(cx, cy, rMiddle, scoreStart, fillEnd);
         ctx.stroke();
         ctx.restore();
 
-        /* Sharp top line */
-        const grad = ctx.createLinearGradient(cx - rMiddle, cy, cx + rMiddle, cy);
-        grad.addColorStop(0, rgba(c.primary, 1));
-        grad.addColorStop(1, rgba(c.accent, 1));
+        /* Sharp line */
+        const g = ctx.createLinearGradient(cx - rMiddle, cy, cx + rMiddle, cy);
+        g.addColorStop(0, rgba(c.primary, 1));
+        g.addColorStop(1, rgba(c.accent, 1));
         ctx.beginPath();
-        ctx.strokeStyle = grad;
+        ctx.strokeStyle = g;
         ctx.lineWidth = 3 * dpr;
         ctx.lineCap = 'round';
-        ctx.arc(cx, cy, rMiddle, -Math.PI / 2, endAngle);
+        ctx.arc(cx, cy, rMiddle, scoreStart, fillEnd);
         ctx.stroke();
 
         /* Leading head dot */
-        if (pct > 0.02) {
-          const hx = cx + Math.cos(endAngle) * rMiddle;
-          const hy = cy + Math.sin(endAngle) * rMiddle;
+        if (pct > 0.01) {
+          const hx = cx + Math.cos(fillEnd) * rMiddle;
+          const hy = cy + Math.sin(fillEnd) * rMiddle;
           const hg = ctx.createRadialGradient(hx, hy, 0, hx, hy, 9 * dpr);
           hg.addColorStop(0, 'rgba(255,255,255,0.95)');
           hg.addColorStop(0.35, rgba(c.glow, 0.8));
@@ -279,10 +301,9 @@ export function IdCore({ score, status, aiActive = false, alerts = 0, size = 260
         }
       }
 
-      /* ═════ LAYER 3: INNER CORE — 8 nodes + 14 edges + packets ═════ */
+      /* ═════ LAYER 4: INNER AI CORE — 8 nodes + edges + packets ═════ */
       const net = netRef.current;
 
-      /* Drift center + satellites */
       if (!reduced && status !== 'offline') {
         for (let i = 1; i < net.nodes.length; i++) {
           const n = net.nodes[i];
@@ -294,14 +315,12 @@ export function IdCore({ score, status, aiActive = false, alerts = 0, size = 260
         }
       }
 
-      /* Spawn packet */
       if (!reduced && status !== 'offline') {
-        const baseInterval = aiActive ? 320 : status === 'critical' ? 180 : status === 'warning' ? 550 : 700;
-        if (now - lastPacketRef.current > baseInterval && packetsRef.current.length < 3) {
+        const interval = aiActive ? 320 : status === 'critical' ? 200 : status === 'warning' ? 550 : 700;
+        if (now - lastPacketRef.current > interval && packetsRef.current.length < 3) {
           lastPacketRef.current = now;
-          const ei = Math.floor(Math.random() * net.edges.length);
           packetsRef.current.push({
-            edge: ei,
+            edge: Math.floor(Math.random() * net.edges.length),
             progress: 0,
             speed: 0.010 + Math.random() * 0.010,
             forward: Math.random() > 0.5,
@@ -309,55 +328,51 @@ export function IdCore({ score, status, aiActive = false, alerts = 0, size = 260
         }
       }
 
-      /* Draw edges (base) */
+      /* Edges base */
       if (status !== 'offline') {
         for (const e of net.edges) {
           const a = net.nodes[e.a], b = net.nodes[e.b];
-          const ax = cx + a.x * rCore, ay = cy + a.y * rCore;
-          const bx = cx + b.x * rCore, by = cy + b.y * rCore;
           ctx.beginPath();
-          ctx.strokeStyle = rgba(c.primary, 0.14);
+          ctx.strokeStyle = rgba(c.primary, 0.15);
           ctx.lineWidth = 0.7 * dpr;
-          ctx.moveTo(ax, ay);
-          ctx.lineTo(bx, by);
+          ctx.moveTo(cx + a.x * rCore, cy + a.y * rCore);
+          ctx.lineTo(cx + b.x * rCore, cy + b.y * rCore);
           ctx.stroke();
         }
       }
 
-      /* Draw packets + trails */
+      /* Packets + trails */
       if (status !== 'offline') {
         const remaining: Packet[] = [];
         for (const p of packetsRef.current) {
           p.progress += p.speed * (dt / 16);
           if (p.progress >= 1) {
             const e = net.edges[p.edge];
-            const endIdx = p.forward ? e.b : e.a;
-            net.nodes[endIdx].pulse = Math.min(1, net.nodes[endIdx].pulse + 0.9);
+            const end = p.forward ? e.b : e.a;
+            net.nodes[end].pulse = Math.min(1, net.nodes[end].pulse + 0.9);
             continue;
           }
           remaining.push(p);
 
           const e = net.edges[p.edge];
-          const startN = p.forward ? net.nodes[e.a] : net.nodes[e.b];
-          const endN   = p.forward ? net.nodes[e.b] : net.nodes[e.a];
-          const px = cx + (startN.x + (endN.x - startN.x) * p.progress) * rCore;
-          const py = cy + (startN.y + (endN.y - startN.y) * p.progress) * rCore;
+          const s = p.forward ? net.nodes[e.a] : net.nodes[e.b];
+          const d = p.forward ? net.nodes[e.b] : net.nodes[e.a];
+          const px = cx + (s.x + (d.x - s.x) * p.progress) * rCore;
+          const py = cy + (s.y + (d.y - s.y) * p.progress) * rCore;
 
-          /* Trail */
           const trailStart = Math.max(0, p.progress - 0.22);
-          const tsx = cx + (startN.x + (endN.x - startN.x) * trailStart) * rCore;
-          const tsy = cy + (startN.y + (endN.y - startN.y) * trailStart) * rCore;
-          const tg = ctx.createLinearGradient(tsx, tsy, px, py);
+          const tx = cx + (s.x + (d.x - s.x) * trailStart) * rCore;
+          const ty = cy + (s.y + (d.y - s.y) * trailStart) * rCore;
+          const tg = ctx.createLinearGradient(tx, ty, px, py);
           tg.addColorStop(0, rgba(c.accent, 0));
-          tg.addColorStop(1, rgba(c.accent, 0.65));
+          tg.addColorStop(1, rgba(c.accent, 0.7));
           ctx.beginPath();
           ctx.strokeStyle = tg;
           ctx.lineWidth = 1.3 * dpr;
-          ctx.moveTo(tsx, tsy);
+          ctx.moveTo(tx, ty);
           ctx.lineTo(px, py);
           ctx.stroke();
 
-          /* Head dot */
           ctx.save();
           ctx.shadowColor = rgba(c.glow, 0.85);
           ctx.shadowBlur = 8 * dpr;
@@ -370,28 +385,25 @@ export function IdCore({ score, status, aiActive = false, alerts = 0, size = 260
         packetsRef.current = remaining;
       }
 
-      /* Draw nodes */
+      /* Nodes */
       if (status !== 'offline') {
         for (let i = 0; i < net.nodes.length; i++) {
           const n = net.nodes[i];
-          const breath2 = 0.55 + 0.45 * Math.sin(t * 1.5 + n.phase);
+          const breath = 0.55 + 0.45 * Math.sin(t * 1.5 + n.phase);
           const isCenter = i === 0;
           const nx = cx + n.x * rCore, ny = cy + n.y * rCore;
-          const intensity = Math.min(1, breath2 * 0.65 + n.pulse);
+          const intensity = Math.min(1, breath * 0.65 + n.pulse);
 
-          /* Soft halo */
           ctx.fillStyle = rgba(c.glow, 0.14 * intensity);
           ctx.beginPath();
           ctx.arc(nx, ny, (isCenter ? 7 : 5) * dpr, 0, Math.PI * 2);
           ctx.fill();
 
-          /* Bright dot */
           ctx.fillStyle = rgba(c.glow, 0.6 + intensity * 0.4);
           ctx.beginPath();
           ctx.arc(nx, ny, (isCenter ? 2.4 : 1.8) * dpr, 0, Math.PI * 2);
           ctx.fill();
 
-          /* Pulse flare */
           if (n.pulse > 0.08) {
             ctx.save();
             ctx.shadowColor = rgba(c.glow, 0.85);
@@ -405,15 +417,15 @@ export function IdCore({ score, status, aiActive = false, alerts = 0, size = 260
         }
       }
 
-      /* ═════ ASYMMETRIC LIGHT (top-left spec highlight on core) ═════ */
+      /* ═════ Directional light (asymmetric specular top-left) ═════ */
       if (status !== 'offline') {
         const lightR = rMiddle * 0.95;
         const lg = ctx.createRadialGradient(
-          cx - lightR * 0.35, cy - lightR * 0.4, 0,
-          cx - lightR * 0.35, cy - lightR * 0.4, lightR * 0.9,
+          cx - lightR * 0.38, cy - lightR * 0.45, 0,
+          cx - lightR * 0.38, cy - lightR * 0.45, lightR,
         );
-        lg.addColorStop(0, 'rgba(255,255,255,0.10)');
-        lg.addColorStop(0.35, 'rgba(255,255,255,0.03)');
+        lg.addColorStop(0, 'rgba(255,255,255,0.14)');
+        lg.addColorStop(0.35, 'rgba(255,255,255,0.04)');
         lg.addColorStop(1, 'rgba(255,255,255,0)');
         ctx.fillStyle = lg;
         ctx.beginPath();
@@ -421,12 +433,13 @@ export function IdCore({ score, status, aiActive = false, alerts = 0, size = 260
         ctx.fill();
       }
 
-      /* ═════ CENTER bloom + score ═════ */
+      /* ═════ Inner bloom + score ═════ */
       if (status !== 'offline') {
         const bloomR = rCore * 0.75;
         const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, bloomR);
-        bg.addColorStop(0, rgba(c.glow, 0.18 + breath * 0.08));
-        bg.addColorStop(0.5, rgba(c.primary, 0.08));
+        const pulseBloom = 0.5 + 0.5 * Math.sin(t * Math.PI * 2 / 2.5);
+        bg.addColorStop(0, rgba(c.glow, 0.2 + pulseBloom * 0.1));
+        bg.addColorStop(0.5, rgba(c.primary, 0.09));
         bg.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = bg;
         ctx.beginPath();
@@ -434,11 +447,10 @@ export function IdCore({ score, status, aiActive = false, alerts = 0, size = 260
         ctx.fill();
       }
 
-      /* Score number */
       ctx.save();
       if (status !== 'offline') {
-        ctx.shadowColor = rgba(c.glow, 0.55 + breath * 0.3);
-        ctx.shadowBlur = (14 + breath * 8) * dpr;
+        ctx.shadowColor = rgba(c.glow, 0.55);
+        ctx.shadowBlur = 16 * dpr;
       }
       ctx.fillStyle = status === 'offline' ? rgba(c.primary, 0.6) : '#FFFFFF';
       ctx.font = `800 ${Math.round(W / 5)}px Inter, ui-sans-serif`;
@@ -463,9 +475,7 @@ export function IdCore({ score, status, aiActive = false, alerts = 0, size = 260
     return () => { running = false; cancelAnimationFrame(raf); ro.disconnect(); };
   }, [size]);
 
-  return (
-    <canvas ref={canvasRef} style={{ width: size, height: size, maxWidth: '100%', maxHeight: '100%', display: 'block' }} />
-  );
+  return <canvas ref={canvasRef} style={{ width: size, height: size, maxWidth: '100%', maxHeight: '100%', display: 'block' }} />;
 }
 
 export function idCoreMessage(status: IdCoreStatus, aiActive: boolean): string {

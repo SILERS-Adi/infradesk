@@ -112,9 +112,12 @@ export default function PanelActivityPage() {
       ) : loading ? (
         <div className="panel-glass" style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)' }}>Ładowanie…</div>
       ) : filtered.length === 0 ? (
-        <div className="panel-glass" style={{ padding: 60, textAlign: 'center' }}>
-          <Activity size={32} style={{ color: 'var(--text-tertiary)', margin: '0 auto 12px' }} />
-          <div style={{ fontSize: 16, fontWeight: 600 }}>Brak aktywności</div>
+        <div className="panel-glass ip-empty-heartbeat">
+          <div className="ip-empty-heartbeat__icon">
+            <Activity size={28} strokeWidth={1.8} />
+          </div>
+          <div className="ip-empty-heartbeat__title">System stabilny — brak zdarzeń</div>
+          <div className="ip-empty-heartbeat__sub">AI monitoruje workspace 24/7</div>
         </div>
       ) : (
         grouped.map(([day, dayItems]) => (
