@@ -1317,3 +1317,433 @@
 /* ─── Search width responsive ─── */
 @media (max-width: 1200px) { .id-panel .ip-search { min-width: 180px; } }
 @media (max-width: 900px)  { .id-panel .ip-search { display: none; } }
+/* ═══════════════════════════════════════════════════════════
+   ID PANEL — Premium Material System (v8 final)
+   4-layer card physics: base gradient + border + inner light + shadow.
+   Per spec — #F4F7FB bg, subtle noise, hover lift physics.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─ Subtle noise texture (SVG data URI, mixed at low opacity globally) ─ */
+.id-panel::after {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  mix-blend-mode: overlay;
+}
+.id-panel[data-theme="light"]::after,
+[data-theme="light"] .id-panel::after { opacity: 0.012; }
+
+/* ═════ LIGHT MODE — exact spec colors ═════ */
+.id-panel[data-theme="light"],
+[data-theme="light"] .id-panel {
+  --ip-bg:            #F4F7FB;
+  --ip-bg-sidebar:    #FFFFFF;
+  --ip-surface:       #FFFFFF;
+  --ip-surface-hi:    #F8FAFC;
+  --ip-border:        rgba(0, 0, 0, 0.06);
+  --ip-border-hi:     rgba(0, 0, 0, 0.12);
+}
+
+/* ═════ CARD — 4-layer material physics ═════ */
+
+/* LIGHT MODE: white→F8FAFC gradient + border + inner light + shadow */
+.id-panel[data-theme="light"] .ip-card,
+[data-theme="light"] .id-panel .ip-card {
+  background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 10px 30px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  padding: 24px;                  /* min 20-24px per spec */
+  transition:
+    transform 180ms cubic-bezier(0.22, 0.82, 0.32, 1),
+    box-shadow 220ms cubic-bezier(0.22, 0.82, 0.32, 1),
+    border-color 180ms cubic-bezier(0.22, 0.82, 0.32, 1),
+    outline 180ms ease;
+  outline: 1px solid transparent;
+}
+
+/* LIGHT hover — physics lift + tech outline */
+.id-panel[data-theme="light"] .ip-card:hover,
+[data-theme="light"] .id-panel .ip-card:hover {
+  transform: translateY(-3px) scale(1.01);
+  box-shadow:
+    0 2px 4px rgba(15, 23, 42, 0.05),
+    0 20px 50px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  border-color: rgba(59, 130, 246, 0.18);
+  outline: 1px solid rgba(59, 130, 246, 0.2);
+  outline-offset: -1px;
+}
+
+/* LIGHT ID CORE card — stronger blue spotlight but white base */
+.id-panel[data-theme="light"] .ip-core-card,
+[data-theme="light"] .id-panel .ip-core-card {
+  background:
+    radial-gradient(circle at 50% 55%, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.03) 45%, transparent 70%),
+    linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
+  box-shadow:
+    0 4px 12px rgba(15, 23, 42, 0.06),
+    0 20px 48px rgba(59, 130, 246, 0.1),
+    0 40px 80px rgba(59, 130, 246, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+.id-panel[data-theme="light"] .ip-core-card:hover,
+[data-theme="light"] .id-panel .ip-core-card:hover {
+  transform: translateY(-3px);    /* no scale on hero card */
+  box-shadow:
+    0 8px 16px rgba(15, 23, 42, 0.08),
+    0 24px 60px rgba(59, 130, 246, 0.16),
+    0 60px 120px rgba(59, 130, 246, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+/* DARK MODE — translate the same physics to dark, not pure white */
+.id-panel .ip-card {
+  background: linear-gradient(180deg, rgba(19, 27, 44, 1) 0%, rgba(14, 20, 34, 1) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 10px 30px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  padding: 24px;
+  transition:
+    transform 180ms cubic-bezier(0.22, 0.82, 0.32, 1),
+    box-shadow 220ms cubic-bezier(0.22, 0.82, 0.32, 1),
+    border-color 180ms cubic-bezier(0.22, 0.82, 0.32, 1),
+    outline 180ms ease;
+  outline: 1px solid transparent;
+}
+.id-panel .ip-card:hover {
+  transform: translateY(-3px) scale(1.01);
+  box-shadow:
+    0 4px 8px rgba(0, 0, 0, 0.35),
+    0 20px 50px rgba(0, 0, 0, 0.5),
+    0 0 32px rgba(59, 130, 246, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  border-color: rgba(59, 130, 246, 0.28);
+  outline: 1px solid rgba(59, 130, 246, 0.2);
+  outline-offset: -1px;
+}
+
+/* Dark ID CORE card — strong blue ambient + spotlight */
+.id-panel .ip-core-card {
+  background:
+    radial-gradient(circle at 50% 55%, rgba(59, 130, 246, 0.16) 0%, rgba(59, 130, 246, 0.04) 45%, transparent 70%),
+    linear-gradient(180deg, rgba(19, 27, 44, 1) 0%, rgba(14, 20, 34, 1) 100%);
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.35),
+    0 20px 48px rgba(0, 0, 0, 0.5),
+    0 40px 80px rgba(59, 130, 246, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.id-panel .ip-core-card:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 4px 8px rgba(0, 0, 0, 0.4),
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    0 60px 120px rgba(59, 130, 246, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* ═════ SPACING — more breathing room ═════ */
+.id-panel .ip-main { padding: 28px 32px 60px; }
+.id-panel .ip-grid-top { gap: 24px; margin-bottom: 24px; }
+.id-panel .ip-grid-bot { gap: 24px; }
+@media (max-width: 768px) {
+  .id-panel .ip-main { padding: 20px 16px 40px; }
+  .id-panel .ip-grid-top, .id-panel .ip-grid-bot { gap: 16px; }
+}
+
+/* ═════ STATUS CHIP — OK green with subtle glow ═════ */
+.id-panel .ip-chip--ok {
+  background: rgba(34, 197, 94, 0.1);
+  color: #16A34A;
+  border-color: rgba(34, 197, 94, 0.3);
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.15);
+}
+.id-panel[data-theme="dark"] .ip-chip--ok,
+.id-panel:not([data-theme="light"]) .ip-chip--ok {
+  background: rgba(34, 197, 94, 0.14);
+  color: #34D399;
+  border-color: rgba(34, 197, 94, 0.38);
+  box-shadow: 0 0 14px rgba(34, 197, 94, 0.22);
+}
+.id-panel .ip-chip--warn {
+  background: rgba(245, 158, 11, 0.1);
+  color: #D97706;
+  border-color: rgba(245, 158, 11, 0.3);
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.15);
+}
+.id-panel[data-theme="dark"] .ip-chip--warn,
+.id-panel:not([data-theme="light"]) .ip-chip--warn {
+  color: #FBBF24;
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.22);
+}
+.id-panel .ip-chip--bad {
+  background: rgba(239, 68, 68, 0.1);
+  color: #DC2626;
+  border-color: rgba(239, 68, 68, 0.3);
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.18);
+}
+.id-panel[data-theme="dark"] .ip-chip--bad,
+.id-panel:not([data-theme="light"]) .ip-chip--bad {
+  color: #F87171;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.25);
+}
+
+/* ═════ DEVICE GRID — premium cards + subtle dividers ═════ */
+.id-panel .dev-card {
+  background: linear-gradient(180deg, var(--ip-surface) 0%, var(--ip-surface-hi) 100%) !important;
+  border: 1px solid var(--ip-border) !important;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 8px 20px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  outline: 1px solid transparent;
+  transition:
+    transform 180ms cubic-bezier(0.22, 0.82, 0.32, 1),
+    box-shadow 220ms cubic-bezier(0.22, 0.82, 0.32, 1),
+    border-color 180ms cubic-bezier(0.22, 0.82, 0.32, 1),
+    outline 180ms ease !important;
+}
+.id-panel[data-theme="light"] .dev-card,
+[data-theme="light"] .id-panel .dev-card {
+  background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%) !important;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 10px 30px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+}
+.id-panel .dev-card:hover {
+  transform: translateY(-3px) scale(1.01) !important;
+  outline: 1px solid rgba(59, 130, 246, 0.2) !important;
+  outline-offset: -1px;
+}
+.id-panel[data-theme="light"] .dev-card:hover,
+[data-theme="light"] .id-panel .dev-card:hover {
+  box-shadow:
+    0 2px 4px rgba(15, 23, 42, 0.04),
+    0 20px 50px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(59, 130, 246, 0.2) !important;
+}
+
+/* Subtle divider inside dev card meta grid */
+.id-panel .dev-card__meta {
+  border-top: 1px solid var(--ip-border);
+  padding-top: 10px;
+  margin-top: 4px;
+}
+
+/* ═════ ACTION TILES (top page) — match premium card material ═════ */
+.id-panel .ip-action-tile {
+  background: linear-gradient(180deg, var(--ip-surface-hi) 0%, var(--ip-surface) 100%) !important;
+  border: 1px solid var(--ip-border) !important;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  outline: 1px solid transparent;
+  transition:
+    transform 180ms cubic-bezier(0.22, 0.82, 0.32, 1),
+    box-shadow 220ms cubic-bezier(0.22, 0.82, 0.32, 1),
+    border-color 180ms cubic-bezier(0.22, 0.82, 0.32, 1),
+    outline 180ms ease !important;
+}
+.id-panel[data-theme="light"] .ip-action-tile,
+[data-theme="light"] .id-panel .ip-action-tile {
+  background: linear-gradient(180deg, #FFFFFF 0%, #F4F7FB 100%) !important;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
+}
+.id-panel .ip-action-tile:hover {
+  transform: translateY(-3px) scale(1.02);
+  outline: 1px solid rgba(59, 130, 246, 0.2);
+  outline-offset: -1px;
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.05),
+    0 14px 32px rgba(0, 0, 0, 0.1),
+    0 0 20px rgba(59, 130, 246, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+/* ═════ SIDEBAR CONTACT — matching material ═════ */
+.id-panel .ip-sidebar__contact {
+  background: linear-gradient(180deg, var(--ip-surface-hi) 0%, var(--ip-surface) 100%);
+  border: 1px solid var(--ip-border);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.id-panel[data-theme="light"] .ip-sidebar__contact,
+[data-theme="light"] .id-panel .ip-sidebar__contact {
+  background: linear-gradient(180deg, #FFFFFF 0%, #F4F7FB 100%);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+/* ═════ STATUS CARD METRICS — inner material ═════ */
+.id-panel .ip-status-card__metric,
+.id-panel .ip-contact-card__box,
+.id-panel .ip-contact-card__stat,
+.id-panel .ip-sec-stat {
+  background: linear-gradient(180deg, var(--ip-surface-hi) 0%, var(--ip-surface) 100%);
+  border: 1px solid var(--ip-border);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: transform 150ms var(--ip-ease), box-shadow 200ms var(--ip-ease), border-color 150ms var(--ip-ease);
+}
+.id-panel[data-theme="light"] .ip-status-card__metric,
+.id-panel[data-theme="light"] .ip-contact-card__box,
+.id-panel[data-theme="light"] .ip-contact-card__stat,
+.id-panel[data-theme="light"] .ip-sec-stat,
+[data-theme="light"] .id-panel .ip-status-card__metric,
+[data-theme="light"] .id-panel .ip-contact-card__box,
+[data-theme="light"] .id-panel .ip-contact-card__stat,
+[data-theme="light"] .id-panel .ip-sec-stat {
+  background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.id-panel .ip-contact-card__stat:hover,
+.id-panel .ip-sec-stat:hover {
+  transform: translateY(-1px);
+  border-color: var(--ip-border-hi);
+}
+
+/* ═════ TICKET ITEMS — material ═════ */
+.id-panel .tk-item {
+  background: linear-gradient(180deg, var(--ip-surface) 0%, var(--ip-surface-hi) 100%) !important;
+  border: 1px solid var(--ip-border) !important;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+  outline: 1px solid transparent;
+  transition: all 180ms cubic-bezier(0.22, 0.82, 0.32, 1) !important;
+}
+.id-panel[data-theme="light"] .tk-item,
+[data-theme="light"] .id-panel .tk-item {
+  background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%) !important;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+}
+.id-panel .tk-item:hover {
+  transform: translateY(-2px) !important;
+  outline: 1px solid rgba(59, 130, 246, 0.2) !important;
+  outline-offset: -1px;
+  border-color: rgba(59, 130, 246, 0.18) !important;
+}
+.id-panel[data-theme="light"] .tk-item:hover,
+[data-theme="light"] .id-panel .tk-item:hover {
+  box-shadow:
+    0 2px 4px rgba(15, 23, 42, 0.04),
+    0 16px 36px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+}
+
+/* ═════ VAULT cards — material ═════ */
+.id-panel .vt-card,
+.id-panel .alert-card {
+  background: linear-gradient(180deg, var(--ip-surface) 0%, var(--ip-surface-hi) 100%) !important;
+  border: 1px solid var(--ip-border) !important;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 6px 16px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  transition: all 180ms cubic-bezier(0.22, 0.82, 0.32, 1) !important;
+}
+.id-panel[data-theme="light"] .vt-card,
+.id-panel[data-theme="light"] .alert-card,
+[data-theme="light"] .id-panel .vt-card,
+[data-theme="light"] .id-panel .alert-card {
+  background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%) !important;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.03),
+    0 10px 30px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+}
+.id-panel .vt-card:hover,
+.id-panel .alert-card:hover {
+  transform: translateY(-2px) scale(1.005) !important;
+  outline: 1px solid rgba(59, 130, 246, 0.2) !important;
+  outline-offset: -1px;
+}
+
+/* ═════ TOPBAR — material underline ═════ */
+.id-panel .ip-topbar {
+  box-shadow: 0 1px 0 var(--ip-border), 0 8px 24px rgba(0, 0, 0, 0.04);
+}
+.id-panel[data-theme="light"] .ip-topbar,
+[data-theme="light"] .id-panel .ip-topbar {
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06), 0 4px 16px rgba(15, 23, 42, 0.04);
+}
+
+/* ═════ BILL / ACTIVITY / timeline internal rows — hover ═════ */
+.id-panel .bill-month__head:hover,
+.id-panel .timeline-item:hover {
+  background: var(--ip-surface-hi);
+  border-radius: var(--ip-r-sm);
+}
+
+/* ═════ Feed items (ai activity on dashboard) — lift on hover ═════ */
+.id-panel .ip-feed-item {
+  border-radius: var(--ip-r-sm);
+  margin: 0 -8px;
+  padding: 10px 12px;
+}
+.id-panel .ip-feed-item:hover {
+  background: var(--ip-surface-hi);
+}
+
+/* ═════ Primary button — add soft bloom in light mode ═════ */
+.id-panel[data-theme="light"] .ip-btn--primary,
+[data-theme="light"] .id-panel .ip-btn--primary {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    0 6px 16px rgba(59, 130, 246, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+.id-panel[data-theme="light"] .ip-btn--primary:hover:not(:disabled),
+[data-theme="light"] .id-panel .ip-btn--primary:hover:not(:disabled) {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    0 12px 28px rgba(59, 130, 246, 0.45),
+    0 0 24px rgba(59, 130, 246, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* Secondary button in light mode — material */
+.id-panel[data-theme="light"] .ip-btn--secondary,
+[data-theme="light"] .id-panel .ip-btn--secondary {
+  background: linear-gradient(180deg, #FFFFFF 0%, #F4F7FB 100%);
+  border-color: rgba(15, 23, 42, 0.1);
+  color: var(--ip-text);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+.id-panel[data-theme="light"] .ip-btn--secondary:hover:not(:disabled),
+[data-theme="light"] .id-panel .ip-btn--secondary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #FFFFFF 0%, #FFFFFF 100%);
+  border-color: rgba(59, 130, 246, 0.35);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 4px 12px rgba(59, 130, 246, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* Ticks in text/badges — no outline on click in default card */
+.id-panel .tk-item:active,
+.id-panel .ip-action-tile:active,
+.id-panel .dev-card:active { transform: translateY(-1px) scale(1); transition-duration: 80ms; }
