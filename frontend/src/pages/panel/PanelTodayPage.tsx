@@ -31,7 +31,7 @@ function formatPLN(n: number): string {
 }
 
 export default function PanelTodayPage() {
-  const { role, isMsp, isOwner } = useRole();
+  const { role, isOwner } = useRole();
   const { user } = useAuth();
 
   const [pulse, setPulse] = React.useState<PanelPulse | null>(null);
@@ -123,7 +123,7 @@ export default function PanelTodayPage() {
             <span className="panel-text-brand">{hello}</span>, {user?.firstName || 'Adrian'}.
           </h1>
           <div className="hero-sub">
-            Panel {role === 'MSP' ? 'dostawcy' : role === 'OWNER' ? 'właściciela' : role === 'ADMIN' ? 'administratora' : 'użytkownika'}
+            Panel {role === 'OWNER' ? 'właściciela' : role === 'ADMIN' ? 'administratora' : role === 'TECHNICIAN' ? 'technika' : 'użytkownika'}
             {' · '}Phase 2 · live
           </div>
         </div>
@@ -207,7 +207,7 @@ export default function PanelTodayPage() {
             {tiles ? `z ${tiles.devicesOnline.total} total` : 'ładowanie…'}
           </span>
         </div>
-        {(isOwner || isMsp) && tiles?.billingDue && (
+        {isOwner && tiles?.billingDue && (
           <div className="panel-glass tile">
             <span className="tile-label">Do zafakturowania</span>
             <span className="tile-value">{formatPLN(tiles.billingDue.value)}</span>

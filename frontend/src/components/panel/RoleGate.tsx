@@ -1,26 +1,23 @@
 /**
  * RoleGate — declarative visibility control for ID Panel.
  *
- * Two usage modes:
- *   1. Render children only when the current user matches allowed roles:
- *        <RoleGate allow={['OWNER', 'ADMIN']}><AdminStuff /></RoleGate>
+ * ID PANEL is ONLY for end-client users. MSP operators use the existing /admin
+ * panel. A super-admin visiting /panel is redirected out by PanelLayout.
  *
- *   2. Use the `useRole()` hook for conditional logic inside components:
- *        const { role, isMsp, isOwner, can } = useRole();
- *        if (can('manage_billing')) { ... }
+ * Supported roles come directly from WorkspaceMembership.role:
+ *   OWNER · ADMIN · TECHNICIAN · MEMBER · VIEWER
  *
- * Abstraction goals:
- *   - Panel treats "MSP" (super-admin seeing operator view) as first-class.
- *   - Workspace membership drives Owner/Admin/Technician/Member/Viewer.
- *   - Capability map is centralized here so pages never hardcode role checks.
+ * Usage:
+ *   <RoleGate allow={['OWNER', 'ADMIN']}><BillingThing /></RoleGate>
+ *   const { role, isOwner, can } = useRole();
+ *   if (can('manage_billing')) { ... }
  */
 
 import React from 'react';
-import { useAuth } from '../../store/authStore';
 import { useWorkspace } from '../../store/workspaceStore';
 import type { MemberRole } from '../../types';
 
-export type PanelRole = 'MSP' | MemberRole;
+export type PanelRole = MemberRole;
 
 export type Capability =
   | 'view_today'
@@ -32,34 +29,29 @@ export type Capability =
   | 'manage_billing'
   | 'manage_members'
   | 'create_ticket'
-  | 'use_ido_chat'
-  | 'msp_tools';
+  | 'use_ido_chat';
 
 const CAPABILITY_MAP: Record<Capability, PanelRole[]> = {
-  view_today:      ['MSP', 'OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER', 'VIEWER'],
-  view_security:   ['MSP', 'OWNER', 'ADMIN'],
-  view_devices:    ['MSP', 'OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'],
-  view_tickets:    ['MSP', 'OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'],
-  view_vault:      ['MSP', 'OWNER', 'ADMIN', 'TECHNICIAN'],
-  view_billing:    ['MSP', 'OWNER', 'ADMIN'],
-  manage_billing:  ['MSP', 'OWNER'],
-  manage_members:  ['MSP', 'OWNER', 'ADMIN'],
-  create_ticket:   ['MSP', 'OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'],
-  use_ido_chat:    ['MSP', 'OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'],
-  msp_tools:       ['MSP'],
+  view_today:      ['OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER', 'VIEWER'],
+  view_security:   ['OWNER', 'ADMIN'],
+  view_devices:    ['OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'],
+  view_tickets:    ['OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'],
+  view_vault:      ['OWNER', 'ADMIN', 'TECHNICIAN'],
+  view_billing:    ['OWNER', 'ADMIN'],
+  manage_billing:  ['OWNER'],
+  manage_members:  ['OWNER', 'ADMIN'],
+  create_ticket:   ['OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'],
+  use_ido_chat:    ['OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'],
 };
 
 export function useRole() {
-  const { user } = useAuth();
   const current = useWorkspace(s => s.current);
   const preview = useWorkspace(s => s.preview);
 
-  // Preview mode overrides real role (operator viewing as end-user)
   const effectiveRole: PanelRole = React.useMemo(() => {
     if (preview) return (preview.role as PanelRole) ?? 'MEMBER';
-    if (user?.isSuperAdmin) return 'MSP';
     return (current?.role as PanelRole) ?? 'VIEWER';
-  }, [user, current, preview]);
+  }, [current, preview]);
 
   const is = React.useCallback(
     (...roles: PanelRole[]) => roles.includes(effectiveRole),
@@ -73,7 +65,6 @@ export function useRole() {
 
   return {
     role: effectiveRole,
-    isMsp: effectiveRole === 'MSP',
     isOwner: effectiveRole === 'OWNER',
     isAdmin: effectiveRole === 'ADMIN',
     isTech: effectiveRole === 'TECHNICIAN',

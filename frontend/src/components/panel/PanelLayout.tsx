@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../../store/authStore';
 import { useWorkspace } from '../../store/workspaceStore';
 import { useTheme } from '../../store/themeStore';
@@ -42,6 +42,8 @@ const NAV: NavItem[] = [
 
 export function PanelLayout() {
   const { user } = useAuth();
+  // ID PANEL jest wyłącznie dla klientów końcowych — MSP/operator używa /admin
+  if (user?.isSuperAdmin) return <Navigate to="/" replace />;
   const resolved = useTheme(st => st.resolved);
   const currentWs = useWorkspace(s => s.current);
   const { role, can, isPreview } = useRole();
