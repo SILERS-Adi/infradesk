@@ -1,140 +1,107 @@
 /**
- * PanelLayout — shell for the new ID Panel (post-preview realization).
+ * PanelLayout v3 — COCKPIT REBUILD.
  *
  * Structure:
- *   ┌─────────────────────────────────────────┐
- *   │  Topbar: logo · workspace · role · user │
- *   ├──────────┬──────────────────────────────┤
- *   │ Sidebar  │  <Outlet />                  │
- *   │  (rails) │                              │
- *   └──────────┴──────────────────────────────┘
+ *   ┌────────────────────────────────────────────────────────┐
+ *   │ [ID·PANEL] [nav nav nav nav]     [theme] [user] │ 56px │
+ *   ├────────────────────────────────────────────────────────┤
+ *   │ <Outlet/> — max-width 1600px, cockpit content          │
+ *   └────────────────────────────────────────────────────────┘
  *
- * Notes:
- *  - Lives under /panel/* — does NOT replace /portal (old UX untouched).
- *  - Uses .panel-scope wrapper so `panel/index.css` tokens & primitives apply.
- *  - Sidebar items are filtered by useRole().can(capability).
- *  - Kept self-contained (no external component deps) so Phase 1 ships clean.
+ * No sidebar (topbar nav like Linear). No gradients. Grid-dense.
+ * Blocks superadmin (MSP uses /admin), clients only.
  */
 
 import React from 'react';
-import { NavLink, Outlet, useLocation, Navigate } from 'react-router-dom';
+import { NavLink, Outlet, Navigate } from 'react-router-dom';
 import { useAuth } from '../../store/authStore';
 import { useWorkspace } from '../../store/workspaceStore';
 import { useTheme } from '../../store/themeStore';
 import { useRole, type Capability } from './RoleGate';
+import { Home, ShieldCheck, MonitorUp, Ticket, KeyRound, Zap, Activity, Receipt, Sun, Moon, Monitor } from 'lucide-react';
 import '../../styles/panel/index.css';
 
-type NavItem = {
-  to: string;
-  label: string;
-  icon: string; // emoji placeholder — swap to lucide later
-  capability?: Capability;
-};
+type NavItem = { to: string; label: string; icon: React.ComponentType<any>; capability?: Capability };
 
 const NAV: NavItem[] = [
-  { to: '/panel',            label: 'Dziś',          icon: '⦿', capability: 'view_today' },
-  { to: '/panel/security',   label: 'Bezpieczeństwo', icon: '⛨', capability: 'view_security' },
-  { to: '/panel/devices',    label: 'Urządzenia',    icon: '▣', capability: 'view_devices' },
-  { to: '/panel/tickets',    label: 'Zgłoszenia',    icon: '✎', capability: 'view_tickets' },
-  { to: '/panel/vault',      label: 'Sejf',          icon: '⚿', capability: 'view_vault' },
-  { to: '/panel/activity',   label: 'Aktywność',    icon: '⌘', capability: 'view_today' },
-  { to: '/panel/billing',    label: 'Rozliczenia',   icon: '§', capability: 'view_billing' },
+  { to: '/panel',          label: 'Dziś',           icon: Home,         capability: 'view_today' },
+  { to: '/panel/security', label: 'Bezpieczeństwo', icon: ShieldCheck,  capability: 'view_security' },
+  { to: '/panel/devices',  label: 'Urządzenia',     icon: MonitorUp,    capability: 'view_devices' },
+  { to: '/panel/tickets',  label: 'Zgłoszenia',     icon: Ticket,       capability: 'view_tickets' },
+  { to: '/panel/vault',    label: 'Hasła',          icon: KeyRound,     capability: 'view_vault' },
+  { to: '/panel/ido',      label: 'IDO',            icon: Zap,          capability: 'use_ido_chat' },
+  { to: '/panel/activity', label: 'Aktywność',      icon: Activity,     capability: 'view_today' },
+  { to: '/panel/billing',  label: 'Rozliczenia',    icon: Receipt,      capability: 'view_billing' },
 ];
 
 export function PanelLayout() {
   const { user } = useAuth();
-  // ID PANEL jest wyłącznie dla klientów końcowych — MSP/operator używa /admin
   if (user?.isSuperAdmin) return <Navigate to="/" replace />;
-  const resolved = useTheme(st => st.resolved);
-  const currentWs = useWorkspace(s => s.current);
-  const { role, can, isPreview } = useRole();
-  const location = useLocation();
 
-  const [collapsed, setCollapsed] = React.useState<boolean>(
-    () => localStorage.getItem('panel_sidebar_collapsed') === '1',
-  );
-  React.useEffect(() => {
-    localStorage.setItem('panel_sidebar_collapsed', collapsed ? '1' : '0');
-  }, [collapsed]);
+  const currentWs = useWorkspace(s => s.current);
+  const { resolved, mode, setMode } = useTheme();
+  const { role, can, isPreview } = useRole();
+
+  const initials = (user?.firstName?.[0] ?? '') + (user?.lastName?.[0] ?? '');
+  const roleLabel = role === 'OWNER' ? 'Właściciel' : role === 'ADMIN' ? 'Administrator' : role === 'TECHNICIAN' ? 'Technik' : role === 'MEMBER' ? 'Użytkownik' : role === 'VIEWER' ? 'Viewer' : role;
 
   return (
-    <div className="panel-scope" data-theme={resolved}>
-      <style>{`
-        .panel-shell { display: grid; grid-template-columns: auto 1fr; grid-template-rows: 56px 1fr; min-height: 100vh; }
-        .panel-topbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 16px; padding: 0 20px; border-bottom: 1px solid var(--glass-border); background: var(--bg-overlay); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); position: sticky; top: 0; z-index: 20; }
-        .panel-brand { font-weight: 800; font-size: 14px; letter-spacing: 0.14em; background: var(--brand-gradient-vivid); -webkit-background-clip: text; background-clip: text; color: transparent; }
-        .panel-brand-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--brand-gradient-vivid); box-shadow: 0 0 12px rgba(34,211,238,0.6); margin-right: 8px; vertical-align: middle; }
-        .panel-ws-pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 10px; background: var(--glass-bg); border: 1px solid var(--glass-border); font-size: 12px; color: var(--text-secondary); }
-        .panel-ws-pill b { color: var(--text-primary); font-weight: 600; }
-        .panel-user { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-secondary); }
-        .panel-user b { color: var(--text-primary); font-weight: 600; }
-
-        .panel-sidebar { padding: 16px 10px; border-right: 1px solid var(--glass-border); background: linear-gradient(180deg, hsla(222,35%,9%,0.4), transparent); width: ${collapsed ? '64px' : '220px'}; transition: width 180ms ease; }
-        .panel-nav { display: flex; flex-direction: column; gap: 4px; }
-        .panel-nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 500; text-decoration: none; border: 1px solid transparent; transition: all 140ms ease; }
-        .panel-nav-item:hover { background: var(--glass-bg); color: var(--text-primary); border-color: var(--glass-border); }
-        .panel-nav-item.active { background: var(--brand-gradient-soft); color: var(--text-primary); border-color: var(--glass-border-hi); box-shadow: var(--glass-inset-hl); }
-        .panel-nav-icon { width: 20px; text-align: center; font-size: 14px; }
-        .panel-nav-label { ${collapsed ? 'display:none;' : ''} }
-        .panel-collapse { margin-top: auto; font-size: 11px; color: var(--text-tertiary); cursor: pointer; padding: 8px 12px; }
-
-        .panel-main { padding: 20px 24px; max-width: 1400px; width: 100%; }
-        .panel-preview-banner { background: var(--status-warn-soft); border: 1px solid var(--status-warn-edge); color: var(--status-warn); padding: 8px 14px; border-radius: 10px; font-size: 12px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-      `}</style>
-
-      <div className="panel-shell">
-        {/* Topbar */}
-        <div className="panel-topbar">
-          <span className="panel-brand"><span className="panel-brand-dot" />ID·PANEL</span>
-          {currentWs && (
-            <span className="panel-ws-pill">
-              <b>{currentWs.name ?? 'Workspace'}</b>
-              <span style={{ opacity: 0.6 }}>·</span>
-              <span>{role}</span>
-            </span>
-          )}
-          <div className="panel-user">
-            {isPreview && <span className="panel-chip panel-chip--warn">PODGLĄD</span>}
-            <span>
-              <b>{user?.firstName} {user?.lastName}</b>
-            </span>
-          </div>
+    <div className="id-panel" data-theme={resolved}>
+      <header className="ip-topbar">
+        <div className="ip-topbar__brand">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--ip-blue-hi)' }} />
+            <circle cx="12" cy="12" r="4" fill="currentColor" style={{ color: 'var(--ip-blue)' }} />
+          </svg>
+          ID·PANEL
+          <span style={{ color: 'var(--ip-text-3)', fontWeight: 400 }}>/ {currentWs?.name ?? '—'}</span>
         </div>
 
-        {/* Sidebar */}
-        <aside className="panel-sidebar">
-          <nav className="panel-nav">
-            {NAV.filter(n => !n.capability || can(n.capability)).map(item => (
+        <nav className="ip-topbar__nav">
+          {NAV.filter(n => !n.capability || can(n.capability)).map(item => {
+            const Icon = item.icon;
+            return (
               <NavLink
                 key={item.to}
                 to={item.to}
                 end={item.to === '/panel'}
-                className={({ isActive }) => `panel-nav-item ${isActive ? 'active' : ''}`}
+                className={({ isActive }) => `ip-topbar__link${isActive ? ' ip-topbar__link--active' : ''}`}
               >
-                <span className="panel-nav-icon">{item.icon}</span>
-                <span className="panel-nav-label">{item.label}</span>
+                <Icon size={14} strokeWidth={2} />
+                <span>{item.label}</span>
               </NavLink>
-            ))}
-          </nav>
-          <div
-            className="panel-collapse"
-            onClick={() => setCollapsed(c => !c)}
-            title={collapsed ? 'Rozwiń' : 'Zwiń'}
-          >
-            {collapsed ? '→' : '← Zwiń'}
-          </div>
-        </aside>
+            );
+          })}
+        </nav>
 
-        {/* Main */}
-        <main className="panel-main" key={location.pathname}>
+        <div className="ip-topbar__actions">
           {isPreview && (
-            <div className="panel-preview-banner">
-              Widzisz panel oczami innego użytkownika (podgląd operatora).
-            </div>
+            <span className="ip-chip ip-chip--warn">Podgląd</span>
           )}
-          <Outlet />
-        </main>
-      </div>
+          <div className="ip-theme-toggle" role="group" aria-label="Motyw">
+            <button aria-pressed={mode === 'light'} onClick={() => setMode('light')} title="Jasny"><Sun size={13} strokeWidth={2} /></button>
+            <button aria-pressed={mode === 'auto'}  onClick={() => setMode('auto')}  title="Auto"><Monitor size={13} strokeWidth={2} /></button>
+            <button aria-pressed={mode === 'dark'}  onClick={() => setMode('dark')}  title="Ciemny"><Moon size={13} strokeWidth={2} /></button>
+          </div>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '3px 10px 3px 3px', background: 'var(--ip-bg-3)', border: '1px solid var(--ip-border)', borderRadius: 'var(--ip-r-full)' }}>
+            <div style={{
+              width: 26, height: 26, borderRadius: '50%',
+              background: 'var(--ip-blue)', color: '#fff',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 10, fontWeight: 700, fontFamily: 'var(--ip-font-mono)',
+              boxShadow: '0 2px 6px rgba(59,130,246,0.35)',
+            }}>{initials.toUpperCase() || '—'}</div>
+            <span style={{ fontSize: 12, color: 'var(--ip-text-2)' }}>
+              <span style={{ color: 'var(--ip-text)', fontWeight: 600 }}>{user?.firstName || '—'}</span>
+              <span style={{ color: 'var(--ip-text-3)', marginLeft: 6 }}>· {roleLabel}</span>
+            </span>
+          </div>
+        </div>
+      </header>
+
+      <main className="ip-main">
+        <Outlet />
+      </main>
     </div>
   );
 }

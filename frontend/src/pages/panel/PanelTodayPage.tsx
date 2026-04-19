@@ -1,55 +1,83 @@
 /**
- * PanelTodayPage — flagship "Dziś" page for ID Panel.
+ * PanelTodayPage v3 — COCKPIT REBUILD.
  *
- * Phase 2 v2:
- *   - Premium canvas Puls Firmy (icosahedron + hex grid + shield + HUD)
- *   - Hero layout with greeting + CTA buttons
- *   - 4 tiles (tickets/devices/alerts/billing)
- *   - IDO orb card + quick actions
- *   - Activity timeline
- * Data: /api/panel/{pulse,tiles,activity} refreshed every 30s.
+ * Layout: 2-col grid (Control | Intelligence) + bottom 3-col (Devices, Activity, Security).
+ * No gradients, no decorative blobs. Dense, command-center dense.
  */
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { useRole } from '../../components/panel/RoleGate';
 import { useAuth } from '../../store/authStore';
-import { panelApi, PanelPulse, PanelTiles, PanelActivityItem } from '../../api/panel';
-import { PulsFirmyCanvas } from '../../components/panel/PulsFirmyCanvas';
+import { panelApi, type PanelPulse, type PanelTiles, type PanelActivityItem } from '../../api/panel';
+import { devicesApi } from '../../api/devices';
+import apiClient from '../../api/client';
+import { IdCore, idCoreMessage, type IdCoreStatus } from '../../components/panel/IdCore';
+import { Ticket, MonitorUp, AlertOctagon, Zap, Activity, ShieldCheck, ChevronRight } from 'lucide-react';
 
-function formatRelative(iso: string): string {
-  const d = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
-  if (d < 60) return `${d}s`;
-  if (d < 3600) return `${Math.round(d / 60)}m`;
-  if (d < 86400) return `${Math.round(d / 3600)}h`;
-  return `${Math.round(d / 86400)}d`;
+interface MiniDevice { id: string; name: string; status: string }
+interface MiniAlert { id: string; severity: string; message: string; agent?: { hostname?: string } | null }
+
+const fmt = (iso?: string) => {
+  if (!iso) return '—';
+  const s = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.round(s / 60)}m`;
+  if (s < 86400) return `${Math.round(s / 3600)}h`;
+  return `${Math.round(s / 86400)}d`;
+};
+
+function mapStatus(state: 'ok' | 'warn' | 'alert' | undefined, loading: boolean): IdCoreStatus {
+  if (loading) return 'offline';
+  if (state === 'alert') return 'critical';
+  if (state === 'warn')  return 'warning';
+  return 'ok';
 }
 
-function formatPLN(n: number): string {
-  return new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN', maximumFractionDigits: 0 }).format(n);
+function devStatusClass(s: string): string {
+  if (s === 'ACTIVE') return 'ok';
+  if (s === 'IN_SERVICE') return 'warn';
+  if (s === 'BROKEN') return 'bad';
+  return 'gray';
+}
+
+function devStatusLabel(s: string): string {
+  const m: Record<string, string> = { ACTIVE: 'Online', INACTIVE: 'Offline', IN_SERVICE: 'Serwis', BROKEN: 'Uszkodzone', RETIRED: 'Wycofane' };
+  return m[s] ?? s;
 }
 
 export default function PanelTodayPage() {
-  const { role, isOwner, isAdmin } = useRole();
   const { user } = useAuth();
 
   const [pulse, setPulse] = React.useState<PanelPulse | null>(null);
   const [tiles, setTiles] = React.useState<PanelTiles | null>(null);
   const [activity, setActivity] = React.useState<PanelActivityItem[]>([]);
+  const [devices, setDevices] = React.useState<MiniDevice[]>([]);
+  const [alerts, setAlerts] = React.useState<MiniAlert[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [err, setErr] = React.useState<string | null>(null);
+  const [lastUpdate, setLastUpdate] = React.useState<Date | null>(null);
+  const [aiActive, setAiActive] = React.useState(false);
 
   const load = React.useCallback(async () => {
+    /* AI active flash — during each refresh pulse the core indicates activity */
+    setAiActive(true);
     try {
-      const [p, t, a] = await Promise.all([
-        panelApi.getPulse(),
-        panelApi.getTiles(),
-        panelApi.getActivity(12),
+      const [p, t, a, d, al] = await Promise.all([
+        panelApi.getPulse().catch(() => null),
+        panelApi.getTiles().catch(() => null),
+        panelApi.getActivity(6).catch(() => ({ items: [] })),
+        devicesApi.getAll().catch(() => []) as Promise<MiniDevice[]>,
+        apiClient.get<MiniAlert[]>('/monitoring/alerts').then(r => r.data).catch(() => []),
       ]);
-      setPulse(p); setTiles(t); setActivity(a.items); setErr(null);
-    } catch (e: any) {
-      setErr(e?.response?.data?.message || e?.message || 'Nie udało się pobrać danych');
-    } finally { setLoading(false); }
+      if (p) setPulse(p);
+      if (t) setTiles(t);
+      setActivity(a.items ?? []);
+      setDevices(d ?? []);
+      setAlerts(al ?? []);
+      setLastUpdate(new Date());
+    } finally {
+      setLoading(false);
+      setTimeout(() => setAiActive(false), 1200);
+    }
   }, []);
 
   React.useEffect(() => {
@@ -57,6 +85,12 @@ export default function PanelTodayPage() {
     const id = window.setInterval(load, 30_000);
     return () => window.clearInterval(id);
   }, [load]);
+
+  const status = mapStatus(pulse?.state, loading);
+  const message = idCoreMessage(status, aiActive);
+  const devicesOnline = devices.filter(d => d.status === 'ACTIVE').length;
+  const devicesTotal = devices.length;
+  const activeAlerts = alerts.length;
 
   const hello = React.useMemo(() => {
     const h = new Date().getHours();
@@ -66,242 +100,194 @@ export default function PanelTodayPage() {
     return 'Dobry wieczór';
   }, []);
 
-  const dateStr = new Intl.DateTimeFormat('pl-PL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
-
-  /* Map API state → canvas state */
-  const canvasState = pulse?.state === 'alert' ? 'bad' : pulse?.state === 'warn' ? 'warn' : 'ok';
-  const statusText = pulse?.state === 'alert'
-    ? 'Krytyczne zagrożenia — wymagana interwencja'
-    : pulse?.state === 'warn'
-      ? 'Wykryto uwagi — warto sprawdzić alerty'
-      : 'W firmie wszystko działa stabilnie';
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <style>{`
-        .today-hero {
-          position: relative; overflow: hidden;
-          display: grid; grid-template-columns: minmax(320px, 1fr) 1fr; gap: 40px;
-          padding: 48px; align-items: center; min-height: 540px;
-          border-radius: 32px;
-        }
-        .today-hero::after {
-          content: ''; position: absolute; top: 50%; right: -10%;
-          width: 60%; height: 120%;
-          background: radial-gradient(circle, rgba(139,92,246,0.12), transparent 60%);
-          transform: translateY(-50%); filter: blur(40px); pointer-events: none;
-        }
-        @media (max-width: 1024px) { .today-hero { grid-template-columns: 1fr; padding: 32px; min-height: auto; } }
-        .today-hero__left { position: relative; z-index: 1; }
-        .today-hero__date { font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 12px; }
-        .today-hero__title { font-size: clamp(40px, 5.5vw, 72px); font-weight: 900; letter-spacing: -0.055em; line-height: 0.98; color: var(--text-primary); margin-bottom: 16px; }
-        .today-hero__title em { background: var(--brand-gradient-vivid); -webkit-background-clip: text; background-clip: text; color: transparent; font-style: normal; }
-        .today-hero__sub { font-size: 16px; color: var(--text-secondary); margin-bottom: 24px; max-width: 480px; line-height: 1.55; }
-        .today-status {
-          display: inline-flex; align-items: center; gap: 8px;
-          padding: 10px 18px; border-radius: 9999px;
-          font-size: 13px; font-weight: 600;
-          margin-bottom: 28px;
-        }
-        .today-status--ok   { background: rgba(52,211,153,0.14); color: #34D399; border: 1px solid rgba(52,211,153,0.35); }
-        .today-status--warn { background: rgba(251,191,36,0.14); color: #FBBF24; border: 1px solid rgba(251,191,36,0.35); }
-        .today-status--bad  { background: rgba(248,113,113,0.14); color: #F87171; border: 1px solid rgba(248,113,113,0.35); }
-        .today-cta { display: flex; gap: 12px; flex-wrap: wrap; }
-        .today-btn {
-          display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-          height: 52px; padding: 0 28px; border-radius: 16px;
-          font-size: 16px; font-weight: 600; border: none; cursor: pointer; text-decoration: none;
-          transition: all 180ms cubic-bezier(0.22, 0.82, 0.32, 1);
-        }
-        .today-btn--primary {
-          background: var(--brand-gradient-vivid, linear-gradient(135deg, #8B5CF6, #22D3EE));
-          color: #fff;
-          box-shadow: 0 10px 30px rgba(139,92,246,.35), 0 24px 60px rgba(34,211,238,.18), inset 0 1px 0 rgba(255,255,255,.22);
-        }
-        .today-btn--primary:hover { transform: translateY(-2px); filter: brightness(1.1); }
-        .today-btn--secondary {
-          background: var(--glass-bg-hi, rgba(255,255,255,0.06));
-          color: var(--text-primary);
-          border: 1px solid var(--glass-border-hi, rgba(255,255,255,0.14));
-        }
-        .today-btn--secondary:hover { background: var(--glass-bg-vivid, rgba(255,255,255,0.10)); transform: translateY(-1px); }
-        .today-hero__canvas-wrap {
-          display: flex; align-items: center; justify-content: center;
-          aspect-ratio: 1; width: 100%; max-width: 540px; justify-self: center;
-        }
-        .today-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
-        .today-tile { padding: 24px; display: flex; flex-direction: column; gap: 12px; min-height: 150px; }
-        .today-tile__label { font-size: 11px; font-weight: 700; letter-spacing: 0.16em; color: var(--text-tertiary); text-transform: uppercase; }
-        .today-tile__value { font-size: 48px; font-weight: 800; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; color: var(--text-primary); }
-        .today-tile__unit { font-size: 20px; color: var(--text-tertiary); font-weight: 500; margin-left: 4px; }
-        .today-tile__sub { font-size: 12px; color: var(--text-secondary); }
-        .today-bottom { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; }
-        @media (max-width: 1024px) { .today-bottom { grid-template-columns: 1fr; } }
-        .today-timeline { padding: 24px; }
-        .today-timeline__head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-        .today-timeline__title { font-size: 20px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.015em; }
-        .today-timeline__sub { font-size: 13px; color: var(--text-tertiary); margin-top: 3px; }
-        .today-timeline__item { display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--glass-border, rgba(255,255,255,0.08)); }
-        .today-timeline__item:last-child { border-bottom: 0; padding-bottom: 0; }
-        .today-timeline__dot { width: 12px; height: 12px; border-radius: 50%; background: var(--brand-gradient, linear-gradient(135deg, #8B5CF6, #22D3EE)); margin-top: 6px; margin-left: 14px; box-shadow: 0 0 16px rgba(139,92,246,.5); }
-        .today-timeline__content { font-size: 13px; color: var(--text-primary); }
-        .today-timeline__meta { color: var(--text-tertiary); font-size: 11px; margin-top: 3px; }
-        .today-timeline__time { color: var(--text-tertiary); font-size: 11px; white-space: nowrap; font-family: var(--font-mono, ui-monospace, monospace); }
-        .today-ido { padding: 28px; display: flex; flex-direction: column; gap: 20px; min-height: 400px; }
-        .today-ido__orb-wrap { display: flex; justify-content: center; margin-top: 8px; }
-        .today-ido__orb {
-          width: 96px; height: 96px; border-radius: 50%;
-          background:
-            radial-gradient(circle at 35% 30%, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 35%),
-            radial-gradient(circle at 50% 50%, #A78BFA 0%, #8B5CF6 40%, #22D3EE 100%);
-          box-shadow: 0 0 50px rgba(139,92,246,.55), 0 0 120px rgba(34,211,238,.28), inset 0 -6px 20px rgba(14,22,40,.35), inset 0 2px 8px rgba(255,255,255,.25);
-          animation: idoOrbPulse 3.5s ease-in-out infinite;
-        }
-        @keyframes idoOrbPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
-        .today-ido__text { text-align: center; }
-        .today-ido__hello { font-size: 22px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; letter-spacing: -0.015em; }
-        .today-ido__sub { font-size: 13px; color: var(--text-secondary); }
-        .today-ido__quick { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: auto; }
-        .today-ido__quick button {
-          padding: 12px 14px; text-align: left; border-radius: 10px;
-          background: var(--glass-bg, rgba(255,255,255,0.04)); border: 1px solid var(--glass-border, rgba(255,255,255,0.08));
-          color: var(--text-secondary); font-size: 11px; cursor: pointer; font-family: inherit;
-          transition: all 160ms;
-        }
-        .today-ido__quick button:hover { border-color: #22D3EE; color: var(--text-primary); }
-      `}</style>
-
-      {/* HERO */}
-      <div className="panel-glass today-hero">
-        <div className="today-hero__left">
-          <div className="today-hero__date">{dateStr}</div>
-          <h1 className="today-hero__title">
-            <em>{hello}</em>, {user?.firstName || ''}
-          </h1>
-          <p className="today-hero__sub">
-            Panel {role === 'OWNER' ? 'właściciela' : role === 'ADMIN' ? 'administratora' : role === 'TECHNICIAN' ? 'technika' : 'użytkownika'}
-            {pulse && pulse.metrics.totalDevices > 0 ? ` · ${pulse.metrics.totalDevices} urządzeń` : ''}
-          </p>
-          <div className={`today-status today-status--${canvasState}`}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'currentColor' }} />
-            {err ? `Błąd: ${err}` : statusText}
+    <>
+      {/* ═ Cockpit row: Control | Intelligence ═ */}
+      <div className="ip-cockpit">
+        {/* LEFT — Control */}
+        <section className="ip-surface ip-status ip-fade-in">
+          <div className="ip-status__eyebrow">
+            <div className="ip-label">Status systemu</div>
+            <span className={`ip-chip ip-chip--live ip-chip--${status === 'critical' ? 'bad' : status === 'warning' ? 'warn' : status === 'offline' ? 'gray' : 'ok'}`}>
+              <span className="ip-chip__dot" style={{ background: 'currentColor' }} />
+              {status === 'critical' ? 'Critical' : status === 'warning' ? 'Warning' : status === 'offline' ? 'Offline' : 'OK'}
+            </span>
           </div>
-          <div className="today-cta">
-            <Link to="/panel/tickets/new" className="today-btn today-btn--primary">
+
+          <div className="ip-status__msg">
+            <h2>{hello}, {user?.firstName || ''}.</h2>
+            <p>{message}</p>
+          </div>
+
+          <div className="ip-status__metrics">
+            <div className="ip-status__metric">
+              <span className="ip-status__metric-label">Urządzeń</span>
+              <span className="ip-status__metric-value">{devicesTotal}</span>
+              <span className="ip-status__metric-sub">
+                <span style={{ color: 'var(--ip-ok)' }}>● {devicesOnline} online</span>
+                {devicesTotal - devicesOnline > 0 && <span style={{ color: 'var(--ip-text-3)', marginLeft: 6 }}>· {devicesTotal - devicesOnline} offline</span>}
+              </span>
+            </div>
+            <div className="ip-status__metric">
+              <span className="ip-status__metric-label">Zgłoszenia</span>
+              <span className="ip-status__metric-value">{pulse?.metrics.openTickets ?? '—'}</span>
+              <span className="ip-status__metric-sub">
+                {pulse?.metrics.overdueTickets
+                  ? <span style={{ color: 'var(--ip-warn)' }}>▲ {pulse.metrics.overdueTickets} przeterminowane</span>
+                  : 'wszystko w terminie'}
+              </span>
+            </div>
+            <div className="ip-status__metric">
+              <span className="ip-status__metric-label">Alerty</span>
+              <span className="ip-status__metric-value" style={{ color: activeAlerts > 0 ? 'var(--ip-warn)' : undefined }}>{activeAlerts}</span>
+              <span className="ip-status__metric-sub">
+                {activeAlerts === 0 ? 'brak aktywnych' : `${activeAlerts} do sprawdzenia`}
+              </span>
+            </div>
+            <div className="ip-status__metric">
+              <span className="ip-status__metric-label">Ostatnia synchr.</span>
+              <span className="ip-status__metric-value" style={{ fontSize: 14, fontWeight: 500 }}>{fmt(lastUpdate?.toISOString())}</span>
+              <span className="ip-status__metric-sub">odświeża co 30s</span>
+            </div>
+          </div>
+
+          <div className="ip-status__cta">
+            <Link to="/panel/tickets?new=1" className="ip-btn ip-btn--primary ip-btn--lg" style={{ width: '100%' }}>
+              <Ticket size={16} strokeWidth={2.2} />
               Zgłoś problem
             </Link>
-            <Link to="/panel/ido" className="today-btn today-btn--secondary">
+            <Link to="/panel/ido" className="ip-btn ip-btn--secondary" style={{ width: '100%' }}>
+              <Zap size={15} strokeWidth={2} />
               Zapytaj IDO
             </Link>
           </div>
-        </div>
-        <div className="today-hero__canvas-wrap">
-          <PulsFirmyCanvas
-            score={pulse?.score ?? 0}
-            devices={pulse?.metrics.totalDevices ?? 0}
-            alerts={tiles?.securityAlerts.value ?? 0}
-            state={canvasState}
-          />
-        </div>
-      </div>
+        </section>
 
-      {/* TILES */}
-      <div className="today-grid">
-        <div className="panel-glass today-tile">
-          <span className="today-tile__label">Zgłoszenia otwarte</span>
-          <span className="today-tile__value">{loading ? '—' : tiles?.openTickets.value ?? '—'}</span>
-          <span className="today-tile__sub">
-            {pulse?.metrics.overdueTickets
-              ? `${pulse.metrics.overdueTickets} overdue`
-              : 'wszystko w terminie'}
-          </span>
-        </div>
-        <div className="panel-glass today-tile">
-          <span className="today-tile__label">Urządzenia aktywne</span>
-          <span className="today-tile__value">
-            {loading ? '—' : tiles?.devicesOnline.value ?? '—'}
-            {tiles && <span className="today-tile__unit">/ {tiles.devicesOnline.total ?? 0}</span>}
-          </span>
-          <span className="today-tile__sub">{tiles ? `${Math.round((tiles.devicesOnline.value / Math.max(1, tiles.devicesOnline.total ?? 1)) * 100)}% online` : 'ładowanie…'}</span>
-        </div>
-        <div className="panel-glass today-tile">
-          <span className="today-tile__label">Alerty bezpieczeństwa</span>
-          <span className="today-tile__value">{loading ? '—' : tiles?.securityAlerts.value ?? '—'}</span>
-          <span className="today-tile__sub">urządzenia bez aktualizacji &gt;30 dni</span>
-        </div>
-        {(isOwner || isAdmin) && tiles?.billingDue && (
-          <div className="panel-glass today-tile">
-            <span className="today-tile__label">Do zafakturowania</span>
-            <span className="today-tile__value">{formatPLN(tiles.billingDue.value)}</span>
-            <span className="today-tile__sub">zaległe faktury</span>
+        {/* RIGHT — Intelligence */}
+        <section className="ip-surface ip-intel ip-fade-in ip-fade-in-1">
+          <div className="ip-intel__head">
+            <div className="ip-label">ID CORE</div>
+            <span className={`ip-chip ip-chip--${aiActive ? 'blue' : 'gray'} ${aiActive ? 'ip-chip--live' : ''}`}>
+              <span className="ip-chip__dot" style={{ background: 'currentColor' }} />
+              {aiActive ? 'AI Active' : 'AI Idle'}
+            </span>
           </div>
-        )}
-      </div>
 
-      {/* BOTTOM */}
-      <div className="today-bottom">
-        <div className="panel-glass today-timeline">
-          <div className="today-timeline__head">
-            <div>
-              <div className="today-timeline__title">Ostatnie w firmie</div>
-              <div className="today-timeline__sub">Timeline wszystkiego co się zdarzyło</div>
+          <div className="ip-intel__core">
+            <IdCore
+              score={pulse?.score ?? 0}
+              status={status}
+              aiActive={aiActive}
+              alerts={activeAlerts}
+              devicesOnline={devicesOnline}
+              size={340}
+            />
+          </div>
+
+          <div className="ip-intel__footer">
+            <div className="ip-intel__stat">
+              <span className="ip-intel__stat-label">Bezpieczeństwo</span>
+              <span className="ip-intel__stat-value">{pulse?.score ?? '—'}<span style={{ color: 'var(--ip-text-3)', fontSize: 12, fontWeight: 500 }}> /100</span></span>
+            </div>
+            <div className="ip-intel__stat">
+              <span className="ip-intel__stat-label">Urządzenia</span>
+              <span className="ip-intel__stat-value">{devicesOnline}<span style={{ color: 'var(--ip-text-3)', fontSize: 12, fontWeight: 500 }}> /{devicesTotal}</span></span>
+            </div>
+            <div className="ip-intel__stat">
+              <span className="ip-intel__stat-label">Alerty</span>
+              <span className="ip-intel__stat-value" style={{ color: activeAlerts > 0 ? 'var(--ip-warn)' : undefined }}>{activeAlerts}</span>
+            </div>
+            <div className="ip-intel__stat">
+              <span className="ip-intel__stat-label">AI Status</span>
+              <span className="ip-intel__stat-value" style={{ fontSize: 13, fontWeight: 600, color: aiActive ? 'var(--ip-blue-hi)' : 'var(--ip-text-2)' }}>
+                {aiActive ? 'ACTIVE' : 'STANDBY'}
+              </span>
             </div>
           </div>
-          {loading && activity.length === 0 ? (
-            <div className="today-timeline__item">
-              <div className="today-timeline__dot" />
-              <div className="today-timeline__content">Ładowanie ostatnich zdarzeń…</div>
-              <div className="today-timeline__time">—</div>
-            </div>
-          ) : activity.length === 0 ? (
-            <div className="today-timeline__item">
-              <div className="today-timeline__dot" />
-              <div className="today-timeline__content">Brak ostatniej aktywności.</div>
-              <div className="today-timeline__time">—</div>
-            </div>
-          ) : (
-            activity.map((it) => (
-              <div key={it.id} className="today-timeline__item">
-                <div className="today-timeline__dot" />
-                <div>
-                  <div className="today-timeline__content">{it.description}</div>
-                  {it.by && <div className="today-timeline__meta">{it.by}</div>}
+        </section>
+      </div>
+
+      {/* ═ Bottom cockpit: 3 modules ═ */}
+      <div className="ip-bottom">
+        {/* Devices */}
+        <section className="ip-surface ip-module ip-fade-in ip-fade-in-2">
+          <div className="ip-module__head">
+            <span className="ip-module__title"><MonitorUp size={12} style={{ display: 'inline', marginRight: 6 }} /> Urządzenia</span>
+            <Link to="/panel/devices" className="ip-btn ip-btn--ghost ip-btn--sm" style={{ height: 24, padding: '0 8px', fontSize: 11 }}>
+              Wszystkie <ChevronRight size={12} />
+            </Link>
+          </div>
+          <div className="ip-module__body">
+            {devices.length === 0 ? (
+              <div className="ip-empty">Brak urządzeń</div>
+            ) : (
+              devices.slice(0, 6).map(d => (
+                <Link key={d.id} to="/panel/devices" className="ip-row" style={{ textDecoration: 'none', color: 'inherit' }}>
+                  <span className={`ip-row__dot ip-row__dot--${devStatusClass(d.status)}`} />
+                  <span className="ip-row__name">{d.name}</span>
+                  <span className="ip-row__meta">{devStatusLabel(d.status)}</span>
+                </Link>
+              ))
+            )}
+          </div>
+        </section>
+
+        {/* Activity */}
+        <section className="ip-surface ip-module ip-fade-in ip-fade-in-3">
+          <div className="ip-module__head">
+            <span className="ip-module__title"><Activity size={12} style={{ display: 'inline', marginRight: 6 }} /> Aktywność</span>
+            <Link to="/panel/activity" className="ip-btn ip-btn--ghost ip-btn--sm" style={{ height: 24, padding: '0 8px', fontSize: 11 }}>
+              Historia <ChevronRight size={12} />
+            </Link>
+          </div>
+          <div className="ip-module__body">
+            {activity.length === 0 ? (
+              <div className="ip-empty">Brak ostatniej aktywności</div>
+            ) : (
+              activity.slice(0, 6).map(a => (
+                <div key={a.id} className="ip-row" style={{ cursor: 'default' }}>
+                  <span className="ip-row__dot ip-row__dot--blue" />
+                  <span className="ip-row__name" style={{ fontSize: 12, fontWeight: 500 }}>{a.description}</span>
+                  <span className="ip-row__meta">{fmt(a.at)}</span>
                 </div>
-                <div className="today-timeline__time">{formatRelative(it.at)}</div>
-              </div>
-            ))
-          )}
-        </div>
+              ))
+            )}
+          </div>
+        </section>
 
-        <div className="panel-glass today-ido">
-          <div className="today-ido__orb-wrap"><div className="today-ido__orb" /></div>
-          <div className="today-ido__text">
-            <div className="today-ido__hello">Jestem Twoim IDO</div>
-            <div className="today-ido__sub">W czym mogę pomóc?</div>
+        {/* Security */}
+        <section className="ip-surface ip-module ip-fade-in ip-fade-in-4">
+          <div className="ip-module__head">
+            <span className="ip-module__title"><ShieldCheck size={12} style={{ display: 'inline', marginRight: 6 }} /> Bezpieczeństwo</span>
+            <Link to="/panel/security" className="ip-btn ip-btn--ghost ip-btn--sm" style={{ height: 24, padding: '0 8px', fontSize: 11 }}>
+              Wszystkie <ChevronRight size={12} />
+            </Link>
           </div>
-          <div className="today-ido__quick">
-            <button>
-              <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>💾 Miejsce na dysku</div>
-              <div>sprawdź i zwolnij</div>
-            </button>
-            <button>
-              <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>🔄 Aktualizacje</div>
-              <div>status Windows i programów</div>
-            </button>
-            <button>
-              <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>🖨️ Drukarka</div>
-              <div>nie drukuje? przywróć</div>
-            </button>
-            <button>
-              <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>🔐 Nowe hasło</div>
-              <div>wygeneruj i zapisz</div>
-            </button>
+          <div className="ip-module__body">
+            {alerts.length === 0 ? (
+              <div className="ip-empty">
+                <ShieldCheck size={24} style={{ margin: '0 auto 8px', color: 'var(--ip-ok)', display: 'block' }} />
+                Wszystko bezpieczne
+              </div>
+            ) : (
+              alerts.slice(0, 6).map(a => (
+                <Link key={a.id} to="/panel/security" className="ip-row" style={{ textDecoration: 'none', color: 'inherit' }}>
+                  <span className={`ip-row__dot ip-row__dot--${a.severity === 'critical' ? 'bad' : a.severity === 'high' ? 'warn' : 'gray'}`} />
+                  <span className="ip-row__name" style={{ fontSize: 12 }}>
+                    {a.agent?.hostname ? `${a.agent.hostname}: ` : ''}{a.message.slice(0, 40)}
+                  </span>
+                  <span className="ip-row__status" style={{
+                    background: a.severity === 'critical' ? 'var(--ip-bad-soft)' : a.severity === 'high' ? 'var(--ip-warn-soft)' : 'var(--ip-gray-soft)',
+                    color: a.severity === 'critical' ? 'var(--ip-bad)' : a.severity === 'high' ? 'var(--ip-warn)' : 'var(--ip-text-3)',
+                  }}>
+                    {a.severity === 'critical' ? 'Crit' : a.severity === 'high' ? 'High' : a.severity === 'medium' ? 'Med' : 'Low'}
+                  </span>
+                </Link>
+              ))
+            )}
           </div>
-          <Link to="/panel/ido" className="today-btn today-btn--primary" style={{ width: '100%' }}>
-            Napisz do IDO
-          </Link>
-        </div>
+        </section>
       </div>
-    </div>
+    </>
   );
 }
