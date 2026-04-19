@@ -122,6 +122,21 @@ export async function resolveWorkspace(req: Request, _res: Response, next: NextF
         select: { id: true, slug: true, type: true, isActive: true },
       });
       if (ws && ws.isActive) {
+        // SECURITY: jeśli user podał X-Workspace-Id, musi mieć tam active membership
+        // (chyba że superadmin). Zapobiega spoofowaniu workspace przez klienta.
+        if (req.user?.userId && !req.user?.isSuperAdmin) {
+          const hasMembership = await prisma.workspaceMembership.findUnique({
+            where: { userId_workspaceId: { userId: req.user.userId, workspaceId: ws.id } },
+            select: { status: true },
+          });
+          if (!hasMembership || hasMembership.status !== 'ACTIVE') {
+            logWarn(`workspace spoof attempt: user=${req.user.email} ws=${ws.slug} — denied`);
+            // Nie ustawiamy workspace — downstream authorizeWorkspace zwróci 403
+            req.workspace = null;
+            next();
+            return;
+          }
+        }
         workspace = { id: ws.id, slug: ws.slug, type: ws.type, source: 'header' };
         logDebug(`workspace from header: ${ws.slug} (${ws.type})`);
       }
