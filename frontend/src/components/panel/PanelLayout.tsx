@@ -50,9 +50,9 @@ export function PanelLayout() {
         {/* ─── Sidebar ─── */}
         <aside className="ip-sidebar">
           <div className="ip-sidebar__logo" title="InfraDesk by SILERS">
-            <span className="ip-sidebar__logo-mark">ID</span>
             <div className="ip-sidebar__brand-wrap">
-              <span className="ip-sidebar__brand-main">INFRA DESK</span>
+              <img src="/logo-dark.png" alt="InfraDesk" className="ip-sidebar__brand-img ip-sidebar__brand-img--dark" />
+              <img src="/logo.png"      alt="InfraDesk" className="ip-sidebar__brand-img ip-sidebar__brand-img--light" />
               <span className="ip-sidebar__brand-sub">by SILERS</span>
             </div>
           </div>

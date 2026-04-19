@@ -1028,3 +1028,27 @@
   0%, 100% { transform: scale(1); opacity: 0.4; }
   50%      { transform: scale(1.8); opacity: 0.1; }
 }
+
+/* ─── Sidebar brand image (real InfraDesk logo) ─── */
+.id-panel .ip-sidebar__brand-img {
+  height: 28px; width: auto; display: block;
+  transition: filter 240ms var(--ip-ease), transform 240ms var(--ip-ease);
+}
+.id-panel .ip-sidebar__brand-img--light { display: none; }
+.id-panel[data-theme="light"] .ip-sidebar__brand-img--dark,
+[data-theme="light"] .id-panel .ip-sidebar__brand-img--dark { display: none; }
+.id-panel[data-theme="light"] .ip-sidebar__brand-img--light,
+[data-theme="light"] .id-panel .ip-sidebar__brand-img--light { display: block; }
+
+.id-panel .ip-sidebar__logo:hover .ip-sidebar__brand-img {
+  transform: scale(1.02);
+  filter: drop-shadow(0 0 12px rgba(59, 130, 246, 0.45));
+}
+.id-panel[data-theme="light"] .ip-sidebar__logo:hover .ip-sidebar__brand-img,
+[data-theme="light"] .id-panel .ip-sidebar__logo:hover .ip-sidebar__brand-img {
+  filter: drop-shadow(0 2px 6px rgba(37, 99, 235, 0.25));
+}
+
+/* Center "by SILERS" under logo (margin top) */
+.id-panel .ip-sidebar__brand-wrap { gap: 6px; }
+.id-panel .ip-sidebar__brand-sub { margin-top: 2px; padding-left: 2px; }
