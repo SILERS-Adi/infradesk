@@ -17,6 +17,7 @@ import credentialsRoutes from './modules/credentials/credentials.routes';
 import ticketsRoutes from './modules/tickets/tickets.routes';
 import activityLogsRoutes from './modules/activityLogs/activityLogs.routes';
 import dashboardRoutes from './modules/dashboard/dashboard.routes';
+import panelRoutes from './modules/panel/panel.routes';
 import uploadRoutes, { secureFileDownload } from './modules/upload/upload.routes';
 import crmRoutes from './modules/crm/crm.routes';
 import accessTypesRoutes from './modules/accessTypes/accessTypes.routes';
@@ -255,6 +256,7 @@ app.use('/api/auth', authRoutes);
 
 // ── Core (no module guard — always available) ──
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/panel', panelRoutes);                        // ID Panel — nowy UX (obok /portal/*)
 app.use('/api/upload', uploadRoutes);
 app.use('/api/files', secureFileDownload(UPLOADS_DIR)); // Authenticated file download for sensitive attachments
 app.use('/api/notifications', notificationsRouter);
