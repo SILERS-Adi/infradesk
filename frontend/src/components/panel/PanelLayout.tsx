@@ -1,6 +1,6 @@
 /**
- * PanelLayout v4 — sidebar + topbar (wzór: nowypanel.png).
- * Linear/Stripe clean. MSP zablokowany, tylko klienci końcowi.
+ * PanelLayout — using foundation UI primitives.
+ * Source of truth: ../../styles/panel/system.css + ../../ui/primitives.tsx
  */
 
 import React from 'react';
@@ -9,20 +9,22 @@ import { useAuth } from '../../store/authStore';
 import { useWorkspace } from '../../store/workspaceStore';
 import { useTheme } from '../../store/themeStore';
 import { useRole, type Capability } from './RoleGate';
-import { Home, ShieldCheck, MonitorUp, Ticket, KeyRound, Zap, Activity, Receipt, Settings, Phone, Mail, Search, Bell, Sun, Moon, Monitor } from 'lucide-react';
-import '../../styles/panel/index.css';
+import { SearchInput } from '../../ui/primitives';
+import { Home, ShieldCheck, MonitorUp, Ticket, KeyRound, Zap, Activity, Receipt, Phone, Mail, Search, Bell, Sun, Moon, Monitor } from 'lucide-react';
+import '../../styles/panel/system.css';
+import '../../styles/panel/index.css';                                /* legacy pages still use these classes — keep until all migrated */
 
 type NavItem = { to: string; label: string; icon: React.ComponentType<any>; capability?: Capability };
 
-const NAV_MAIN: NavItem[] = [
-  { to: '/panel',          label: 'Panel główny',    icon: Home,        capability: 'view_today' },
-  { to: '/panel/devices',  label: 'Urządzenia',      icon: MonitorUp,   capability: 'view_devices' },
-  { to: '/panel/tickets',  label: 'Zgłoszenia',      icon: Ticket,      capability: 'view_tickets' },
-  { to: '/panel/ido',      label: 'IDO asystent',    icon: Zap,         capability: 'use_ido_chat' },
-  { to: '/panel/activity', label: 'Aktywność',       icon: Activity,    capability: 'view_today' },
-  { to: '/panel/security', label: 'Bezpieczeństwo',  icon: ShieldCheck, capability: 'view_security' },
-  { to: '/panel/vault',    label: 'Hasła',           icon: KeyRound,    capability: 'view_vault' },
-  { to: '/panel/billing',  label: 'Rozliczenia',     icon: Receipt,     capability: 'view_billing' },
+const NAV: NavItem[] = [
+  { to: '/panel',          label: 'Panel główny',   icon: Home,        capability: 'view_today' },
+  { to: '/panel/devices',  label: 'Urządzenia',     icon: MonitorUp,   capability: 'view_devices' },
+  { to: '/panel/tickets',  label: 'Zgłoszenia',     icon: Ticket,      capability: 'view_tickets' },
+  { to: '/panel/ido',      label: 'IDO asystent',   icon: Zap,         capability: 'use_ido_chat' },
+  { to: '/panel/activity', label: 'Aktywność',      icon: Activity,    capability: 'view_today' },
+  { to: '/panel/security', label: 'Bezpieczeństwo', icon: ShieldCheck, capability: 'view_security' },
+  { to: '/panel/vault',    label: 'Hasła',          icon: KeyRound,    capability: 'view_vault' },
+  { to: '/panel/billing',  label: 'Rozliczenia',    icon: Receipt,     capability: 'view_billing' },
 ];
 
 export function PanelLayout() {
@@ -46,26 +48,24 @@ export function PanelLayout() {
 
   return (
     <div className="id-panel" data-theme={resolved}>
-      <div className="ip-shell">
-        {/* ─── Sidebar ─── */}
-        <aside className="ip-sidebar">
-          <div className="ip-sidebar__logo" title="InfraDesk by SILERS">
-            <div className="ip-sidebar__brand-wrap">
-              <img src="/logo.png"      alt="InfraDesk by SILERS" className="ip-sidebar__brand-img ip-sidebar__brand-img--dark" />
-              <img src="/logo-dark.png" alt="InfraDesk by SILERS" className="ip-sidebar__brand-img ip-sidebar__brand-img--light" />
-            </div>
+      <div className="ui-shell">
+        {/* SIDEBAR */}
+        <aside className="ui-sidebar">
+          <div className="ui-sidebar__brand" title="InfraDesk by SILERS">
+            <img src="/logo.png"      alt="InfraDesk by SILERS" className="ui-sidebar__brand-img ui-sidebar__brand-img--dark" />
+            <img src="/logo-dark.png" alt="InfraDesk by SILERS" className="ui-sidebar__brand-img ui-sidebar__brand-img--light" />
           </div>
 
-          <div className="ip-sidebar__section-label">Nawigacja</div>
-          <nav className="ip-sidebar__nav">
-            {NAV_MAIN.filter(n => !n.capability || can(n.capability)).map(item => {
+          <div className="ui-sidebar__section-label">Nawigacja</div>
+          <nav className="ui-nav">
+            {NAV.filter(n => !n.capability || can(n.capability)).map(item => {
               const Icon = item.icon;
               return (
                 <NavLink
                   key={item.to}
                   to={item.to}
                   end={item.to === '/panel'}
-                  className={({ isActive }) => `ip-nav-link${isActive ? ' ip-nav-link--active' : ''}`}
+                  className={({ isActive }) => `ui-nav-link${isActive ? ' ui-nav-link--active' : ''}`}
                 >
                   <Icon size={16} strokeWidth={2} />
                   {item.label}
@@ -74,50 +74,40 @@ export function PanelLayout() {
             })}
           </nav>
 
-          <div className="ip-sidebar__contact">
-            <div className="ip-sidebar__contact-label">Kontakt z IT</div>
-            <div className="ip-sidebar__contact-name">SILERS — Opieka IT</div>
-            <div className="ip-sidebar__contact-line">
-              <Phone size={12} strokeWidth={2} />
-              +48 604 292 831
-            </div>
-            <div className="ip-sidebar__contact-line">
-              <Mail size={12} strokeWidth={2} />
-              biuro@silers.pl
-            </div>
+          <div className="ui-sidebar__contact">
+            <div className="ui-sidebar__contact-label">Kontakt z IT</div>
+            <div className="ui-sidebar__contact-name">SILERS — Opieka IT</div>
+            <div className="ui-sidebar__contact-line"><Phone size={12} strokeWidth={2} /> +48 604 292 831</div>
+            <div className="ui-sidebar__contact-line"><Mail size={12} strokeWidth={2} /> biuro@silers.pl</div>
           </div>
         </aside>
 
-        {/* ─── Main column ─── */}
+        {/* MAIN */}
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-          <header className="ip-topbar">
-            <div className="ip-topbar__greet">
-              <div className="ip-topbar__hello">{hello}, {user?.firstName || ''}</div>
-              <div className="ip-topbar__sub">
+          <header className="ui-topbar">
+            <div className="ui-topbar__greet">
+              <div className="ui-topbar__hello">{hello}, {user?.firstName || ''}</div>
+              <div className="ui-topbar__sub">
                 Przeglądasz: <strong style={{ color: 'var(--ip-text-2)', fontWeight: 600 }}>{currentWs?.name ?? '—'}</strong>
               </div>
             </div>
 
-            <div className="ip-topbar__actions">
-              <div className="ip-search">
-                <Search size={14} strokeWidth={2} />
-                <input placeholder="Szukaj…" />
-                <span className="ip-search__kbd">⌘K</span>
-              </div>
-              <div className="ip-theme-mini">
+            <div className="ui-topbar__actions">
+              <SearchInput placeholder="Szukaj…" kbd="⌘K" icon={<Search size={14} strokeWidth={2} />} />
+              <div className="ui-theme-toggle" role="group" aria-label="Motyw">
                 <button aria-pressed={mode === 'light'} onClick={() => setMode('light')} title="Jasny"><Sun size={13} /></button>
                 <button aria-pressed={mode === 'auto'}  onClick={() => setMode('auto')}  title="Auto"><Monitor size={13} /></button>
                 <button aria-pressed={mode === 'dark'}  onClick={() => setMode('dark')}  title="Ciemny"><Moon size={13} /></button>
               </div>
-              <button className="ip-iconbtn" aria-label="Powiadomienia" title="Powiadomienia">
+              <button className="ui-iconbtn" aria-label="Powiadomienia">
                 <Bell size={15} strokeWidth={2} />
-                <span className="ip-iconbtn__badge" />
+                <span className="ui-iconbtn__badge" />
               </button>
-              <div className="ip-avatar" title={`${user?.firstName} ${user?.lastName} · ${roleLabel}`}>{initials}</div>
+              <div className="ui-avatar" title={`${user?.firstName} ${user?.lastName} · ${roleLabel}`}>{initials}</div>
             </div>
           </header>
 
-          <main className="ip-main">
+          <main className="ui-main">
             <Outlet />
           </main>
         </div>
