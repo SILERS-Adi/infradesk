@@ -1,19 +1,18 @@
 /**
- * PanelVaultPage — workspace credentials (hasła) with reveal + copy.
- * Data: /api/credentials (workspace-scoped, TECHNICIAN+ access).
+ * PanelVaultPage — migrated to primitives.
  */
 
 import React from 'react';
 import { credentialsApi } from '../../api/credentials';
 import type { Credential } from '../../types';
 import toast from 'react-hot-toast';
-import { Lock, Eye, EyeOff, Copy, Search, Key, User as UserIcon, Globe } from 'lucide-react';
+import { Search, Eye, EyeOff, Copy, Key, User as UserIcon, Globe, Lock } from 'lucide-react';
+import { Card, SectionHeader, SearchInput, EmptyState, IconContainer } from '../../ui/primitives';
 
 const CATEGORY_LABEL: Record<string, string> = {
   WINDOWS: 'Windows', VPN: 'VPN', EMAIL: 'E-mail', APPLICATION: 'Aplikacja',
   DATABASE: 'Baza danych', ROUTER: 'Router', WIFI: 'Wi-Fi', OTHER: 'Inne',
 };
-
 function icon(cat: string) {
   if (cat === 'EMAIL' || cat === 'WEBSITE') return <Globe size={18} />;
   if (cat === 'WIFI') return <Key size={18} />;
@@ -27,12 +26,9 @@ export default function PanelVaultPage() {
   const [search, setSearch] = React.useState('');
   const [revealed, setRevealed] = React.useState<Record<string, string | null>>({});
 
-  const load = React.useCallback(async () => {
-    try { setCreds(await credentialsApi.getAll()); }
-    catch (e: any) { toast.error(e?.response?.data?.message || 'Błąd'); }
-    finally { setLoading(false); }
+  React.useEffect(() => {
+    credentialsApi.getAll().then(d => { setCreds(d); setLoading(false); }).catch(e => { toast.error(e?.response?.data?.message || 'Błąd'); setLoading(false); });
   }, []);
-  React.useEffect(() => { load(); }, [load]);
 
   const filtered = React.useMemo(() => {
     if (!search.trim()) return creds;
@@ -40,7 +36,7 @@ export default function PanelVaultPage() {
     return creds.filter(c =>
       c.name?.toLowerCase().includes(q) ||
       c.username?.toLowerCase().includes(q) ||
-      (c as any).urlOrHost?.toLowerCase().includes(q)
+      (c as any).urlOrHost?.toLowerCase().includes(q),
     );
   }, [creds, search]);
 
@@ -49,7 +45,7 @@ export default function PanelVaultPage() {
     try {
       const { password } = await credentialsApi.reveal(c.id);
       setRevealed(s => ({ ...s, [c.id]: password }));
-      setTimeout(() => setRevealed(s => ({ ...s, [c.id]: null })), 30_000); // auto-hide after 30s
+      setTimeout(() => setRevealed(s => ({ ...s, [c.id]: null })), 30_000);
     } catch (e: any) { toast.error(e?.response?.data?.message || 'Nie udało się odkryć hasła'); }
   };
 
@@ -59,87 +55,78 @@ export default function PanelVaultPage() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <style>{`
-        .vt-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; padding: 8px 4px; flex-wrap: wrap; }
-        .vt-title { font-size: clamp(28px, 4vw, 40px); font-weight: 800; letter-spacing: -0.025em; }
-        .vt-sub { color: var(--text-secondary); font-size: 14px; margin-top: 6px; }
-        .vt-search { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 10px; min-width: 280px; }
-        .vt-search input { background: none; border: none; outline: none; color: var(--text-primary); font-size: 14px; flex: 1; font-family: inherit; }
-        .vt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
-        .vt-card { padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
-        .vt-card__head { display: flex; align-items: center; gap: 12px; }
-        .vt-card__icon { width: 36px; height: 36px; border-radius: 10px; background: var(--brand-gradient-soft, rgba(139,92,246,0.12)); display: flex; align-items: center; justify-content: center; color: #A78BFA; flex-shrink: 0; }
-        .vt-card__name { flex: 1; font-size: 14px; font-weight: 600; color: var(--text-primary); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .vt-card__cat { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-tertiary); padding: 3px 8px; border-radius: 6px; background: var(--glass-bg-hi); }
-        .vt-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--glass-bg); border-radius: 8px; border: 1px solid var(--glass-border); font-family: var(--font-mono, monospace); font-size: 12px; }
-        .vt-row__label { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-tertiary); min-width: 56px; font-family: inherit; }
-        .vt-row__value { flex: 1; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .vt-btn { padding: 6px 8px; border-radius: 6px; background: var(--glass-bg-hi); border: 1px solid var(--glass-border); cursor: pointer; color: var(--text-secondary); display: flex; align-items: center; justify-content: center; transition: all 150ms; }
-        .vt-btn:hover { background: var(--glass-bg-vivid); color: var(--text-primary); border-color: #22D3EE; }
-      `}</style>
-
-      <header className="vt-head">
-        <div>
-          <h1 className="vt-title">Hasła</h1>
-          <div className="vt-sub">{creds.length} zapisanych haseł · zaszyfrowane AES-256</div>
-        </div>
-        <div className="vt-search">
-          <Search size={16} style={{ color: 'var(--text-tertiary)' }} />
-          <input placeholder="Szukaj…" value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-      </header>
+    <>
+      <SectionHeader
+        title="Hasła"
+        sub={`${creds.length} zapisanych haseł · zaszyfrowane AES-256`}
+        action={<SearchInput placeholder="Szukaj…" icon={<Search size={14} strokeWidth={2} />} value={search} onChange={e => setSearch(e.target.value)} style={{ minWidth: 280 }} />}
+      />
 
       {loading ? (
-        <div className="panel-glass" style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)' }}>Ładowanie…</div>
+        <Card><EmptyState icon={<Key size={28} />} title="Ładowanie…" /></Card>
       ) : filtered.length === 0 ? (
-        <div className="panel-glass" style={{ padding: 60, textAlign: 'center' }}>
-          <Key size={32} style={{ color: 'var(--text-tertiary)', margin: '0 auto 12px' }} />
-          <div style={{ fontSize: 16, fontWeight: 600 }}>{search ? 'Brak wyników' : 'Brak zapisanych haseł'}</div>
-        </div>
+        <Card>
+          <EmptyState
+            icon={<Key size={28} strokeWidth={1.8} />}
+            title={search ? 'Brak wyników' : 'Brak zapisanych haseł'}
+            sub={search ? 'Nic nie pasuje do filtra' : 'Hasła pojawią się tu po dodaniu przez IT'}
+          />
+        </Card>
       ) : (
-        <div className="vt-grid">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
           {filtered.map(c => {
             const pw = revealed[c.id];
             return (
-              <div key={c.id} className="panel-glass vt-card">
-                <div className="vt-card__head">
-                  <div className="vt-card__icon">{icon((c as any).category ?? 'OTHER')}</div>
-                  <div className="vt-card__name">{c.name}</div>
-                  <span className="vt-card__cat">{CATEGORY_LABEL[(c as any).category] ?? 'Inne'}</span>
-                </div>
-                {c.username && (
-                  <div className="vt-row">
-                    <span className="vt-row__label">Login</span>
-                    <span className="vt-row__value">{c.username}</span>
-                    <button className="vt-btn" onClick={() => copy(c.username!, 'login')}><Copy size={12} /></button>
+              <Card key={c.id} size="md">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 12, borderBottom: 'var(--ip-border)', marginBottom: 12 }}>
+                  <IconContainer size="sm" tone="violet">{icon((c as any).category ?? 'OTHER')}</IconContainer>
+                  <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: 'var(--ip-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {c.name}
                   </div>
-                )}
-                <div className="vt-row">
-                  <span className="vt-row__label">Hasło</span>
-                  <span className="vt-row__value" style={{ letterSpacing: pw ? 0 : '0.15em' }}>
-                    {pw || '••••••••••••'}
+                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ip-text-3)', padding: '3px 8px', borderRadius: 6, background: 'var(--ip-surface-hi)', fontFamily: 'var(--ip-font-mono)' }}>
+                    {CATEGORY_LABEL[(c as any).category] ?? 'Inne'}
                   </span>
-                  <button className="vt-btn" onClick={() => toggleReveal(c)} title={pw ? 'Ukryj' : 'Pokaż'}>
-                    {pw ? <EyeOff size={12} /> : <Eye size={12} />}
-                  </button>
-                  {pw && <button className="vt-btn" onClick={() => copy(pw, 'hasło')} title="Kopiuj"><Copy size={12} /></button>}
                 </div>
-                {(c as any).urlOrHost && (
-                  <div className="vt-row">
-                    <span className="vt-row__label">Host</span>
-                    <span className="vt-row__value">{(c as any).urlOrHost}</span>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {c.username && <VaultRow label="LOGIN" value={c.username} onCopy={() => copy(c.username!, 'login')} />}
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'var(--ip-surface-tile)', borderRadius: 8, border: 'var(--ip-border)', fontFamily: 'var(--ip-font-mono)', fontSize: 12 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ip-text-3)', minWidth: 56, fontFamily: 'inherit' }}>HASŁO</span>
+                    <span style={{ flex: 1, color: 'var(--ip-text)', letterSpacing: pw ? 0 : '0.15em' }}>{pw || '••••••••••••'}</span>
+                    <button onClick={() => toggleReveal(c)} title={pw ? 'Ukryj' : 'Pokaż'} className="ui-iconbtn" style={{ width: 28, height: 28 }}>
+                      {pw ? <EyeOff size={12} /> : <Eye size={12} />}
+                    </button>
+                    {pw && (
+                      <button onClick={() => copy(pw, 'hasło')} title="Kopiuj" className="ui-iconbtn" style={{ width: 28, height: 28 }}>
+                        <Copy size={12} />
+                      </button>
+                    )}
                   </div>
-                )}
-                {(c as any).notes && (
-                  <div style={{ fontSize: 12, color: 'var(--text-tertiary)', fontFamily: 'inherit', padding: '4px 2px' }}>
-                    {(c as any).notes}
-                  </div>
-                )}
-              </div>
+
+                  {(c as any).urlOrHost && <VaultRow label="HOST" value={(c as any).urlOrHost} />}
+                  {(c as any).notes && (
+                    <div style={{ fontSize: 12, color: 'var(--ip-text-3)', padding: '4px 2px' }}>
+                      {(c as any).notes}
+                    </div>
+                  )}
+                </div>
+              </Card>
             );
           })}
         </div>
+      )}
+    </>
+  );
+}
+
+function VaultRow({ label, value, onCopy }: { label: string; value: string; onCopy?: () => void }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'var(--ip-surface-tile)', borderRadius: 8, border: 'var(--ip-border)', fontFamily: 'var(--ip-font-mono)', fontSize: 12 }}>
+      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ip-text-3)', minWidth: 56, fontFamily: 'inherit' }}>{label}</span>
+      <span style={{ flex: 1, color: 'var(--ip-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
+      {onCopy && (
+        <button onClick={onCopy} className="ui-iconbtn" style={{ width: 28, height: 28 }}><Copy size={12} /></button>
       )}
     </div>
   );
