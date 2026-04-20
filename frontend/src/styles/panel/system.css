@@ -777,3 +777,188 @@
 .id-panel ::-webkit-scrollbar-track { background: transparent; }
 .id-panel ::-webkit-scrollbar-thumb { background: var(--ip-border-hi); border-radius: var(--ip-r-full); }
 .id-panel ::-webkit-scrollbar-thumb:hover { background: var(--ip-blue); }
+/* ═══════════════════════════════════════════════════════════════════
+   ID PANEL — EXACT SPEC PATCH
+   No interpretation. Values below match the brief verbatim.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ─ 1 · IDO AVATAR — prosty elegancki orb ───────────────────────── */
+
+.id-panel .ui-ido {
+  position: relative;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #7dd3fc, #6366f1 60%, #1e3a8a);
+  box-shadow:
+    0 0 20px rgba(99, 102, 241, 0.25),
+    inset 0 0 10px rgba(255, 255, 255, 0.2);
+  animation: ui-ido-beat 3s ease-in-out infinite;
+}
+
+/* Remove old 4-layer sub-elements (outer-glow, inner-light, grain, core) */
+.id-panel .ui-ido__outer-glow,
+.id-panel .ui-ido__core,
+.id-panel .ui-ido__inner-light,
+.id-panel .ui-ido__grain {
+  display: none;
+}
+
+@keyframes ui-ido-beat {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.03); }
+}
+
+/* ─ 2 · CARDS — GLOBAL GLASS MATERIAL ──────────────────────────── */
+
+/* Single authoritative rule for every card type */
+.id-panel .ui-card,
+.id-panel .ip-card,
+.id-panel .panel-glass,
+.id-panel .dev-card,
+.id-panel .tk-item,
+.id-panel .alert-card,
+.id-panel .vt-card,
+.id-panel .sec-sum-tile,
+.id-panel .bill-sum-tile,
+.id-panel .bill-month,
+.id-panel .act-day {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(248, 250, 252, 0.9)) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
+  outline: 1px solid transparent;
+  transition: all 180ms ease !important;
+  color: #0B1220 !important;
+}
+
+/* DARK MODE — parallel glass with inverted tones (preserves glass feel) */
+.id-panel[data-theme="dark"] .ui-card,
+.id-panel[data-theme="dark"] .ip-card,
+.id-panel[data-theme="dark"] .panel-glass,
+.id-panel[data-theme="dark"] .dev-card,
+.id-panel[data-theme="dark"] .tk-item,
+.id-panel[data-theme="dark"] .alert-card,
+.id-panel[data-theme="dark"] .vt-card,
+.id-panel[data-theme="dark"] .sec-sum-tile,
+.id-panel[data-theme="dark"] .bill-sum-tile,
+.id-panel[data-theme="dark"] .bill-month,
+.id-panel[data-theme="dark"] .act-day,
+.id-panel:not([data-theme="light"]) .ui-card,
+.id-panel:not([data-theme="light"]) .ip-card,
+.id-panel:not([data-theme="light"]) .panel-glass,
+.id-panel:not([data-theme="light"]) .dev-card,
+.id-panel:not([data-theme="light"]) .tk-item,
+.id-panel:not([data-theme="light"]) .alert-card,
+.id-panel:not([data-theme="light"]) .vt-card,
+.id-panel:not([data-theme="light"]) .sec-sum-tile,
+.id-panel:not([data-theme="light"]) .bill-sum-tile,
+.id-panel:not([data-theme="light"]) .bill-month,
+.id-panel:not([data-theme="light"]) .act-day {
+  background: linear-gradient(180deg, rgba(20, 28, 48, 0.85), rgba(14, 20, 36, 0.85)) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+  color: #E8EBF4 !important;
+}
+
+/* ─ 3 · HOVER — GLOBAL PHYSICS ────────────────────────────────── */
+
+.id-panel .ui-card:hover,
+.id-panel .ip-card:hover,
+.id-panel .panel-glass:hover,
+.id-panel .dev-card:hover,
+.id-panel .tk-item:hover,
+.id-panel .alert-card:hover,
+.id-panel .vt-card:hover,
+.id-panel .sec-sum-tile:hover,
+.id-panel .bill-sum-tile:hover {
+  transform: translateY(-4px) scale(1.02) !important;
+  box-shadow:
+    0 25px 60px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85) !important;
+  outline: 1px solid rgba(59, 130, 246, 0.25) !important;
+  outline-offset: -1px;
+}
+.id-panel[data-theme="dark"] .ui-card:hover,
+.id-panel[data-theme="dark"] .ip-card:hover,
+.id-panel[data-theme="dark"] .panel-glass:hover,
+.id-panel[data-theme="dark"] .dev-card:hover,
+.id-panel[data-theme="dark"] .tk-item:hover,
+.id-panel[data-theme="dark"] .alert-card:hover,
+.id-panel[data-theme="dark"] .vt-card:hover,
+.id-panel[data-theme="dark"] .sec-sum-tile:hover,
+.id-panel[data-theme="dark"] .bill-sum-tile:hover,
+.id-panel:not([data-theme="light"]) .ui-card:hover,
+.id-panel:not([data-theme="light"]) .ip-card:hover,
+.id-panel:not([data-theme="light"]) .panel-glass:hover,
+.id-panel:not([data-theme="light"]) .dev-card:hover,
+.id-panel:not([data-theme="light"]) .tk-item:hover,
+.id-panel:not([data-theme="light"]) .alert-card:hover,
+.id-panel:not([data-theme="light"]) .vt-card:hover,
+.id-panel:not([data-theme="light"]) .sec-sum-tile:hover,
+.id-panel:not([data-theme="light"]) .bill-sum-tile:hover {
+  box-shadow:
+    0 25px 60px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+
+/* ─ 4 · STATUS AKTYWNE — green dot pulse + soft badge ─────────── */
+
+.id-panel .ui-badge--ok {
+  background: rgba(34, 197, 94, 0.1) !important;
+  color: #16A34A !important;
+  border-color: rgba(34, 197, 94, 0.35) !important;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.25) !important;
+}
+.id-panel[data-theme="dark"] .ui-badge--ok,
+.id-panel:not([data-theme="light"]) .ui-badge--ok {
+  color: #34D399 !important;
+}
+.id-panel .ui-badge--ok .ui-badge__dot {
+  background: #22C55E !important;
+  box-shadow: 0 0 6px #22C55E;
+}
+.id-panel .ui-badge--ok.ui-badge--live .ui-badge__dot::after {
+  background: #22C55E;
+}
+
+/* ─ 5 · DEVICE CARDS — cursor + blue accent glow ──────────────── */
+
+.id-panel .dev-card,
+.id-panel .ui-card--interactive {
+  cursor: pointer !important;
+}
+.id-panel .dev-card:hover,
+.id-panel .ui-card--interactive:hover {
+  outline: 1px solid rgba(59, 130, 246, 0.3) !important;
+  box-shadow:
+    0 25px 60px rgba(0, 0, 0, 0.15),
+    0 0 0 1px rgba(59, 130, 246, 0.1),
+    0 0 24px rgba(59, 130, 246, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85) !important;
+}
+.id-panel[data-theme="dark"] .dev-card:hover,
+.id-panel[data-theme="dark"] .ui-card--interactive:hover,
+.id-panel:not([data-theme="light"]) .dev-card:hover,
+.id-panel:not([data-theme="light"]) .ui-card--interactive:hover {
+  box-shadow:
+    0 25px 60px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(59, 130, 246, 0.18),
+    0 0 32px rgba(59, 130, 246, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+
+/* ─ 6 · ID PANEL BG — light cool base (per earlier spec) ──────── */
+.id-panel[data-theme="light"],
+[data-theme="light"] .id-panel {
+  background: #F4F7FB !important;
+}
+.id-panel[data-theme="dark"],
+.id-panel:not([data-theme="light"]) {
+  background: #0A0F1C !important;
+}
