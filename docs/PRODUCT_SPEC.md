@@ -743,3 +743,211 @@ Używany w:
 **Wersja spec**: 0.1
 **Następna aktualizacja**: po zakończeniu Fazy 1 (backend-v2 scaffold + auth)
 **Kto może aktualizować**: Adrian (owner) → PR z uzasadnieniem, zmiana po akceptacji
+
+---
+
+## 12. GPS / FIELD SERVICE MODULE
+
+### 12.1 Cel
+
+Automatyczne tracking pracy terenowej serwisantów (Mariusz & spółka): kiedy wszedł do klienta, kiedy wyszedł, ile km przejechał, czy jadąc w terenie nie mija otwartego ticketu u sąsiedniego klienta.
+
+### 12.2 Funkcje
+
+1. **Geofence auto-checkin** — mobile app co 30 s (foreground) / 5 min (background) wysyła fixa. Gdy serwisant wejdzie w promień `Location.geofenceRadiusMeters` (default 100 m) na ≥ 2 min → backend tworzy `LocationVisit(checkInMethod=AUTO_GEOFENCE)` i pushuje powiadomienie „Jesteś u [Klient] — rozpocząć sesję?”. Akceptacja → `WorkSession` startuje z `autoStartedByGeofence=true` i stempluje `arrivalGpsLat/Lon`.
+2. **Checkout** — gdy serwisant oddala się > `radius × 1.5` i przez 5 min brak bliskiego fixa → `LocationVisit.checkedOutAt=now()`, prompt „Zakończyć sesję?”.
+3. **Proximity alert (the killer feature)** — gdy serwisant w ruchu (speed > 30 km/h), w godzinach pracy, backend co 60 s zapytuje otwarte tickety w workspace gdzie `Device.Location` ma GPS i dystans < 10 km, a kierunek heading serwisanta trafia w „stożek” 60° wokół wektora do celu → push „Jesteś 7 km od [klient] — ticket T-XXX [priority]. Dojedziesz?”. Akcje: Accept (auto-assign + Google Maps nav) / Later (mute 30 min) / Not me.
+4. **Smart routing morning briefing** — `GET /api/v2/field-service/briefing` zwraca zoptymalizowaną kolejność ticketów na dziś, z ETA i sumą km. AI (Claude Haiku 4.5) bierze pod uwagę priorytet, SLA, lokalizację i dopasowuje trasę.
+
+### 12.3 Dane (Prisma — już w schema.prisma)
+
+- `TechnicianLocationLog` — surowy strumień fixów (retencja 30 dni default, potem tylko agregaty)
+- `LocationVisit` — semantyczne wizyty (jestem/wyszedłem), 1:1 z opcjonalnym `WorkSession`
+- `TechnicianGpsConsent` — preferencje + RODO consent per user (workingHoursStart/End, trackingOnWeekends, retentionDays, batteryThresholdPercent)
+- Pola na `Location`: `geofenceRadiusMeters`, `autoCheckInEnabled`, `requireQrConfirmation`
+- Pola na `WorkSession`: `autoStartedByGeofence`, `arrivalGps*`, `departureGps*`, `distanceTraveledKm`
+
+### 12.4 RODO / compliance
+
+1. Consent screen przy pierwszym uruchomieniu mobile — checkbox „Rozumiem, że pracodawca zobaczy moją lokalizację w godzinach pracy (08–17, Pn–Pt). Dane są trzymane 30 dni i potem anonimizowane. Mogę wyłączyć GPS w każdej chwili (toggle w topbarze)."
+2. Status w topbarze: 🟢 GPS ON / 🔴 GPS OFF / 🟡 Off duty.
+3. `AuditEvent` dla każdego wyświetlenia GPS innej osoby (RODO right-to-know).
+4. Automatyczna anonimizacja po `retentionDays` — zostają tylko `total km`, `avg visit duration`, `visits count` per week.
+5. Off-hours, weekendy, battery < 20% — default OFF (serwisant nie martwi się że nie wróci do domu).
+
+### 12.5 Decyzje do Adriana (przed kodem)
+
+- **Radius default**: 100 m OK dla biur; dla magazynów / małych lokali może być za duży (zostaje per-Location override).
+- **Working hours default 08–17 Pn–Pt**: OK? Dodać „zawsze on-call" dla emergency.
+- **Retention 30 dni**: OK z RODO + miesięczny payroll.
+- **Routing provider**: Google Maps Directions ($200/mies dla 10k requests) vs OSRM self-hosted (darmowe, mniej dokładne) — **rekomendacja: OSRM na start, Google w Enterprise plan**.
+
+---
+
+## 13. AI PIONEER FEATURES — 4 confirmed + 1 deferred
+
+Szczegółowa analiza wykonana 2026-04-20 (patrz conversation log). Z 5 pomysłów Adriana wybrane 4 do MVP rebuild-v2, piąty (Technician Brain Clone) odłożony.
+
+### 13.1 Shadow Mode AI  (priorytet #1 — T7)
+
+Każda decyzja AI (auto-resolve, priority guess, ticket classify) działa w tle i nagrywa do `ShadowDecision` table. Raz w tygodniu raport „gdyby Iris działała autonomicznie, zaoszczędziłbyś X godzin i Y PLN, ale Z decyzji byłoby błędnych". Gdy accuracy > 95 % przez 4 tyg — Adrian może włączyć auto-apply per moduł.
+
+**Schema dodatek (Phase 2):**
+```prisma
+model ShadowDecision {
+  id              String   @id @default(uuid())
+  workspaceId     String
+  feature         String   // "ticket_classify", "auto_resolve", "priority_guess"
+  inputHash       String   // SHA-256 of input context
+  aiOutput        Json
+  humanOutput     Json?    // actual decision taken by human
+  matched         Boolean? // AI == human?
+  estimatedValue  Decimal? @db.Decimal(10, 2)  // PLN saved if auto-applied
+  createdAt       DateTime @default(now())
+  @@index([workspaceId, feature, createdAt(sort: Desc)])
+}
+```
+
+### 13.2 Invisible Time Tracking  (priorytet #2 — T9-T11)
+
+Multi-source signal aggregation (desktop agent active-window, GPS visits, ticket comments, ssh sessions, mail replies) → automatyczna `TimeSlot` z sugestią „30 min u PKS Garwolin na ticket T-1234, 15 min RDP na srv-prod-01". Serwisant zatwierdza 1-klikiem zamiast wypisywać godziny ręcznie.
+
+**Schema dodatek (Phase 3):**
+```prisma
+model TimeSignal {
+  id            String     @id @default(uuid())
+  workspaceId   String
+  userId        String
+  source        SignalSource  // DESKTOP_AGENT, GPS_VISIT, TICKET_COMMENT, SSH, MAIL
+  startedAt     DateTime
+  endedAt       DateTime?
+  context       Json       // source-specific: process name, ticket id, device id, recipient
+  createdAt     DateTime   @default(now())
+  @@index([workspaceId, userId, startedAt(sort: Desc)])
+}
+
+model TimeSlot {
+  id            String   @id @default(uuid())
+  workspaceId   String
+  userId        String
+  startedAt     DateTime
+  endedAt       DateTime
+  minutes       Int
+  aiGuess       Json     // { ticketId, deviceId, confidence, reasoning }
+  approvedBy    String?  // user who approved
+  approvedAt    DateTime?
+  workSessionId String?  @unique
+  createdAt     DateTime @default(now())
+  @@index([workspaceId, userId, startedAt(sort: Desc)])
+}
+
+enum SignalSource { DESKTOP_AGENT GPS_VISIT TICKET_COMMENT SSH MAIL }
+```
+
+### 13.3 Failure DNA  (priorytet #3 — T12+, Product-Market-Fit feature)
+
+Embedding każdego `ResolvedTicket` → pgvector → HDBSCAN clustering nocą → LLM weryfikuje i etykietuje skupiska → „U 12 klientów mamy powtarzalny problem: router TP-Link resetuje połączenie co 7 dni po aktualizacji firmware 3.19. Propozycja: rollback + upsell nowszego modelu → 18k PLN opportunity". Raport w Insights tab, powiadomienie dla OWNER.
+
+**Schema dodatek (Phase 4):**
+```prisma
+model FailureCluster {
+  id             String   @id @default(uuid())
+  workspaceId    String
+  label          String   // AI-generated: "TP-Link reset after firmware 3.19"
+  description    String   @db.Text
+  ticketCount    Int
+  affectedClients Int
+  opportunityPln Decimal? @db.Decimal(10, 2)
+  status         ClusterStatus  @default(ACTIVE)
+  dismissedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  members        FailureClusterMember[]
+  @@index([workspaceId, status])
+}
+model FailureClusterMember {
+  clusterId  String
+  ticketId   String
+  similarity Float
+  cluster    FailureCluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+  @@id([clusterId, ticketId])
+}
+enum ClusterStatus { ACTIVE DISMISSED RESOLVED }
+```
+
+### 13.4 Client Risk Score  (priorytet #4 — T7, równolegle z Shadow Mode)
+
+Per-klient `ClientRiskScore 0–100` z rozbiciem na komponenty (payment delay, ticket volume spike, SLA breaches, device criticality mismatch, churn signals). Explainability — hover pokazuje „dlaczego 73? → 2× late payment + 3× CRITICAL w ostatnim tygodniu". Alert dla Owner gdy score spada > 15 punktów w 30 dni.
+
+**Schema dodatek (Phase 2):**
+```prisma
+model ClientRiskScore {
+  id               String   @id @default(uuid())
+  workspaceId      String   // MSP workspace
+  clientWorkspaceId String  // scored client
+  score            Int      // 0–100
+  trend7d          Int      // delta vs 7 days ago
+  components       Json     // { payment: 20, tickets: 15, sla: 8, churn: 30, ... }
+  factors          Json     // human-readable explanations
+  computedAt       DateTime @default(now())
+  @@unique([workspaceId, clientWorkspaceId, computedAt])
+  @@index([workspaceId, score])
+}
+```
+
+### 13.5 DEFERRED: Technician Brain Clone
+
+Pomysł — system uczy się stylu serwisanta (język, kolejność diagnostyki, preferowane narzędzia) i klonuje go na innych. **Odrzucono w pełnej formie** ze względu na RODO (personality profiling pracownika), poor ROI (trudno rozróżnić „styl" od przypadkowej wariancji), i trudności z walidacją.  Pozostawiono jako opcjonalne Level 1: „pisz raporty w stylu X" — włączane świadomie per user.
+
+---
+
+## 14. ID CORE — BACKBONE v2 (nie bridge jak v1)
+
+W v1 ID CORE był zewnętrznym projektem (`/home/adrian/idcore`), wołanym przez backend InfraDesk przez HTTP API. W v2 **ID CORE jest fundamentem, nie nadbudową**.
+
+### 14.1 Architektura
+
+```
+          ┌─────────────────────────────────────────┐
+          │     Frontend (ID PANEL + mobile)        │
+          └──────┬───────────────────────────┬──────┘
+                 │                           │
+       ┌─────────▼──────────┐   ┌────────────▼────────────┐
+       │  Public API        │   │  ID CORE Agent API      │
+       │  /api/v2/*         │   │  /api/v2/ido/*          │
+       └─────────┬──────────┘   └────────────┬────────────┘
+                 │                           │
+       ┌─────────▼───────────────────────────▼────────────┐
+       │            DOMAIN MODULES                        │
+       │  tickets, devices, sessions, vault, crm,         │
+       │  orders, monitoring, agents, mail, gps, kb       │
+       └─────────┬─────────────────────────────────┬──────┘
+                 │                                 │
+       ┌─────────▼──────────┐          ┌───────────▼────────┐
+       │  Prisma + pgvector │          │  ID CORE Core      │
+       │  Postgres 14+      │          │  ─ RAG memory      │
+       │  Redis (BullMQ)    │          │  ─ Tool catalog    │
+       └────────────────────┘          │  ─ Cost tracking   │
+                                       │  ─ Shadow mode     │
+                                       │  ─ Digital twin    │
+                                       └────────────────────┘
+```
+
+### 14.2 Kluczowe komponenty ID CORE (in-process w backend-v2)
+
+- **Multi-tenant RAG memory** — `VectorEmbedding(workspaceId, entityType, entityId, embedding vector(1536))`. Per-tenant isolation by RLS + `workspaceId` filter.
+- **Tool catalog** — każde wywołanie Claude Tools jest RBAC-wrapowane: `canAccess(user, module, action)` sprawdzane przed wykonaniem każdego tool-calla. AI nigdy nie dostaje uprawnień ponad to co user.
+- **Cost tracking** — każdy call do Anthropic zapisuje `LlmUsage(model, inputTokens, outputTokens, costPln, feature)` — OWNER widzi billing per feature w czasie rzeczywistym.
+- **Shadow mode** — per-feature flag w `WorkspaceAiConfig`. Decyzje AI nagrywane do `ShadowDecision` do weryfikacji zanim user włączy auto-apply.
+- **Digital twin** — przed destructive actions (np. „zamknij wszystkie tickety statusu X"), AI pokazuje what-if diff („zamknę 47 ticketów, z czego 12 ma otwarte sesje < 1h — zasugeruj wstrzymanie").
+
+### 14.3 Różnica v1 vs v2
+
+| Aspekt               | v1 (bridge)                     | v2 (backbone)                                |
+|----------------------|----------------------------------|----------------------------------------------|
+| Deployment           | Osobny proces (idcore:PORT)      | In-process w backend-v2 (`src/modules/ai`)   |
+| Memory               | Globalna                         | Per-tenant z RLS                             |
+| Tool security        | Manualne (trust the prompt)      | RBAC-wrapped (każdy tool sprawdza canAccess) |
+| Cost visibility      | Logi, nie widoczne dla klienta   | LlmUsage → Billing tab live                  |
+| Shadow mode          | Brak                             | Built-in dla każdego feature                 |
+| Rollout              | Deploy całej monolity            | Feature flags per feature per workspace      |

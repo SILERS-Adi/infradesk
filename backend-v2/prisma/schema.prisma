@@ -12,7 +12,8 @@
 // Last updated: 2026-04-21
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
@@ -72,6 +73,9 @@ model User {
   credentialViews  CredentialViewLog[]
   passwordResets   PasswordResetToken[]
   refreshTokens    RefreshToken[]
+  gpsConsent       TechnicianGpsConsent?
+  locationLogs     TechnicianLocationLog[]
+  locationVisits   LocationVisit[]
 
   @@index([email])
   @@index([isSuperAdmin])
@@ -163,6 +167,9 @@ model Workspace {
   auditEvents   AuditEvent[]
   kbArticles    KbArticle[]
   llmUsage      LlmUsage[]
+  locationLogs  TechnicianLocationLog[]
+  locationVisits LocationVisit[]
+  gpsConsents   TechnicianGpsConsent[]
 
   // MSP relations
   asProvider    WorkspaceRelation[] @relation("AsProvider")
@@ -221,9 +228,16 @@ model WorkspaceRelation {
   @@index([clientWorkspaceId])
 }
 
-enum RelationStatus { ACTIVE SUSPENDED TERMINATED }
-enum BillingType { HOURLY SUBSCRIPTION HYBRID }
-
+enum RelationStatus {
+  ACTIVE
+  SUSPENDED
+  TERMINATED
+}
+enum BillingType {
+  HOURLY
+  SUBSCRIPTION
+  HYBRID
+}
 // ═══════════════════════════════════════════════════════════════════════════════
 // PERMISSIONS (jeden model, 3 warstwy: Role → Scope → Overrides)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -266,8 +280,11 @@ enum Scope {
   SCOPED  // ograniczony do AccessGrant resources
 }
 
-enum MembershipStatus { ACTIVE INVITED REVOKED }
-
+enum MembershipStatus {
+  ACTIVE
+  INVITED
+  REVOKED
+}
 // Per-resource access (SCOPED users)
 model AccessGrant {
   id           String       @id @default(uuid())
@@ -283,9 +300,17 @@ model AccessGrant {
   @@index([resourceType, resourceId])
 }
 
-enum ResourceType { DEVICE LOCATION CLIENT_WORKSPACE }
-enum AccessLevel { NONE VIEW EDIT DELETE }
-
+enum ResourceType {
+  DEVICE
+  LOCATION
+  CLIENT_WORKSPACE
+}
+enum AccessLevel {
+  NONE
+  VIEW
+  EDIT
+  DELETE
+}
 // Per-module override (MEMBER default NONE, admin can grant specific module)
 model PermissionOverride {
   id           String       @id @default(uuid())
@@ -319,18 +344,28 @@ model Location {
   gpsLat       Float?
   gpsLon       Float?
 
+  geofenceRadiusMeters  Int       @default(100)
+  autoCheckInEnabled    Boolean   @default(true)
+  requireQrConfirmation Boolean   @default(false)
+
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   deletedAt    DateTime?
 
   workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   devices      Device[]
+  locationVisits LocationVisit[]
 
   @@index([workspaceId])
 }
 
-enum LocationType { OFFICE WAREHOUSE RETAIL HOME_OFFICE OTHER }
-
+enum LocationType {
+  OFFICE
+  WAREHOUSE
+  RETAIL
+  HOME_OFFICE
+  OTHER
+}
 model Device {
   id            String          @id @default(uuid())
   workspaceId   String
@@ -395,12 +430,29 @@ model Device {
 }
 
 enum DeviceCategory {
-  WORKSTATION SERVER ROUTER SWITCH FIREWALL
-  PRINTER SCANNER CCTV PHONE IOT OTHER
+  WORKSTATION
+  SERVER
+  ROUTER
+  SWITCH
+  FIREWALL
+  PRINTER
+  SCANNER
+  CCTV
+  PHONE
+  IOT
+  OTHER
 }
-enum Criticality  { LOW MEDIUM HIGH CRITICAL }
-enum DeviceStatus { ACTIVE INACTIVE DECOMMISSIONED }
-
+enum Criticality {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+enum DeviceStatus {
+  ACTIVE
+  INACTIVE
+  DECOMMISSIONED
+}
 // ═══════════════════════════════════════════════════════════════════════════════
 // AGENTS (Desktop Asystent Business)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -459,8 +511,12 @@ model AgentRegistration {
   @@index([lastSeen])
 }
 
-enum AgentStatus { PENDING ACTIVE REJECTED INACTIVE }
-
+enum AgentStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+  INACTIVE
+}
 // ═══════════════════════════════════════════════════════════════════════════════
 // TICKETS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -547,8 +603,12 @@ enum TicketStatus {
   CANCELLED    // cancelled (by client or tech)
 }
 
-enum TicketPriority { LOW MEDIUM HIGH CRITICAL }
-
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
 enum TicketType {
   INCIDENT   // something broken
   REQUEST    // new thing / change
@@ -568,8 +628,10 @@ enum TicketSource {
   API          // external integration
 }
 
-enum ServiceMode { REMOTE ONSITE }
-
+enum ServiceMode {
+  REMOTE
+  ONSITE
+}
 model TicketComment {
   id         String   @id @default(uuid())
   ticketId   String
@@ -650,18 +712,31 @@ model WorkSession {
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
+  autoStartedByGeofence Boolean   @default(false)
+  arrivalGpsLat         Float?
+  arrivalGpsLon         Float?
+  arrivalAccuracy       Float?
+  departureGpsLat       Float?
+  departureGpsLon       Float?
+  distanceTraveledKm    Float?
+
   workspace       Workspace       @relation(fields: [workspaceId], references: [id])
   technician      User            @relation(fields: [technicianId], references: [id])
+  device          Device?         @relation(fields: [deviceId], references: [id])
   timeEntries     SessionTimeEntry[]
   ticketLinks     TicketSessionLink[]
+  locationVisit   LocationVisit?  @relation("WorkSessionVisit")
 
   @@index([workspaceId, technicianId])
   @@index([status])
   @@index([startedAt])
 }
 
-enum SessionStatus { ACTIVE PAUSED COMPLETED }
-
+enum SessionStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
 model SessionTimeEntry {
   id              String       @id @default(uuid())
   workSessionId   String
@@ -717,8 +792,13 @@ model MonitoringAlert {
   @@index([severity, resolved])
 }
 
-enum AlertSeverity { INFO LOW MEDIUM HIGH CRITICAL }
-
+enum AlertSeverity {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
 // ═══════════════════════════════════════════════════════════════════════════════
 // VAULT (encrypted credentials)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -760,10 +840,18 @@ model Credential {
 }
 
 enum CredentialCategory {
-  WINDOWS VPN EMAIL APPLICATION DATABASE
-  ROUTER WIFI SSH API_KEY CERTIFICATE OTHER
+  WINDOWS
+  VPN
+  EMAIL
+  APPLICATION
+  DATABASE
+  ROUTER
+  WIFI
+  SSH
+  API_KEY
+  CERTIFICATE
+  OTHER
 }
-
 model CredentialViewLog {
   id           String     @id @default(uuid())
   credentialId String
@@ -850,7 +938,6 @@ enum OrderStatus {
   INVOICED
   CANCELLED
 }
-
 model OrderItem {
   id             String   @id @default(uuid())
   orderId        String
@@ -921,7 +1008,12 @@ model Invoice {
   @@index([issueDate])
 }
 
-enum InvoiceType { VAT PROFORMA CORRECTION ADVANCE }
+enum InvoiceType {
+  VAT
+  PROFORMA
+  CORRECTION
+  ADVANCE
+}
 enum InvoiceStatus {
   DRAFT
   ISSUED
@@ -930,7 +1022,6 @@ enum InvoiceStatus {
   OVERDUE
   CANCELLED
 }
-
 model InvoiceItem {
   id        String  @id @default(uuid())
   invoiceId String
@@ -1020,8 +1111,11 @@ model KbArticle {
   @@index([workspaceId, status])
 }
 
-enum KbStatus { PENDING_REVIEW PUBLISHED ARCHIVED }
-
+enum KbStatus {
+  PENDING_REVIEW
+  PUBLISHED
+  ARCHIVED
+}
 // Vector embeddings (for RAG — Copilot drawer, KB search, ticket similarity)
 model VectorEmbedding {
   id           String                      @id @default(uuid())
@@ -1089,4 +1183,89 @@ model NotificationSubscription {
   auth         String
   userAgent    String?
   createdAt    DateTime  @default(now())
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GPS / FIELD SERVICE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model TechnicianLocationLog {
+  id            String         @id @default(uuid())
+  workspaceId   String
+  technicianId  String
+  lat           Float
+  lon           Float
+  accuracy      Float?
+  speed         Float?
+  heading       Float?
+  source        LocationSource
+  recordedAt    DateTime
+  deviceBattery Int?
+  createdAt     DateTime       @default(now())
+
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  technician    User           @relation(fields: [technicianId], references: [id])
+
+  @@index([technicianId, recordedAt(sort: Desc)])
+  @@index([workspaceId, recordedAt(sort: Desc)])
+}
+
+enum LocationSource {
+  GPS
+  NETWORK
+  MANUAL
+  QR_SCAN
+}
+model LocationVisit {
+  id                     String         @id @default(uuid())
+  workspaceId            String
+  technicianId           String
+  locationId             String
+  checkedInAt            DateTime
+  checkedOutAt           DateTime?
+  durationMinutes        Int?
+  checkInMethod          CheckInMethod
+  workSessionId          String?        @unique
+  distanceFromPreviousKm Float?
+  notes                  String?
+  createdAt              DateTime       @default(now())
+
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  technician  User         @relation(fields: [technicianId], references: [id])
+  location    Location     @relation(fields: [locationId], references: [id])
+  workSession WorkSession? @relation("WorkSessionVisit", fields: [workSessionId], references: [id])
+
+  @@index([locationId, checkedInAt])
+  @@index([technicianId, checkedInAt])
+  @@index([workspaceId, checkedInAt(sort: Desc)])
+}
+
+enum CheckInMethod {
+  AUTO_GEOFENCE
+  MANUAL
+  QR_SCAN
+  PHONE_TAP
+}
+model TechnicianGpsConsent {
+  id                        String    @id @default(uuid())
+  userId                    String    @unique
+  workspaceId               String
+  consentGiven              Boolean   @default(false)
+  consentGivenAt            DateTime?
+  consentRevokedAt          DateTime?
+  gpsEnabled                Boolean   @default(false)
+  backgroundTrackingEnabled Boolean   @default(false)
+  proximityAlertsEnabled    Boolean   @default(true)
+  workingHoursStart         String    @default("08:00")
+  workingHoursEnd           String    @default("17:00")
+  trackingOnWeekends        Boolean   @default(false)
+  offDutyActivatedAt        DateTime?
+  retentionDays             Int       @default(30)
+  batteryThresholdPercent   Int       @default(20)
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
