@@ -8,6 +8,7 @@ import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { TicketsPage } from '@/features/tickets/TicketsPage';
 import { TicketDetailPage } from '@/features/tickets/TicketDetailPage';
 import { SessionsPage } from '@/features/sessions/SessionsPage';
+import { TasksPage } from '@/features/tasks/TasksPage';
 import { ComingSoon } from '@/components/ui/ComingSoon';
 
 const queryClient = new QueryClient({
@@ -34,7 +35,7 @@ export default function App() {
             {/* OPERACJE */}
             <Route path="/tickets" element={<TicketsPage />} />
             <Route path="/tickets/:id" element={<TicketDetailPage />} />
-            <Route path="/tasks" element={<ComingSoon title="Zadania" sprint="Sprint 2" />} />
+            <Route path="/tasks" element={<TasksPage />} />
             <Route path="/calendar" element={<ComingSoon title="Kalendarz" sprint="Sprint 2" />} />
             <Route path="/sessions" element={<SessionsPage />} />
             <Route path="/billing" element={<ComingSoon title="Rozliczenia" sprint="Sprint 2" />} />
