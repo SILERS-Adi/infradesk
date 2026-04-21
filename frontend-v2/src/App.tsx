@@ -14,6 +14,8 @@ import { OrdersPage } from '@/features/orders/OrdersPage';
 import { DelegationsPage } from '@/features/delegations/DelegationsPage';
 import { CalendarPage } from '@/features/calendar/CalendarPage';
 import { BillingPage } from '@/features/billing/BillingPage';
+import { ClientsPage } from '@/features/clients/ClientsPage';
+import { ClientDetailPage } from '@/features/clients/ClientDetailPage';
 import { ComingSoon } from '@/components/ui/ComingSoon';
 
 const queryClient = new QueryClient({
@@ -50,8 +52,8 @@ export default function App() {
             <Route path="/portal-settings" element={<ComingSoon title="Portal i obsługa" sprint="Sprint 5" />} />
 
             {/* KLIENCI */}
-            <Route path="/clients" element={<ComingSoon title="Firmy klientów" sprint="Sprint 3" />} />
-            <Route path="/clients/:id" element={<ComingSoon title="Szczegóły klienta" sprint="Sprint 3" />} />
+            <Route path="/clients" element={<ClientsPage />} />
+            <Route path="/clients/:id" element={<ClientDetailPage />} />
             <Route path="/contacts" element={<ComingSoon title="Kontakty" sprint="Sprint 3" />} />
             <Route path="/locations" element={<ComingSoon title="Lokalizacje" sprint="Sprint 3" />} />
             <Route path="/partners" element={<ComingSoon title="Partnerzy IT" sprint="Phase 2 (post-launch)" />} />
