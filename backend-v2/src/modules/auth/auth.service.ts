@@ -402,6 +402,27 @@ export async function disableTwoFactor(userId: string, password: string, code: s
   });
 }
 
+export async function changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, passwordHash: true, tokenVersion: true },
+  });
+  if (!user) throw HttpError.unauthorized('Użytkownik nie znaleziony', 'invalid_credentials');
+  const ok = await verifyPassword(user.passwordHash, currentPassword);
+  if (!ok) throw HttpError.unauthorized('Nieprawidłowe obecne hasło', 'invalid_credentials');
+  validatePasswordStrength(newPassword);
+  const passwordHash = await hashPassword(newPassword);
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash, tokenVersion: { increment: 1 } },
+  });
+  // Revoke all refresh tokens — user must re-login.
+  await prisma.refreshToken.updateMany({
+    where: { userId, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+}
+
 // Email verification
 
 export async function verifyEmail(token: string): Promise<void> {

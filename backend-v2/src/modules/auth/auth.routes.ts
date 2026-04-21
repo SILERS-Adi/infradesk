@@ -1,4 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
+import { z } from 'zod';
 import { config } from '../../config';
 import { loginLimiter, passwordResetLimiter } from '../../middleware/rateLimit';
 import { requireAuth } from '../../middleware/auth';
@@ -75,6 +76,19 @@ router.post('/logout', async (req: Request, res: Response, next: NextFunction) =
 router.post('/logout-everywhere', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     await service.logoutEverywhere(req.auth!.sub);
+    clearRefreshCookie(res);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+router.post('/change-password', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const schema = z.object({
+      currentPassword: z.string().min(1),
+      newPassword: z.string().min(10).max(200),
+    });
+    const input = schema.parse(req.body);
+    await service.changePassword(req.auth!.sub, input.currentPassword, input.newPassword);
     clearRefreshCookie(res);
     res.json({ success: true });
   } catch (err) { next(err); }

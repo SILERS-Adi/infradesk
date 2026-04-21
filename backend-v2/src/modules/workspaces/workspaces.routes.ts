@@ -64,7 +64,22 @@ router.patch(
     try {
       const schema = z.object({
         name: z.string().min(2).max(120).trim().optional(),
-        taxId: z.string().optional(),
+        taxId: z.string().max(50).nullable().optional(),
+        regon: z.string().max(50).nullable().optional(),
+        krs: z.string().max(50).nullable().optional(),
+        logoUrl: z.string().url().max(500).nullable().optional(),
+        primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+        locale: z.string().max(10).optional(),
+        timezone: z.string().max(60).optional(),
+        currency: z.string().length(3).optional(),
+        addressLine1: z.string().max(200).nullable().optional(),
+        addressLine2: z.string().max(200).nullable().optional(),
+        postalCode: z.string().max(20).nullable().optional(),
+        city: z.string().max(120).nullable().optional(),
+        country: z.string().length(2).optional(),
+        email: z.string().email().max(200).nullable().optional(),
+        phone: z.string().max(50).nullable().optional(),
+        website: z.string().url().max(300).nullable().optional(),
       });
       const input = schema.parse(req.body);
       const ws = await prisma.workspace.update({ where: { id: req.workspaceId! }, data: input });

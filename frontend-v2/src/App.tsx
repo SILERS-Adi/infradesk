@@ -24,6 +24,10 @@ import { BackupsPage } from '@/features/backups/BackupsPage';
 import { ActivityLogsPage } from '@/features/activity-logs/ActivityLogsPage';
 import { MonitoringPage } from '@/features/monitoring/MonitoringPage';
 import { VaultPage } from '@/features/vault/VaultPage';
+import { MyCompanyPage } from '@/features/my-company/MyCompanyPage';
+import { UsersPage } from '@/features/users/UsersPage';
+import { PlanAndModulesPage } from '@/features/plan-and-modules/PlanAndModulesPage';
+import { SettingsPage } from '@/features/settings/SettingsPage';
 import { ComingSoon } from '@/components/ui/ComingSoon';
 
 const queryClient = new QueryClient({
@@ -85,10 +89,10 @@ export default function App() {
             <Route path="/ai/usage" element={<ComingSoon title="Koszty AI" sprint="Sprint 4" />} />
 
             {/* MOJA FIRMA */}
-            <Route path="/my-company" element={<ComingSoon title="Moje dane" sprint="Sprint 4" />} />
-            <Route path="/users" element={<ComingSoon title="Użytkownicy" sprint="Sprint 4" />} />
-            <Route path="/plan-and-modules" element={<ComingSoon title="Plan i moduły" sprint="Sprint 4" />} />
-            <Route path="/settings" element={<ComingSoon title="Ustawienia" sprint="Sprint 4" />} />
+            <Route path="/my-company" element={<MyCompanyPage />} />
+            <Route path="/users" element={<UsersPage />} />
+            <Route path="/plan-and-modules" element={<PlanAndModulesPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
