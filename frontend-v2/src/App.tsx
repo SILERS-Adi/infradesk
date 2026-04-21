@@ -6,6 +6,7 @@ import { LoginPage } from '@/features/auth/LoginPage';
 import { AppShell } from '@/components/layout/AppShell';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { TicketsPage } from '@/features/tickets/TicketsPage';
+import { TicketDetailPage } from '@/features/tickets/TicketDetailPage';
 import { ComingSoon } from '@/components/ui/ComingSoon';
 
 const queryClient = new QueryClient({
@@ -31,7 +32,7 @@ export default function App() {
 
             {/* OPERACJE */}
             <Route path="/tickets" element={<TicketsPage />} />
-            <Route path="/tickets/:id" element={<ComingSoon title="Szczegóły zgłoszenia" sprint="Sprint 2" />} />
+            <Route path="/tickets/:id" element={<TicketDetailPage />} />
             <Route path="/tasks" element={<ComingSoon title="Zadania" sprint="Sprint 2" />} />
             <Route path="/calendar" element={<ComingSoon title="Kalendarz" sprint="Sprint 2" />} />
             <Route path="/sessions" element={<ComingSoon title="Sesje pracy" sprint="Sprint 2" />} />
