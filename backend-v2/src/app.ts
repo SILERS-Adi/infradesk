@@ -16,6 +16,7 @@ import usersRouter from './modules/users/users.routes';
 import permissionsRouter from './modules/permissions/permissions.routes';
 import ticketsRouter from './modules/tickets/tickets.routes';
 import tasksRouter from './modules/tasks/tasks.routes';
+import delegationsRouter, { calendarRouter, billingRouter } from './modules/delegations/delegations.routes';
 import devicesRouter from './modules/devices/devices.routes';
 import locationsRouter from './modules/locations/locations.routes';
 import sessionsRouter from './modules/sessions/sessions.routes';
@@ -68,6 +69,9 @@ export function buildApp(): Express {
   app.use('/api/v2/permissions', permissionsRouter);
   app.use('/api/v2/tickets', ticketsRouter);
   app.use('/api/v2/tasks', tasksRouter);
+  app.use('/api/v2/delegations', delegationsRouter);
+  app.use('/api/v2/calendar', calendarRouter);
+  app.use('/api/v2/billing', billingRouter);
   app.use('/api/v2/devices', devicesRouter);
   app.use('/api/v2/locations', locationsRouter);
   app.use('/api/v2/sessions', sessionsRouter);

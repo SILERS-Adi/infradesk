@@ -11,6 +11,9 @@ import { SessionsPage } from '@/features/sessions/SessionsPage';
 import { TasksPage } from '@/features/tasks/TasksPage';
 import { AlertsPage } from '@/features/alerts/AlertsPage';
 import { OrdersPage } from '@/features/orders/OrdersPage';
+import { DelegationsPage } from '@/features/delegations/DelegationsPage';
+import { CalendarPage } from '@/features/calendar/CalendarPage';
+import { BillingPage } from '@/features/billing/BillingPage';
 import { ComingSoon } from '@/components/ui/ComingSoon';
 
 const queryClient = new QueryClient({
@@ -38,12 +41,12 @@ export default function App() {
             <Route path="/tickets" element={<TicketsPage />} />
             <Route path="/tickets/:id" element={<TicketDetailPage />} />
             <Route path="/tasks" element={<TasksPage />} />
-            <Route path="/calendar" element={<ComingSoon title="Kalendarz" sprint="Sprint 2" />} />
+            <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/sessions" element={<SessionsPage />} />
-            <Route path="/billing" element={<ComingSoon title="Rozliczenia" sprint="Sprint 2" />} />
+            <Route path="/billing" element={<BillingPage />} />
             <Route path="/alerts" element={<AlertsPage />} />
             <Route path="/orders" element={<OrdersPage />} />
-            <Route path="/delegations" element={<ComingSoon title="Delegacje" sprint="Sprint 2" />} />
+            <Route path="/delegations" element={<DelegationsPage />} />
             <Route path="/portal-settings" element={<ComingSoon title="Portal i obsługa" sprint="Sprint 5" />} />
 
             {/* KLIENCI */}
