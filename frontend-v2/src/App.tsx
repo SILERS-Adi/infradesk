@@ -9,6 +9,8 @@ import { TicketsPage } from '@/features/tickets/TicketsPage';
 import { TicketDetailPage } from '@/features/tickets/TicketDetailPage';
 import { SessionsPage } from '@/features/sessions/SessionsPage';
 import { TasksPage } from '@/features/tasks/TasksPage';
+import { AlertsPage } from '@/features/alerts/AlertsPage';
+import { OrdersPage } from '@/features/orders/OrdersPage';
 import { ComingSoon } from '@/components/ui/ComingSoon';
 
 const queryClient = new QueryClient({
@@ -39,8 +41,8 @@ export default function App() {
             <Route path="/calendar" element={<ComingSoon title="Kalendarz" sprint="Sprint 2" />} />
             <Route path="/sessions" element={<SessionsPage />} />
             <Route path="/billing" element={<ComingSoon title="Rozliczenia" sprint="Sprint 2" />} />
-            <Route path="/alerts" element={<ComingSoon title="Alerty i asystenci" sprint="Sprint 2" />} />
-            <Route path="/orders" element={<ComingSoon title="Zamówienia klientów" sprint="Sprint 2" />} />
+            <Route path="/alerts" element={<AlertsPage />} />
+            <Route path="/orders" element={<OrdersPage />} />
             <Route path="/delegations" element={<ComingSoon title="Delegacje" sprint="Sprint 2" />} />
             <Route path="/portal-settings" element={<ComingSoon title="Portal i obsługa" sprint="Sprint 5" />} />
 
