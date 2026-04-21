@@ -16,6 +16,11 @@ import ticketsRouter from './modules/tickets/tickets.routes';
 import devicesRouter from './modules/devices/devices.routes';
 import locationsRouter from './modules/locations/locations.routes';
 import sessionsRouter from './modules/sessions/sessions.routes';
+import crmRouter from './modules/crm/crm.routes';
+import ordersRouter from './modules/orders/orders.routes';
+import monitoringRouter from './modules/monitoring/monitoring.routes';
+import vaultRouter from './modules/vault/vault.routes';
+import agentsRouter from './modules/agents/agents.routes';
 
 export function buildApp(): Express {
   const app = express();
@@ -53,6 +58,11 @@ export function buildApp(): Express {
   app.use('/api/v2/devices', devicesRouter);
   app.use('/api/v2/locations', locationsRouter);
   app.use('/api/v2/sessions', sessionsRouter);
+  app.use('/api/v2/contacts', crmRouter);
+  app.use('/api/v2/orders', ordersRouter);
+  app.use('/api/v2/monitoring', monitoringRouter);
+  app.use('/api/v2/vault', vaultRouter);
+  app.use('/api/v2/agents', agentsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
