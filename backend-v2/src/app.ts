@@ -7,6 +7,8 @@ import { config } from './config';
 import { requestId } from './middleware/requestId';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { globalLimiter } from './middleware/rateLimit';
+import { resolveWorkspaceFromHost } from './middleware/resolveWorkspace';
+import publicRouter from './modules/public/public.routes';
 import authRouter from './modules/auth/auth.routes';
 import workspacesRouter from './modules/workspaces/workspaces.routes';
 import membershipsRouter from './modules/memberships/memberships.routes';
@@ -30,11 +32,14 @@ export function buildApp(): Express {
   app.set('trust proxy', 1);
   app.use(requestId);
   app.use(helmet({ contentSecurityPolicy: false }));
+  // CORS: allow explicit origins + wildcard *.infradesk.pl (production subdomains)
+  const WILDCARD_PATTERN = /^https?:\/\/[a-z0-9-]{3,40}\.infradesk\.pl$/;
   app.use(
     cors({
       origin: (origin, cb) => {
         if (!origin) return cb(null, true);
         if (config.corsOrigins.includes(origin)) return cb(null, true);
+        if (WILDCARD_PATTERN.test(origin)) return cb(null, true);
         return cb(new Error('CORS: origin not allowed'));
       },
       credentials: true,
@@ -45,12 +50,16 @@ export function buildApp(): Express {
   app.use(express.urlencoded({ extended: true, limit: '1mb' }));
   app.use(cookieParser());
 
+  // Resolve workspace from Host header — populates req.resolvedWorkspace + req.hostSubdomain
+  app.use(resolveWorkspaceFromHost);
+
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', service: 'infradesk-backend-v2', version: '2.0.0-alpha.1' });
   });
 
   if (!config.isTest) app.use(globalLimiter);
 
+  app.use('/api/v2/public', publicRouter);
   app.use('/api/v2/auth', authRouter);
   app.use('/api/v2/workspaces', workspacesRouter);
   app.use('/api/v2/memberships', membershipsRouter);
