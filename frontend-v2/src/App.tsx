@@ -16,6 +16,8 @@ import { CalendarPage } from '@/features/calendar/CalendarPage';
 import { BillingPage } from '@/features/billing/BillingPage';
 import { ClientsPage } from '@/features/clients/ClientsPage';
 import { ClientDetailPage } from '@/features/clients/ClientDetailPage';
+import { ContactsPage } from '@/features/contacts/ContactsPage';
+import { LocationsPage } from '@/features/locations/LocationsPage';
 import { ComingSoon } from '@/components/ui/ComingSoon';
 
 const queryClient = new QueryClient({
@@ -54,8 +56,8 @@ export default function App() {
             {/* KLIENCI */}
             <Route path="/clients" element={<ClientsPage />} />
             <Route path="/clients/:id" element={<ClientDetailPage />} />
-            <Route path="/contacts" element={<ComingSoon title="Kontakty" sprint="Sprint 3" />} />
-            <Route path="/locations" element={<ComingSoon title="Lokalizacje" sprint="Sprint 3" />} />
+            <Route path="/contacts" element={<ContactsPage />} />
+            <Route path="/locations" element={<LocationsPage />} />
             <Route path="/partners" element={<ComingSoon title="Partnerzy IT" sprint="Phase 2 (post-launch)" />} />
 
             {/* INFRASTRUKTURA */}
