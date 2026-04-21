@@ -12,6 +12,10 @@ import workspacesRouter from './modules/workspaces/workspaces.routes';
 import membershipsRouter from './modules/memberships/memberships.routes';
 import usersRouter from './modules/users/users.routes';
 import permissionsRouter from './modules/permissions/permissions.routes';
+import ticketsRouter from './modules/tickets/tickets.routes';
+import devicesRouter from './modules/devices/devices.routes';
+import locationsRouter from './modules/locations/locations.routes';
+import sessionsRouter from './modules/sessions/sessions.routes';
 
 export function buildApp(): Express {
   const app = express();
@@ -45,6 +49,10 @@ export function buildApp(): Express {
   app.use('/api/v2/memberships', membershipsRouter);
   app.use('/api/v2/users', usersRouter);
   app.use('/api/v2/permissions', permissionsRouter);
+  app.use('/api/v2/tickets', ticketsRouter);
+  app.use('/api/v2/devices', devicesRouter);
+  app.use('/api/v2/locations', locationsRouter);
+  app.use('/api/v2/sessions', sessionsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
