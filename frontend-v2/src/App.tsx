@@ -22,6 +22,8 @@ import { DevicesPage } from '@/features/devices/DevicesPage';
 import { AgentsPage } from '@/features/agents/AgentsPage';
 import { BackupsPage } from '@/features/backups/BackupsPage';
 import { ActivityLogsPage } from '@/features/activity-logs/ActivityLogsPage';
+import { MonitoringPage } from '@/features/monitoring/MonitoringPage';
+import { VaultPage } from '@/features/vault/VaultPage';
 import { ComingSoon } from '@/components/ui/ComingSoon';
 
 const queryClient = new QueryClient({
@@ -67,14 +69,13 @@ export default function App() {
             {/* INFRASTRUKTURA */}
             <Route path="/devices" element={<DevicesPage />} />
             <Route path="/agents" element={<AgentsPage />} />
-            <Route path="/monitoring" element={<ComingSoon title="Audyt i sieć" sprint="Sprint 3" />} />
+            <Route path="/monitoring" element={<MonitoringPage />} />
             <Route path="/backups" element={<BackupsPage />} />
             <Route path="/activity-logs" element={<ActivityLogsPage />} />
 
             {/* VAULT */}
-            <Route path="/vault" element={<ComingSoon title="Sejf haseł — Wszystkie" sprint="Sprint 4" />} />
-            <Route path="/vault/mine" element={<ComingSoon title="Sejf haseł — Moje" sprint="Sprint 4" />} />
-            <Route path="/vault/shared" element={<ComingSoon title="Sejf haseł — Współdzielone" sprint="Sprint 4" />} />
+            <Route path="/vault" element={<VaultPage />} />
+            <Route path="/vault/:scope" element={<VaultPage />} />
 
             {/* AI */}
             <Route path="/ai" element={<ComingSoon title="Czat z Iris" sprint="Sprint 4" />} />
