@@ -21,6 +21,8 @@ import ordersRouter from './modules/orders/orders.routes';
 import monitoringRouter from './modules/monitoring/monitoring.routes';
 import vaultRouter from './modules/vault/vault.routes';
 import agentsRouter from './modules/agents/agents.routes';
+import shadowRouter from './modules/shadow/shadow.routes';
+import riskRouter from './modules/risk/risk.routes';
 
 export function buildApp(): Express {
   const app = express();
@@ -63,6 +65,8 @@ export function buildApp(): Express {
   app.use('/api/v2/monitoring', monitoringRouter);
   app.use('/api/v2/vault', vaultRouter);
   app.use('/api/v2/agents', agentsRouter);
+  app.use('/api/v2/ai/shadow', shadowRouter);
+  app.use('/api/v2/clients/risk', riskRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

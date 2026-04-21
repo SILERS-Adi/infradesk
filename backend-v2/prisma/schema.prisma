@@ -170,6 +170,8 @@ model Workspace {
   locationLogs  TechnicianLocationLog[]
   locationVisits LocationVisit[]
   gpsConsents   TechnicianGpsConsent[]
+  shadowDecisions  ShadowDecision[]
+  clientRiskScores ClientRiskScore[]
 
   // MSP relations
   asProvider    WorkspaceRelation[] @relation("AsProvider")
@@ -1268,4 +1270,46 @@ model TechnicianGpsConsent {
 
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AI PIONEER FEATURES — Phase 2 (Shadow Mode + Client Risk Score)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model ShadowDecision {
+  id             String   @id @default(uuid())
+  workspaceId    String
+  feature        String   // "ticket_classify", "auto_resolve", "priority_guess", "routing", …
+  inputHash      String   // SHA-256 of input context for dedup / linking
+  aiOutput       Json
+  humanOutput    Json?    // actual decision captured later (nullable)
+  matched        Boolean? // aiOutput == humanOutput?
+  estimatedValue Decimal? @db.Decimal(10, 2)   // PLN saved if auto-applied
+  linkedTicketId String?
+  linkedSessionId String?
+  createdAt      DateTime @default(now())
+  decidedAt      DateTime?  // set when humanOutput filled in
+
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, feature, createdAt(sort: Desc)])
+  @@index([workspaceId, matched])
+}
+
+model ClientRiskScore {
+  id                String   @id @default(uuid())
+  workspaceId       String   // MSP scoring
+  clientWorkspaceId String   // scored client workspace
+  score             Int      // 0–100 (100 = highest risk)
+  trend7d           Int      // score - score(7d ago). negative = improving
+  components        Json     // {payment: 20, tickets: 15, sla: 8, churn: 30, devices: 5}
+  factors           Json     // human-readable list: ["2x late payment", "3x CRITICAL tickets last 7d"]
+  computedAt        DateTime @default(now())
+
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, clientWorkspaceId, computedAt])
+  @@index([workspaceId, score])
+  @@index([clientWorkspaceId, computedAt(sort: Desc)])
 }
