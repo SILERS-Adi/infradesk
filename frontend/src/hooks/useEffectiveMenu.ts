@@ -8,6 +8,7 @@ import {
 import { useMenuStore } from '../store/menuStore';
 import { useWorkspaceContext } from './useWorkspaceContext';
 import { useAuth } from '../store/authStore';
+import { useMyPermissions, canSeeModule } from './useMyPermissions';
 
 export interface EffectiveGroup {
   id: string;
@@ -39,6 +40,7 @@ export interface EffectiveItem {
  */
 export function useEffectiveMenu(): EffectiveGroup[] {
   const { isAdmin, hasModule, wsType, wsPlan, features } = useWorkspaceContext();
+  const { data: myPerms } = useMyPermissions();
   const { user } = useAuth();
   const isSuperAdmin = !!user?.isSuperAdmin;
 
@@ -74,6 +76,11 @@ export function useEffectiveMenu(): EffectiveGroup[] {
       if (si.feature && !(features as unknown as Record<string, boolean>)[si.feature]) return false;
       if (si.module && !hasModule(si.module)) return false;
       if (si.adminOnly) return isAdmin;
+      // User-level permission override
+      if (si.module && !canSeeModule(myPerms, si.module)) return false;
+      // Hierarchical permission: <groupId>.<itemId> also acts as an override key
+      // Lets admin block specific items under allowed group (e.g. infrastructure.activity-logs)
+      if (si.groupId && !canSeeModule(myPerms, `${si.groupId}.${itemId}`)) return false;
       return true;
     };
 

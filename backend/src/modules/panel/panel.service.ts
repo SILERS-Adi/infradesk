@@ -99,12 +99,9 @@ export async function getPanelTiles(
     prisma.ticket.count({ where: { ...wf, status: { in: [...OPEN_STATUSES] } } }),
     prisma.device.count({ where: wf }),
     prisma.device.count({ where: { ...wf, status: 'ACTIVE' as any } }),
-    // Security alerts: urządzenia bez aktualizacji >30 dni (heurystyka)
-    prisma.device.count({
-      where: {
-        ...wf,
-        updatedAt: { lt: new Date(now.getTime() - 30 * 24 * 3600 * 1000) },
-      },
+    // Security alerts: realne nierozwiązane MonitoringAlert (spójne z /panel/security)
+    prisma.monitoringAlert.count({
+      where: { ...wf, resolved: false },
     }),
     // Billing: suma do zafakturowania (tylko dla ról co widzą billing)
     (['OWNER', 'ADMIN', 'MSP'].includes(role)

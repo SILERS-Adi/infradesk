@@ -16,7 +16,7 @@ from PIL import Image, ImageGrab, ImageDraw
 # --- Config ---------------------------------------------------------------
 
 APP_NAME    = "Asystent Business"
-APP_VERSION = "3.0.0"
+APP_VERSION = "4.14.4"
 _OLD_INSTALL_DIR = os.path.join(os.environ.get("APPDATA", ""), "InfraDesk")
 INSTALL_DIR = os.path.join(os.environ.get("APPDATA", ""), "SILERS", "Asystent Business")
 INSTALL_EXE = os.path.join(INSTALL_DIR, "Asystent Business.exe")
@@ -797,6 +797,14 @@ def api_post(path, data, token=None):
 def api_get(path, token=None):
     h = {"Authorization": f"Bearer {token}"} if token else {}
     r = requests.get(f"{API_BASE}{path}", headers=h, timeout=10)
+    r.raise_for_status()
+    return r.json()
+
+
+def api_patch(path, data, token=None):
+    h = {"Content-Type": "application/json"}
+    if token: h["Authorization"] = f"Bearer {token}"
+    r = requests.patch(f"{API_BASE}{path}", json=data, headers=h, timeout=15)
     r.raise_for_status()
     return r.json()
 
@@ -2103,6 +2111,41 @@ class BusinessAPI:
         except Exception as e:
             log.debug("get_tickets error: %s", e)
             return []
+
+    def get_ticket_detail(self, ticket_id):
+        """Get full ticket detail incl. comments."""
+        try:
+            return api_get(f"/agent/tickets/{ticket_id}", self.token)
+        except Exception as e:
+            log.debug("get_ticket_detail error: %s", e)
+            return {"error": str(e)}
+
+    def post_ticket_comment(self, ticket_id, comment):
+        """Client adds comment / message to the technician."""
+        try:
+            return api_post(f"/agent/tickets/{ticket_id}/comments", {"comment": comment}, self.token)
+        except Exception as e:
+            log.debug("post_ticket_comment error: %s", e)
+            return {"error": str(e)}
+
+    def cancel_my_ticket(self, ticket_id):
+        """Client cancels own ticket (only NEW/PENDING/ASSIGNED)."""
+        try:
+            return api_post(f"/agent/tickets/{ticket_id}/cancel", {}, self.token)
+        except Exception as e:
+            log.debug("cancel_my_ticket error: %s", e)
+            return {"error": str(e)}
+
+    def edit_my_ticket(self, ticket_id, title, description):
+        """Client edits own ticket title/description (only NEW/PENDING)."""
+        try:
+            payload = {}
+            if title: payload["title"] = title
+            if description: payload["description"] = description
+            return api_patch(f"/agent/tickets/{ticket_id}", payload, self.token)
+        except Exception as e:
+            log.debug("edit_my_ticket error: %s", e)
+            return {"error": str(e)}
 
     def get_contact(self):
         """Get IT support contact info."""

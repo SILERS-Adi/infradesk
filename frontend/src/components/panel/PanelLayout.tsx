@@ -10,7 +10,7 @@ import { useWorkspace } from '../../store/workspaceStore';
 import { useTheme } from '../../store/themeStore';
 import { useRole, type Capability } from './RoleGate';
 import { SearchInput } from '../../ui/primitives';
-import { Home, ShieldCheck, MonitorUp, Ticket, KeyRound, Zap, Activity, Receipt, Phone, Mail, Search, Bell, Sun, Moon, Monitor } from 'lucide-react';
+import { Home, ShieldCheck, MonitorUp, Ticket, KeyRound, Zap, Activity, Receipt, Phone, Mail, Search, Bell, Sun, Moon, Monitor, LogOut } from 'lucide-react';
 import '../../styles/panel/system.css';
 import '../../styles/panel/index.css';                                /* legacy pages still use these classes — keep until all migrated */
 
@@ -30,6 +30,13 @@ const NAV: NavItem[] = [
 export function PanelLayout() {
   const { user } = useAuth();
   if (user?.isSuperAdmin) return <Navigate to="/" replace />;
+
+  const currentWsForGuard = useWorkspace(s => s.current);
+  const wsOrgType: string | undefined = (currentWsForGuard as any)?.orgType;
+  const isMspOrInternal = wsOrgType === 'MSP' || wsOrgType === 'IT_OPERATOR' || wsOrgType === 'INTERNAL_IT';
+  const userRoleForGuard = (currentWsForGuard as any)?.role;
+  const isOperationalRole = ['OWNER','ADMIN','TECHNICIAN'].includes(userRoleForGuard);
+  if (isMspOrInternal && isOperationalRole) return <Navigate to="/dashboard" replace />;
 
   const currentWs = useWorkspace(s => s.current);
   const { resolved, mode, setMode } = useTheme();
@@ -103,7 +110,7 @@ export function PanelLayout() {
                 <Bell size={15} strokeWidth={2} />
                 <span className="ui-iconbtn__badge" />
               </button>
-              <div className="ui-avatar" title={`${user?.firstName} ${user?.lastName} · ${roleLabel}`}>{initials}</div>
+              <UserAvatarMenu user={user} roleLabel={roleLabel} initials={initials} />
             </div>
           </header>
 
@@ -112,6 +119,59 @@ export function PanelLayout() {
           </main>
         </div>
       </div>
+    </div>
+  );
+}
+
+function UserAvatarMenu({ user, roleLabel, initials }: { user: any; roleLabel: string; initials: string }) {
+  const [open, setOpen] = React.useState(false);
+  const { logout } = useAuth();
+  const handleLogout = () => {
+    logout();
+    window.location.href = '/login';
+  };
+  return (
+    <div style={{ position: 'relative' }}>
+      <button
+        className="ui-avatar"
+        title={`${user?.firstName||''} ${user?.lastName||''} · ${roleLabel}`}
+        onClick={() => setOpen(o => !o)}
+        style={{ cursor: 'pointer', background: 'none', border: 'none', padding: 0 }}
+      >
+        {initials}
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 100 }} />
+          <div style={{
+            position: 'absolute', right: 0, top: '110%', zIndex: 101,
+            minWidth: 220, padding: 6, borderRadius: 10,
+            background: 'var(--ip-bg-elev)', border: 'var(--ip-border-hi)',
+            boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
+          }}>
+            <div style={{ padding: '10px 12px', borderBottom: 'var(--ip-border)' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ip-text)' }}>
+                {user?.firstName || ''} {user?.lastName || ''}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--ip-text-3)' }}>{user?.email} · {roleLabel}</div>
+            </div>
+            <button
+              onClick={handleLogout}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                width: '100%', padding: '10px 12px', marginTop: 4,
+                background: 'transparent', border: 'none',
+                color: '#EF4444', cursor: 'pointer', fontSize: 13, fontWeight: 500,
+                borderRadius: 6, textAlign: 'left', fontFamily: 'inherit',
+              }}
+              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.08)'}
+              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'transparent'}
+            >
+              <LogOut size={14} /> Wyloguj
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

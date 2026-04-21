@@ -1,4 +1,4 @@
-const CACHE = 'infradesk-v2';
+const CACHE = 'infradesk-v3';
 
 const PRECACHE = [
   '/',

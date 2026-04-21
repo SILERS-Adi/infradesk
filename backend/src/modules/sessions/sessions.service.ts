@@ -134,7 +134,12 @@ export async function startSession(techId: string, agentRegId: string) {
 
 // ── End session ──────────────────────────────────────────────────────────────
 
-export async function endSession(id: string, techId: string, notes?: string) {
+export async function endSession(
+  id: string,
+  techId: string,
+  notes?: string,
+  closedTicketIds?: string[],
+) {
   const session = await prisma.workSession.findFirst({
     where: { id, techId },
     include: { timeEntries: true },
@@ -163,6 +168,27 @@ export async function endSession(id: string, techId: string, notes?: string) {
     data: { endedAt: now, durationMin: totalWork, notes, status: 'COMPLETED' },
     include: sessionInclude,
   });
+
+  // Bulk close tickets selected in the End Session modal — link them to this session for billing
+  let bulkClosedCount = 0;
+  if (closedTicketIds && closedTicketIds.length > 0) {
+    const sessionRef = notes?.trim() ? ` — ${notes.trim()}` : '';
+    const summary = `Zamknięte przy sesji #${id.slice(0, 8)}${sessionRef}`;
+    const result = await prisma.ticket.updateMany({
+      where: {
+        id: { in: closedTicketIds },
+        workspaceId: session.workspaceId,
+        status: { in: ['NEW', 'PENDING', 'ASSIGNED', 'IN_PROGRESS', 'WAITING_FOR_CLIENT'] as any },
+      },
+      data: {
+        status: 'RESOLVED' as any,
+        resolutionSummary: summary,
+        resolvedAt: now,
+        assignedToUserId: techId,
+      },
+    });
+    bulkClosedCount = result.count;
+  }
 
   // Powiadom klienta
   if (session.ticketId) {

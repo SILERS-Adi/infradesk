@@ -327,6 +327,7 @@ const _businessPages = {
   overview: null, // handled by script.js renderOverview
   ticket: renderTicketPage,
   history: renderHistoryPage,
+  detail: renderTicketDetailPage,
   remote: renderRemotePage,
   backup: typeof renderBackup !== 'undefined' ? renderBackup : null,
   contact: renderContactPage,
@@ -500,10 +501,162 @@ async function renderHistoryPage(root) {
     const col = colors[status] || '#4F8CFF';
     const lab = labels[status] || status;
     const date = t.createdAt ? new Date(t.createdAt).toLocaleDateString('pl') : '';
-    html += '<div class="card fade-up" style="animation-delay:'+(i*0.06)+'s;cursor:default;margin-bottom:6px"><div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:12px;font-weight:600;color:var(--t)">'+(t.title||'Bez tytulu')+'</div><div style="font-size:10px;color:var(--tm);margin-top:2px">#'+(t.number||t.id||'')+' · '+date+'</div></div><span style="font-size:9px;font-weight:600;padding:3px 10px;border-radius:10px;background:'+col+'18;color:'+col+';border:1px solid '+col+'30">'+lab+'</span></div></div>';
+    html += '<div class="card fade-up" style="animation-delay:'+(i*0.06)+'s;cursor:pointer;margin-bottom:6px" onclick="window.openTicketDetail(\''+(t.id||'')+'\')"><div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:12px;font-weight:600;color:var(--t)">'+(t.title||'Bez tytulu')+'</div><div style="font-size:10px;color:var(--tm);margin-top:2px">#'+(t.number||t.id||'')+' · '+date+'</div></div><span style="font-size:9px;font-weight:600;padding:3px 10px;border-radius:10px;background:'+col+'18;color:'+col+';border:1px solid '+col+'30">'+lab+'</span></div></div>';
   });
   list.innerHTML = html;
 }
+
+/* ── PAGE: Ticket Detail ── */
+let _currentTicketId = null;
+
+window.openTicketDetail = function(id) {
+  _currentTicketId = id;
+  window.navigateTo('detail');
+};
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function fmtDateTime(iso) {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString('pl', { dateStyle: 'short', timeStyle: 'short' });
+  } catch { return ''; }
+}
+
+async function renderTicketDetailPage(root) {
+  const id = _currentTicketId;
+  if (!id) { window.navigateTo('history'); return; }
+
+  root.innerHTML = `
+    <div class="content-header">
+      <div class="content-title">
+        <a href="#" onclick="event.preventDefault();window.navigateTo('history')" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none;color:var(--t)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+          Wstecz
+        </a>
+      </div>
+      <div class="content-subtitle">Szczegoly zgloszenia</div>
+    </div>
+    <div id="ticketDetailBody" class="fade-up">
+      <div class="live-status"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg><span>Ladowanie...</span></div>
+    </div>`;
+
+  await loadAndRenderDetail(id);
+}
+
+async function loadAndRenderDetail(id) {
+  const body = document.getElementById('ticketDetailBody');
+  if (!body) return;
+  const t = await py('get_ticket_detail', id);
+  if (!t || t.error) {
+    body.innerHTML = '<div class="page-card"><div class="page-card-body" style="padding:20px;color:var(--tm)">Nie udalo sie pobrac zgloszenia.</div></div>';
+    return;
+  }
+
+  const colors = {OPEN:'#4F8CFF',IN_PROGRESS:'#FB923C',RESOLVED:'#4ADE80',CLOSED:'#6B7280'};
+  const labels = {OPEN:'Otwarte',IN_PROGRESS:'W trakcie',RESOLVED:'Rozwiazane',CLOSED:'Zamkniete'};
+  const col = colors[t.status] || '#4F8CFF';
+  const lab = labels[t.status] || t.status;
+  const raw = (t.rawStatus || '').toUpperCase();
+  const canCancel = ['NEW', 'PENDING', 'ASSIGNED'].includes(raw);
+  const canEdit = ['NEW', 'PENDING'].includes(raw);
+  const assignee = t.assignedTo ? `${t.assignedTo.firstName||''} ${t.assignedTo.lastName||''}`.trim() : '';
+
+  let commentsHtml = '';
+  const comments = Array.isArray(t.comments) ? t.comments : [];
+  if (comments.length === 0) {
+    commentsHtml = '<div style="padding:14px;color:var(--tm);font-size:11px;text-align:center">Brak wiadomosci.</div>';
+  } else {
+    commentsHtml = comments.map(c => {
+      const author = c.user ? `${c.user.firstName||''} ${c.user.lastName||''}`.trim() || (c.user.email||'') : 'Uzytkownik';
+      return `<div style="padding:10px 12px;border-bottom:1px solid var(--border);font-size:11px">
+        <div style="display:flex;justify-content:space-between;color:var(--tm);margin-bottom:4px;font-size:10px">
+          <strong style="color:var(--t)">${escapeHtml(author)}</strong>
+          <span>${fmtDateTime(c.createdAt)}</span>
+        </div>
+        <div style="color:var(--t);white-space:pre-wrap">${escapeHtml(c.comment)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  body.innerHTML = `
+    <div class="page-card" style="margin-bottom:10px">
+      <div class="page-card-body" style="padding:16px">
+        <div style="display:flex;justify-content:space-between;align-items:start;gap:12px">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:10px;color:var(--tm);font-family:monospace">#${escapeHtml(t.number||t.ticketNumber||'')}</div>
+            <div style="font-size:14px;font-weight:700;color:var(--t);margin-top:2px">${escapeHtml(t.title||'')}</div>
+            ${assignee ? `<div style="font-size:10px;color:var(--tm);margin-top:4px">Zajmuje sie: <strong style="color:var(--t)">${escapeHtml(assignee)}</strong></div>` : ''}
+          </div>
+          <span style="font-size:10px;font-weight:600;padding:4px 10px;border-radius:10px;background:${col}18;color:${col};border:1px solid ${col}30;white-space:nowrap">${lab}</span>
+        </div>
+        ${t.description ? `<div style="margin-top:12px;padding:10px;background:var(--hover-bg);border-radius:8px;font-size:11px;color:var(--t);white-space:pre-wrap;max-height:200px;overflow-y:auto">${escapeHtml(t.description)}</div>` : ''}
+        ${t.resolutionSummary ? `<div style="margin-top:10px;padding:10px;background:#4ADE8015;border-radius:8px;font-size:11px;color:var(--t)"><strong>Rozwiazanie:</strong> ${escapeHtml(t.resolutionSummary)}</div>` : ''}
+        ${(canCancel || canEdit) ? `<div style="display:flex;gap:8px;margin-top:12px">
+          ${canEdit ? '<button class="btn" onclick="window.editMyTicket(\''+id+'\',\''+escapeHtml(t.title||'').replace(/\x27/g,"&#39;")+'\',\''+escapeHtml(t.description||'').replace(/\x27/g,"&#39;").replace(/\n/g,"\\n")+'\')" style="flex:1;padding:8px;font-size:11px;background:#4F8CFF;color:#fff;border:none;border-radius:6px;cursor:pointer">Edytuj</button>' : ''}
+          ${canCancel ? '<button class="btn" onclick="window.cancelMyTicket(\''+id+'\')" style="flex:1;padding:8px;font-size:11px;background:#EF4444;color:#fff;border:none;border-radius:6px;cursor:pointer">Anuluj zgloszenie</button>' : ''}
+        </div>` : ''}
+      </div>
+    </div>
+
+    <div class="page-card" style="margin-bottom:10px">
+      <div class="page-card-body" style="padding:0">
+        <div style="padding:10px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--tm);border-bottom:1px solid var(--border)">Wiadomosci</div>
+        <div id="commentsList" style="max-height:260px;overflow-y:auto">${commentsHtml}</div>
+      </div>
+    </div>
+
+    <div class="page-card">
+      <div class="page-card-body" style="padding:12px">
+        <textarea id="newCommentText" placeholder="Napisz wiadomosc do technika..." style="width:100%;min-height:60px;font-size:11px;padding:8px;background:var(--hover-bg);border:1px solid var(--border);border-radius:6px;color:var(--t);font-family:inherit;resize:vertical"></textarea>
+        <button onclick="window.sendCommentNow('${id}')" style="margin-top:8px;padding:8px 16px;font-size:11px;background:#4F8CFF;color:#fff;border:none;border-radius:6px;cursor:pointer;width:100%">Wyslij wiadomosc</button>
+      </div>
+    </div>`;
+}
+
+window.sendCommentNow = async function(id) {
+  const ta = document.getElementById('newCommentText');
+  if (!ta) return;
+  const text = ta.value.trim();
+  if (!text) return;
+  ta.disabled = true;
+  const resp = await py('post_ticket_comment', id, text);
+  if (resp && resp.error) {
+    alert('Nie udalo sie wyslac: ' + resp.error);
+    ta.disabled = false;
+    return;
+  }
+  ta.value = '';
+  ta.disabled = false;
+  await loadAndRenderDetail(id);
+};
+
+window.cancelMyTicket = async function(id) {
+  if (!confirm('Anulowac zgloszenie? Tej operacji nie mozna cofnac.')) return;
+  const resp = await py('cancel_my_ticket', id);
+  if (resp && resp.error) {
+    alert('Nie udalo sie anulowac: ' + resp.error);
+    return;
+  }
+  alert('Zgloszenie anulowane.');
+  window.navigateTo('history');
+};
+
+window.editMyTicket = async function(id, oldTitle, oldDesc) {
+  const newTitle = prompt('Nowy tytul:', oldTitle);
+  if (newTitle === null) return;
+  const newDesc = prompt('Nowy opis:', oldDesc);
+  if (newDesc === null) return;
+  const resp = await py('edit_my_ticket', id, newTitle, newDesc);
+  if (resp && resp.error) {
+    alert('Nie udalo sie zapisac: ' + resp.error);
+    return;
+  }
+  await loadAndRenderDetail(id);
+};
 
 /* ── PAGE: Remote Help — detect all remote programs ── */
 async function renderRemotePage(root) {

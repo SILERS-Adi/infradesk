@@ -6,7 +6,7 @@ import { authenticate } from '../../middleware/auth';
 import { withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
 import { validate } from '../../middleware/validate';
 import {
-  agentAuth, postRegister, postMetrics, postTicket,
+  agentAuth, postRegister, postMetrics, postTicket, getMyAgentTickets, getAgentTicketDetail, postAgentTicketComment, postAgentTicketCancel, patchAgentTicket,
   getRegistrations, getAuditData, postApprove, postApproveNewClient, postPushUpdate, postWindowsUpdate, postRestartService, postSystemReboot, postWakeDevice, deleteReg, getStatus, getConnectPassword,
   getRustdeskPeers, getRustdeskSessions, postRustdeskSync, getRustdeskActiveSessions, postRustdeskSyncSessions,
 } from './agent.controller';
@@ -45,6 +45,11 @@ router.post('/register', agentRegisterLimiter, validate(registerSchema), postReg
 router.get('/status',   agentAuth, getStatus);
 router.post('/metrics', agentAuth, validate(metricsSchema), postMetrics);
 router.post('/ticket',  agentAuth, validate(agentTicketSchema), postTicket);
+router.get('/tickets',   agentAuth, getMyAgentTickets);
+router.get('/tickets/:id',          agentAuth, getAgentTicketDetail);
+router.post('/tickets/:id/comments', agentAuth, postAgentTicketComment);
+router.post('/tickets/:id/cancel',   agentAuth, postAgentTicketCancel);
+router.patch('/tickets/:id',        agentAuth, patchAgentTicket);
 router.post('/upload',  agentAuth, upload.single('file'), (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.file) { res.status(400).json({ error: 'Brak pliku' }); return; }

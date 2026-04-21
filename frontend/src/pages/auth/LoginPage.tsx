@@ -267,12 +267,16 @@ export function LoginPage() {
         return;
       }
 
-      // Determine correct route based on workspace role
+      // Determine correct route — workspace orgType decides main panel, role decides permissions inside it
       const currentWs = myWorkspaces.find((w: any) => w.isDefault) || myWorkspaces[0];
       const userRole = currentWs?.role;
+      const orgType = currentWs?.orgType;
       const isSuperAdmin = response.user?.isSuperAdmin;
-      const isPortalUser = (userRole === 'MEMBER' || userRole === 'VIEWER') && !isSuperAdmin;
-      const defaultRoute = isPortalUser ? '/panel' : '/dashboard';
+      const isMspWorkspace = ['MSP', 'IT_OPERATOR', 'INTERNAL_IT'].includes(orgType);
+      const isOperationalRole = ['OWNER', 'ADMIN', 'TECHNICIAN'].includes(userRole);
+      // Superadmin always sees dashboard. Otherwise: MSP workspace + operational role → /dashboard, else /panel.
+      const defaultRoute = isSuperAdmin || (isMspWorkspace && isOperationalRole) ? '/dashboard' : '/panel';
+      const isPortalUser = defaultRoute === '/panel';
 
       if (isMobile && !isPortalUser) setShowVersionPicker(true);
       else navigate(defaultRoute);

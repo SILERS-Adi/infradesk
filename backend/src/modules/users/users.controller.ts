@@ -36,6 +36,13 @@ export async function postUser(req: Request, res: Response, next: NextFunction):
 
 export async function patchUser(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    // self-or-admin guard — non-admin users can only edit their own profile
+    const isSelf = req.params.id === req.user!.userId;
+    const isAdmin = req.user!.isSuperAdmin || ['OWNER', 'ADMIN'].includes(req.membership?.role || '');
+    if (!isSelf && !isAdmin) {
+      res.status(403).json({ error: 'Możesz edytować tylko swój profil. Zmiany dla innych użytkowników wymagają uprawnień administratora.' });
+      return;
+    }
     const user = await updateUser(req.params.id, req.body, req.user!.userId);
     res.status(200).json(user);
   } catch (err) {

@@ -7,6 +7,7 @@ import path from 'path';
 import fs from 'fs';
 import { config } from './config';
 import { initWebSocket } from './utils/websocket';
+import { withWorkspaceMembership } from './middleware/workspace';
 
 // Route imports
 import authRoutes from './modules/auth/auth.routes';
@@ -71,6 +72,7 @@ import helpdeskSettingsRouter from './modules/helpdesk-settings/helpdesk-setting
 import operatorRouter from './modules/operator/operator.routes';
 import workspaceConfigRouter from './modules/workspace-config/workspace-config.routes';
 import eventsRouter from './modules/events/events.routes';
+import { requireModule } from './middleware/requireModule';
 import slaRouter from './modules/sla/sla.routes';
 
 // Middleware
@@ -265,7 +267,7 @@ app.use('/api/access-types', accessTypesRoutes);
 app.use('/api/geolocation', geolocationRouter);
 
 // ── Permanent sections (always available, no module guard) ──
-app.use('/api/credentials', credentialsRoutes);            // Sejf haseł
+app.use('/api/credentials', authenticate, withWorkspaceMembership, requireModule('vault'), credentialsRoutes);            // Sejf haseł
 app.use('/api/ai', aiRouter);                              // Asystent AI
 app.use('/api/locations', locationsRoutes);                 // Moja firma: Lokalizacje
 app.use('/api/users', usersRoutes);                        // Moja firma: Użytkownicy
@@ -275,7 +277,7 @@ app.use('/api/downloads', downloadsRouter);                // Moja firma: Pobier
 // ── Module: infrastructure ──
 app.use('/api/devices', authenticate, requireModule('infrastructure'), devicesRoutes);
 app.use('/api/agent', agentRoutes);                        // Agent has mixed public+authenticated
-app.use('/api/activity-logs', authenticate, requireModule('infrastructure'), activityLogsRoutes);
+app.use('/api/activity-logs', authenticate, withWorkspaceMembership, requireModule('infrastructure.activity-logs'), activityLogsRoutes);
 // Agent cloud upload — uses agent token, no JWT required (must be before authenticated backup routes)
 import multer from 'multer';
 import path from 'path';
@@ -608,6 +610,32 @@ app.get('/api/workspaces/:id/subscription', authenticate, async (req, res, next)
 // Workspace membership management (Etap 2.3)
 import { resolveWorkspace as _rw, resolveMembership, authorizeWorkspace, withWorkspaceMembership } from './middleware/workspace';
 
+
+// Role-orgType consistency guard — prevents adding MEMBER/VIEWER to MSP workspace or TECHNICIAN/OWNER to client portal
+async function enforceRoleOrgTypeConsistency(workspaceId: string, role: string | undefined) {
+  if (!role) return;
+  const ws = await prisma.workspace.findUnique({
+    where: { id: workspaceId },
+    select: { orgType: true, name: true },
+  });
+  if (!ws) return;
+  const isMspType = ws.orgType === 'MSP' || ws.orgType === 'IT_OPERATOR';
+  const isClientType = ws.orgType === 'CLIENT';
+  const isClientRole = role === 'MEMBER' || role === 'VIEWER';
+  const isOperationalRole = role === 'TECHNICIAN';
+
+  if (isMspType && isClientRole) {
+    const err: any = new Error(`Firma "${ws.name}" jest typu MSP/IT — nie można dodać roli ${role} (to rola klienta). Użyj Administrator lub Technik.`);
+    err.status = 400;
+    throw err;
+  }
+  if (isClientType && isOperationalRole) {
+    const err: any = new Error(`Firma "${ws.name}" jest typu Klient — nie można dodać roli ${role} (to rola MSP). Użyj Administrator klienta lub Pracownik.`);
+    err.status = 400;
+    throw err;
+  }
+}
+
 app.get('/api/workspaces/members', authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), async (req, res, next) => {
   try {
     const wsId = req.workspace?.id;
@@ -652,6 +680,7 @@ app.post('/api/workspaces/members', authenticate, withWorkspaceMembership, autho
     // Determine source
     const source = req.membership?.source === 'DIRECT' ? 'MSP_ASSIGNED' : 'DIRECT';
 
+        await enforceRoleOrgTypeConsistency(req.workspace!.id, role);
     const membership = await prisma.workspaceMembership.create({
       data: {
         userId: user.id,
@@ -715,6 +744,9 @@ app.patch('/api/workspaces/members/:membershipId', authenticate, withWorkspaceMe
     if (role === 'OWNER' && req.membership?.role !== 'OWNER') {
       res.status(403).json({ error: 'Only OWNER can assign OWNER role' }); return;
     }
+
+    // Guard — prevent role that doesn't match workspace orgType
+    await enforceRoleOrgTypeConsistency(req.workspace!.id, role);
 
     const updateData: Record<string, unknown> = {};
     if (role) updateData.role = role;

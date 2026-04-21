@@ -180,7 +180,7 @@ export function WorkspaceMembersPage() {
                     {canManageUsers && (
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => startPreview({
+                          <button type="button" onClick={() => startPreview({
                             userName: `${m.user.firstName} ${m.user.lastName}`,
                             role: m.role,
                             scopeType: m.scopeType,
@@ -189,11 +189,11 @@ export function WorkspaceMembersPage() {
                             style={{ padding: 4, background: 'none', border: 'none', cursor: 'pointer', color: '#FBBF24' }}>
                             <Eye style={{ width: 13, height: 13 }} />
                           </button>
-                          <button onClick={() => setEditTarget(m)} title="Edytuj"
+                          <button type="button" onClick={() => setEditTarget(m)} title="Edytuj"
                             style={{ padding: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--tm)' }}>
                             <Edit2 style={{ width: 13, height: 13 }} />
                           </button>
-                          <button onClick={() => setDeleteTarget(m)} title="Usun"
+                          <button type="button" onClick={() => setDeleteTarget(m)} title="Usun"
                             style={{ padding: 4, background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444' }}>
                             <Trash2 style={{ width: 13, height: 13 }} />
                           </button>
@@ -235,6 +235,10 @@ export function WorkspaceMembersPage() {
 /* ── Member form (add + edit) ────────────────────────────────────── */
 
 function MemberForm({ member, onSuccess }: { member?: WsMember; onSuccess: () => void }) {
+  const { workspace: currentWs } = useWorkspaceContext();
+  const wsOrgType: string | undefined = (currentWs as any)?.orgType;
+  const isClientWs = wsOrgType === 'CLIENT';
+  const isMspWs = wsOrgType === 'MSP' || wsOrgType === 'IT_OPERATOR';
   const isEdit = !!member;
   const { isOwner } = useWorkspaceContext();
   const [email, setEmail] = useState(member?.user.email ?? '');
@@ -259,8 +263,13 @@ function MemberForm({ member, onSuccess }: { member?: WsMember; onSuccess: () =>
   }, [isEdit, member]);
 
   // Legacy compat
-  const role = accountType === 'ADMIN' ? (member?.role === 'OWNER' ? 'OWNER' : 'ADMIN')
-    : accessScope === 'FULL' ? 'TECHNICIAN' : 'MEMBER';
+  const role = accountType === 'ADMIN'
+    ? (member?.role === 'OWNER' ? 'OWNER' : 'ADMIN')
+    : isMspWs
+      ? 'TECHNICIAN'   // In MSP workspace USER is always a technician (SCOPED controls grants, not role)
+      : isClientWs
+        ? 'MEMBER'     // In CLIENT workspace USER is always an employee
+        : (accessScope === 'FULL' ? 'TECHNICIAN' : 'MEMBER');
   const scopeType = member?.scopeType ?? 'FULL';
   const [grantSearch, setGrantSearch] = useState('');
   const [expandedLocs, setExpandedLocs] = useState<Set<string>>(new Set());
@@ -465,8 +474,8 @@ function MemberForm({ member, onSuccess }: { member?: WsMember; onSuccess: () =>
                 background: accountType === 'USER' ? 'rgba(59,130,246,0.08)' : 'transparent',
                 border: `1px solid ${accountType === 'USER' ? '#3B82F6' : 'var(--border)'}`,
               }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: accountType === 'USER' ? '#3B82F6' : 'var(--t)' }}>Użytkownik</div>
-                <div style={{ fontSize: 10, color: 'var(--td)' }}>Dostęp do wybranych modułów wg zakresu</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: accountType === 'USER' ? '#3B82F6' : 'var(--t)' }}>{isMspWs ? "Członek zespołu" : isClientWs ? "Pracownik firmy" : "Użytkownik"}</div>
+                <div style={{ fontSize: 10, color: 'var(--td)' }}>{isMspWs ? "Członek firmy — dostęp do modułów wg zakresu uprawnień (panel /dashboard)" : isClientWs ? "Pracownik firmy — portal klienta, własne zgłoszenia i hasła (/panel)" : "Dostęp do wybranych modułów wg zakresu"}</div>
               </button>
             </div>
           </div>

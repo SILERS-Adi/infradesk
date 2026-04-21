@@ -394,38 +394,17 @@ export async function updateMetrics(token: string, data: MetricsInput) {
 export async function createAgentTicket(token: string, data: AgentTicketInput) {
   const reg = await prisma.agentRegistration.findUnique({
     where: { agentToken: token },
-    include: { device: { select: { locationId: true, workspaceId: true } } },
+    include: { device: { select: { locationId: true } } },
   });
 
-  if (!reg || reg.status !== 'ACTIVE') {
-    throw new AppError('Agent not active', 403);
-  }
-
-  // Canonical workspaceId: device is source of truth if present, else registration
-  const workspaceId = reg.device?.workspaceId ?? reg.workspaceId;
-  if (!workspaceId) {
-    throw new AppError('Agent not linked to any workspace', 403);
-  }
-  // Hard guard: workspace must exist and be active (prevents legacy/deleted ws leakage)
-  const ws = await prisma.workspace.findUnique({
-    where: { id: workspaceId },
-    select: { id: true, isActive: true },
-  });
-  if (!ws?.isActive) {
-    throw new AppError(`Workspace ${workspaceId} not found or inactive — admin must re-approve agent`, 409);
-  }
-  // Drift detection: if reg and device disagree, fix reg to match device (audit trail)
-  if (reg.device && reg.workspaceId !== reg.device.workspaceId) {
-    await prisma.agentRegistration.update({
-      where: { id: reg.id },
-      data: { workspaceId: reg.device.workspaceId },
-    });
+  if (!reg || reg.status !== 'ACTIVE' || !reg.workspaceId) {
+    throw new AppError('Agent not active or not linked to workspace', 403);
   }
 
   // ── Deduplication: skip if an open ticket with the same title exists for this agent ──
   const existingTicket = await prisma.ticket.findFirst({
     where: {
-      workspaceId: workspaceId,
+      workspaceId: reg.workspaceId!,
       deviceId: reg.deviceId ?? undefined,
       source: 'AGENT' as any,
       title: data.title,
@@ -435,42 +414,30 @@ export async function createAgentTicket(token: string, data: AgentTicketInput) {
   });
 
   if (existingTicket) {
-    // Agent re-reports same problem: refresh updatedAt so auto-resolve scheduler knows
-    // the condition is still active. Without this, ticket would look stale and get auto-closed.
-    await prisma.ticket.update({
-      where: { id: existingTicket.id },
-      data: { updatedAt: new Date() },
-    });
     return existingTicket;
   }
 
   let location: { id: string } | null = reg.device?.locationId
     ? { id: reg.device.locationId }
-    : await prisma.location.findFirst({ where: { workspaceId: workspaceId }, select: { id: true } });
+    : await prisma.location.findFirst({ where: { workspaceId: reg.workspaceId! }, select: { id: true } });
 
   if (!location) {
-    throw new AppError(
-      'Workspace ma brak lokalizacji — admin musi utworzyć lokację zanim agent wyśle zgłoszenie',
-      409,
-    );
+    // Brak lokalizacji — utwórz domyślną żeby zgłoszenie mogło powstać
+    const created = await prisma.location.create({
+      data: {
+        workspaceId:  reg.workspaceId!,
+        name:         'Główna siedziba',
+        type:         'OFFICE',
+        addressLine1: '-',
+        postalCode:   '00-000',
+        city:         'Nieznane',
+      },
+    });
+    location = { id: created.id };
   }
 
-  // Dedicated system user authors agent-generated tickets (never a real human —
-  // prevents noise like "ticket created by <random active user>").
-  let systemAuthor = await prisma.user.findUnique({
-    where: { email: 'agent@infradesk.system' },
-    select: { id: true },
-  });
-  if (!systemAuthor) {
-    // Fallback if the system user is missing (shouldn't happen in prod): use the workspace owner.
-    const ownerMembership = await prisma.workspaceMembership.findFirst({
-      where: { workspaceId, role: 'OWNER', status: 'ACTIVE' },
-      select: { userId: true },
-    });
-    if (!ownerMembership) throw new AppError('No system author available for agent ticket', 500);
-    systemAuthor = { id: ownerMembership.userId };
-  }
-  const admin = systemAuthor;
+  const admin = await prisma.user.findFirst({ where: { isActive: true } });
+  if (!admin) throw new AppError('No admin configured', 500);
 
   const count  = await prisma.ticket.count();
   const ticketNumber = `T-${String(count + 1).padStart(4, '0')}`;
@@ -482,7 +449,7 @@ export async function createAgentTicket(token: string, data: AgentTicketInput) {
   const ticket = await prisma.ticket.create({
     data: {
       ticketNumber,
-      workspaceId:     workspaceId,
+      workspaceId:     reg.workspaceId!,
       locationId:      location.id,
       deviceId:        reg.deviceId ?? undefined,
       createdByUserId: admin.id,
@@ -689,225 +656,4 @@ export async function deleteRegistration(id: string, performedByUserId?: string)
       performedByUserId, workspaceId: reg.workspaceId ?? undefined,
     }).catch(() => {});
   }
-}
-
-
-// ── List tickets for this agent's device (desktop tray view) ───────────────
-// Returns a bare array (not { data: [] }) for backwards-compat with 4.14.3 desktop
-// agents that expect a top-level array. Adds `number` alias for `ticketNumber`.
-export async function listMyAgentTickets(token: string) {
-  const reg = await prisma.agentRegistration.findUnique({
-    where: { agentToken: token },
-    select: { id: true, status: true, deviceId: true, workspaceId: true },
-  });
-  if (!reg) throw new AppError('Agent not found', 404);
-  if (reg.status !== 'ACTIVE') throw new AppError('Agent not active', 403);
-  if (!reg.deviceId || !reg.workspaceId) {
-    return [];
-  }
-
-  const tickets = await prisma.ticket.findMany({
-    where: {
-      workspaceId: reg.workspaceId,
-      deviceId: reg.deviceId,
-    },
-    orderBy: { createdAt: 'desc' },
-    take: 50,
-    select: {
-      id: true,
-      ticketNumber: true,
-      title: true,
-      description: true,
-      status: true,
-      priority: true,
-      source: true,
-      createdAt: true,
-      updatedAt: true,
-      resolvedAt: true,
-      resolutionSummary: true,
-      serviceMode: true,
-      assignedTo: {
-        select: { firstName: true, lastName: true, email: true },
-      },
-    },
-  });
-
-  // Normalise: 4.14.3 desktop UI knows OPEN/IN_PROGRESS/RESOLVED/CLOSED.
-  // Map the richer backend statuses onto that reduced set so the Polish
-  // label rendering works. Keep the raw status in `rawStatus` for future UIs.
-  const STATUS_MAP: Record<string, string> = {
-    NEW: 'OPEN',
-    PENDING: 'OPEN',
-    ASSIGNED: 'IN_PROGRESS',
-    IN_PROGRESS: 'IN_PROGRESS',
-    WAITING_FOR_CLIENT: 'IN_PROGRESS',
-    RESOLVED: 'RESOLVED',
-    COMPLETED: 'RESOLVED',
-    CLOSED: 'CLOSED',
-    CANCELLED: 'CLOSED',
-  };
-
-  return tickets.map(t => ({
-    ...t,
-    number: t.ticketNumber,
-    rawStatus: t.status,
-    status: STATUS_MAP[t.status as string] ?? t.status,
-  }));
-}
-
-
-// ── Detail for one ticket (with comments) ────────────────────────────────
-export async function getMyAgentTicketDetail(token: string, ticketId: string) {
-  const reg = await prisma.agentRegistration.findUnique({
-    where: { agentToken: token },
-    select: { id: true, status: true, deviceId: true, workspaceId: true },
-  });
-  if (!reg) throw new AppError('Agent not found', 404);
-  if (reg.status !== 'ACTIVE') throw new AppError('Agent not active', 403);
-  if (!reg.deviceId || !reg.workspaceId) throw new AppError('Agent has no device linked', 404);
-
-  const t = await prisma.ticket.findFirst({
-    where: {
-      id: ticketId,
-      deviceId: reg.deviceId,
-      workspaceId: reg.workspaceId,
-    },
-    select: {
-      id: true, ticketNumber: true, title: true, description: true,
-      status: true, priority: true, source: true, serviceMode: true,
-      createdAt: true, updatedAt: true, resolvedAt: true, resolutionSummary: true,
-      assignedTo: { select: { firstName: true, lastName: true, email: true } },
-      comments: {
-        where: { isInternal: false },
-        orderBy: { createdAt: 'asc' },
-        select: {
-          id: true, comment: true, createdAt: true,
-          user: { select: { id: true, firstName: true, lastName: true, email: true } },
-        },
-      },
-    },
-  });
-  if (!t) throw new AppError('Ticket not found', 404);
-
-  const STATUS_MAP: Record<string, string> = {
-    NEW: 'OPEN', PENDING: 'OPEN', ASSIGNED: 'IN_PROGRESS',
-    IN_PROGRESS: 'IN_PROGRESS', WAITING_FOR_CLIENT: 'IN_PROGRESS',
-    RESOLVED: 'RESOLVED', COMPLETED: 'RESOLVED',
-    CLOSED: 'CLOSED', CANCELLED: 'CLOSED',
-  };
-
-  return {
-    ...t,
-    number: t.ticketNumber,
-    rawStatus: t.status,
-    status: STATUS_MAP[t.status as string] ?? t.status,
-  };
-}
-
-// ── Agent adds comment on their own ticket ────────────────────────────────
-export async function addAgentTicketComment(token: string, ticketId: string, comment: string) {
-  if (!comment?.trim()) throw new AppError('Komentarz nie może być pusty', 400);
-
-  const reg = await prisma.agentRegistration.findUnique({
-    where: { agentToken: token },
-    select: { id: true, status: true, deviceId: true, workspaceId: true, contactEmail: true, hostname: true },
-  });
-  if (!reg) throw new AppError('Agent not found', 404);
-  if (reg.status !== 'ACTIVE') throw new AppError('Agent not active', 403);
-  if (!reg.deviceId || !reg.workspaceId) throw new AppError('Agent has no device linked', 404);
-
-  const t = await prisma.ticket.findFirst({
-    where: { id: ticketId, deviceId: reg.deviceId, workspaceId: reg.workspaceId },
-    select: { id: true },
-  });
-  if (!t) throw new AppError('Ticket not found', 404);
-
-  // Resolve author: prefer contactEmail lookup, fallback to system user
-  let authorId: string | null = null;
-  if (reg.contactEmail) {
-    const u = await prisma.user.findUnique({ where: { email: reg.contactEmail }, select: { id: true } });
-    if (u) authorId = u.id;
-  }
-  if (!authorId) {
-    const sys = await prisma.user.findUnique({ where: { email: 'agent@infradesk.system' }, select: { id: true } });
-    if (!sys) throw new AppError('No author available', 500);
-    authorId = sys.id;
-  }
-
-  const prefix = reg.hostname ? `[z komputera ${reg.hostname}] ` : '';
-  const created = await prisma.ticketComment.create({
-    data: {
-      ticketId: t.id,
-      userId: authorId,
-      comment: `${prefix}${comment.trim()}`,
-      isInternal: false,
-    },
-    select: {
-      id: true, comment: true, createdAt: true,
-      user: { select: { id: true, firstName: true, lastName: true, email: true } },
-    },
-  });
-
-  return created;
-}
-
-// ── Agent cancels their own ticket (only before IN_PROGRESS) ──────────────
-export async function cancelAgentTicket(token: string, ticketId: string) {
-  const reg = await prisma.agentRegistration.findUnique({
-    where: { agentToken: token },
-    select: { id: true, status: true, deviceId: true, workspaceId: true },
-  });
-  if (!reg) throw new AppError('Agent not found', 404);
-  if (reg.status !== 'ACTIVE') throw new AppError('Agent not active', 403);
-  if (!reg.deviceId || !reg.workspaceId) throw new AppError('Agent has no device linked', 404);
-
-  const t = await prisma.ticket.findFirst({
-    where: { id: ticketId, deviceId: reg.deviceId, workspaceId: reg.workspaceId },
-    select: { id: true, status: true },
-  });
-  if (!t) throw new AppError('Ticket not found', 404);
-
-  const cancellable: any[] = ['NEW', 'PENDING', 'ASSIGNED'];
-  if (!cancellable.includes(t.status)) {
-    throw new AppError('Zgłoszenie już w realizacji — nie można anulować. Napisz wiadomość do technika.', 409);
-  }
-
-  return prisma.ticket.update({
-    where: { id: t.id },
-    data: { status: 'CANCELLED' as any, resolvedAt: new Date(), resolutionSummary: 'Anulowane przez klienta' },
-    select: { id: true, status: true, ticketNumber: true },
-  });
-}
-
-// ── Agent edits title/description (only while NEW/PENDING) ────────────────
-export async function editAgentTicket(token: string, ticketId: string, data: { title?: string; description?: string }) {
-  const reg = await prisma.agentRegistration.findUnique({
-    where: { agentToken: token },
-    select: { id: true, status: true, deviceId: true, workspaceId: true },
-  });
-  if (!reg) throw new AppError('Agent not found', 404);
-  if (reg.status !== 'ACTIVE') throw new AppError('Agent not active', 403);
-  if (!reg.deviceId || !reg.workspaceId) throw new AppError('Agent has no device linked', 404);
-
-  const t = await prisma.ticket.findFirst({
-    where: { id: ticketId, deviceId: reg.deviceId, workspaceId: reg.workspaceId },
-    select: { id: true, status: true },
-  });
-  if (!t) throw new AppError('Ticket not found', 404);
-
-  const editable: any[] = ['NEW', 'PENDING'];
-  if (!editable.includes(t.status)) {
-    throw new AppError('Zgłoszenie już przypisane — edycja zablokowana. Dodaj komentarz z zmianami.', 409);
-  }
-
-  const update: any = {};
-  if (data.title?.trim()) update.title = data.title.trim().slice(0, 500);
-  if (data.description?.trim()) update.description = data.description.trim();
-  if (Object.keys(update).length === 0) throw new AppError('Brak zmian', 400);
-
-  return prisma.ticket.update({
-    where: { id: t.id },
-    data: update,
-    select: { id: true, ticketNumber: true, title: true, description: true, status: true },
-  });
 }

@@ -28,7 +28,7 @@ export function Modal({ open, onClose, title, children, size = 'md', footer, noP
     <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }} onClick={onClose} />
       <div style={{
-        position: 'relative', width: '100%', maxWidth: sizeMap[size], maxHeight: '90vh',
+        position: 'relative', width: '100%', maxWidth: sizeMap[size], maxHeight: '94vh',
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
         background: 'var(--bg2)', border: '1px solid var(--border-l)', borderRadius: 'var(--r)',
         boxShadow: '0 8px 32px rgba(0,0,0,0.2)',

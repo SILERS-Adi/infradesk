@@ -13,7 +13,7 @@ router.use(authenticate, withWorkspaceMembership);
 router.get('/', authorizeWorkspace('OWNER', 'ADMIN'), getUsers);
 router.get('/:id', authorizeWorkspace('OWNER', 'ADMIN'), getUser);
 router.post('/', authorizeWorkspace('OWNER', 'ADMIN'), checkLimit('users'), validate(createUserSchema), postUser);
-router.patch('/:id', authorizeWorkspace('OWNER', 'ADMIN'), validate(updateUserSchema), patchUser);
+router.patch('/:id', validate(updateUserSchema), patchUser);  // auth check moved into controller (self-or-admin)
 router.delete('/:id', authorizeWorkspace('OWNER', 'ADMIN'), removeUser);
 
 export default router;

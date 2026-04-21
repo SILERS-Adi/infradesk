@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate } from '../../middleware/auth';
 import { requireWorkspace, withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
 import prisma from '../../lib/prisma';
+import { pushToUser } from '../events/events.routes';
 
 const router = Router();
 router.use(authenticate, requireWorkspace);
@@ -95,6 +96,23 @@ router.get('/tree', (req: Request, res: Response) => {
   res.json({ tree: PERMISSION_TREE });
 });
 
+// GET /api/permissions/me — current user's effective permissions for current workspace
+router.get('/me/current', withWorkspaceMembership, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.membership) { res.status(403).json({ error: 'No membership' }); return; }
+    const full = await prisma.workspaceMembership.findUnique({
+      where: { id: req.membership.id },
+      select: {
+        id: true, role: true, accountType: true, accessScope: true, scopeType: true,
+        permissionOverrides: { select: { nodeId: true, level: true, canDelete: true } },
+        workspace: { select: { orgType: true } },
+      },
+    });
+    if (!full) { res.status(404).json({ error: 'Not found' }); return; }
+    res.json(full);
+  } catch (err) { next(err); }
+});
+
 // GET /api/permissions/:membershipId — get overrides for a member
 router.get('/:membershipId', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -141,8 +159,11 @@ router.put('/:membershipId', withWorkspaceMembership, authorizeWorkspace('OWNER'
     }
     const { accountType, accessScope, overrides } = parseResult.data;
 
-    // Verify same workspace
-    const target = await prisma.workspaceMembership.findUnique({ where: { id: membershipId }, select: { workspaceId: true, role: true } });
+    // Verify same workspace + pobierz orgType
+    const target = await prisma.workspaceMembership.findUnique({
+      where: { id: membershipId },
+      select: { workspaceId: true, role: true, workspace: { select: { orgType: true } } },
+    });
     if (!target || target.workspaceId !== req.workspaceId) { res.status(403).json({ error: 'Cross-workspace access denied' }); return; }
 
     // Don't allow changing OWNER accountType
@@ -150,17 +171,22 @@ router.put('/:membershipId', withWorkspaceMembership, authorizeWorkspace('OWNER'
       res.status(400).json({ error: 'Cannot change Owner account type' }); return;
     }
 
+    const wsOrgType = (target as any).workspace?.orgType;
+    const isMspWs = wsOrgType === 'MSP' || wsOrgType === 'IT_OPERATOR';
+    const isClientWs = wsOrgType === 'CLIENT';
+
     // Update membership fields
     const updateData: any = {};
     if (accountType && ['ADMIN', 'USER'].includes(accountType)) updateData.accountType = accountType;
     if (accessScope && ['FULL', 'RESTRICTED'].includes(accessScope)) updateData.accessScope = accessScope;
 
-    // Map accountType to role for backward compat
+    // Map accountType to role — orgType decides: MSP USER→TECHNICIAN, CLIENT USER→MEMBER
     if (accountType === 'ADMIN' && target.role !== 'OWNER') {
       updateData.role = 'ADMIN';
     } else if (accountType === 'USER' && target.role !== 'OWNER') {
-      if (accessScope === 'FULL') updateData.role = 'TECHNICIAN';
-      else updateData.role = 'MEMBER';
+      if (isMspWs) updateData.role = 'TECHNICIAN';          // MSP: user = członek zespołu (panel /dashboard)
+      else if (isClientWs) updateData.role = 'MEMBER';      // CLIENT: user = pracownik (portal /panel)
+      else updateData.role = accessScope === 'FULL' ? 'TECHNICIAN' : 'MEMBER';  // INTERNAL_IT fallback
     }
 
     if (Object.keys(updateData).length > 0) {
@@ -184,6 +210,13 @@ router.put('/:membershipId', withWorkspaceMembership, authorizeWorkspace('OWNER'
         });
       }
     }
+
+    // Notify target user via SSE that their permissions changed — client hook will refetch
+    const targetUser = await prisma.workspaceMembership.findUnique({
+      where: { id: membershipId },
+      select: { userId: true },
+    });
+    if (targetUser) pushToUser(targetUser.userId, 'permissions-updated', { membershipId });
 
     res.json({ success: true });
   } catch (err) { next(err); }
