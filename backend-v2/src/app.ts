@@ -30,6 +30,7 @@ import agentsRouter from './modules/agents/agents.routes';
 import shadowRouter from './modules/shadow/shadow.routes';
 import riskRouter from './modules/risk/risk.routes';
 import activityLogsRouter from './modules/activity-logs/activity-logs.routes';
+import monitoringOverviewRouter from './modules/monitoring/monitoring-overview.routes';
 
 export function buildApp(): Express {
   const app = express();
@@ -83,6 +84,7 @@ export function buildApp(): Express {
   app.use('/api/v2/contacts', crmRouter);
   app.use('/api/v2/orders', ordersRouter);
   app.use('/api/v2/monitoring', monitoringRouter);
+  app.use('/api/v2/monitoring', monitoringOverviewRouter);
   app.use('/api/v2/vault', vaultRouter);
   app.use('/api/v2/agents', agentsRouter);
   app.use('/api/v2/ai/shadow', shadowRouter);
