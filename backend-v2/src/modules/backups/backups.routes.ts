@@ -7,6 +7,7 @@ import { requireAccess } from '../../middleware/requireAccess';
 import { HttpError } from '../../utils/httpError';
 import { MODULES } from '../../utils/canAccess';
 import { encrypt } from '../../lib/crypto';
+import { logActivity, reqContext } from '../activity-logs/logActivity';
 
 const router = Router();
 router.use(requireAuth, requireWorkspace);
@@ -92,6 +93,16 @@ router.post('/', requireAccess(MODULES.BACKUPS, 'edit'), async (req: Request, re
       data.ftpPasswordEnc = enc.ciphertext; data.ftpPasswordIv = enc.iv; data.ftpPasswordAuthTag = enc.authTag;
     }
     const c = await prisma.backupConfig.create({ data: data as never });
+    void logActivity({
+      workspaceId: req.workspaceId!,
+      entityType: 'backup',
+      entityId: c.id,
+      actionType: 'created',
+      description: `Dodano konfigurację backupu "${c.name}" (${c.type})`,
+      performedByUserId: req.auth!.sub,
+      ...reqContext(req),
+      metadata: { type: c.type, cron: c.cronSchedule },
+    });
     res.status(201).json({ config: publicShape(c) });
   } catch (err) { next(err); }
 });
@@ -149,6 +160,16 @@ router.post('/:id/run-now', requireAccess(MODULES.BACKUPS, 'edit'), async (req: 
       },
     });
     await prisma.backupConfig.update({ where: { id: existing.id }, data: { lastStatus: 'RUNNING', lastRunAt: new Date() } });
+    void logActivity({
+      workspaceId: req.workspaceId!,
+      entityType: 'backup',
+      entityId: existing.id,
+      actionType: 'run_now',
+      description: `Ręcznie uruchomiono backup`,
+      performedByUserId: req.auth!.sub,
+      ...reqContext(req),
+      metadata: { runId: run.id },
+    });
     // TODO: actual backup worker (BullMQ) — teraz tylko rekord, workers w Sprint 6
     res.status(202).json({ run, message: 'Backup scheduled (worker TODO in Sprint 6)' });
   } catch (err) { next(err); }

@@ -7,6 +7,7 @@ import { requireAccess, loadMembershipContext } from '../../middleware/requireAc
 import { HttpError } from '../../utils/httpError';
 import { MODULES } from '../../utils/canAccess';
 import { encrypt, decrypt } from '../../lib/crypto';
+import { logActivity, reqContext } from '../activity-logs/logActivity';
 
 const router = Router();
 router.use(requireAuth, requireWorkspace);
@@ -106,6 +107,16 @@ router.post('/', requireAccess(MODULES.VAULT, 'edit'), async (req: Request, res:
         createdByUserId: true, createdAt: true, updatedAt: true,
       },
     });
+    void logActivity({
+      workspaceId: req.workspaceId!,
+      entityType: 'credential',
+      entityId: created.id,
+      actionType: 'created',
+      description: `Dodano hasło "${created.name}" (${created.category})`,
+      performedByUserId: req.auth!.sub,
+      ...reqContext(req),
+      metadata: { category: created.category, deviceId: created.deviceId ?? null },
+    });
     res.status(201).json({ credential: created });
   } catch (err) { next(err); }
 });
@@ -156,6 +167,16 @@ router.post('/:id/reveal', requireAccess(MODULES.VAULT, 'view'), async (req: Req
         reason: input.reason,
       },
     });
+    void logActivity({
+      workspaceId: req.workspaceId!,
+      entityType: 'credential',
+      entityId: c.id,
+      actionType: 'revealed_credential',
+      description: `Odsłonięto hasło${input.reason ? ` (powód: ${input.reason})` : ''}`,
+      performedByUserId: req.auth!.sub,
+      ...reqContext(req),
+      metadata: { reason: input.reason ?? null, username: c.username },
+    });
     res.json({ username: c.username, password: plaintext });
   } catch (err) { next(err); }
 });
@@ -187,6 +208,16 @@ router.patch('/:id', requireAccess(MODULES.VAULT, 'edit'), async (req: Request, 
         createdByUserId: true, createdAt: true, updatedAt: true,
       },
     });
+    void logActivity({
+      workspaceId: req.workspaceId!,
+      entityType: 'credential',
+      entityId: c.id,
+      actionType: input.password ? 'rotated' : 'updated',
+      description: input.password ? `Zmieniono hasło "${c.name}"` : `Zaktualizowano hasło "${c.name}"`,
+      performedByUserId: req.auth!.sub,
+      ...reqContext(req),
+      metadata: { changedFields: Object.keys(input).filter((k) => k !== 'password') },
+    });
     res.json({ credential: c });
   } catch (err) { next(err); }
 });
@@ -199,6 +230,15 @@ router.delete('/:id', requireAccess(MODULES.VAULT, 'delete'), async (req: Reques
     });
     if (!existing) throw HttpError.notFound();
     await prisma.credential.update({ where: { id: existing.id }, data: { deletedAt: new Date() } });
+    void logActivity({
+      workspaceId: req.workspaceId!,
+      entityType: 'credential',
+      entityId: existing.id,
+      actionType: 'deleted',
+      description: `Usunięto hasło`,
+      performedByUserId: req.auth!.sub,
+      ...reqContext(req),
+    });
     res.json({ success: true });
   } catch (err) { next(err); }
 });

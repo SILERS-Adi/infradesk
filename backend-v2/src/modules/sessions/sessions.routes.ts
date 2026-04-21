@@ -7,6 +7,7 @@ import { requireAccess } from '../../middleware/requireAccess';
 import { HttpError } from '../../utils/httpError';
 import { MODULES } from '../../utils/canAccess';
 import { canTransition, type TicketStatus } from '../../utils/ticketStateMachine';
+import { logActivity, reqContext } from '../activity-logs/logActivity';
 
 const router = Router();
 router.use(requireAuth, requireWorkspace);
@@ -137,6 +138,21 @@ router.post('/start', requireAccess(MODULES.SESSIONS, 'edit'), async (req: Reque
       }
       return s;
     });
+    void logActivity({
+      workspaceId: req.workspaceId!,
+      entityType: 'session',
+      entityId: session.id,
+      actionType: 'session_started',
+      description: `Rozpoczęto sesję pracy (${input.serviceMode})`,
+      performedByUserId: req.auth!.sub,
+      ...reqContext(req),
+      metadata: {
+        deviceId: input.deviceId ?? null,
+        locationId: input.locationId ?? null,
+        ticketIds: input.ticketIds ?? [],
+        serviceMode: input.serviceMode,
+      },
+    });
     res.status(201).json({ session });
   } catch (err) { next(err); }
 });
@@ -252,6 +268,19 @@ router.post('/:id/end', requireAccess(MODULES.SESSIONS, 'edit'), async (req: Req
       return updated;
     });
 
+    void logActivity({
+      workspaceId: req.workspaceId!,
+      entityType: 'session',
+      entityId: String(req.params.id),
+      actionType: 'session_ended',
+      description: `Zakończono sesję pracy`,
+      performedByUserId: req.auth!.sub,
+      ...reqContext(req),
+      metadata: {
+        bulkClosedTicketIds: input.bulkCloseTicketIds ?? [],
+        billable: input.billable ?? null,
+      },
+    });
     res.json({ session: completed });
   } catch (err) { next(err); }
 });

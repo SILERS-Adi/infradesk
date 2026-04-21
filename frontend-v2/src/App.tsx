@@ -21,6 +21,7 @@ import { LocationsPage } from '@/features/locations/LocationsPage';
 import { DevicesPage } from '@/features/devices/DevicesPage';
 import { AgentsPage } from '@/features/agents/AgentsPage';
 import { BackupsPage } from '@/features/backups/BackupsPage';
+import { ActivityLogsPage } from '@/features/activity-logs/ActivityLogsPage';
 import { ComingSoon } from '@/components/ui/ComingSoon';
 
 const queryClient = new QueryClient({
@@ -68,7 +69,7 @@ export default function App() {
             <Route path="/agents" element={<AgentsPage />} />
             <Route path="/monitoring" element={<ComingSoon title="Audyt i sieć" sprint="Sprint 3" />} />
             <Route path="/backups" element={<BackupsPage />} />
-            <Route path="/activity-logs" element={<ComingSoon title="Logi aktywności" sprint="Sprint 3" />} />
+            <Route path="/activity-logs" element={<ActivityLogsPage />} />
 
             {/* VAULT */}
             <Route path="/vault" element={<ComingSoon title="Sejf haseł — Wszystkie" sprint="Sprint 4" />} />
