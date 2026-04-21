@@ -51,8 +51,8 @@ function Placeholder({ title }: { title: string }) {
   return (
     <div className="h-full flex items-center justify-center">
       <div className="text-center">
-        <h1 className="text-2xl font-semibold text-t mb-2">{title}</h1>
-        <p className="text-sm text-tm">Wkrótce — moduł zgodny z dual-view (wizualnie/tabelarycznie) + 3-tryby dodawania.</p>
+        <h1 className="text-2xl font-semibold text-tx mb-2">{title}</h1>
+        <p className="text-sm text-tx3">Wkrótce — moduł zgodny z dual-view (wizualnie/tabelarycznie) + 3-tryby dodawania.</p>
       </div>
     </div>
   );

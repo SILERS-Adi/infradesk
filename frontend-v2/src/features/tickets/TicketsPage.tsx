@@ -54,8 +54,8 @@ export function TicketsPage() {
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-t">Zgłoszenia</h1>
-          <p className="text-sm text-tm">Wszystkie tickety w Twoim workspace.</p>
+          <h1 className="text-2xl font-semibold text-tx">Zgłoszenia</h1>
+          <p className="text-sm text-tx3">Wszystkie tickety w Twoim workspace.</p>
         </div>
         <div className="flex items-center gap-3">
           <ViewToggle value={view} onChange={setView} />
@@ -70,11 +70,11 @@ export function TicketsPage() {
       </div>
 
       {isLoading ? (
-        <Card className="p-10 text-center text-tm">Wczytywanie…</Card>
+        <Card className="p-10 text-center text-tx3">Wczytywanie…</Card>
       ) : items.length === 0 ? (
         <Card className="p-10 text-center">
-          <p className="text-t font-medium mb-1">Brak zgłoszeń</p>
-          <p className="text-sm text-tm">Kliknij „Nowe" aby utworzyć pierwsze.</p>
+          <p className="text-tx font-medium mb-1">Brak zgłoszeń</p>
+          <p className="text-sm text-tx3">Kliknij „Nowe" aby utworzyć pierwsze.</p>
         </Card>
       ) : view === 'visual' ? (
         <TicketsVisualGrid items={items} />

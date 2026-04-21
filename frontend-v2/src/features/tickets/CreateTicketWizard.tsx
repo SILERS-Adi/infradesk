@@ -48,13 +48,13 @@ export function CreateTicketWizard() {
               className={cn(
                 'h-7 w-7 rounded-full flex items-center justify-center text-xs font-semibold',
                 i < step && 'bg-success text-white',
-                i === step && 'bg-accent text-accent-fg',
-                i > step && 'bg-bg2 text-tm',
+                i === step && 'bg-pri text-white',
+                i > step && 'bg-sf2 text-tx3',
               )}
             >
               {i < step ? <Check className="h-3.5 w-3.5" /> : i + 1}
             </div>
-            <span className={cn('text-xs', i === step ? 'text-t font-medium' : 'text-tm')}>{label}</span>
+            <span className={cn('text-xs', i === step ? 'text-tx font-medium' : 'text-tx3')}>{label}</span>
             {i < STEPS.length - 1 && <div className={cn('flex-1 h-px', i < step ? 'bg-success' : 'bg-border')} />}
           </div>
         ))}
@@ -69,11 +69,11 @@ export function CreateTicketWizard() {
               onClick={() => { setCategory(c.value); setStep(1); }}
               className={cn(
                 'text-left p-3 rounded-[var(--rs)] border transition-colors',
-                category === c.value ? 'border-accent bg-accent/10' : 'border-border hover:bg-bg2',
+                category === c.value ? 'border-[var(--bd-f)] bg-[var(--pri-l)]' : 'border-bd hover:bg-sf2',
               )}
             >
-              <div className="text-sm font-medium text-t">{c.label}</div>
-              <div className="text-xs text-tm mt-0.5">{c.hint}</div>
+              <div className="text-sm font-medium text-tx">{c.label}</div>
+              <div className="text-xs text-tx3 mt-0.5">{c.hint}</div>
             </button>
           ))}
         </div>
@@ -82,17 +82,17 @@ export function CreateTicketWizard() {
       {step === 1 && (
         <div className="space-y-4">
           <div>
-            <label className="text-xs text-tm mb-1.5 block">Tytuł (krótko)</label>
+            <label className="text-xs text-tx3 mb-1.5 block">Tytuł (krótko)</label>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="np. Drukarka w księgowości nie drukuje" />
           </div>
           <div>
-            <label className="text-xs text-tm mb-1.5 block">Opis (szczegóły)</label>
+            <label className="text-xs text-tx3 mb-1.5 block">Opis (szczegóły)</label>
             <textarea
               rows={6}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Kiedy się zaczęło? Co już próbowałeś? Komunikaty błędów?"
-              className="w-full rounded-[var(--rs)] border border-border bg-bg2 px-3 py-2 text-sm text-t placeholder:text-tm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="w-full rounded-[var(--rs)] border border-bd bg-sf2 px-3 py-2 text-sm text-tx placeholder:text-tx3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pri"
             />
           </div>
         </div>
@@ -107,17 +107,17 @@ export function CreateTicketWizard() {
               onClick={() => setPriority(p.value as typeof priority)}
               className={cn(
                 'w-full text-left p-3 rounded-[var(--rs)] border transition-colors',
-                priority === p.value ? 'border-accent bg-accent/10' : 'border-border hover:bg-bg2',
+                priority === p.value ? 'border-[var(--bd-f)] bg-[var(--pri-l)]' : 'border-bd hover:bg-sf2',
               )}
             >
-              <div className="text-sm font-medium text-t">{p.label}</div>
-              <div className="text-xs text-tm mt-0.5">{p.hint}</div>
+              <div className="text-sm font-medium text-tx">{p.label}</div>
+              <div className="text-xs text-tx3 mt-0.5">{p.hint}</div>
             </button>
           ))}
         </div>
       )}
 
-      <div className="flex items-center justify-between pt-3 border-t border-border">
+      <div className="flex items-center justify-between pt-3 border-t border-bd">
         <Button variant="ghost" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0}>
           <ChevronLeft className="h-4 w-4" /> Wstecz
         </Button>

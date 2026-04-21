@@ -19,8 +19,8 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-t">Kokpit</h1>
-        <p className="text-sm text-tm">Puls firmy — co się dzieje właśnie teraz.</p>
+        <h1 className="text-2xl font-semibold text-tx">Kokpit</h1>
+        <p className="text-sm text-tx3">Puls firmy — co się dzieje właśnie teraz.</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -34,13 +34,13 @@ export function DashboardPage() {
         <CardHeader className="flex items-center justify-between">
           <CardTitle>Ostatnie zgłoszenia</CardTitle>
         </CardHeader>
-        <CardContent className="divide-y divide-border">
-          {items.length === 0 && <p className="text-sm text-tm">Brak zgłoszeń. Wszystko spokojnie.</p>}
+        <CardContent className="divide-y divide-bd">
+          {items.length === 0 && <p className="text-sm text-tx3">Brak zgłoszeń. Wszystko spokojnie.</p>}
           {items.map((t) => (
             <div key={t.id} className="py-3 flex items-center justify-between first:pt-0 last:pb-0">
               <div className="min-w-0">
-                <div className="text-sm font-medium text-t truncate">{t.ticketNumber} · {t.title}</div>
-                <div className="text-xs text-tm mt-0.5">{new Date(t.createdAt).toLocaleString('pl-PL')}</div>
+                <div className="text-sm font-medium text-tx truncate">{t.ticketNumber} · {t.title}</div>
+                <div className="text-xs text-tx3 mt-0.5">{new Date(t.createdAt).toLocaleString('pl-PL')}</div>
               </div>
               <PriorityBadge priority={t.priority} />
             </div>
@@ -53,9 +53,9 @@ export function DashboardPage() {
 
 function KpiCard({ icon: Icon, label, value, accent }: { icon: typeof Ticket; label: string; value: number | string; accent: 'accent' | 'danger' | 'neutral' }) {
   const accentMap = {
-    accent: 'text-accent bg-accent/15',
-    danger: 'text-danger bg-danger/15',
-    neutral: 'text-ts bg-bg2',
+    accent: 'text-pri bg-[var(--pri-l)]',
+    danger: 'text-er bg-[var(--er-l)]',
+    neutral: 'text-tx2 bg-sf2',
   } as const;
   return (
     <Card className="p-5 flex items-center gap-4">
@@ -63,8 +63,8 @@ function KpiCard({ icon: Icon, label, value, accent }: { icon: typeof Ticket; la
         <Icon className="h-5 w-5" aria-hidden />
       </div>
       <div>
-        <div className="text-xs text-tm">{label}</div>
-        <div className="text-2xl font-semibold text-t tabular-nums">{value}</div>
+        <div className="text-xs text-tx3">{label}</div>
+        <div className="text-2xl font-semibold text-tx tabular-nums">{value}</div>
       </div>
     </Card>
   );

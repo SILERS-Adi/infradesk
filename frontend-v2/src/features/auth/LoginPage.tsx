@@ -52,31 +52,28 @@ export function LoginPage() {
       <div className="absolute top-6 right-6"><ThemeToggle /></div>
       <Card className="w-full max-w-sm p-6 space-y-5">
         <div>
-          <div className="flex items-center gap-2 mb-6">
-            <div className="h-10 w-10 rounded-md bg-gradient-to-br from-accent to-accent/50 flex items-center justify-center font-bold text-accent-fg">I</div>
-            <div>
-              <h1 className="text-lg font-semibold text-t">InfraDesk v2</h1>
-              <p className="text-xs text-tm">IT helpdesk. Polski pierwszy.</p>
-            </div>
+          <div className="flex flex-col items-center text-center mb-6">
+            <img src="/logo.png" alt="InfraDesk" className="h-14 w-auto mb-3" />
+            <p className="text-[10px] text-tx3 uppercase tracking-[0.25em]">v2 · IT helpdesk dla MSP</p>
           </div>
-          <h2 className="text-2xl font-semibold text-t">Zaloguj się</h2>
-          <p className="text-sm text-tm mt-1">Podaj email i hasło do konta.</p>
+          <h2 className="text-2xl font-semibold text-tx">Zaloguj się</h2>
+          <p className="text-sm text-tx3 mt-1">Podaj email i hasło do konta.</p>
         </div>
 
         <form className="space-y-3" onSubmit={handleSubmit(onSubmit)} noValidate>
           <div>
-            <label className="text-xs text-tm mb-1.5 block" htmlFor="email">Email</label>
+            <label className="text-xs text-tx3 mb-1.5 block" htmlFor="email">Email</label>
             <Input id="email" type="email" autoComplete="email" {...register('email')} />
-            {errors.email && <p className="text-xs text-danger mt-1">{errors.email.message}</p>}
+            {errors.email && <p className="text-xs text-er mt-1">{errors.email.message}</p>}
           </div>
           <div>
-            <label className="text-xs text-tm mb-1.5 block" htmlFor="password">Hasło</label>
+            <label className="text-xs text-tx3 mb-1.5 block" htmlFor="password">Hasło</label>
             <Input id="password" type="password" autoComplete="current-password" {...register('password')} />
-            {errors.password && <p className="text-xs text-danger mt-1">{errors.password.message}</p>}
+            {errors.password && <p className="text-xs text-er mt-1">{errors.password.message}</p>}
           </div>
           {twoFactorRequired && (
             <div>
-              <label className="text-xs text-tm mb-1.5 block" htmlFor="twoFactorCode">Kod 2FA (6 cyfr lub kod zapasowy)</label>
+              <label className="text-xs text-tx3 mb-1.5 block" htmlFor="twoFactorCode">Kod 2FA (6 cyfr lub kod zapasowy)</label>
               <Input id="twoFactorCode" inputMode="numeric" autoComplete="one-time-code" {...register('twoFactorCode')} />
             </div>
           )}

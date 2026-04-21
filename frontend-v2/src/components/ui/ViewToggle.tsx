@@ -9,23 +9,19 @@ interface ViewToggleProps {
   onChange: (v: ViewMode) => void;
 }
 
-/**
- * Toggle between two layouts for the same data:
- *   - visual: cards / charts / graph / map (preferred for OWNER/ADMIN)
- *   - table: spreadsheet-like (preferred for technicians)
- */
 export function ViewToggle({ value, onChange }: ViewToggleProps) {
   return (
-    <div className="inline-flex rounded-[var(--rs)] border border-border bg-bg2 p-1" role="radiogroup" aria-label="Układ widoku">
+    <div className="inline-flex rounded-[var(--r-s)] border border-bd bg-sf2 p-1" role="radiogroup" aria-label="Układ widoku">
       <button
         type="button"
         role="radio"
         aria-checked={value === 'visual'}
         onClick={() => onChange('visual')}
         className={cn(
-          'flex items-center gap-1.5 rounded-sm px-2.5 h-7 text-xs font-medium transition-colors',
-          value === 'visual' ? 'bg-accent text-accent-fg' : 'text-tm hover:text-t',
+          'flex items-center gap-1.5 rounded-[8px] px-2.5 h-7 text-[11px] font-semibold press transition-colors',
+          value === 'visual' ? 'text-white' : 'text-tx3 hover:text-tx',
         )}
+        style={value === 'visual' ? { background: 'linear-gradient(135deg, var(--pri), #7c3aed)' } : undefined}
       >
         <LayoutGrid className="h-3.5 w-3.5" aria-hidden /> Wizualnie
       </button>
@@ -35,9 +31,10 @@ export function ViewToggle({ value, onChange }: ViewToggleProps) {
         aria-checked={value === 'table'}
         onClick={() => onChange('table')}
         className={cn(
-          'flex items-center gap-1.5 rounded-sm px-2.5 h-7 text-xs font-medium transition-colors',
-          value === 'table' ? 'bg-accent text-accent-fg' : 'text-tm hover:text-t',
+          'flex items-center gap-1.5 rounded-[8px] px-2.5 h-7 text-[11px] font-semibold press transition-colors',
+          value === 'table' ? 'text-white' : 'text-tx3 hover:text-tx',
         )}
+        style={value === 'table' ? { background: 'linear-gradient(135deg, var(--pri), #7c3aed)' } : undefined}
       >
         <Table2 className="h-3.5 w-3.5" aria-hidden /> Tabelarycznie
       </button>
@@ -45,10 +42,6 @@ export function ViewToggle({ value, onChange }: ViewToggleProps) {
   );
 }
 
-/**
- * Persisted-per-user preference for a given view key.
- * Technicians (pure client-side heuristic) default to 'table'.
- */
 export function useViewPreference(storageKey: string, defaultValue: ViewMode = 'visual'): [ViewMode, (v: ViewMode) => void] {
   const key = `idesk-view:${storageKey}`;
   const [value, setValue] = useState<ViewMode>(() => {

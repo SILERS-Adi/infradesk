@@ -48,16 +48,16 @@ export function CreateTicketFromAi() {
   if (!draft) {
     return (
       <div className="space-y-4">
-        <div className="flex items-start gap-2 p-3 rounded-[var(--rs)] bg-accent/10 border border-accent/30">
-          <Sparkles className="h-4 w-4 text-accent mt-0.5 shrink-0" />
-          <p className="text-xs text-t">Wklej email od klienta, zrzut ekranu komunikatu błędu, notatkę głosową lub po prostu opisz czego potrzebujesz. Iris rozpozna kategorię, priorytet i stworzy draft.</p>
+        <div className="flex items-start gap-2 p-3 rounded-[var(--rs)] bg-[var(--pri-l)] border border-[var(--bd-f)]">
+          <Sparkles className="h-4 w-4 text-pri mt-0.5 shrink-0" />
+          <p className="text-xs text-tx">Wklej email od klienta, zrzut ekranu komunikatu błędu, notatkę głosową lub po prostu opisz czego potrzebujesz. Iris rozpozna kategorię, priorytet i stworzy draft.</p>
         </div>
         <textarea
           rows={10}
           value={source}
           onChange={(e) => setSource(e.target.value)}
           placeholder={"np. „Anna Kowalska: Nie działa mi Outlook od rana. Hasło jest prawdopodobnie ok, bo komórkowy działa. Potrzebuję do końca dnia."}
-          className="w-full rounded-[var(--rs)] border border-border bg-bg2 px-3 py-2 text-sm text-t placeholder:text-tm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="w-full rounded-[var(--rs)] border border-bd bg-sf2 px-3 py-2 text-sm text-tx placeholder:text-tx3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pri"
         />
         <div className="flex justify-end">
           <Button onClick={parseLocal} disabled={source.trim().length < 10 || parsing}>
@@ -71,29 +71,29 @@ export function CreateTicketFromAi() {
   return (
     <div className="space-y-4">
       <div className="flex items-start gap-2 p-3 rounded-[var(--rs)] bg-success/10 border border-success/30">
-        <Sparkles className="h-4 w-4 text-success mt-0.5 shrink-0" />
-        <p className="text-xs text-t">Iris stworzyła draft. Sprawdź, popraw jeśli potrzeba i zatwierdź.</p>
+        <Sparkles className="h-4 w-4 text-ok mt-0.5 shrink-0" />
+        <p className="text-xs text-tx">Iris stworzyła draft. Sprawdź, popraw jeśli potrzeba i zatwierdź.</p>
       </div>
       <div>
-        <label className="text-xs text-tm mb-1.5 block">Tytuł</label>
+        <label className="text-xs text-tx3 mb-1.5 block">Tytuł</label>
         <Input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
       </div>
       <div>
-        <label className="text-xs text-tm mb-1.5 block">Opis</label>
+        <label className="text-xs text-tx3 mb-1.5 block">Opis</label>
         <textarea
           rows={6}
           value={draft.description}
           onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-          className="w-full rounded-[var(--rs)] border border-border bg-bg2 px-3 py-2 text-sm text-t focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="w-full rounded-[var(--rs)] border border-bd bg-sf2 px-3 py-2 text-sm text-tx focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pri"
         />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-xs text-tm mb-1.5 block">Priorytet</label>
+          <label className="text-xs text-tx3 mb-1.5 block">Priorytet</label>
           <select
             value={draft.priority}
             onChange={(e) => setDraft({ ...draft, priority: e.target.value as Draft['priority'] })}
-            className="h-10 w-full rounded-[var(--rs)] border border-border bg-bg2 px-3 text-sm text-t"
+            className="h-10 w-full rounded-[var(--rs)] border border-bd bg-sf2 px-3 text-sm text-tx"
           >
             <option value="LOW">Niski</option>
             <option value="MEDIUM">Średni</option>
@@ -102,11 +102,11 @@ export function CreateTicketFromAi() {
           </select>
         </div>
         <div>
-          <label className="text-xs text-tm mb-1.5 block">Kategoria</label>
+          <label className="text-xs text-tx3 mb-1.5 block">Kategoria</label>
           <Input value={draft.category ?? ''} onChange={(e) => setDraft({ ...draft, category: e.target.value || null })} />
         </div>
       </div>
-      <div className="flex items-center justify-between pt-2 border-t border-border">
+      <div className="flex items-center justify-between pt-2 border-t border-bd">
         <Button variant="ghost" onClick={() => setDraft(null)}>Wróć</Button>
         <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
           Utwórz zgłoszenie

@@ -37,26 +37,26 @@ export function CreateTicketForm() {
   return (
     <form onSubmit={handleSubmit((d) => mutation.mutate(d))} className="space-y-4" noValidate>
       <div>
-        <label className="text-xs text-tm mb-1.5 block" htmlFor="t-title">Tytuł</label>
+        <label className="text-xs text-tx3 mb-1.5 block" htmlFor="t-title">Tytuł</label>
         <Input id="t-title" placeholder="Co się dzieje?" {...register('title')} />
-        {errors.title && <p className="text-xs text-danger mt-1">{errors.title.message}</p>}
+        {errors.title && <p className="text-xs text-er mt-1">{errors.title.message}</p>}
       </div>
       <div>
-        <label className="text-xs text-tm mb-1.5 block" htmlFor="t-desc">Opis</label>
+        <label className="text-xs text-tx3 mb-1.5 block" htmlFor="t-desc">Opis</label>
         <textarea
           id="t-desc"
           rows={6}
-          className="w-full rounded-[var(--rs)] border border-border bg-bg2 px-3 py-2 text-sm text-t placeholder:text-tm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="w-full rounded-[var(--rs)] border border-bd bg-sf2 px-3 py-2 text-sm text-tx placeholder:text-tx3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pri"
           placeholder="Szczegóły problemu, kroki, komunikaty błędów…"
           {...register('description')}
         />
-        {errors.description && <p className="text-xs text-danger mt-1">{errors.description.message}</p>}
+        {errors.description && <p className="text-xs text-er mt-1">{errors.description.message}</p>}
       </div>
       <div>
-        <label className="text-xs text-tm mb-1.5 block" htmlFor="t-prio">Priorytet</label>
+        <label className="text-xs text-tx3 mb-1.5 block" htmlFor="t-prio">Priorytet</label>
         <select
           id="t-prio"
-          className="h-10 w-full rounded-[var(--rs)] border border-border bg-bg2 px-3 text-sm text-t focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="h-10 w-full rounded-[var(--rs)] border border-bd bg-sf2 px-3 text-sm text-tx focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pri"
           {...register('priority')}
         >
           <option value="LOW">Niski</option>

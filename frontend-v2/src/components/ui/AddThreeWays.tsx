@@ -37,17 +37,17 @@ export function AddThreeWays({ title, trigger, formTab, wizardTab, aiTab, defaul
         <Dialog.Content
           className={cn(
             'fixed left-1/2 top-1/2 z-50 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2',
-            'rounded-[var(--r)] bg-surface border border-border shadow-2xl animate-fade-in',
+            'rounded-[var(--r)] bg-sf border border-bd shadow-2xl animate-fade-in',
           )}
         >
-          <div className="flex items-center justify-between border-b border-border px-5 py-4">
-            <Dialog.Title className="text-lg font-semibold text-t">{title}</Dialog.Title>
+          <div className="flex items-center justify-between border-b border-bd px-5 py-4">
+            <Dialog.Title className="text-lg font-semibold text-tx">{title}</Dialog.Title>
             <Dialog.Close asChild>
               <Button variant="ghost" size="sm" aria-label="Zamknij"><X className="h-4 w-4" /></Button>
             </Dialog.Close>
           </div>
           <Tabs.Root value={tab} onValueChange={handleTabChange}>
-            <Tabs.List className="flex border-b border-border px-5 bg-bg2/40">
+            <Tabs.List className="flex border-b border-bd px-5 bg-sf2/40">
               <TabButton value="form" icon={<FileText className="h-4 w-4" />}>Formularz</TabButton>
               <TabButton value="wizard" icon={<Wand2 className="h-4 w-4" />}>Wizard</TabButton>
               <TabButton value="ai" icon={<Sparkles className="h-4 w-4" />}>Z AI</TabButton>
@@ -69,8 +69,8 @@ function TabButton({ value, icon, children }: { value: string; icon: ReactNode; 
     <Tabs.Trigger
       value={value}
       className={cn(
-        'flex items-center gap-2 px-4 py-3 text-sm text-tm',
-        'data-[state=active]:text-t data-[state=active]:border-b-2 data-[state=active]:border-accent',
+        'flex items-center gap-2 px-4 py-3 text-sm text-tx3',
+        'data-[state=active]:text-tx data-[state=active]:border-b-2 data-[state=active]:border-[var(--bd-f)]',
       )}
     >
       {icon}{children}
