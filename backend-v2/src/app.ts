@@ -31,6 +31,7 @@ import shadowRouter from './modules/shadow/shadow.routes';
 import riskRouter from './modules/risk/risk.routes';
 import activityLogsRouter from './modules/activity-logs/activity-logs.routes';
 import monitoringOverviewRouter from './modules/monitoring/monitoring-overview.routes';
+import aiRouter from './modules/ai/ai.routes';
 
 export function buildApp(): Express {
   const app = express();
@@ -88,6 +89,7 @@ export function buildApp(): Express {
   app.use('/api/v2/vault', vaultRouter);
   app.use('/api/v2/agents', agentsRouter);
   app.use('/api/v2/ai/shadow', shadowRouter);
+  app.use('/api/v2/ai', aiRouter);
   app.use('/api/v2/clients/risk', riskRouter);
   app.use('/api/v2/activity-logs', activityLogsRouter);
 

@@ -28,6 +28,10 @@ import { MyCompanyPage } from '@/features/my-company/MyCompanyPage';
 import { UsersPage } from '@/features/users/UsersPage';
 import { PlanAndModulesPage } from '@/features/plan-and-modules/PlanAndModulesPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
+import { IrisChatPage } from '@/features/ai/IrisChatPage';
+import { ShadowModePage } from '@/features/ai/ShadowModePage';
+import { AiInsightsPage } from '@/features/ai/AiInsightsPage';
+import { AiUsagePage } from '@/features/ai/AiUsagePage';
 import { ComingSoon } from '@/components/ui/ComingSoon';
 
 const queryClient = new QueryClient({
@@ -82,11 +86,11 @@ export default function App() {
             <Route path="/vault/:scope" element={<VaultPage />} />
 
             {/* AI */}
-            <Route path="/ai" element={<ComingSoon title="Czat z Iris" sprint="Sprint 4" />} />
-            <Route path="/ai/shadow" element={<ComingSoon title="Shadow Mode raport" sprint="Sprint 4" />} />
-            <Route path="/ai/insights" element={<ComingSoon title="AI Insights" sprint="Sprint 4" />} />
+            <Route path="/ai" element={<IrisChatPage />} />
+            <Route path="/ai/shadow" element={<ShadowModePage />} />
+            <Route path="/ai/insights" element={<AiInsightsPage />} />
             <Route path="/ai/time" element={<ComingSoon title="Invisible Time Tracking" sprint="Sprint 7 (pionier)" />} />
-            <Route path="/ai/usage" element={<ComingSoon title="Koszty AI" sprint="Sprint 4" />} />
+            <Route path="/ai/usage" element={<AiUsagePage />} />
 
             {/* MOJA FIRMA */}
             <Route path="/my-company" element={<MyCompanyPage />} />
