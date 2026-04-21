@@ -18,6 +18,8 @@ import { ClientsPage } from '@/features/clients/ClientsPage';
 import { ClientDetailPage } from '@/features/clients/ClientDetailPage';
 import { ContactsPage } from '@/features/contacts/ContactsPage';
 import { LocationsPage } from '@/features/locations/LocationsPage';
+import { DevicesPage } from '@/features/devices/DevicesPage';
+import { AgentsPage } from '@/features/agents/AgentsPage';
 import { ComingSoon } from '@/components/ui/ComingSoon';
 
 const queryClient = new QueryClient({
@@ -61,8 +63,8 @@ export default function App() {
             <Route path="/partners" element={<ComingSoon title="Partnerzy IT" sprint="Phase 2 (post-launch)" />} />
 
             {/* INFRASTRUKTURA */}
-            <Route path="/devices" element={<ComingSoon title="Urządzenia" sprint="Sprint 3" />} />
-            <Route path="/agents" element={<ComingSoon title="Asystenci" sprint="Sprint 3" />} />
+            <Route path="/devices" element={<DevicesPage />} />
+            <Route path="/agents" element={<AgentsPage />} />
             <Route path="/monitoring" element={<ComingSoon title="Audyt i sieć" sprint="Sprint 3" />} />
             <Route path="/backups" element={<ComingSoon title="Kopie zapasowe" sprint="Sprint 3" />} />
             <Route path="/activity-logs" element={<ComingSoon title="Logi aktywności" sprint="Sprint 3" />} />
