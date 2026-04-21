@@ -1,5 +1,5 @@
 import { prisma } from '../../lib/prisma';
-import { hashPassword, verifyPassword, validatePasswordStrength } from '../../lib/password';
+import { hashPassword, verifyPassword, validatePasswordStrength, isLegacyHash } from '../../lib/password';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../../lib/jwt';
 import { randomToken, hashToken, encrypt, decrypt } from '../../lib/crypto';
 import { HttpError } from '../../utils/httpError';
@@ -173,10 +173,14 @@ export async function login(input: LoginInput, ipAddress?: string, userAgent?: s
     }
   }
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { loginAttempts: 0, lockedUntil: null, lastLoginAt: new Date(), lastLoginIp: ipAddress ?? null },
-  });
+  // Opportunistic rehash: migrate legacy bcrypt hashes to argon2id on next successful login.
+  const updateData: Record<string, unknown> = {
+    loginAttempts: 0, lockedUntil: null, lastLoginAt: new Date(), lastLoginIp: ipAddress ?? null,
+  };
+  if (isLegacyHash(user.passwordHash)) {
+    updateData.passwordHash = await hashPassword(input.password);
+  }
+  await prisma.user.update({ where: { id: user.id }, data: updateData });
 
   const defaultMembership = await prisma.membership.findFirst({
     where: { userId: user.id, status: 'ACTIVE', isDefault: true },
