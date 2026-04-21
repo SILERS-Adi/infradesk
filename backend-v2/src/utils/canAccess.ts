@@ -62,6 +62,7 @@ export const MODULES = {
   WORKSPACE_SETTINGS: 'workspace.settings',
   AUDIT_LOG: 'audit.log',
   GPS: 'gps',
+  BACKUPS: 'backups',
   INVOICES: 'invoices',          // post-MVP module
 } as const;
 
@@ -88,6 +89,7 @@ const DEFAULT_MEMBER_LEVELS: Record<string, AccessLevel> = {
   [MODULES.WORKSPACE_SETTINGS]: 'NONE',
   [MODULES.AUDIT_LOG]: 'NONE',
   [MODULES.GPS]: 'VIEW',
+  [MODULES.BACKUPS]: 'NONE',
   [MODULES.INVOICES]: 'NONE',
 };
 

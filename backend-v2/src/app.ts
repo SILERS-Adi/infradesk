@@ -18,6 +18,7 @@ import ticketsRouter from './modules/tickets/tickets.routes';
 import tasksRouter from './modules/tasks/tasks.routes';
 import delegationsRouter, { calendarRouter, billingRouter } from './modules/delegations/delegations.routes';
 import clientsRouter from './modules/clients/clients.routes';
+import backupsRouter from './modules/backups/backups.routes';
 import devicesRouter from './modules/devices/devices.routes';
 import locationsRouter from './modules/locations/locations.routes';
 import sessionsRouter from './modules/sessions/sessions.routes';
@@ -74,6 +75,7 @@ export function buildApp(): Express {
   app.use('/api/v2/calendar', calendarRouter);
   app.use('/api/v2/billing', billingRouter);
   app.use('/api/v2/clients', clientsRouter);
+  app.use('/api/v2/backups', backupsRouter);
   app.use('/api/v2/devices', devicesRouter);
   app.use('/api/v2/locations', locationsRouter);
   app.use('/api/v2/sessions', sessionsRouter);

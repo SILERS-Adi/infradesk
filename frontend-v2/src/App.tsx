@@ -20,6 +20,7 @@ import { ContactsPage } from '@/features/contacts/ContactsPage';
 import { LocationsPage } from '@/features/locations/LocationsPage';
 import { DevicesPage } from '@/features/devices/DevicesPage';
 import { AgentsPage } from '@/features/agents/AgentsPage';
+import { BackupsPage } from '@/features/backups/BackupsPage';
 import { ComingSoon } from '@/components/ui/ComingSoon';
 
 const queryClient = new QueryClient({
@@ -66,7 +67,7 @@ export default function App() {
             <Route path="/devices" element={<DevicesPage />} />
             <Route path="/agents" element={<AgentsPage />} />
             <Route path="/monitoring" element={<ComingSoon title="Audyt i sieć" sprint="Sprint 3" />} />
-            <Route path="/backups" element={<ComingSoon title="Kopie zapasowe" sprint="Sprint 3" />} />
+            <Route path="/backups" element={<BackupsPage />} />
             <Route path="/activity-logs" element={<ComingSoon title="Logi aktywności" sprint="Sprint 3" />} />
 
             {/* VAULT */}
