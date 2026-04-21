@@ -1,71 +1,231 @@
-import { NavLink } from 'react-router-dom';
+import { useState, type ReactNode } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, Ticket, Server, Users, Key, MapPin,
-  ShoppingCart, Activity, Brain, Settings, LogOut,
+  LayoutDashboard, Ticket, CheckSquare, Calendar, Timer, Receipt, Bell, ShoppingCart, Car, Globe2,
+  Building2, Users, MapPin, Handshake,
+  Server, Zap, Activity, HardDriveDownload, Scroll,
+  Key, Brain, Radar, Lightbulb, Clock, DollarSign,
+  Building, UserCog, Package2, Cog,
+  ChevronDown, LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
-import { Button } from '../ui/Button';
 
-const NAV = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Kokpit', module: 'dashboard' },
-  { to: '/tickets', icon: Ticket, label: 'Zgłoszenia', module: 'tickets' },
-  { to: '/devices', icon: Server, label: 'Urządzenia', module: 'devices' },
-  { to: '/locations', icon: MapPin, label: 'Lokalizacje', module: 'locations' },
-  { to: '/clients', icon: Users, label: 'Klienci (CRM)', module: 'clients' },
-  { to: '/orders', icon: ShoppingCart, label: 'Zakupy', module: 'orders' },
-  { to: '/vault', icon: Key, label: 'Sejf haseł', module: 'vault' },
-  { to: '/monitoring', icon: Activity, label: 'Monitoring', module: 'monitoring' },
-  { to: '/ai', icon: Brain, label: 'AI (Iris)', module: 'ai.copilot' },
-  { to: '/settings', icon: Settings, label: 'Ustawienia', module: 'workspace.settings' },
+interface NavItem {
+  to: string;
+  icon: typeof Ticket;
+  label: string;
+  badge?: number;
+  comingSoon?: boolean;
+}
+
+interface NavGroup {
+  id: string;
+  label: string;
+  items: NavItem[];
+}
+
+const GROUPS: NavGroup[] = [
+  {
+    id: 'operations',
+    label: 'Operacje',
+    items: [
+      { to: '/', icon: LayoutDashboard, label: 'Kokpit' },
+      { to: '/tickets', icon: Ticket, label: 'Zgłoszenia' },
+      { to: '/tasks', icon: CheckSquare, label: 'Zadania' },
+      { to: '/calendar', icon: Calendar, label: 'Kalendarz' },
+      { to: '/sessions', icon: Timer, label: 'Sesje pracy' },
+      { to: '/billing', icon: Receipt, label: 'Rozliczenia' },
+      { to: '/alerts', icon: Bell, label: 'Alerty' },
+      { to: '/orders', icon: ShoppingCart, label: 'Zamówienia' },
+      { to: '/delegations', icon: Car, label: 'Delegacje' },
+      { to: '/portal-settings', icon: Globe2, label: 'Portal i obsługa' },
+    ],
+  },
+  {
+    id: 'clients',
+    label: 'Klienci',
+    items: [
+      { to: '/clients', icon: Building2, label: 'Firmy klientów' },
+      { to: '/contacts', icon: Users, label: 'Kontakty' },
+      { to: '/locations', icon: MapPin, label: 'Lokalizacje' },
+      { to: '/partners', icon: Handshake, label: 'Partnerzy IT', comingSoon: true },
+    ],
+  },
+  {
+    id: 'infrastructure',
+    label: 'Infrastruktura IT',
+    items: [
+      { to: '/devices', icon: Server, label: 'Urządzenia' },
+      { to: '/agents', icon: Zap, label: 'Asystenci' },
+      { to: '/monitoring', icon: Activity, label: 'Audyt i sieć' },
+      { to: '/backups', icon: HardDriveDownload, label: 'Kopie zapasowe' },
+      { to: '/activity-logs', icon: Scroll, label: 'Logi aktywności' },
+    ],
+  },
+  {
+    id: 'vault',
+    label: 'Sejf haseł',
+    items: [
+      { to: '/vault', icon: Key, label: 'Wszystkie' },
+      { to: '/vault/mine', icon: Key, label: 'Moje' },
+      { to: '/vault/shared', icon: Key, label: 'Współdzielone' },
+    ],
+  },
+  {
+    id: 'ai',
+    label: 'Asystent AI',
+    items: [
+      { to: '/ai', icon: Brain, label: 'Czat i komendy' },
+      { to: '/ai/shadow', icon: Radar, label: 'Shadow Mode' },
+      { to: '/ai/insights', icon: Lightbulb, label: 'Insights' },
+      { to: '/ai/time', icon: Clock, label: 'Invisible Time', comingSoon: true },
+      { to: '/ai/usage', icon: DollarSign, label: 'Koszty AI' },
+    ],
+  },
+  {
+    id: 'company',
+    label: 'Moja firma',
+    items: [
+      { to: '/my-company', icon: Building, label: 'Moje dane' },
+      { to: '/users', icon: UserCog, label: 'Użytkownicy' },
+      { to: '/plan-and-modules', icon: Package2, label: 'Plan i moduły' },
+      { to: '/settings', icon: Cog, label: 'Ustawienia' },
+    ],
+  },
 ];
 
 export function Sidebar() {
   const { user, logout } = useAuthStore();
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const toggleGroup = (id: string) => {
+    const next = new Set(collapsed);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setCollapsed(next);
+  };
+
   return (
-    <aside className="w-64 shrink-0 bg-sf2/50 backdrop-blur border-r border-bd flex flex-col">
-      <div className="h-16 flex items-center px-5 border-b border-bd">
-        <div className="flex items-center gap-3">
-          <img src="/logo-icon.png" alt="" className="h-9 w-9 shrink-0 object-contain" />
-          <div className="flex flex-col leading-tight">
-            <span className="text-sm font-semibold text-tx">InfraDesk</span>
-            <span className="text-[10px] text-tx3 uppercase tracking-wider">v2 · alpha</span>
-          </div>
+    <aside
+      className="w-[240px] shrink-0 flex flex-col h-screen fixed left-0 top-0 z-40"
+      style={{ background: 'var(--side-bg)', borderRight: '1px solid var(--side-bd)' }}
+    >
+      {/* Brand */}
+      <div className="px-5 pt-5 pb-4 flex items-center gap-3">
+        <img src="/logo-icon.png" alt="" className="h-9 w-9 shrink-0 object-contain" />
+        <div className="leading-tight">
+          <p className="text-[14px] font-bold text-tx">
+            Infra<span style={{ color: 'var(--pri)' }}>Desk</span>
+          </p>
+          <p className="text-[9px] font-semibold tracking-[0.2em] uppercase text-tx3">v2 · Operacje</p>
         </div>
       </div>
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {NAV.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              cn(
-                'flex items-center gap-3 rounded-[var(--rs)] px-3 py-2 text-sm transition-colors',
-                isActive ? 'bg-[var(--pri-l)] text-pri' : 'text-tx2 hover:bg-sf2 hover:text-tx',
-              )
-            }
-          >
-            <item.icon className="h-4 w-4 shrink-0" aria-hidden />
-            {item.label}
-          </NavLink>
+
+      <div className="mx-4 h-px" style={{ background: 'var(--side-bd)' }} />
+
+      {/* Nav */}
+      <nav className="flex-1 px-3 py-3 overflow-y-auto">
+        {GROUPS.map((group) => (
+          <SidebarGroup
+            key={group.id}
+            group={group}
+            collapsed={collapsed.has(group.id)}
+            onToggle={() => toggleGroup(group.id)}
+          />
         ))}
       </nav>
-      <div className="border-t border-bd p-3 space-y-2">
+
+      {/* User footer */}
+      <div className="px-3 pt-1 pb-3" style={{ borderTop: '1px solid var(--side-bd)' }}>
         {user && (
-          <div className="flex items-center gap-2 px-2">
-            <div className="h-8 w-8 shrink-0 rounded-full bg-[var(--pri-l)] flex items-center justify-center text-xs font-semibold text-pri">
+          <div className="flex items-center gap-2 px-2 py-2">
+            <div
+              className="w-7 h-7 rounded-[8px] flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+              style={{ background: 'linear-gradient(135deg, var(--pri), #7c3aed)' }}
+            >
               {user.firstName[0]}{user.lastName[0]}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-medium text-tx truncate">{user.firstName} {user.lastName}</div>
-              <div className="text-[10px] text-tx3 truncate">{user.email}</div>
+              <p className="text-[12px] font-semibold text-tx truncate">{user.firstName} {user.lastName}</p>
+              <p className="text-[10px] text-tx3 truncate">{user.email}</p>
             </div>
+            <button
+              onClick={logout}
+              className="p-1.5 rounded-[6px] text-tx3 press transition-colors"
+              style={{ transition: 'all .15s' }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--er-l)'; e.currentTarget.style.color = 'var(--er)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--tx3)'; }}
+              title="Wyloguj"
+            >
+              <LogOut style={{ width: 13, height: 13 }} />
+            </button>
           </div>
         )}
-        <Button variant="ghost" size="sm" className="w-full justify-start" onClick={logout}>
-          <LogOut className="h-4 w-4" /> Wyloguj
-        </Button>
       </div>
     </aside>
+  );
+}
+
+function SidebarGroup({ group, collapsed, onToggle }: { group: NavGroup; collapsed: boolean; onToggle: () => void }) {
+  return (
+    <div className="mb-2">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center justify-between px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.15em] text-tx3 hover:text-tx2"
+      >
+        <span>{group.label}</span>
+        <ChevronDown
+          className={cn('h-3 w-3 transition-transform', collapsed && '-rotate-90')}
+          aria-hidden
+        />
+      </button>
+      {!collapsed && (
+        <div className="space-y-[1px]">
+          {group.items.map((item) => (
+            <SidebarItem key={item.to} item={item} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SidebarItem({ item }: { item: NavItem }): ReactNode {
+  const loc = useLocation();
+  const active = item.to === '/' ? loc.pathname === '/' : loc.pathname.startsWith(item.to) && item.to !== '/vault' || loc.pathname === item.to;
+
+  return (
+    <NavLink
+      to={item.to}
+      end={item.to === '/'}
+      className={({ isActive }) =>
+        cn(
+          'flex items-center gap-2.5 px-3 py-[9px] rounded-[var(--r-s)] text-[13px] font-medium transition-all',
+          isActive || active ? '' : 'text-tx2 hover:text-tx',
+        )
+      }
+      style={({ isActive }) => {
+        const isOn = isActive || (item.to !== '/vault' && item.to !== '/' && loc.pathname.startsWith(item.to));
+        return isOn
+          ? { background: 'var(--side-act)', color: 'var(--side-act-tx)', fontWeight: 600 }
+          : {};
+      }}
+    >
+      <item.icon style={{ width: 16, height: 16, strokeWidth: 1.7 }} aria-hidden />
+      <span className="flex-1">{item.label}</span>
+      {item.comingSoon && (
+        <span className="text-[8px] font-bold uppercase tracking-wider text-tx3 bg-sf-h px-1.5 py-0.5 rounded">
+          soon
+        </span>
+      )}
+      {item.badge !== undefined && item.badge > 0 && (
+        <span
+          className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded-full min-w-[18px] text-center"
+          style={{ background: 'var(--pri)' }}
+        >
+          {item.badge > 99 ? '99+' : item.badge}
+        </span>
+      )}
+    </NavLink>
   );
 }
