@@ -1,0 +1,23 @@
+@import './tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: hsl(var(--bg));
+  color: hsl(var(--t));
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar — subtle, brand-coloured. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border)); border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--tm)); }

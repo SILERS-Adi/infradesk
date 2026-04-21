@@ -1,0 +1,56 @@
+/* ══════════════════════════════════════════════
+   INFRADESK v2 — DESIGN TOKENS
+   3 modes: dark (default), light, auto (matches system).
+   All tokens expressed as HSL for Tailwind color binding.
+   ══════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root,
+:root[data-theme='dark'] {
+  --bg:        222 47% 7%;
+  --bg2:       223 40% 12%;
+  --surface:   225 38% 18%;
+  --t:         220 40% 96%;
+  --ts:        224 28% 70%;
+  --tm:        224 20% 50%;
+  --border:    224 40% 25%;
+  --accent:    239 84% 67%;
+  --accent-fg: 0 0% 100%;
+  --success:   160 84% 39%;
+  --danger:    0 84% 72%;
+  --warning:   45 96% 58%;
+  --r:         16px;
+  --rs:        10px;
+}
+
+:root[data-theme='light'] {
+  --bg:        220 30% 98%;
+  --bg2:       220 28% 95%;
+  --surface:   0 0% 100%;
+  --t:         222 47% 11%;
+  --ts:        224 20% 40%;
+  --tm:        224 14% 55%;
+  --border:    220 22% 85%;
+  --accent:    239 84% 55%;
+  --accent-fg: 0 0% 100%;
+  --success:   160 84% 32%;
+  --danger:    0 78% 52%;
+  --warning:   38 90% 48%;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-theme='auto'] {
+    --bg:        220 30% 98%;
+    --bg2:       220 28% 95%;
+    --surface:   0 0% 100%;
+    --t:         222 47% 11%;
+    --ts:        224 20% 40%;
+    --tm:        224 14% 55%;
+    --border:    220 22% 85%;
+    --accent:    239 84% 55%;
+    --success:   160 84% 32%;
+    --danger:    0 78% 52%;
+    --warning:   38 90% 48%;
+  }
+}
