@@ -73,4 +73,19 @@ router.post('/me/change-password', requireAuth, async (req: Request, res: Respon
   } catch (err) { next(err); }
 });
 
+// Live email lookup for "zaproś użytkownika" — sprawdza czy user istnieje w InfraDesk.
+router.get('/search', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const q = z.object({ email: z.string().email() }).parse(req.query);
+    const user = await prisma.user.findUnique({
+      where: { email: q.email.toLowerCase() },
+      select: {
+        id: true, email: true, firstName: true, lastName: true,
+        avatarUrl: true, phone: true, isActive: true,
+      },
+    });
+    res.json({ user });
+  } catch (err) { next(err); }
+});
+
 export default router;

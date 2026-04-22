@@ -1,20 +1,19 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import * as Dialog from '@radix-ui/react-dialog';
 import {
-  UserPlus, Users, ShieldCheck, Shield, User as UserIcon, X, Check, Ban, Mail, KeyRound,
+  UserPlus, Users, ShieldCheck, Shield, User as UserIcon, Check, Ban, Mail, KeyRound,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Input, Select } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { SkeletonCard } from '@/components/ui/Skeleton';
+import { ViewToggle, useViewPreference } from '@/components/ui/ViewToggle';
 import { formatRelativePl } from '@/lib/utils';
+import { MemberForm } from './MemberForm';
 
 type Role = 'OWNER' | 'ADMIN' | 'MEMBER';
 type Scope = 'FULL' | 'SCOPED';
@@ -46,8 +45,15 @@ const ROLE_META: Record<Role, { label: string; icon: typeof Shield; color: strin
 };
 
 export function UsersPage() {
+  const nav = useNavigate();
+  const [view, setView] = useViewPreference('users', 'visual');
   const [inviteOpen, setInviteOpen] = useState(false);
   const qc = useQueryClient();
+
+  function handleInvite() {
+    if (view === 'visual') setInviteOpen(true);
+    else nav('/users/new');
+  }
 
   const listQ = useQuery({
     queryKey: ['memberships'],
@@ -81,9 +87,12 @@ export function UsersPage() {
             {active.length} aktywnych · {invited.length} zaproszonych · {revoked.length} wyłączonych
           </p>
         </div>
-        <Button onClick={() => setInviteOpen(true)} className="gap-1.5">
-          <UserPlus size={14} /> Zaproś
-        </Button>
+        <div className="flex items-center gap-2">
+          <ViewToggle value={view} onChange={setView} />
+          <Button onClick={handleInvite} className="gap-1.5">
+            <UserPlus size={14} /> Zaproś
+          </Button>
+        </div>
       </div>
 
       {listQ.isLoading ? (
@@ -118,7 +127,7 @@ export function UsersPage() {
         </>
       )}
 
-      <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
+      {inviteOpen && <MemberForm onClose={() => setInviteOpen(false)} />}
     </div>
   );
 }
@@ -219,90 +228,4 @@ function MemberRow({
   );
 }
 
-const inviteSchema = z.object({
-  email: z.string().email(),
-  firstName: z.string().min(1).max(100),
-  lastName: z.string().min(1).max(100),
-  role: z.enum(['OWNER', 'ADMIN', 'MEMBER']).default('MEMBER'),
-  scope: z.enum(['FULL', 'SCOPED']).default('FULL'),
-});
-
-type InviteData = z.infer<typeof inviteSchema>;
-
-function InviteModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const qc = useQueryClient();
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<InviteData>({
-    resolver: zodResolver(inviteSchema),
-    defaultValues: { role: 'MEMBER', scope: 'FULL' },
-  });
-
-  const inviteMut = useMutation({
-    mutationFn: (data: InviteData) => api.post('/memberships/invite', data),
-    onSuccess: () => {
-      toast.success('Zaproszenie wysłane');
-      qc.invalidateQueries({ queryKey: ['memberships'] });
-      reset();
-      onClose();
-    },
-    onError: (e: unknown) =>
-      toast.error((e as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Błąd'),
-  });
-
-  return (
-    <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[92vw] max-w-[440px] bg-[var(--sf)] border border-[var(--bd)] rounded-[var(--r-m)] shadow-xl">
-          <form onSubmit={handleSubmit((v) => inviteMut.mutate(v))}>
-            <div className="flex items-center justify-between p-[var(--sp-4)] border-b border-[var(--bd)]">
-              <Dialog.Title className="text-[15px] font-semibold flex items-center gap-2">
-                <UserPlus size={15} /> Zaproś użytkownika
-              </Dialog.Title>
-              <Dialog.Close asChild>
-                <button type="button" className="p-1 rounded hover:bg-[var(--sf-h)]"><X size={14} /></button>
-              </Dialog.Close>
-            </div>
-            <div className="p-[var(--sp-4)] space-y-[var(--sp-3)]">
-              <Field label="Email"><Input type="email" {...register('email')} />{errors.email && <div className="text-[11px] text-[var(--er)] mt-1">{errors.email.message}</div>}</Field>
-              <div className="grid grid-cols-2 gap-[var(--sp-3)]">
-                <Field label="Imię"><Input {...register('firstName')} /></Field>
-                <Field label="Nazwisko"><Input {...register('lastName')} /></Field>
-              </div>
-              <div className="grid grid-cols-2 gap-[var(--sp-3)]">
-                <Field label="Rola">
-                  <Select {...register('role')}>
-                    <option value="MEMBER">Członek</option>
-                    <option value="ADMIN">Admin</option>
-                    <option value="OWNER">Właściciel</option>
-                  </Select>
-                </Field>
-                <Field label="Zakres">
-                  <Select {...register('scope')}>
-                    <option value="FULL">Pełny</option>
-                    <option value="SCOPED">Zawężony</option>
-                  </Select>
-                </Field>
-              </div>
-            </div>
-            <div className="flex items-center justify-end gap-2 p-[var(--sp-3)] border-t border-[var(--bd)] bg-[var(--sf-h)]">
-              <Button type="button" variant="ghost" onClick={onClose}>Anuluj</Button>
-              <Button type="submit" disabled={isSubmitting || inviteMut.isPending}>
-                {inviteMut.isPending ? 'Zapraszanie…' : 'Zaproś'}
-              </Button>
-            </div>
-          </form>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="text-[11px] text-[var(--tx3)] uppercase tracking-wider block mb-1">{label}</label>
-      {children}
-    </div>
-  );
-}
 

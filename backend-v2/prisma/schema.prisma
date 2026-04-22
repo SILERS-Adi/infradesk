@@ -196,6 +196,7 @@ model Workspace {
   failureClusters FailureCluster[]
   emailAccounts  UserEmailAccount[]
   emailMessages  EmailMessage[]
+  permissionSchemas PermissionSchema[]
 
   // MSP relations
   asProvider    WorkspaceRelation[] @relation("AsProvider")
@@ -1829,5 +1830,23 @@ model EmailMessage {
   @@index([accountId, receivedAt(sort: Desc)])
   @@index([workspaceId, linkedTicketId])
   @@index([threadId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PERMISSION SCHEMAS (quick-apply templates)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model PermissionSchema {
+  id           String   @id @default(uuid())
+  workspaceId  String
+  name         String
+  description  String?
+  overrides    Json     // [{ nodeId, level, canDelete? }]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
 }
 
