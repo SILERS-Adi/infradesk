@@ -555,6 +555,14 @@ model Ticket {
   type              TicketType     @default(INCIDENT)
   source            TicketSource
 
+  // Master ticket — MSP chooses client upfront (null for client-portal tickets: workspace = client)
+  clientWorkspaceId String?
+
+  // Components — flags which artefacts are generated from this master ticket
+  hasService        Boolean @default(true)
+  hasOrder          Boolean @default(false)
+  hasCrm            Boolean @default(false)
+
   // Requester (if from email/portal, not logged-in user)
   requesterName     String?
   requesterEmail    String?
@@ -607,6 +615,8 @@ model Ticket {
   attachments       Attachment[]
   sessionLinks      TicketSessionLink[]
   linkedTasks       Task[]
+  linkedOrders         Order[]
+  linkedCrmActivities  CrmActivity[]
 
   @@unique([workspaceId, ticketNumber])
   @@index([workspaceId, status])
@@ -944,11 +954,14 @@ model Order {
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
+  linkedTicketId    String?
   workspace         Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   items             OrderItem[]
+  linkedTicket      Ticket?      @relation(fields: [linkedTicketId], references: [id], onDelete: SetNull)
 
   @@unique([workspaceId, orderNumber])
   @@index([workspaceId, status])
+  @@index([linkedTicketId])
 }
 
 enum OrderStatus {
@@ -1432,6 +1445,7 @@ model CrmActivity {
   followUpRequired  Boolean  @default(false)
   followUpAt        DateTime?
   linkedTicketId    String?
+  billable          Boolean  @default(false)
   quoteValueNet     Decimal? @db.Decimal(12, 2)
   quoteStatus       QuoteStatus?
   createdAt         DateTime @default(now())
@@ -1440,10 +1454,12 @@ model CrmActivity {
   workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdBy         User      @relation("CrmCreatedBy", fields: [createdByUserId], references: [id])
   assignedTo        User?     @relation("CrmAssignedTo", fields: [assignedToUserId], references: [id])
+  linkedTicket      Ticket?   @relation(fields: [linkedTicketId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, type])
   @@index([scheduledAt])
   @@index([contactId])
+  @@index([linkedTicketId])
 }
 
 enum CrmActivityType {

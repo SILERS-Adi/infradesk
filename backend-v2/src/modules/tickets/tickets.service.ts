@@ -25,54 +25,202 @@ export async function nextTicketNumber(workspaceId: string, year = new Date().ge
   });
 }
 
+async function nextTaskNumber(tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0], workspaceId: string): Promise<string> {
+  const year = new Date().getFullYear();
+  const prefix = `TSK-${year}-`;
+  const last = await tx.task.findFirst({
+    where: { workspaceId, taskNumber: { startsWith: prefix } },
+    orderBy: { taskNumber: 'desc' },
+    select: { taskNumber: true },
+  });
+  let n = 1;
+  if (last) {
+    const m = last.taskNumber.match(/-(\d+)$/);
+    if (m) n = parseInt(m[1]!, 10) + 1;
+  }
+  return `${prefix}${String(n).padStart(4, '0')}`;
+}
+
+async function nextOrderNumber(tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0], workspaceId: string): Promise<string> {
+  const year = new Date().getFullYear();
+  const prefix = `ORD-${year}-`;
+  const last = await tx.order.findFirst({
+    where: { workspaceId, orderNumber: { startsWith: prefix } },
+    orderBy: { orderNumber: 'desc' },
+    select: { orderNumber: true },
+  });
+  let n = 1;
+  if (last) {
+    const m = last.orderNumber.match(/-(\d+)$/);
+    if (m) n = parseInt(m[1]!, 10) + 1;
+  }
+  return `${prefix}${String(n).padStart(4, '0')}`;
+}
+
 export async function createTicket(workspaceId: string, userId: string, input: CreateTicketInput) {
   // Validate references belong to workspace.
-  if (input.deviceId) {
-    const d = await prisma.device.findFirst({ where: { id: input.deviceId, workspaceId }, select: { id: true } });
-    if (!d) throw HttpError.badRequest('Device nie należy do tego workspace', 'invalid_device');
-  }
   if (input.locationId) {
     const l = await prisma.location.findFirst({ where: { id: input.locationId, workspaceId }, select: { id: true } });
     if (!l) throw HttpError.badRequest('Location nie należy do tego workspace', 'invalid_location');
   }
-  if (input.assignedToUserId) {
+  if (input.components.service?.deviceId) {
+    const d = await prisma.device.findFirst({
+      where: { id: input.components.service.deviceId, workspaceId },
+      select: { id: true },
+    });
+    if (!d) throw HttpError.badRequest('Device nie należy do tego workspace', 'invalid_device');
+  }
+  if (input.components.service?.assignedToUserId) {
     const m = await prisma.membership.findFirst({
-      where: { userId: input.assignedToUserId, workspaceId, status: 'ACTIVE' },
+      where: { userId: input.components.service.assignedToUserId, workspaceId, status: 'ACTIVE' },
       select: { id: true },
     });
     if (!m) throw HttpError.badRequest('Assignee nie jest członkiem workspace', 'invalid_assignee');
   }
 
   const ticketNumber = await nextTicketNumber(workspaceId);
+  const hasService = !!input.components.service;
+  const hasOrder = !!input.components.order;
+  const hasCrm = !!input.components.crm;
+  const serviceAssignee = input.components.service?.assignedToUserId ?? null;
+  // Master status: ASSIGNED gdy service ma assignee, inaczej OPEN (Nowe/nieprzydzielone).
+  const initialStatus: TicketStatus = serviceAssignee ? 'ASSIGNED' : 'OPEN';
 
-  const initialStatus: TicketStatus = input.assignedToUserId ? 'ASSIGNED' : 'OPEN';
-
-  const ticket = await prisma.ticket.create({
-    data: {
-      workspaceId,
-      ticketNumber,
-      title: input.title,
-      description: input.description,
-      status: initialStatus,
-      priority: input.priority,
-      type: input.type,
-      source: input.source,
-      category: input.category,
-      deviceId: input.deviceId ?? null,
-      locationId: input.locationId ?? null,
-      assignedToUserId: input.assignedToUserId ?? null,
-      createdByUserId: userId,
-      requesterName: input.requesterName,
-      requesterEmail: input.requesterEmail,
-      requesterPhone: input.requesterPhone,
-      dueAt: input.dueAt ? new Date(input.dueAt) : null,
-      events: {
-        create: { userId, eventType: 'created', toValue: initialStatus },
+  const result = await prisma.$transaction(async (tx) => {
+    const ticket = await tx.ticket.create({
+      data: {
+        workspaceId,
+        clientWorkspaceId: input.clientWorkspaceId ?? null,
+        ticketNumber,
+        title: input.title,
+        description: input.description,
+        status: initialStatus,
+        priority: input.priority,
+        type: input.type ?? 'INCIDENT',
+        source: input.source,
+        category: input.category,
+        hasService,
+        hasOrder,
+        hasCrm,
+        deviceId: input.components.service?.deviceId ?? input.deviceId ?? null,
+        locationId: input.locationId ?? null,
+        assignedToUserId: serviceAssignee ?? input.assignedToUserId ?? null,
+        createdByUserId: userId,
+        requesterName: input.requesterName,
+        requesterEmail: input.requesterEmail,
+        requesterPhone: input.requesterPhone,
+        dueAt: input.dueAt ? new Date(input.dueAt) : null,
+        serviceMode: input.components.service?.serviceMode ?? null,
+        events: { create: { userId, eventType: 'created', toValue: initialStatus } },
       },
-    },
-    include: { events: true },
+    });
+
+    // 1) SERVICE → Task (generated only when assignee is set, otherwise ticket floats in Nowe/nieprzydzielone)
+    if (hasService && serviceAssignee) {
+      const taskNumber = await nextTaskNumber(tx, workspaceId);
+      await tx.task.create({
+        data: {
+          workspaceId,
+          taskNumber,
+          title: input.title,
+          description: input.description,
+          status: 'NEW',
+          priority: input.priority,
+          assignedToUserId: serviceAssignee,
+          createdByUserId: userId,
+          linkedTicketId: ticket.id,
+          clientWorkspaceId: input.clientWorkspaceId ?? null,
+          locationId: input.locationId ?? null,
+          deviceId: input.components.service!.deviceId ?? null,
+          dueAt: input.components.service?.dueAt
+            ? new Date(input.components.service.dueAt)
+            : input.dueAt
+              ? new Date(input.dueAt)
+              : null,
+        },
+      });
+    }
+
+    // 2) ORDER → Order + OrderItem[]
+    if (hasOrder && input.components.order) {
+      const orderNumber = await nextOrderNumber(tx, workspaceId);
+      const items = input.components.order.items;
+      const totalNet = items.reduce((s, it) => s + Number(it.unitNet) * it.quantity, 0);
+      const totalGross = Number((totalNet * 1.23).toFixed(2));
+      await tx.order.create({
+        data: {
+          workspaceId,
+          clientWorkspaceId: input.clientWorkspaceId ?? null,
+          orderNumber,
+          title: input.title,
+          description: input.components.order.notes ?? input.description,
+          status: 'DRAFT',
+          totalNet: totalNet.toFixed(2),
+          totalGross: totalGross.toFixed(2),
+          vatRate: '23',
+          supplierName: input.components.order.supplierName ?? null,
+          expectedDeliveryDate: input.components.order.expectedDeliveryDate
+            ? new Date(input.components.order.expectedDeliveryDate)
+            : null,
+          createdByUserId: userId,
+          linkedTicketId: ticket.id,
+          items: {
+            create: items.map((it) => ({
+              name: it.name,
+              description: it.description ?? null,
+              quantity: it.quantity,
+              unitNet: Number(it.unitNet).toFixed(2),
+              totalNet: (Number(it.unitNet) * it.quantity).toFixed(2),
+            })),
+          },
+        },
+      });
+    }
+
+    // 3) CRM → CrmActivity[] (po jednej na aktywność)
+    if (hasCrm && input.components.crm) {
+      for (const act of input.components.crm.activities) {
+        await tx.crmActivity.create({
+          data: {
+            workspaceId,
+            createdByUserId: userId,
+            clientWorkspaceId: input.clientWorkspaceId ?? null,
+            type: act.type,
+            title: act.title ?? input.title,
+            notes: act.notes ?? null,
+            scheduledAt: act.scheduledAt ? new Date(act.scheduledAt) : null,
+            followUpRequired: act.followUpRequired,
+            followUpAt: act.followUpAt ? new Date(act.followUpAt) : null,
+            billable: act.billable,
+            quoteValueNet: act.quoteValueNet ? Number(act.quoteValueNet).toFixed(2) : null,
+            linkedTicketId: ticket.id,
+          },
+        });
+      }
+    }
+
+    return ticket;
   });
-  return ticket;
+
+  return result;
+}
+
+/**
+ * Computes derived status for list views:
+ * - "nowe" when no children or none started
+ * - "w_toku" when any child active
+ * - "zakonczone" when all children done
+ * - "anulowane" when ticket status = CANCELLED
+ */
+export function derivedTabStatus(
+  status: string,
+  counts: { totalChildren: number; doneChildren: number; activeChildren: number },
+): 'nowe' | 'w_toku' | 'zakonczone' | 'anulowane' {
+  if (status === 'CANCELLED') return 'anulowane';
+  if (counts.totalChildren === 0) return 'nowe';
+  if (counts.activeChildren > 0) return 'w_toku';
+  if (counts.doneChildren === counts.totalChildren) return 'zakonczone';
+  return 'nowe';
 }
 
 export async function listTickets(workspaceId: string, opts: {
@@ -101,14 +249,36 @@ export async function listTickets(workspaceId: string, opts: {
       id: true, ticketNumber: true, title: true, status: true, priority: true,
       category: true, createdAt: true, updatedAt: true, dueAt: true,
       assignedToUserId: true, deviceId: true,
+      clientWorkspaceId: true, hasService: true, hasOrder: true, hasCrm: true,
       assignedTo: { select: { id: true, firstName: true, lastName: true } },
       device: { select: { id: true, name: true } },
+      linkedTasks: { select: { id: true, status: true } },
+      linkedOrders: { select: { id: true, status: true } },
+      linkedCrmActivities: { select: { id: true, completedAt: true } },
     },
   });
   const hasMore = items.length > opts.limit;
   const slice = hasMore ? items.slice(0, -1) : items;
   const nextCursor = hasMore ? slice[slice.length - 1]!.id : null;
-  return { items: slice, nextCursor };
+
+  // Compute derived tab status per item based on child states.
+  const enriched = slice.map((t) => {
+    const tasks = t.linkedTasks ?? [];
+    const orders = t.linkedOrders ?? [];
+    const crms = t.linkedCrmActivities ?? [];
+    const isTaskDone = (s: string) => s === 'DONE' || s === 'CANCELLED';
+    const isOrderDone = (s: string) => s === 'DELIVERED' || s === 'INVOICED' || s === 'CANCELLED';
+    const isCrmDone = (c: { completedAt: Date | null }) => c.completedAt !== null;
+    const total = tasks.length + orders.length + crms.length;
+    const done = tasks.filter((x) => isTaskDone(x.status)).length
+      + orders.filter((x) => isOrderDone(x.status)).length
+      + crms.filter(isCrmDone).length;
+    const active = total - done;
+    const tab = derivedTabStatus(t.status, { totalChildren: total, doneChildren: done, activeChildren: active });
+    return { ...t, tab, childCounts: { total, done, active } };
+  });
+
+  return { items: enriched, nextCursor };
 }
 
 export async function getTicket(workspaceId: string, id: string) {
@@ -126,10 +296,41 @@ export async function getTicket(workspaceId: string, id: string) {
         },
       },
       events: { orderBy: { createdAt: 'asc' } },
+      linkedTasks: {
+        select: {
+          id: true, taskNumber: true, title: true, status: true, priority: true,
+          dueAt: true, completedAt: true,
+          assignedTo: { select: { id: true, firstName: true, lastName: true } },
+        },
+      },
+      linkedOrders: {
+        select: {
+          id: true, orderNumber: true, title: true, status: true,
+          totalNet: true, totalGross: true, supplierName: true,
+          expectedDeliveryDate: true, deliveredAt: true,
+        },
+      },
+      linkedCrmActivities: {
+        select: {
+          id: true, type: true, title: true, scheduledAt: true, completedAt: true,
+          followUpRequired: true, followUpAt: true, billable: true, quoteValueNet: true,
+        },
+      },
     },
   });
   if (!t) throw HttpError.notFound('Ticket not found');
-  return t;
+
+  // Resolve client workspace name
+  let clientName: string | null = null;
+  if (t.clientWorkspaceId) {
+    const w = await prisma.workspace.findUnique({
+      where: { id: t.clientWorkspaceId },
+      select: { name: true, slug: true },
+    });
+    clientName = w ? `${w.name}` : null;
+  }
+
+  return { ...t, clientName };
 }
 
 export async function updateTicket(workspaceId: string, userId: string, id: string, patch: UpdateTicketInput) {
