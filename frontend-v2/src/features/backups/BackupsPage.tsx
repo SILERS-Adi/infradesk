@@ -240,7 +240,7 @@ function CreateBackupModal({ onClose }: { onClose: () => void }) {
             <Dialog.Title className="text-[16px] font-bold text-tx">Nowy backup</Dialog.Title>
             <Dialog.Close asChild><button className="p-2 rounded-[var(--r-s)] text-tx3 hover:bg-sf-h press"><X className="h-4 w-4" /></button></Dialog.Close>
           </div>
-          <form className="px-6 py-5 space-y-5 overflow-y-auto" onSubmit={handleSubmit((d) => mutation.mutate(d))}>
+          <form className="px-6 py-5 space-y-5 overflow-y-auto flex-1 min-h-0" onSubmit={handleSubmit((d) => mutation.mutate(d))}>
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-[0.1em] mb-1.5 text-tx2">Nazwa</label>
               <Input {...register('name')} placeholder="np. Produkcja — baza klienta" />

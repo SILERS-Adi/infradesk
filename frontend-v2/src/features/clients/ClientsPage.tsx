@@ -298,7 +298,7 @@ function CreateClientModal({ onClose }: { onClose: () => void }) {
               </button>
             </Dialog.Close>
           </div>
-          <form className="px-6 py-5 space-y-5 overflow-y-auto" onSubmit={handleSubmit((d) => mutation.mutate(d))}>
+          <form className="px-6 py-5 space-y-5 overflow-y-auto flex-1 min-h-0" onSubmit={handleSubmit((d) => mutation.mutate(d))}>
             <div>
               <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-tx2 mb-3">Dane firmy</h3>
               <div className="space-y-3">

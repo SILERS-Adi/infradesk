@@ -220,7 +220,7 @@ function CreateLocationModal({ onClose }: { onClose: () => void }) {
               <button className="p-2 rounded-[var(--r-s)] text-tx3 hover:bg-sf-h press"><X className="h-4 w-4" /></button>
             </Dialog.Close>
           </div>
-          <form className="px-6 py-5 space-y-5 overflow-y-auto" onSubmit={handleSubmit((d) => mutation.mutate(d))}>
+          <form className="px-6 py-5 space-y-5 overflow-y-auto flex-1 min-h-0" onSubmit={handleSubmit((d) => mutation.mutate(d))}>
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-2">
                 <label className="block text-[10px] font-semibold text-tx3 mb-1">Nazwa *</label>

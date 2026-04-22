@@ -195,7 +195,7 @@ function CreateOrderModal({ onClose }: { onClose: () => void }) {
               </button>
             </Dialog.Close>
           </div>
-          <form className="px-6 py-5 space-y-4 overflow-y-auto" onSubmit={handleSubmit((d) => mutation.mutate(d))}>
+          <form className="px-6 py-5 space-y-4 overflow-y-auto flex-1 min-h-0" onSubmit={handleSubmit((d) => mutation.mutate(d))}>
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-[0.12em] mb-1.5 text-tx2">Tytuł</label>
               <Input {...register('title')} placeholder="np. Zakup laptopów Dell" />

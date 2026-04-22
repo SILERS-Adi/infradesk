@@ -254,7 +254,7 @@ function CreateDeviceModal({ locations, onClose }: { locations: Location[]; onCl
             <Dialog.Title className="text-[16px] font-bold text-tx">Nowe urządzenie</Dialog.Title>
             <Dialog.Close asChild><button className="p-2 rounded-[var(--r-s)] text-tx3 hover:bg-sf-h press"><X className="h-4 w-4" /></button></Dialog.Close>
           </div>
-          <form className="px-6 py-5 space-y-4 overflow-y-auto" onSubmit={handleSubmit((d) => mutation.mutate(d))}>
+          <form className="px-6 py-5 space-y-4 overflow-y-auto flex-1 min-h-0" onSubmit={handleSubmit((d) => mutation.mutate(d))}>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-[10px] font-semibold text-tx3 mb-1">Nazwa *</label>
