@@ -389,14 +389,20 @@ async function main(): Promise<void> {
   }
   console.log(`  ✓ ${aCreated} utworzonych, ${aSkipped} pominięto`);
 
-  // ── 8. ALERTY (MonitoringAlert)
-  console.log('\n[8/9] MonitoringAlerts…');
+  // ── 8. ALERTY (MonitoringAlert) — V1 używa agentRegId → lookup deviceId przez AgentRegistration
+  console.log('\n[8/11] MonitoringAlerts…');
+  const v1AgentsForAlerts = (await v1.query(`SELECT id, "deviceId" FROM "AgentRegistration"`)).rows;
+  const agentToDevice = new Map<string, string>();
+  for (const a of v1AgentsForAlerts) {
+    if (a.deviceId) agentToDevice.set(a.id, a.deviceId);
+  }
   const v1Alerts = (await v1.query(`SELECT * FROM "MonitoringAlert"`)).rows;
   let alCreated = 0;
   let alSkipped = 0;
   for (const al of v1Alerts) {
     const wsId = ids.workspaces.get(al.workspaceId);
-    const devId = al.deviceId ? ids.devices.get(al.deviceId) : null;
+    const v1DevId = agentToDevice.get(al.agentRegId);
+    const devId = v1DevId ? ids.devices.get(v1DevId) : null;
     if (!wsId || !devId) { alSkipped++; continue; }
     if (!dryRun) {
       await prisma.monitoringAlert.create({
@@ -404,12 +410,9 @@ async function main(): Promise<void> {
           workspaceId: wsId,
           deviceId: devId,
           type: al.type,
-          severity: (al.severity ?? 'MEDIUM') as never,
+          severity: mapSeverity(al.severity) as never,
           message: al.message ?? '',
-          rawData: al.rawData,
           resolved: al.resolved ?? false,
-          resolvedAt: al.resolvedAt,
-          autoResolveReason: al.autoResolveReason,
           createdAt: al.createdAt,
         },
       });
@@ -418,7 +421,78 @@ async function main(): Promise<void> {
   }
   console.log(`  ✓ ${alCreated} utworzonych, ${alSkipped} pominięto`);
 
-  // ── 9. SUMMARY
+  // ── 9. TASKS
+  console.log('\n[9/11] Tasks…');
+  const v1Tasks = (await v1.query(`SELECT * FROM "Task"`)).rows;
+  let tkCreated = 0;
+  let tkSkipped = 0;
+  for (const tk of v1Tasks) {
+    const wsId = ids.workspaces.get(tk.workspaceId);
+    const createdBy = ids.users.get(tk.createdByUserId);
+    if (!wsId || !createdBy) { tkSkipped++; continue; }
+    const assignedTo = tk.assignedToUserId ? ids.users.get(tk.assignedToUserId) : null;
+    const linkedTicketId = tk.ticketId ? ids.tickets.get(tk.ticketId) : null;
+    const exists = await prisma.task.findFirst({
+      where: { workspaceId: wsId, taskNumber: tk.taskNumber },
+      select: { id: true },
+    });
+    if (exists) { tkSkipped++; continue; }
+    if (!dryRun) {
+      await prisma.task.create({
+        data: {
+          workspaceId: wsId,
+          taskNumber: tk.taskNumber,
+          title: tk.title ?? 'Zadanie',
+          description: tk.description,
+          status: mapTaskStatus(tk.status) as never,
+          priority: 'MEDIUM' as never,
+          assignedToUserId: assignedTo,
+          createdByUserId: createdBy,
+          linkedTicketId,
+          dueAt: tk.dueAt,
+          completedAt: tk.completedAt,
+          estimatedMinutes: tk.estimatedMinutes,
+          travelKm: tk.travelKm,
+          createdAt: tk.createdAt,
+        },
+      });
+    }
+    tkCreated++;
+  }
+  console.log(`  ✓ ${tkCreated} utworzonych, ${tkSkipped} pominięto`);
+
+  // ── 10. WORK SESSIONS
+  console.log('\n[10/11] WorkSessions…');
+  const v1Sess = (await v1.query(`SELECT * FROM "WorkSession"`)).rows;
+  let sCreated = 0;
+  let sSkipped = 0;
+  for (const s of v1Sess) {
+    const wsId = ids.workspaces.get(s.workspaceId);
+    const techId = ids.users.get(s.techId);
+    if (!wsId || !techId) { sSkipped++; continue; }
+    const deviceId = s.deviceId ? ids.devices.get(s.deviceId) : null;
+    const locationId = s.locationId ? ids.locations.get(s.locationId) : null;
+    if (!dryRun) {
+      await prisma.workSession.create({
+        data: {
+          workspaceId: wsId,
+          technicianId: techId,
+          deviceId,
+          locationId,
+          status: mapSessionStatus(s.status) as never,
+          serviceMode: 'REMOTE' as never,
+          startedAt: s.startedAt,
+          endedAt: s.endedAt,
+          notes: s.notes,
+          createdAt: s.createdAt,
+        },
+      });
+    }
+    sCreated++;
+  }
+  console.log(`  ✓ ${sCreated} utworzonych, ${sSkipped} pominięto`);
+
+  // ── 11. SUMMARY
   console.log('\n━━━ MIGRATION COMPLETE ━━━');
   console.log(`Users:        ${ids.users.size}`);
   console.log(`Workspaces:   ${ids.workspaces.size}`);
@@ -443,6 +517,27 @@ function mapTicketStatus(s: string): string {
 function mapPriority(p: string): string {
   const ok = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
   return ok.includes(p) ? p : 'MEDIUM';
+}
+function mapSeverity(s: string): string {
+  const m: Record<string, string> = {
+    INFO: 'INFO', LOW: 'LOW', MEDIUM: 'MEDIUM', HIGH: 'HIGH', CRITICAL: 'CRITICAL',
+    WARNING: 'MEDIUM', ERROR: 'HIGH',
+  };
+  return m[s] ?? 'MEDIUM';
+}
+function mapTaskStatus(s: string): string {
+  const m: Record<string, string> = {
+    TODO: 'NEW', NEW: 'NEW', PENDING: 'NEW',
+    IN_PROGRESS: 'IN_PROGRESS', DOING: 'IN_PROGRESS',
+    DONE: 'DONE', COMPLETED: 'DONE', CANCELLED: 'CANCELLED',
+  };
+  return m[s] ?? 'NEW';
+}
+function mapSessionStatus(s: string): string {
+  const m: Record<string, string> = {
+    ACTIVE: 'ACTIVE', PAUSED: 'PAUSED', COMPLETED: 'COMPLETED', CANCELLED: 'CANCELLED',
+  };
+  return m[s] ?? 'COMPLETED';
 }
 
 async function connectV1(): Promise<PgClient> {
