@@ -32,6 +32,7 @@ import { IrisChatPage } from '@/features/ai/IrisChatPage';
 import { ShadowModePage } from '@/features/ai/ShadowModePage';
 import { AiInsightsPage } from '@/features/ai/AiInsightsPage';
 import { AiUsagePage } from '@/features/ai/AiUsagePage';
+import { PortalSettingsPage } from '@/features/portal-settings/PortalSettingsPage';
 import { ComingSoon } from '@/components/ui/ComingSoon';
 
 const queryClient = new QueryClient({
@@ -65,7 +66,7 @@ export default function App() {
             <Route path="/alerts" element={<AlertsPage />} />
             <Route path="/orders" element={<OrdersPage />} />
             <Route path="/delegations" element={<DelegationsPage />} />
-            <Route path="/portal-settings" element={<ComingSoon title="Portal i obsługa" sprint="Sprint 5" />} />
+            <Route path="/portal-settings" element={<PortalSettingsPage />} />
 
             {/* KLIENCI */}
             <Route path="/clients" element={<ClientsPage />} />

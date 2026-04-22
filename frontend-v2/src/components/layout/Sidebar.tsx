@@ -1,5 +1,6 @@
-import { useState, type ReactNode } from 'react';
+import { useState, type ReactNode, useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard, Ticket, CheckSquare, Calendar, Timer, Receipt, Bell, ShoppingCart, Car, Globe2,
   Building2, Users, MapPin, Handshake,
@@ -10,6 +11,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
+import { api } from '@/lib/api';
+
+type WorkspaceType = 'MSP' | 'CLIENT' | 'INTERNAL_IT';
 
 interface NavItem {
   to: string;
@@ -24,6 +28,19 @@ interface NavGroup {
   label: string;
   items: NavItem[];
 }
+
+// Groups visible for each workspace type. CLIENT portal is drastically trimmed:
+// only their own tickets/devices/vault + AI chat + own settings. No MSP-only admin views.
+const CLIENT_VISIBLE_PATHS = new Set<string>([
+  '/', '/tickets', '/calendar',
+  '/devices', '/activity-logs',
+  '/vault', '/vault/mine', '/vault/shared',
+  '/ai',
+  '/my-company', '/users', '/settings',
+]);
+
+// Group IDs hidden entirely in CLIENT portal.
+const CLIENT_HIDDEN_GROUPS = new Set<string>(['clients']);
 
 const GROUPS: NavGroup[] = [
   {
@@ -98,6 +115,26 @@ const GROUPS: NavGroup[] = [
 export function Sidebar() {
   const { user, logout } = useAuthStore();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  const wsQ = useQuery<{ workspace: { id: string; name: string; slug: string; type: WorkspaceType } }>({
+    queryKey: ['workspace', 'current'],
+    queryFn: async () => (await api.get<{ workspace: { id: string; name: string; slug: string; type: WorkspaceType } }>('/workspaces/current')).data,
+    staleTime: 5 * 60_000,
+  });
+  const workspace = wsQ.data?.workspace;
+  const isClient = workspace?.type === 'CLIENT';
+
+  const visibleGroups = useMemo(() => {
+    if (!isClient) return GROUPS;
+    return GROUPS
+      .filter((g) => !CLIENT_HIDDEN_GROUPS.has(g.id))
+      .map((g) => ({
+        ...g,
+        items: g.items.filter((it) => CLIENT_VISIBLE_PATHS.has(it.to)),
+      }))
+      .filter((g) => g.items.length > 0);
+  }, [isClient]);
+
   const toggleGroup = (id: string) => {
     const next = new Set(collapsed);
     if (next.has(id)) next.delete(id); else next.add(id);
@@ -113,10 +150,12 @@ export function Sidebar() {
       <div className="px-5 pt-5 pb-4 flex items-center gap-3">
         <img src="/logo-icon.png" alt="" className="h-9 w-9 shrink-0 object-contain" />
         <div className="leading-tight">
-          <p className="text-[14px] font-bold text-tx">
-            Infra<span style={{ color: 'var(--pri)' }}>Desk</span>
+          <p className="text-[14px] font-bold text-tx truncate">
+            {isClient && workspace ? workspace.name : <>Infra<span style={{ color: 'var(--pri)' }}>Desk</span></>}
           </p>
-          <p className="text-[9px] font-semibold tracking-[0.2em] uppercase text-tx3">v2 · Operacje</p>
+          <p className="text-[9px] font-semibold tracking-[0.2em] uppercase text-tx3">
+            {isClient ? 'Portal klienta' : 'v2 · Operacje'}
+          </p>
         </div>
       </div>
 
@@ -124,7 +163,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-3 overflow-y-auto">
-        {GROUPS.map((group) => (
+        {visibleGroups.map((group) => (
           <SidebarGroup
             key={group.id}
             group={group}
