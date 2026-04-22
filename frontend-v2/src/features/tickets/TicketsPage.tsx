@@ -46,8 +46,9 @@ export function statusBadge(status: string) {
   return <Badge variant={cfg.variant}>{cfg.label}</Badge>;
 }
 
-type Tab = 'nowe' | 'w_toku' | 'zakonczone' | 'anulowane';
+type Tab = 'wszystkie' | 'nowe' | 'w_toku' | 'zakonczone' | 'anulowane';
 const TAB_LABEL: Record<Tab, string> = {
+  wszystkie: 'Wszystkie',
   nowe: 'Nowe',
   w_toku: 'W toku',
   zakonczone: 'Zakończone',
@@ -57,7 +58,7 @@ const TAB_LABEL: Record<Tab, string> = {
 export function TicketsPage() {
   const nav = useNavigate();
   const [view, setView] = useViewPreference('tickets', 'visual');
-  const [tab, setTab] = useState<Tab>('nowe');
+  const [tab, setTab] = useState<Tab>('wszystkie');
   const [showNew, setShowNew] = useState(false);
 
   function handleAdd() {
@@ -68,20 +69,25 @@ export function TicketsPage() {
   const { data, isLoading } = useQuery<{ items: TicketListItem[] }>({
     queryKey: ['tickets', 'list'],
     queryFn: async () => (await api.get('/tickets', { params: { limit: 200 } })).data,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const items = data?.items ?? [];
 
   const counts = useMemo(() => {
-    const c: Record<Tab, number> = { nowe: 0, w_toku: 0, zakonczone: 0, anulowane: 0 };
+    const c: Record<Tab, number> = { wszystkie: items.length, nowe: 0, w_toku: 0, zakonczone: 0, anulowane: 0 };
     for (const t of items) {
-      const tabValue: Tab = t.tab ?? 'nowe';
-      c[tabValue]++;
+      const tabValue: Tab = (t.tab as Tab) ?? 'nowe';
+      if (tabValue !== 'wszystkie') c[tabValue]++;
     }
     return c;
   }, [items]);
 
-  const filtered = useMemo(() => items.filter((t) => (t.tab ?? 'nowe') === tab), [items, tab]);
+  const filtered = useMemo(() => {
+    if (tab === 'wszystkie') return items;
+    return items.filter((t) => (t.tab ?? 'nowe') === tab);
+  }, [items, tab]);
 
   return (
     <div className="space-y-5">
@@ -126,12 +132,13 @@ export function TicketsPage() {
       ) : filtered.length === 0 ? (
         <Card className="p-10 text-center">
           <p className="text-tx font-medium mb-1">
+            {tab === 'wszystkie' && 'Brak zgłoszeń'}
             {tab === 'nowe' && 'Brak nieprzydzielonych zgłoszeń'}
             {tab === 'w_toku' && 'Brak zgłoszeń w toku'}
             {tab === 'zakonczone' && 'Brak zakończonych'}
             {tab === 'anulowane' && 'Brak anulowanych'}
           </p>
-          {tab === 'nowe' && <p className="text-sm text-tx3">Kliknij „Nowe zgłoszenie" aby utworzyć.</p>}
+          {(tab === 'wszystkie' || tab === 'nowe') && <p className="text-sm text-tx3">Kliknij „Nowe zgłoszenie" aby utworzyć.</p>}
         </Card>
       ) : view === 'visual' ? (
         <TicketsVisualGrid items={filtered} />

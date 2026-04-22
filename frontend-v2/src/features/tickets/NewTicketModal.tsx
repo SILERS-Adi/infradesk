@@ -262,55 +262,84 @@ export function TicketCreator({ onClose, variant = 'modal' }: { onClose: () => v
     </div>
   );
 
+  const step1Content = (
+    <Step1
+      clients={clients}
+      locations={filteredLocations}
+      clientWorkspaceId={clientWorkspaceId}
+      setClientWorkspaceId={setClientWorkspaceId}
+      locationId={locationId}
+      setLocationId={setLocationId}
+    />
+  );
+  const step2Content = (
+    <Step2
+      title={title} setTitle={setTitle}
+      description={description} setDescription={setDescription}
+      priority={priority} setPriority={setPriority}
+      dueAt={dueAt} setDueAt={setDueAt}
+      requesterName={requesterName} setRequesterName={setRequesterName}
+      requesterEmail={requesterEmail} setRequesterEmail={setRequesterEmail}
+      requesterPhone={requesterPhone} setRequesterPhone={setRequesterPhone}
+      enableService={enableService} setEnableService={setEnableService}
+      enableOrder={enableOrder} setEnableOrder={setEnableOrder}
+      enableCrm={enableCrm} setEnableCrm={setEnableCrm}
+      serviceMode={serviceMode} setServiceMode={setServiceMode}
+      deviceId={deviceId} setDeviceId={setDeviceId}
+      freeTextSubject={freeTextSubject} setFreeTextSubject={setFreeTextSubject}
+      assignedToUserId={assignedToUserId} setAssignedToUserId={setAssignedToUserId}
+      devices={filteredDevices}
+      members={members}
+      clientWorkspaceId={clientWorkspaceId}
+      locationId={locationId}
+      orderItems={orderItems}
+      addOrderItem={addOrderItem}
+      updateOrderItem={updateOrderItem}
+      removeOrderItem={removeOrderItem}
+      orderSupplier={orderSupplier} setOrderSupplier={setOrderSupplier}
+      orderExpected={orderExpected} setOrderExpected={setOrderExpected}
+      crmActs={crmActs}
+      toggleCrm={toggleCrm}
+      updateCrm={updateCrm}
+    />
+  );
+
   const body = (
     <div style={variant === 'modal' ? MODAL_BODY : { padding: '24px', flex: '1 1 auto' }}>
-      {step === 1 && (
-        <Step1
-          clients={clients}
-          locations={filteredLocations}
-          clientWorkspaceId={clientWorkspaceId}
-          setClientWorkspaceId={setClientWorkspaceId}
-          locationId={locationId}
-          setLocationId={setLocationId}
-        />
-      )}
-      {step === 2 && (
-        <Step2
-          title={title} setTitle={setTitle}
-          description={description} setDescription={setDescription}
-          priority={priority} setPriority={setPriority}
-          dueAt={dueAt} setDueAt={setDueAt}
-          requesterName={requesterName} setRequesterName={setRequesterName}
-          requesterEmail={requesterEmail} setRequesterEmail={setRequesterEmail}
-          requesterPhone={requesterPhone} setRequesterPhone={setRequesterPhone}
-          enableService={enableService} setEnableService={setEnableService}
-          enableOrder={enableOrder} setEnableOrder={setEnableOrder}
-          enableCrm={enableCrm} setEnableCrm={setEnableCrm}
-          serviceMode={serviceMode} setServiceMode={setServiceMode}
-          deviceId={deviceId} setDeviceId={setDeviceId}
-          freeTextSubject={freeTextSubject} setFreeTextSubject={setFreeTextSubject}
-          assignedToUserId={assignedToUserId} setAssignedToUserId={setAssignedToUserId}
-          devices={filteredDevices}
-          members={members}
-          clientWorkspaceId={clientWorkspaceId}
-          locationId={locationId}
-          orderItems={orderItems}
-          addOrderItem={addOrderItem}
-          updateOrderItem={updateOrderItem}
-          removeOrderItem={removeOrderItem}
-          orderSupplier={orderSupplier} setOrderSupplier={setOrderSupplier}
-          orderExpected={orderExpected} setOrderExpected={setOrderExpected}
-          crmActs={crmActs}
-          toggleCrm={toggleCrm}
-          updateCrm={updateCrm}
-        />
+      {variant === 'modal' ? (
+        <>
+          {step === 1 && step1Content}
+          {step === 2 && step2Content}
+        </>
+      ) : (
+        <div className="space-y-8">
+          <section>
+            <h2 className="text-[13px] font-bold uppercase tracking-[0.15em] text-tx2 mb-4 pb-2 border-b border-bd">
+              1. Klient i lokalizacja
+            </h2>
+            {step1Content}
+          </section>
+          <section>
+            <h2 className="text-[13px] font-bold uppercase tracking-[0.15em] text-tx2 mb-4 pb-2 border-b border-bd">
+              2. Czego dotyczy zgłoszenie
+            </h2>
+            {step2Content}
+          </section>
+        </div>
       )}
     </div>
   );
 
   const footer = (
     <div className="px-6 py-3 border-t border-bd flex items-center justify-between gap-2 bg-sf-h" style={{ flexShrink: 0 }}>
-      {step === 1 ? (
+      {variant === 'page' ? (
+        <>
+          <Button variant="ghost" onClick={onClose}>Anuluj</Button>
+          <Button onClick={() => mutation.mutate()} disabled={!canSubmit || !canGoNext || mutation.isPending}>
+            {mutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Tworzenie…</> : <>Utwórz zgłoszenie <Check className="h-4 w-4" /></>}
+          </Button>
+        </>
+      ) : step === 1 ? (
         <>
           <Button variant="ghost" onClick={onClose}>Anuluj</Button>
           <Button onClick={() => setStep(2)} disabled={!canGoNext}>
@@ -344,7 +373,6 @@ export function TicketCreator({ onClose, variant = 'modal' }: { onClose: () => v
         }}
       >
         {header}
-        {stepIndicator}
         {body}
         {footer}
       </div>
