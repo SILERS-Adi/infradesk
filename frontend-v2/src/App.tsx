@@ -17,7 +17,7 @@ import { CalendarPage } from '@/features/calendar/CalendarPage';
 import { BillingPage } from '@/features/billing/BillingPage';
 import { ClientsPage } from '@/features/clients/ClientsPage';
 import { ClientDetailPage } from '@/features/clients/ClientDetailPage';
-import { ContactsPage } from '@/features/contacts/ContactsPage';
+import { CrmHubPage } from '@/features/crm/CrmHubPage';
 import { LocationsPage } from '@/features/locations/LocationsPage';
 import { DevicesPage } from '@/features/devices/DevicesPage';
 import { AgentsPage } from '@/features/agents/AgentsPage';
@@ -73,7 +73,7 @@ export default function App() {
             {/* KLIENCI */}
             <Route path="/clients" element={<ClientsPage />} />
             <Route path="/clients/:id" element={<ClientDetailPage />} />
-            <Route path="/contacts" element={<ContactsPage />} />
+            <Route path="/contacts" element={<CrmHubPage />} />
             <Route path="/locations" element={<LocationsPage />} />
             <Route path="/partners" element={<ComingSoon title="Partnerzy IT" sprint="Phase 2 (post-launch)" />} />
 

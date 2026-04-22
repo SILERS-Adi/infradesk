@@ -85,6 +85,8 @@ model User {
   activityLogs     ActivityLog[]
   timeSignals      TimeSignal[]
   timeSlots        TimeSlot[]
+  emailAccounts    UserEmailAccount[]
+  emailMessagesAdded EmailMessage[] @relation("EmailMessageAddedBy")
 
   @@index([email])
   @@index([isSuperAdmin])
@@ -192,6 +194,8 @@ model Workspace {
   timeSignals    TimeSignal[]
   timeSlots      TimeSlot[]
   failureClusters FailureCluster[]
+  emailAccounts  UserEmailAccount[]
+  emailMessages  EmailMessage[]
 
   // MSP relations
   asProvider    WorkspaceRelation[] @relation("AsProvider")
@@ -617,6 +621,7 @@ model Ticket {
   linkedTasks       Task[]
   linkedOrders         Order[]
   linkedCrmActivities  CrmActivity[]
+  linkedEmails         EmailMessage[]
 
   @@unique([workspaceId, ticketNumber])
   @@index([workspaceId, status])
@@ -1711,3 +1716,118 @@ model FailureClusterMember {
   @@id([clusterId, ticketId])
   @@index([ticketId])
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CRM EMAIL (Phase 1: manual; Phase 2: IMAP sync; Phase 3: OAuth)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+enum EmailAccountType {
+  PERSONAL       // osobista skrzynka serwisanta
+  SHARED         // współdzielona między wybrany zespół
+  MSP_MAIN       // główna poczta MSP (widoczna dla adminów)
+}
+
+enum EmailProvider {
+  IMAP
+  GMAIL
+  OUTLOOK
+}
+
+enum EmailDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum EmailFolder {
+  INBOX
+  SENT
+  ARCHIVE
+  SPAM
+  DRAFT
+}
+
+model UserEmailAccount {
+  id              String   @id @default(uuid())
+  workspaceId     String
+  userId          String   // właściciel skrzynki (dla SHARED może być admin MSP)
+  email           String
+  displayName     String?
+  type            EmailAccountType @default(PERSONAL)
+  provider        EmailProvider    @default(IMAP)
+
+  // IMAP
+  imapHost            String?
+  imapPort            Int?
+  imapUsername        String?
+  imapPasswordEnc     String?
+  imapPasswordIv      String?
+  imapPasswordAuthTag String?
+  imapUseTls          Boolean  @default(true)
+
+  // SMTP (Phase 2)
+  smtpHost            String?
+  smtpPort            Int?
+  smtpUsername        String?
+  smtpPasswordEnc     String?
+  smtpPasswordIv      String?
+  smtpPasswordAuthTag String?
+
+  lastSyncAt      DateTime?
+  lastErrorAt     DateTime?
+  lastErrorMsg    String?
+  isActive        Boolean  @default(true)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages        EmailMessage[]
+
+  @@unique([userId, email])
+  @@index([workspaceId, userId])
+  @@index([workspaceId, type])
+}
+
+model EmailMessage {
+  id                  String   @id @default(uuid())
+  workspaceId         String
+  accountId           String
+  messageId           String?
+  threadId            String?
+
+  direction           EmailDirection  @default(INBOUND)
+  folder              EmailFolder     @default(INBOX)
+
+  fromAddress         String
+  fromName            String?
+  toAddresses         String[]
+  ccAddresses         String[]  @default([])
+  subject             String?
+  bodyText            String?  @db.Text
+  bodyHtml            String?  @db.Text
+
+  receivedAt          DateTime
+
+  linkedTicketId      String?
+  linkedCrmActivityId String?
+
+  isRead              Boolean @default(false)
+  isStarred           Boolean @default(false)
+
+  addedManually       Boolean @default(true)
+  addedByUserId       String?
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  workspace           Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  account             UserEmailAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  linkedTicket        Ticket?          @relation(fields: [linkedTicketId], references: [id], onDelete: SetNull)
+  addedBy             User?            @relation("EmailMessageAddedBy", fields: [addedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([accountId, receivedAt(sort: Desc)])
+  @@index([workspaceId, linkedTicketId])
+  @@index([threadId])
+}
+
