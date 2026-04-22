@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
@@ -54,9 +55,15 @@ const TAB_LABEL: Record<Tab, string> = {
 };
 
 export function TicketsPage() {
+  const nav = useNavigate();
   const [view, setView] = useViewPreference('tickets', 'visual');
   const [tab, setTab] = useState<Tab>('nowe');
   const [showNew, setShowNew] = useState(false);
+
+  function handleAdd() {
+    if (view === 'visual') setShowNew(true);
+    else nav('/tickets/new');
+  }
 
   const { data, isLoading } = useQuery<{ items: TicketListItem[] }>({
     queryKey: ['tickets', 'list'],
@@ -87,7 +94,7 @@ export function TicketsPage() {
         </div>
         <div className="flex items-center gap-3">
           <ViewToggle value={view} onChange={setView} />
-          <Button onClick={() => setShowNew(true)}><Plus className="h-4 w-4" /> Nowe zgłoszenie</Button>
+          <Button onClick={handleAdd}><Plus className="h-4 w-4" /> Nowe zgłoszenie</Button>
         </div>
       </div>
 

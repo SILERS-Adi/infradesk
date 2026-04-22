@@ -7,6 +7,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { TicketsPage } from '@/features/tickets/TicketsPage';
 import { TicketDetailPage } from '@/features/tickets/TicketDetailPage';
+import { NewTicketPage } from '@/features/tickets/NewTicketPage';
 import { SessionsPage } from '@/features/sessions/SessionsPage';
 import { TasksPage } from '@/features/tasks/TasksPage';
 import { AlertsPage } from '@/features/alerts/AlertsPage';
@@ -58,6 +59,7 @@ export default function App() {
 
             {/* OPERACJE */}
             <Route path="/tickets" element={<TicketsPage />} />
+            <Route path="/tickets/new" element={<NewTicketPage />} />
             <Route path="/tickets/:id" element={<TicketDetailPage />} />
             <Route path="/tasks" element={<TasksPage />} />
             <Route path="/calendar" element={<CalendarPage />} />
