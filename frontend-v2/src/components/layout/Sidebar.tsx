@@ -64,7 +64,7 @@ const GROUPS: NavGroup[] = [
     label: 'Klienci',
     items: [
       { to: '/clients', icon: Building2, label: 'Firmy klientów' },
-      { to: '/contacts', icon: Users, label: 'Kontakty' },
+      { to: '/crm', icon: Users, label: 'CRM' },
       { to: '/locations', icon: MapPin, label: 'Lokalizacje' },
       { to: '/partners', icon: Handshake, label: 'Partnerzy IT', comingSoon: true },
     ],

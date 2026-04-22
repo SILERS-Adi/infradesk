@@ -73,7 +73,8 @@ export default function App() {
             {/* KLIENCI */}
             <Route path="/clients" element={<ClientsPage />} />
             <Route path="/clients/:id" element={<ClientDetailPage />} />
-            <Route path="/contacts" element={<CrmHubPage />} />
+            <Route path="/crm" element={<CrmHubPage />} />
+            <Route path="/contacts" element={<Navigate to="/crm" replace />} />
             <Route path="/locations" element={<LocationsPage />} />
             <Route path="/partners" element={<ComingSoon title="Partnerzy IT" sprint="Phase 2 (post-launch)" />} />
 
