@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   X, ChevronLeft, ChevronRight, Wrench, Package, Phone as PhoneIcon, Plus,
-  Check, Loader2, Building2, MapPin, Trash2,
+  Check, Loader2, Building2, MapPin, Trash2, Search, Link as LinkIcon, Image as ImageIcon,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
@@ -30,7 +30,10 @@ const MODAL_BODY: React.CSSProperties = { flex: '1 1 auto', minHeight: 0, overfl
 
 interface ClientRow {
   relationId: string;
-  client: { id: string; name: string; slug: string; isActive: boolean };
+  client: {
+    id: string; name: string; slug: string; isActive: boolean;
+    taxId?: string | null; city?: string | null; email?: string | null;
+  };
 }
 interface LocationRow { id: string; name: string; city: string | null; clientWorkspaceId?: string | null }
 interface DeviceRow { id: string; name: string; hostname: string | null; location: { id: string; name: string } | null }
@@ -39,7 +42,15 @@ interface MemberRow {
   user: { id: string; firstName: string | null; lastName: string | null; email: string };
 }
 
-interface OrderItem { name: string; description?: string; quantity: number; unitNet: number }
+interface OrderItem {
+  name: string;
+  description?: string;
+  quantity: number;
+  unitNet: number;
+  linkUrl?: string;
+  photoUrl?: string;
+  withInstallation: boolean;
+}
 type CrmType = 'PHONE' | 'MEETING' | 'EMAIL' | 'QUOTE';
 interface CrmAct {
   type: CrmType;
@@ -81,7 +92,7 @@ export function NewTicketModal({ onClose }: { onClose: () => void }) {
   const [assignedToUserId, setAssignedToUserId] = useState('');
 
   // Order fields
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([{ name: '', quantity: 1, unitNet: 0 }]);
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([{ name: '', quantity: 1, unitNet: 0, withInstallation: false }]);
   const [orderSupplier, setOrderSupplier] = useState('');
   const [orderExpected, setOrderExpected] = useState('');
 
@@ -132,7 +143,7 @@ export function NewTicketModal({ onClose }: { onClose: () => void }) {
   const canGoNext = !!clientWorkspaceId || clients.length === 0;
 
   function addOrderItem() {
-    setOrderItems([...orderItems, { name: '', quantity: 1, unitNet: 0 }]);
+    setOrderItems([...orderItems, { name: '', quantity: 1, unitNet: 0, withInstallation: false }]);
   }
   function updateOrderItem(i: number, patch: Partial<OrderItem>) {
     setOrderItems(orderItems.map((it, idx) => idx === i ? { ...it, ...patch } : it));
@@ -337,38 +348,106 @@ function Step1({
   clientWorkspaceId: string; setClientWorkspaceId: (v: string) => void;
   locationId: string; setLocationId: (v: string) => void;
 }) {
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const activeClients = clients.filter((c) => c.client.isActive);
+  const selected = activeClients.find((c) => c.client.id === clientWorkspaceId);
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return activeClients;
+    const q = search.toLowerCase();
+    return activeClients.filter((c) =>
+      c.client.name.toLowerCase().includes(q)
+      || c.client.slug.toLowerCase().includes(q)
+      || (c.client.taxId?.toLowerCase().includes(q) ?? false)
+      || (c.client.city?.toLowerCase().includes(q) ?? false)
+      || (c.client.email?.toLowerCase().includes(q) ?? false),
+    );
+  }, [activeClients, search]);
+
   return (
     <div className="space-y-5">
       <div>
-        <label className="text-[11px] font-bold uppercase tracking-[0.1em] text-tx2 block mb-2 flex items-center gap-2">
+        <label className="text-[11px] font-bold uppercase tracking-[0.1em] text-tx2 mb-2 flex items-center gap-2">
           <Building2 className="h-3 w-3" /> Klient *
         </label>
-        <select
-          value={clientWorkspaceId}
-          onChange={(e) => { setClientWorkspaceId(e.target.value); setLocationId(''); }}
-          className="h-10 w-full rounded-[var(--r-s)] border border-bd bg-sf2 px-3 text-[13px] text-tx"
-        >
-          <option value="">— wybierz klienta —</option>
-          {activeClients.map((c) => (
-            <option key={c.client.id} value={c.client.id}>{c.client.name} ({c.client.slug}.infradesk.pl)</option>
-          ))}
-        </select>
-        {activeClients.length === 0 && (
-          <p className="text-[11px] text-tx3 mt-2">
-            Brak klientów. Dodaj pierwszego w zakładce Klienci → Firmy klientów.
-          </p>
+
+        {selected ? (
+          <div className="flex items-center gap-3 p-3 rounded-[var(--r-s)] border"
+            style={{ borderColor: 'var(--pri)', background: 'var(--pri-l)' }}>
+            <Building2 className="h-4 w-4 text-pri shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-[13px] font-semibold text-tx truncate">{selected.client.name}</div>
+              <div className="text-[11px] text-tx3 truncate">
+                {selected.client.slug}.infradesk.pl
+                {selected.client.taxId && ` · NIP ${selected.client.taxId}`}
+                {selected.client.city && ` · ${selected.client.city}`}
+              </div>
+            </div>
+            <button type="button" onClick={() => { setClientWorkspaceId(''); setLocationId(''); setSearch(''); }}
+              className="text-[11px] text-tx3 hover:text-er px-2 py-1 rounded hover:bg-sf-h">
+              zmień
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-tx3" />
+              <input
+                type="text"
+                placeholder="Szukaj po nazwie, NIP, mieście, subdomenie…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-9 pr-3 h-10 rounded-[var(--r-s)] border border-bd bg-sf2 text-[13px] text-tx outline-none focus:border-pri"
+                autoFocus
+              />
+            </div>
+            <div className="mt-2 max-h-[280px] overflow-y-auto rounded-[var(--r-s)] border border-bd divide-y divide-bd">
+              {filtered.length === 0 ? (
+                <div className="p-4 text-center text-[12px] text-tx3">
+                  Brak firm pasujących do „{search}"
+                </div>
+              ) : (
+                filtered.map((c) => (
+                  <button
+                    key={c.client.id}
+                    type="button"
+                    onClick={() => { setClientWorkspaceId(c.client.id); setLocationId(''); }}
+                    className="w-full flex items-center gap-3 p-2.5 hover:bg-sf-h text-left"
+                  >
+                    <Building2 className="h-4 w-4 text-tx3 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-medium text-tx truncate">{c.client.name}</div>
+                      <div className="text-[10px] text-tx3 truncate">
+                        {c.client.slug}.infradesk.pl
+                        {c.client.taxId && ` · NIP ${c.client.taxId}`}
+                        {c.client.city && ` · ${c.client.city}`}
+                      </div>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setQuickCreateOpen(true)}
+              className="mt-2 w-full flex items-center justify-center gap-1.5 py-2 rounded-[var(--r-s)] border border-dashed border-bd text-[12px] text-pri hover:bg-pri-l hover:border-pri"
+            >
+              <Plus className="h-3.5 w-3.5" /> Dodaj nową firmę
+            </button>
+          </>
         )}
       </div>
 
       <div>
-        <label className="text-[11px] font-bold uppercase tracking-[0.1em] text-tx2 block mb-2 flex items-center gap-2">
+        <label className="text-[11px] font-bold uppercase tracking-[0.1em] text-tx2 mb-2 flex items-center gap-2">
           <MapPin className="h-3 w-3" /> Lokalizacja
         </label>
         <select
           value={locationId}
           onChange={(e) => setLocationId(e.target.value)}
           className="h-10 w-full rounded-[var(--r-s)] border border-bd bg-sf2 px-3 text-[13px] text-tx"
+          disabled={!clientWorkspaceId}
         >
           <option value="">— dowolna / nie dotyczy —</option>
           {locations.map((l) => (
@@ -379,7 +458,110 @@ function Step1({
           Lokalizacja służy do filtrowania urządzeń w kolejnym kroku.
         </p>
       </div>
+
+      {quickCreateOpen && (
+        <QuickCreateClientInline
+          onClose={() => setQuickCreateOpen(false)}
+          onCreated={(id) => {
+            setClientWorkspaceId(id);
+            setQuickCreateOpen(false);
+          }}
+          defaultName={search}
+        />
+      )}
     </div>
+  );
+}
+
+// Szybkie dodanie firmy inline — tylko nazwa + NIP + miasto + osoba kontaktowa.
+function QuickCreateClientInline({
+  onClose, onCreated, defaultName,
+}: { onClose: () => void; onCreated: (id: string) => void; defaultName: string }) {
+  const qc = useQueryClient();
+  const [name, setName] = useState(defaultName);
+  const [taxId, setTaxId] = useState('');
+  const [city, setCity] = useState('');
+  const [ownerFirstName, setOwnerFirstName] = useState('');
+  const [ownerLastName, setOwnerLastName] = useState('');
+  const [ownerEmail, setOwnerEmail] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submit() {
+    if (name.trim().length < 2) return;
+    if (!ownerEmail.trim() || !ownerFirstName.trim() || !ownerLastName.trim()) {
+      toast.error('Wypełnij dane osoby kontaktowej (imię, nazwisko, email)');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await api.post('/clients', {
+        name, taxId: taxId || undefined, city: city || undefined,
+        ownerFirstName, ownerLastName, ownerEmail,
+        billingType: 'HOURLY',
+      });
+      const id = res.data?.client?.id;
+      if (!id) throw new Error('Brak ID w odpowiedzi');
+      toast.success('Dodano firmę');
+      qc.invalidateQueries({ queryKey: ['clients'] });
+      onCreated(id);
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { message?: string } } };
+      toast.error(ax.response?.data?.message ?? 'Błąd dodawania');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // Overlay-on-top + nested modal
+  return (
+    <Dialog.Root open onOpenChange={(o) => !o && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-[60] bg-black/50" />
+        <Dialog.Content
+          style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            zIndex: 61, width: 'min(92vw, 30rem)', maxHeight: '88vh',
+            background: 'var(--sf)', border: '1px solid var(--bd)', borderRadius: 'var(--r-xl)',
+            boxShadow: 'var(--sh4)', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          }}
+        >
+          <div className="flex items-center justify-between px-5 py-3 border-b border-bd">
+            <Dialog.Title className="text-[14px] font-bold text-tx">Szybkie dodanie firmy</Dialog.Title>
+            <Dialog.Close asChild><button className="p-1 rounded hover:bg-sf-h text-tx3"><X className="h-4 w-4" /></button></Dialog.Close>
+          </div>
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3 min-h-0">
+            <div>
+              <label className="text-[11px] font-semibold text-tx3 block mb-1">Nazwa firmy *</label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] font-semibold text-tx3 block mb-1">NIP</label>
+                <Input value={taxId} onChange={(e) => setTaxId(e.target.value)} placeholder="1234567890" />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold text-tx3 block mb-1">Miasto</label>
+                <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Warszawa" />
+              </div>
+            </div>
+            <div className="pt-2 border-t border-bd">
+              <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-tx2 mb-2">Osoba kontaktowa *</div>
+              <div className="grid grid-cols-2 gap-3 mb-2">
+                <Input placeholder="Imię *" value={ownerFirstName} onChange={(e) => setOwnerFirstName(e.target.value)} />
+                <Input placeholder="Nazwisko *" value={ownerLastName} onChange={(e) => setOwnerLastName(e.target.value)} />
+              </div>
+              <Input type="email" placeholder="Email *" value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)} />
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-bd bg-sf-h">
+            <Button variant="ghost" onClick={onClose}>Anuluj</Button>
+            <Button onClick={submit} disabled={submitting || name.trim().length < 2}>
+              {submitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Dodawanie…</> : <>Dodaj firmę</>}
+            </Button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 
@@ -630,27 +812,56 @@ function OrderFields(p: {
     <>
       <div>
         <label className="text-[11px] font-semibold text-tx3 block mb-2">Pozycje</label>
-        <div className="space-y-2">
+        <div className="space-y-3">
           {p.orderItems.map((it, i) => (
-            <div key={i} className="grid grid-cols-12 gap-2 items-start">
-              <div className="col-span-6">
-                <Input placeholder="Nazwa (np. SSD 500GB NVMe)" value={it.name}
-                  onChange={(e) => p.updateOrderItem(i, { name: e.target.value })} />
+            <div key={i} className="rounded-[var(--r-s)] border border-bd p-3 space-y-2">
+              <div className="grid grid-cols-12 gap-2 items-start">
+                <div className="col-span-6">
+                  <Input placeholder="Nazwa (np. SSD 500GB NVMe)" value={it.name}
+                    onChange={(e) => p.updateOrderItem(i, { name: e.target.value })} />
+                </div>
+                <div className="col-span-2">
+                  <Input type="number" min={1} placeholder="ilość" value={it.quantity}
+                    onChange={(e) => p.updateOrderItem(i, { quantity: Number(e.target.value) || 1 })} />
+                </div>
+                <div className="col-span-3">
+                  <Input type="number" step="0.01" placeholder="cena netto" value={it.unitNet}
+                    onChange={(e) => p.updateOrderItem(i, { unitNet: Number(e.target.value) || 0 })} />
+                </div>
+                <div className="col-span-1">
+                  <button type="button" onClick={() => p.removeOrderItem(i)}
+                    className="h-10 w-full rounded-[var(--r-s)] text-tx3 hover:bg-er-l hover:text-er">
+                    <Trash2 className="h-3.5 w-3.5 mx-auto" />
+                  </button>
+                </div>
               </div>
-              <div className="col-span-2">
-                <Input type="number" min={1} placeholder="ilość" value={it.quantity}
-                  onChange={(e) => p.updateOrderItem(i, { quantity: Number(e.target.value) || 1 })} />
+              <div className="grid grid-cols-12 gap-2">
+                <div className="col-span-6 relative">
+                  <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-tx3" />
+                  <input type="url" placeholder="Link do produktu (https://…)"
+                    value={it.linkUrl ?? ''}
+                    onChange={(e) => p.updateOrderItem(i, { linkUrl: e.target.value })}
+                    className="w-full pl-8 pr-3 h-9 rounded-[var(--r-s)] border border-bd bg-sf2 text-[12px]" />
+                </div>
+                <div className="col-span-6 relative">
+                  <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-tx3" />
+                  <input type="url" placeholder="URL zdjęcia (https://…)"
+                    value={it.photoUrl ?? ''}
+                    onChange={(e) => p.updateOrderItem(i, { photoUrl: e.target.value })}
+                    className="w-full pl-8 pr-3 h-9 rounded-[var(--r-s)] border border-bd bg-sf2 text-[12px]" />
+                </div>
               </div>
-              <div className="col-span-3">
-                <Input type="number" step="0.01" placeholder="cena netto" value={it.unitNet}
-                  onChange={(e) => p.updateOrderItem(i, { unitNet: Number(e.target.value) || 0 })} />
-              </div>
-              <div className="col-span-1">
-                <button type="button" onClick={() => p.removeOrderItem(i)}
-                  className="h-10 w-full rounded-[var(--r-s)] text-tx3 hover:bg-er-l hover:text-er">
-                  <Trash2 className="h-3.5 w-3.5 mx-auto" />
-                </button>
-              </div>
+              <label className="flex items-center gap-2 text-[12px] cursor-pointer">
+                <input type="checkbox" checked={it.withInstallation}
+                  onChange={(e) => p.updateOrderItem(i, { withInstallation: e.target.checked })} />
+                <Wrench className="h-3 w-3 text-pri" />
+                <span>Z montażem</span>
+                {it.withInstallation && (
+                  <span className="text-[10px] text-tx3">
+                    → po dostawie auto-utworzy ticket na montaż (Sprint 6)
+                  </span>
+                )}
+              </label>
             </div>
           ))}
         </div>

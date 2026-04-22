@@ -14,6 +14,9 @@ export const orderItemSchema = z.object({
   description: z.string().max(500).optional(),
   quantity: z.coerce.number().int().min(1).default(1),
   unitNet: z.coerce.number().nonnegative().default(0),
+  linkUrl: z.string().url().max(500).optional().or(z.literal('')),
+  photoUrl: z.string().url().max(500).optional().or(z.literal('')),
+  withInstallation: z.boolean().default(false),
 });
 export const orderComponentSchema = z.object({
   items: z.array(orderItemSchema).min(1),

@@ -171,6 +171,9 @@ export async function createTicket(workspaceId: string, userId: string, input: C
               quantity: it.quantity,
               unitNet: Number(it.unitNet).toFixed(2),
               totalNet: (Number(it.unitNet) * it.quantity).toFixed(2),
+              linkUrl: it.linkUrl || null,
+              photoUrl: it.photoUrl || null,
+              withInstallation: it.withInstallation ?? false,
             })),
           },
         },
@@ -262,19 +265,29 @@ export async function listTickets(workspaceId: string, opts: {
   const nextCursor = hasMore ? slice[slice.length - 1]!.id : null;
 
   // Compute derived tab status per item based on child states.
+  // fresh  = child exists but work has not started
+  // active = child is being worked on
+  // done   = terminal state
   const enriched = slice.map((t) => {
     const tasks = t.linkedTasks ?? [];
     const orders = t.linkedOrders ?? [];
     const crms = t.linkedCrmActivities ?? [];
-    const isTaskDone = (s: string) => s === 'DONE' || s === 'CANCELLED';
-    const isOrderDone = (s: string) => s === 'DELIVERED' || s === 'INVOICED' || s === 'CANCELLED';
-    const isCrmDone = (c: { completedAt: Date | null }) => c.completedAt !== null;
+    const taskDone = (s: string) => s === 'DONE' || s === 'CANCELLED';
+    const taskActive = (s: string) => s === 'IN_PROGRESS';
+    const orderDone = (s: string) => s === 'DELIVERED' || s === 'INVOICED' || s === 'CANCELLED';
+    const orderActive = (s: string) => s === 'ORDERED' || s === 'IN_TRANSIT';
+    const crmDone = (c: { completedAt: Date | null }) => c.completedAt !== null;
     const total = tasks.length + orders.length + crms.length;
-    const done = tasks.filter((x) => isTaskDone(x.status)).length
-      + orders.filter((x) => isOrderDone(x.status)).length
-      + crms.filter(isCrmDone).length;
-    const active = total - done;
-    const tab = derivedTabStatus(t.status, { totalChildren: total, doneChildren: done, activeChildren: active });
+    const done = tasks.filter((x) => taskDone(x.status)).length
+      + orders.filter((x) => orderDone(x.status)).length
+      + crms.filter(crmDone).length;
+    const active = tasks.filter((x) => taskActive(x.status)).length
+      + orders.filter((x) => orderActive(x.status)).length;
+    let tab: 'nowe' | 'w_toku' | 'zakonczone' | 'anulowane';
+    if (t.status === 'CANCELLED') tab = 'anulowane';
+    else if (total > 0 && done === total) tab = 'zakonczone';
+    else if (active > 0) tab = 'w_toku';
+    else tab = 'nowe';
     return { ...t, tab, childCounts: { total, done, active } };
   });
 

@@ -983,6 +983,9 @@ model OrderItem {
   unitNet        Decimal  @db.Decimal(10, 2)
   totalNet       Decimal  @db.Decimal(12, 2)
   linkedDeviceId String?  // created after delivery
+  linkUrl        String?  // URL do produktu (sklep)
+  photoUrl       String?  // URL do zdjęcia
+  withInstallation Boolean @default(false)  // gdy TRUE: po dostawie auto-generuje ticket na montaż
 
   order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 }
