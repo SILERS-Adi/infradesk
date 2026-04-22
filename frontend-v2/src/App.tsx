@@ -27,7 +27,7 @@ import { MonitoringPage } from '@/features/monitoring/MonitoringPage';
 import { VaultPage } from '@/features/vault/VaultPage';
 import { MyCompanyPage } from '@/features/my-company/MyCompanyPage';
 import { UsersPage } from '@/features/users/UsersPage';
-import { MemberFormPage } from '@/features/users/MemberForm';
+import { MemberFormPage, MemberEditPage } from '@/features/users/MemberForm';
 import { PlanAndModulesPage } from '@/features/plan-and-modules/PlanAndModulesPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { IrisChatPage } from '@/features/ai/IrisChatPage';
@@ -101,6 +101,7 @@ export default function App() {
             <Route path="/my-company" element={<MyCompanyPage />} />
             <Route path="/users" element={<UsersPage />} />
             <Route path="/users/new" element={<MemberFormPage />} />
+            <Route path="/users/:id/edit" element={<MemberEditPage />} />
             <Route path="/plan-and-modules" element={<PlanAndModulesPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>

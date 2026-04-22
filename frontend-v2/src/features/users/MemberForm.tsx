@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
@@ -19,13 +19,15 @@ type Variant = 'modal' | 'page';
 interface Props {
   onClose: () => void;
   variant?: Variant;
+  /** Gdy podane → tryb edycji istniejącego membership (inaczej: zaproszenie nowego). */
+  membershipId?: string;
 }
 
 export function MemberForm(props: Props) {
   return <MemberFormCore variant="modal" {...props} />;
 }
 
-export function MemberFormCore({ onClose, variant = 'modal' }: Props) {
+export function MemberFormCore({ onClose, variant = 'modal', membershipId }: Props) {
   const qc = useQueryClient();
   const nav = useNavigate();
 
@@ -48,6 +50,43 @@ export function MemberFormCore({ onClose, variant = 'modal' }: Props) {
   const wsType = wsQ.data?.workspace.type ?? 'MSP';
   const isMsp = wsType === 'MSP' || wsType === 'INTERNAL_IT';
   const isClient = wsType === 'CLIENT';
+
+  const isEdit = !!membershipId;
+
+  // Pre-fill z istniejącego membership (tryb edycji)
+  const memberQ = useQuery({
+    queryKey: ['membership', membershipId],
+    queryFn: async () => {
+      const list = await api.get<{ memberships: Array<{
+        id: string; role: string; scope: string; status: string;
+        user: { id: string; email: string; firstName: string | null; lastName: string | null; phone?: string | null };
+      }> }>('/memberships');
+      const m = list.data.memberships.find((x) => x.id === membershipId);
+      if (!m) throw new Error('Membership nie znaleziony');
+      const ov = await api.get<{ overrides: Array<{ moduleKey: string; level: string }> }>(`/permissions/${membershipId}/overrides`);
+      return { m, overrides: ov.data.overrides };
+    },
+    enabled: !!membershipId,
+  });
+
+  useEffect(() => {
+    if (!memberQ.data) return;
+    const { m, overrides: ov } = memberQ.data;
+    setEmail(m.user.email);
+    setFirstName(m.user.firstName ?? '');
+    setLastName(m.user.lastName ?? '');
+    setPhone(m.user.phone ?? '');
+    setAccountType(m.role === 'ADMIN' || m.role === 'OWNER' ? 'ADMIN' : 'USER');
+    setAccessScope(m.scope === 'SCOPED' ? 'RESTRICTED' : 'FULL');
+    setFoundUser({ id: m.user.id, firstName: m.user.firstName ?? '', lastName: m.user.lastName ?? '' });
+    setEmailStatus('found');
+    // Map backend overrides (moduleKey + NONE/VIEW/EDIT/DELETE) → tree overrides (nodeId + FULL/VIEW/NONE)
+    const mapped: Override[] = ov.map((o) => ({
+      nodeId: o.moduleKey,
+      level: o.level === 'NONE' ? 'NONE' : o.level === 'VIEW' ? 'VIEW' : 'FULL',
+    }));
+    setOverrides(mapped);
+  }, [memberQ.data]);
 
   // Live email lookup
   useEffect(() => {
@@ -89,21 +128,28 @@ export function MemberFormCore({ onClose, variant = 'modal' }: Props) {
         level: mapLevel(o.level),
       })).filter((o) => o.moduleKey);
 
-      const invite = await api.post('/memberships/invite', {
-        email, firstName, lastName, role, scope,
-        phone: phone || undefined,
-      });
-      const membershipId = invite.data?.membership?.id;
-
-      // If restricted, write overrides
-      if (scope === 'SCOPED' && membershipId && backendOverrides.length > 0) {
-        await api.put(`/permissions/${membershipId}/overrides`, { overrides: backendOverrides });
+      let targetMembershipId: string;
+      if (isEdit && membershipId) {
+        // EDIT: zaktualizuj role/scope istniejącego membership
+        await api.patch(`/memberships/${membershipId}`, { role, scope });
+        targetMembershipId = membershipId;
+      } else {
+        const invite = await api.post('/memberships/invite', {
+          email, firstName, lastName, role, scope,
+          phone: phone || undefined,
+        });
+        targetMembershipId = invite.data?.membership?.id;
       }
-      return invite.data;
+
+      if (scope === 'SCOPED' && targetMembershipId) {
+        await api.put(`/permissions/${targetMembershipId}/overrides`, { overrides: backendOverrides });
+      }
+      return { membershipId: targetMembershipId };
     },
     onSuccess: () => {
-      toast.success('Użytkownik zaproszony');
+      toast.success(isEdit ? 'Zmiany zapisane' : 'Użytkownik zaproszony');
       qc.invalidateQueries({ queryKey: ['memberships'] });
+      qc.invalidateQueries({ queryKey: ['membership'] });
       if (variant === 'page') nav('/users');
       else onClose();
     },
@@ -125,7 +171,8 @@ export function MemberFormCore({ onClose, variant = 'modal' }: Props) {
         <label className="text-[11px] font-bold uppercase tracking-[0.1em] text-tx2 block mb-1">Email użytkownika *</label>
         <div className="relative">
           <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-            placeholder="jan@firma.pl" autoFocus className="pr-10" />
+            placeholder="jan@firma.pl" autoFocus={!isEdit} className="pr-10"
+            disabled={isEdit} />
           {emailStatus === 'checking' && (
             <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-tx3 animate-spin" />
           )}
@@ -273,7 +320,7 @@ export function MemberFormCore({ onClose, variant = 'modal' }: Props) {
             <ChevronLeft className="h-4 w-4" />
           </button>
         )}
-        <h2 className="text-[16px] font-bold text-tx">Zaproś użytkownika</h2>
+        <h2 className="text-[16px] font-bold text-tx">{isEdit ? 'Edytuj użytkownika' : 'Zaproś użytkownika'}</h2>
       </div>
       {variant === 'modal' ? (
         <Dialog.Close asChild>
@@ -289,7 +336,9 @@ export function MemberFormCore({ onClose, variant = 'modal' }: Props) {
     <div className="flex items-center justify-end gap-2 border-t border-bd bg-sf-h px-6 py-3" style={{ flexShrink: 0 }}>
       <Button variant="ghost" onClick={onClose}>Anuluj</Button>
       <Button onClick={() => submitMut.mutate()} disabled={!canSubmit || submitMut.isPending}>
-        {submitMut.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Zapraszanie…</> : 'Zaproś'}
+        {submitMut.isPending
+          ? <><Loader2 className="h-4 w-4 animate-spin" /> {isEdit ? 'Zapisywanie…' : 'Zapraszanie…'}</>
+          : (isEdit ? 'Zapisz zmiany' : 'Zaproś')}
       </Button>
     </div>
   );
@@ -346,4 +395,10 @@ function leafModuleKey(nodeId: string): string {
 export function MemberFormPage() {
   const nav = useNavigate();
   return <MemberFormCore variant="page" onClose={() => nav('/users')} />;
+}
+
+export function MemberEditPage() {
+  const nav = useNavigate();
+  const params = useParams<{ id: string }>();
+  return <MemberFormCore variant="page" membershipId={params.id} onClose={() => nav('/users')} />;
 }

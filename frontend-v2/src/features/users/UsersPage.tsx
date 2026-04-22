@@ -3,12 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
-  UserPlus, Users, ShieldCheck, Shield, User as UserIcon, Check, Ban, Mail, KeyRound,
+  UserPlus, Users, ShieldCheck, Shield, User as UserIcon, Check, Ban, Mail, KeyRound, Pencil,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Select } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { ViewToggle, useViewPreference } from '@/components/ui/ViewToggle';
@@ -48,11 +47,17 @@ export function UsersPage() {
   const nav = useNavigate();
   const [view, setView] = useViewPreference('users', 'visual');
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [editMemberId, setEditMemberId] = useState<string | null>(null);
   const qc = useQueryClient();
 
   function handleInvite() {
     if (view === 'visual') setInviteOpen(true);
     else nav('/users/new');
+  }
+
+  function handleEdit(membershipId: string) {
+    if (view === 'visual') setEditMemberId(membershipId);
+    else nav(`/users/${membershipId}/edit`);
   }
 
   const listQ = useQuery({
@@ -102,7 +107,7 @@ export function UsersPage() {
           {invited.length > 0 && (
             <Section title="Zaproszeni" count={invited.length}>
               {invited.map((m) => (
-                <MemberRow key={m.id} m={m} onUpdate={(data) => updateMut.mutate({ id: m.id, data })} />
+                <MemberRow key={m.id} m={m} onUpdate={(data) => updateMut.mutate({ id: m.id, data })} onEdit={() => handleEdit(m.id)} />
               ))}
             </Section>
           )}
@@ -112,7 +117,7 @@ export function UsersPage() {
               <div className="p-[var(--sp-4)] text-center text-[var(--tx3)] text-[13px]">Brak aktywnych członków.</div>
             ) : (
               active.map((m) => (
-                <MemberRow key={m.id} m={m} onUpdate={(data) => updateMut.mutate({ id: m.id, data })} />
+                <MemberRow key={m.id} m={m} onUpdate={(data) => updateMut.mutate({ id: m.id, data })} onEdit={() => handleEdit(m.id)} />
               ))
             )}
           </Section>
@@ -120,7 +125,7 @@ export function UsersPage() {
           {revoked.length > 0 && (
             <Section title="Wyłączeni" count={revoked.length}>
               {revoked.map((m) => (
-                <MemberRow key={m.id} m={m} onUpdate={(data) => updateMut.mutate({ id: m.id, data })} />
+                <MemberRow key={m.id} m={m} onUpdate={(data) => updateMut.mutate({ id: m.id, data })} onEdit={() => handleEdit(m.id)} />
               ))}
             </Section>
           )}
@@ -128,6 +133,7 @@ export function UsersPage() {
       )}
 
       {inviteOpen && <MemberForm onClose={() => setInviteOpen(false)} />}
+      {editMemberId && <MemberForm membershipId={editMemberId} onClose={() => setEditMemberId(null)} />}
     </div>
   );
 }
@@ -144,83 +150,110 @@ function Section({ title, count, children }: { title: string; count: number; chi
   );
 }
 
+// Stabilny kolor per user z hash email
+function avatarColor(email: string): string {
+  const colors = ['#8B5CF6', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#06B6D4', '#6366F1'];
+  let hash = 0;
+  for (let i = 0; i < email.length; i++) hash = (hash * 31 + email.charCodeAt(i)) >>> 0;
+  return colors[hash % colors.length]!;
+}
+
+function getInitials(m: Membership): string {
+  const f = m.user.firstName?.trim()?.[0] ?? '';
+  const l = m.user.lastName?.trim()?.[0] ?? '';
+  const combined = (f + l).toUpperCase();
+  if (combined) return combined;
+  return (m.user.email[0] ?? '?').toUpperCase();
+}
+
 function MemberRow({
-  m, onUpdate,
-}: { m: Membership; onUpdate: (data: Partial<{ role: Role; scope: Scope; status: Status }>) => void }) {
+  m, onUpdate, onEdit,
+}: {
+  m: Membership;
+  onUpdate: (data: Partial<{ role: Role; scope: Scope; status: Status }>) => void;
+  onEdit: () => void;
+}) {
   const meta = ROLE_META[m.role];
   const RoleIcon = meta.icon;
   const name = [m.user.firstName, m.user.lastName].filter(Boolean).join(' ') || m.user.email;
+  const initials = getInitials(m);
+  const color = avatarColor(m.user.email);
+  const hasRealAvatar = !!m.user.avatarUrl && m.user.avatarUrl.length > 0;
 
   return (
-    <div className="flex items-center gap-[var(--sp-3)] px-[var(--sp-4)] py-[var(--sp-3)]">
+    <div className="group flex items-center gap-3 px-4 py-3 hover:bg-sf-h transition-colors">
+      {/* Avatar */}
       <div
-        className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-[12px] font-semibold"
-        style={{ background: 'var(--sf-h)', color: 'var(--tx2)' }}
+        className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-[12px] font-bold overflow-hidden text-white"
+        style={{ background: color }}
       >
-        {m.user.avatarUrl ? (
-          <img src={m.user.avatarUrl} alt={name} className="w-full h-full rounded-full object-cover" />
+        {hasRealAvatar ? (
+          <img src={m.user.avatarUrl!} alt="" className="w-full h-full object-cover"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
         ) : (
-          (m.user.firstName?.[0] ?? m.user.email[0] ?? '?').toUpperCase()
+          initials
         )}
       </div>
+
+      {/* Name + email */}
       <div className="flex-1 min-w-0">
-        <div className="text-[13px] font-medium truncate">{name}</div>
-        <div className="flex items-center gap-2 text-[11px] text-[var(--tx3)] mt-0.5">
-          <Mail size={10} /> <span className="truncate">{m.user.email}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[13px] font-semibold text-tx truncate">{name}</span>
+          <div className="inline-flex items-center gap-1" style={{ color: meta.color }}>
+            <RoleIcon size={11} />
+            <span className="text-[10px] font-medium hidden sm:inline">{meta.label}</span>
+          </div>
           {m.user.twoFactorEnabled && (
-            <span className="inline-flex items-center gap-1 text-[var(--ok)]">
-              <KeyRound size={10} /> 2FA
+            <span className="inline-flex items-center gap-0.5 text-[10px] text-ok" title="2FA włączone">
+              <KeyRound size={9} /> 2FA
             </span>
           )}
         </div>
+        <div className="flex items-center gap-2 text-[11px] text-tx3 mt-0.5 min-w-0">
+          <Mail size={10} className="shrink-0" />
+          <span className="truncate">{m.user.email}</span>
+        </div>
       </div>
 
-      <div className="flex items-center gap-[var(--sp-2)]">
-        <Select
-          value={m.role}
-          onChange={(e) => onUpdate({ role: e.target.value as Role })}
-          disabled={m.status !== 'ACTIVE'}
-          className="w-[130px]"
-        >
-          <option value="OWNER">Właściciel</option>
-          <option value="ADMIN">Admin</option>
-          <option value="MEMBER">Członek</option>
-        </Select>
-
-        <Badge variant={m.scope === 'FULL' ? 'accent' : 'neutral'}>
-          {m.scope === 'FULL' ? 'Pełny' : 'Zawężony'}
+      {/* Scope badge + last login */}
+      <div className="hidden md:flex flex-col items-end text-right shrink-0 mr-2">
+        <Badge variant={m.scope === 'FULL' ? 'accent' : 'warning'}>
+          {m.scope === 'FULL' ? 'Pełny dostęp' : 'Spersonalizowany'}
         </Badge>
-
-        <div
-          className="inline-flex items-center gap-1 text-[11px]"
-          style={{ color: meta.color }}
-        >
-          <RoleIcon size={11} />
-        </div>
-
         {m.user.lastLoginAt && (
-          <span className="text-[11px] text-[var(--tx3)] hidden md:inline">
-            {formatRelativePl(m.user.lastLoginAt)}
+          <span className="text-[10px] text-tx3 mt-0.5">
+            Aktywny {formatRelativePl(m.user.lastLoginAt)}
           </span>
         )}
+      </div>
 
+      {/* Actions */}
+      <div className="flex items-center gap-1 shrink-0">
+        <button
+          type="button"
+          onClick={onEdit}
+          className="p-1.5 rounded hover:bg-pri-l text-tx3 hover:text-pri opacity-60 group-hover:opacity-100 transition-opacity"
+          title="Edytuj"
+        >
+          <Pencil size={13} />
+        </button>
         {m.status === 'ACTIVE' ? (
           <button
             type="button"
-            onClick={() => onUpdate({ status: 'REVOKED' })}
-            className="p-1.5 rounded hover:bg-[var(--er-l)] text-[var(--tx3)] hover:text-[var(--er)]"
+            onClick={() => { if (confirm(`Wyłączyć dostęp użytkownika ${name}?`)) onUpdate({ status: 'REVOKED' }); }}
+            className="p-1.5 rounded hover:bg-er-l text-tx3 hover:text-er opacity-60 group-hover:opacity-100 transition-opacity"
             title="Wyłącz dostęp"
           >
-            <Ban size={12} />
+            <Ban size={13} />
           </button>
         ) : (
           <button
             type="button"
             onClick={() => onUpdate({ status: 'ACTIVE' })}
-            className="p-1.5 rounded hover:bg-[var(--ok-l)] text-[var(--tx3)] hover:text-[var(--ok)]"
+            className="p-1.5 rounded hover:bg-ok-l text-tx3 hover:text-ok opacity-60 group-hover:opacity-100 transition-opacity"
             title="Aktywuj"
           >
-            <Check size={12} />
+            <Check size={13} />
           </button>
         )}
       </div>
