@@ -54,6 +54,26 @@ interface TicketDetail {
     userId: string | null;
     metadata: unknown;
   }>;
+  clientName?: string | null;
+  hasService?: boolean;
+  hasOrder?: boolean;
+  hasCrm?: boolean;
+  linkedTasks?: Array<{
+    id: string; taskNumber: string; title: string; status: string; priority: string;
+    dueAt: string | null; completedAt: string | null;
+    assignedTo: { id: string; firstName: string | null; lastName: string | null } | null;
+  }>;
+  linkedOrders?: Array<{
+    id: string; orderNumber: string; title: string; status: string;
+    totalNet: string; totalGross: string;
+    supplierName: string | null; expectedDeliveryDate: string | null; deliveredAt: string | null;
+  }>;
+  linkedCrmActivities?: Array<{
+    id: string; type: string; title: string;
+    scheduledAt: string | null; completedAt: string | null;
+    followUpRequired: boolean; followUpAt: string | null;
+    billable: boolean; quoteValueNet: string | null;
+  }>;
 }
 
 // State machine order — for the stepper UI.
@@ -267,6 +287,8 @@ export function TicketDetailPage() {
             </CardContent>
           </Card>
 
+          <GeneratedArtifactsCard ticket={t} />
+
           <Card>
             <CardHeader className="flex items-center justify-between">
               <CardTitle>Komentarze ({t.comments.length})</CardTitle>
@@ -476,3 +498,149 @@ function labelForState(key: string): string {
     default: return key;
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Wygenerowane — Task / Order / CrmActivity powiązane z ticketem
+// ─────────────────────────────────────────────────────────────────────────────
+const CRM_TYPE_LABEL: Record<string, string> = {
+  PHONE: 'Telefon', MEETING: 'Spotkanie', EMAIL: 'E-mail', QUOTE: 'Oferta', OTHER: 'Inne',
+};
+const ORDER_STATUS_LABEL: Record<string, { label: string; variant: 'neutral' | 'accent' | 'warning' | 'success' | 'danger' }> = {
+  DRAFT: { label: 'Szkic', variant: 'neutral' },
+  QUOTE_SENT: { label: 'Wycena wysłana', variant: 'accent' },
+  APPROVED: { label: 'Zatwierdzone', variant: 'accent' },
+  ORDERED: { label: 'Zamówione', variant: 'warning' },
+  IN_TRANSIT: { label: 'W drodze', variant: 'warning' },
+  DELIVERED: { label: 'Dostarczone', variant: 'success' },
+  INVOICED: { label: 'Zafakturowane', variant: 'success' },
+  CANCELLED: { label: 'Anulowane', variant: 'danger' },
+};
+const TASK_STATUS_LABEL: Record<string, { label: string; variant: 'neutral' | 'accent' | 'warning' | 'success' | 'danger' }> = {
+  NEW: { label: 'Nowe', variant: 'neutral' },
+  IN_PROGRESS: { label: 'W toku', variant: 'warning' },
+  DONE: { label: 'Zrobione', variant: 'success' },
+  CANCELLED: { label: 'Anulowane', variant: 'danger' },
+};
+
+function GeneratedArtifactsCard({ ticket }: { ticket: TicketDetail }) {
+  const tasks = ticket.linkedTasks ?? [];
+  const orders = ticket.linkedOrders ?? [];
+  const crms = ticket.linkedCrmActivities ?? [];
+  const total = tasks.length + orders.length + crms.length;
+  if (total === 0 && !ticket.hasService && !ticket.hasOrder && !ticket.hasCrm) return null;
+
+  return (
+    <Card>
+      <CardHeader className="flex items-center justify-between">
+        <CardTitle>Wygenerowane ({total})</CardTitle>
+        <span className="text-[11px] text-tx3">
+          Ze zgłoszenia #{ticket.ticketNumber} powstały automatycznie:
+        </span>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* TASKS */}
+        {tasks.length > 0 && (
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-tx3 mb-2">
+              Zadania ({tasks.length})
+            </div>
+            <div className="space-y-1.5">
+              {tasks.map((t) => {
+                const s = TASK_STATUS_LABEL[t.status] ?? TASK_STATUS_LABEL.NEW!;
+                return (
+                  <Link key={t.id} to={`/tasks`} className="block p-2.5 rounded-[var(--r-s)] border border-bd hover:bg-sf-h transition-colors">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-mono text-tx3">{t.taskNumber}</span>
+                          <span className="text-[13px] font-medium text-tx truncate">{t.title}</span>
+                        </div>
+                        {t.assignedTo && (
+                          <div className="text-[11px] text-tx3 mt-0.5">
+                            Przypisane: {[t.assignedTo.firstName, t.assignedTo.lastName].filter(Boolean).join(' ')}
+                          </div>
+                        )}
+                      </div>
+                      <Badge variant={s.variant}>{s.label}</Badge>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {/* ORDERS */}
+        {orders.length > 0 && (
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-tx3 mb-2">
+              Zamówienia ({orders.length})
+            </div>
+            <div className="space-y-1.5">
+              {orders.map((o) => {
+                const s = ORDER_STATUS_LABEL[o.status] ?? ORDER_STATUS_LABEL.DRAFT!;
+                return (
+                  <Link key={o.id} to={`/orders`} className="block p-2.5 rounded-[var(--r-s)] border border-bd hover:bg-sf-h transition-colors">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-mono text-tx3">{o.orderNumber}</span>
+                          <span className="text-[13px] font-medium text-tx truncate">{o.title}</span>
+                        </div>
+                        <div className="text-[11px] text-tx3 mt-0.5 flex items-center gap-2">
+                          <span>Netto: <strong>{Number(o.totalNet).toFixed(2)} zł</strong></span>
+                          {o.supplierName && <span>· {o.supplierName}</span>}
+                          {o.expectedDeliveryDate && <span>· dostawa {formatRelativePl(o.expectedDeliveryDate)}</span>}
+                        </div>
+                      </div>
+                      <Badge variant={s.variant}>{s.label}</Badge>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {/* CRM ACTIVITIES */}
+        {crms.length > 0 && (
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-tx3 mb-2">
+              Aktywności CRM ({crms.length})
+            </div>
+            <div className="space-y-1.5">
+              {crms.map((c) => {
+                const done = !!c.completedAt;
+                return (
+                  <Link key={c.id} to={`/contacts`} className="block p-2.5 rounded-[var(--r-s)] border border-bd hover:bg-sf-h transition-colors">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="accent">{CRM_TYPE_LABEL[c.type] ?? c.type}</Badge>
+                          <span className="text-[13px] text-tx truncate">{c.title}</span>
+                          {c.billable && <Badge variant="warning">Bilowane</Badge>}
+                          {c.quoteValueNet && <Badge variant="accent">{Number(c.quoteValueNet).toFixed(2)} zł</Badge>}
+                          {c.followUpRequired && !done && <Badge variant="danger">Follow-up</Badge>}
+                        </div>
+                        {c.scheduledAt && (
+                          <div className="text-[11px] text-tx3 mt-0.5">
+                            {formatRelativePl(c.scheduledAt)}
+                          </div>
+                        )}
+                      </div>
+                      <Badge variant={done ? 'success' : 'neutral'}>{done ? 'Zrobione' : 'Zaplanowane'}</Badge>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {total === 0 && (
+          <div className="text-[13px] text-tx3 text-center py-4">
+            Zgłoszenie nie wygenerowało jeszcze artefaktów (np. nie przypisano technika dla usługi serwisowej).
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
