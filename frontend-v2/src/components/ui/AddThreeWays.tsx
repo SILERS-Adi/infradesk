@@ -5,6 +5,23 @@ import { X, FileText, Wand2, Sparkles } from 'lucide-react';
 import { Button } from './Button';
 import { cn } from '@/lib/utils';
 
+const MODAL_SHELL_STYLE: React.CSSProperties = {
+  position: 'fixed',
+  top: '50%',
+  left: '50%',
+  transform: 'translate(-50%, -50%)',
+  zIndex: 50,
+  width: 'min(96vw, 48rem)',
+  maxHeight: '90vh',
+  display: 'flex',
+  flexDirection: 'column',
+  background: 'var(--sf)',
+  border: '1px solid var(--bd)',
+  borderRadius: 'var(--r)',
+  boxShadow: 'var(--sh4)',
+  overflow: 'hidden',
+};
+
 interface AddThreeWaysProps {
   title: string;
   trigger: ReactNode;
@@ -33,26 +50,21 @@ export function AddThreeWays({ title, trigger, formTab, wizardTab, aiTab, defaul
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm animate-fade-in" />
-        <Dialog.Content
-          className={cn(
-            'fixed left-1/2 top-1/2 z-50 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2',
-            'rounded-[var(--r)] bg-sf border border-bd shadow-2xl animate-fade-in',
-          )}
-        >
-          <div className="flex items-center justify-between border-b border-bd px-5 py-4">
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
+        <Dialog.Content style={MODAL_SHELL_STYLE}>
+          <div className="flex items-center justify-between border-b border-bd px-5 py-4" style={{ flexShrink: 0 }}>
             <Dialog.Title className="text-lg font-semibold text-tx">{title}</Dialog.Title>
             <Dialog.Close asChild>
               <Button variant="ghost" size="sm" aria-label="Zamknij"><X className="h-4 w-4" /></Button>
             </Dialog.Close>
           </div>
-          <Tabs.Root value={tab} onValueChange={handleTabChange}>
-            <Tabs.List className="flex border-b border-bd px-5 bg-sf2/40">
+          <Tabs.Root value={tab} onValueChange={handleTabChange} style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0 }}>
+            <Tabs.List className="flex border-b border-bd px-5 bg-sf2/40" style={{ flexShrink: 0 }}>
               <TabButton value="form" icon={<FileText className="h-4 w-4" />}>Formularz</TabButton>
               <TabButton value="wizard" icon={<Wand2 className="h-4 w-4" />}>Wizard</TabButton>
               <TabButton value="ai" icon={<Sparkles className="h-4 w-4" />}>Z AI</TabButton>
             </Tabs.List>
-            <div className="p-5 max-h-[70vh] overflow-y-auto">
+            <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: '20px' }}>
               <Tabs.Content value="form">{formTab}</Tabs.Content>
               <Tabs.Content value="wizard">{wizardTab}</Tabs.Content>
               <Tabs.Content value="ai">{aiTab}</Tabs.Content>
