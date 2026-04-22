@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   Mail, Plus, X, Inbox, Send, Trash2, ExternalLink, Loader2,
-  CheckCircle2, Circle, User as UserIcon, Shield, Building2,
+  CheckCircle2, Circle, User as UserIcon, Shield, Building2, RefreshCw,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/Card';
@@ -79,6 +79,21 @@ export function MyEmailTab() {
 
   const messages = messagesQ.data?.messages ?? [];
   const unreadCount = messages.filter((m) => !m.isRead).length;
+
+  const qc = useQueryClient();
+  const syncMut = useMutation({
+    mutationFn: async (accountId: string) => (await api.post(`/crm/mailboxes/${accountId}/sync-now`)).data,
+    onSuccess: (d: { result: { email: string; newMessages: number; error?: string } }) => {
+      if (d.result.error) {
+        toast.error(`Sync błąd: ${d.result.error}`);
+      } else {
+        toast.success(`Zsynchronizowano: ${d.result.newMessages} nowych wiadomości`);
+        qc.invalidateQueries({ queryKey: ['crm', 'messages'] });
+        qc.invalidateQueries({ queryKey: ['crm', 'mailboxes'] });
+      }
+    },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Błąd sync'),
+  });
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-4 min-h-[500px]">
@@ -156,9 +171,16 @@ export function MyEmailTab() {
                 </span>
                 {unreadCount > 0 && <Badge variant="accent">{unreadCount} nieprzecz.</Badge>}
               </div>
-              <Button size="sm" onClick={() => setShowAddMessage(true)} className="gap-1">
-                <Plus className="h-3.5 w-3.5" /> Dodaj wiadomość
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="ghost" onClick={() => active && syncMut.mutate(active)}
+                  disabled={syncMut.isPending} className="gap-1">
+                  <RefreshCw className={`h-3.5 w-3.5 ${syncMut.isPending ? 'animate-spin' : ''}`} />
+                  Sync teraz
+                </Button>
+                <Button size="sm" onClick={() => setShowAddMessage(true)} className="gap-1">
+                  <Plus className="h-3.5 w-3.5" /> Dodaj
+                </Button>
+              </div>
             </div>
             {messagesQ.isLoading ? (
               <div className="p-4"><SkeletonCard /></div>

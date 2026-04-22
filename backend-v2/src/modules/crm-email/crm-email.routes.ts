@@ -7,6 +7,7 @@ import { requireAccess, loadMembershipContext } from '../../middleware/requireAc
 import { HttpError } from '../../utils/httpError';
 import { MODULES } from '../../utils/canAccess';
 import { encrypt } from '../../lib/crypto';
+import { syncMailbox } from './imap-sync';
 import { EmailAccountType } from '@prisma/client';
 
 const router = Router();
@@ -365,6 +366,23 @@ router.get('/activities', requireAccess(MODULES.CLIENTS, 'view'), async (req: Re
       },
     });
     res.json({ items });
+  } catch (err) { next(err); }
+});
+
+
+router.post('/mailboxes/:id/sync-now', requireAccess(MODULES.CLIENTS, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = String(req.params.id);
+    const existing = await prisma.userEmailAccount.findFirst({
+      where: { id, workspaceId: req.workspaceId! },
+      select: { id: true, userId: true, type: true },
+    });
+    if (!existing) throw HttpError.notFound();
+    if (existing.type === 'PERSONAL' && existing.userId !== req.auth!.sub) {
+      throw HttpError.forbidden('Nie możesz synchronizować czyjejś osobistej skrzynki');
+    }
+    const result = await syncMailbox(id);
+    res.json({ result });
   } catch (err) { next(err); }
 });
 
