@@ -68,7 +68,7 @@ router.put(
       await prisma.$transaction([
         prisma.permissionOverride.deleteMany({ where: { membershipId: m.id } }),
         prisma.permissionOverride.createMany({
-          data: input.overrides.map((o) => ({ membershipId: m.id, moduleKey: o.moduleKey, level: o.level })),
+          data: Array.from(new Map(input.overrides.map((o) => [o.moduleKey, o])).values()).map((o) => ({ membershipId: m.id, moduleKey: o.moduleKey, level: o.level })),
         }),
       ]);
       res.json({ success: true, count: input.overrides.length });

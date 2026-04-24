@@ -1,4 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
+import { prisma } from '../../lib/prisma';
 import { requireAuth } from '../../middleware/auth';
 import { requireWorkspace } from '../../middleware/requireWorkspace';
 import { requireAccess } from '../../middleware/requireAccess';
@@ -18,7 +19,9 @@ router.use(requireAuth, requireWorkspace);
 router.get('/', requireAccess(MODULES.TICKETS, 'view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const q = listQuerySchema.parse(req.query);
-    const result = await service.listTickets(req.workspaceId!, q);
+    const relations = await prisma.workspaceRelation.findMany({ where: { providerWorkspaceId: req.workspaceId!, canReceiveTickets: true, status: 'ACTIVE' }, select: { clientWorkspaceId: true } });
+    const visibleWsIds = [req.workspaceId!, ...relations.map((r) => r.clientWorkspaceId)];
+    const result = await service.listTickets(req.workspaceId!, { ...q, visibleWsIds });
     res.json(result);
   } catch (err) { next(err); }
 });

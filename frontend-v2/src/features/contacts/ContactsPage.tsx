@@ -1,11 +1,12 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Plus, Users, Mail, Phone, Star, X, Loader2, Search, Trash2 } from 'lucide-react';
+import { Plus, Users, Mail, Phone, Star, X, Loader2, Search, Trash2, ChevronLeft } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -33,6 +34,7 @@ interface ClientRow {
 }
 
 export function ContactsPage() {
+  const navigate = useNavigate();
   const [view, setView] = useViewPreference('contacts', 'visual');
   const [showCreate, setShowCreate] = useState(false);
   const [clientFilter, setClientFilter] = useState<string>('');
@@ -55,6 +57,11 @@ export function ContactsPage() {
 
   const contacts = data?.contacts ?? [];
 
+  function handleAdd() {
+    if (view === 'visual') setShowCreate(true);
+    else navigate('/contacts/new');
+  }
+
   return (
     <div className="space-y-5 anim-up">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -66,7 +73,7 @@ export function ContactsPage() {
         </div>
         <div className="flex items-center gap-3">
           <ViewToggle value={view} onChange={setView} />
-          <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4" /> Dodaj kontakt</Button>
+          <Button onClick={handleAdd}><Plus className="h-4 w-4" /> Dodaj kontakt</Button>
         </div>
       </div>
 
@@ -93,7 +100,7 @@ export function ContactsPage() {
           <Users className="h-10 w-10 mx-auto mb-3 text-tx3" />
           <p className="text-tx font-medium mb-2">Brak kontaktów</p>
           <p className="text-[13px] text-tx3 mb-4">Dodaj pierwsze osoby kontaktowe do klientów.</p>
-          <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4" /> Dodaj pierwszy kontakt</Button>
+          <Button onClick={handleAdd}><Plus className="h-4 w-4" /> Dodaj pierwszy kontakt</Button>
         </Card>
       ) : view === 'visual' ? (
         <ContactsGrid contacts={contacts} clients={clients?.clients ?? []} />
@@ -102,6 +109,26 @@ export function ContactsPage() {
       )}
 
       {showCreate && <CreateContactModal clients={clients?.clients ?? []} onClose={() => setShowCreate(false)} />}
+    </div>
+  );
+}
+
+export function ContactNewPage() {
+  const navigate = useNavigate();
+  const { data: clients } = useQuery<{ clients: ClientRow[] }>({
+    queryKey: ['clients'],
+    queryFn: async () => (await api.get('/clients')).data,
+  });
+  return (
+    <div className="max-w-3xl mx-auto space-y-4 anim-up">
+      <button
+        onClick={() => navigate(-1)}
+        className="flex items-center gap-1 text-tx3 text-sm hover:text-tx press"
+      >
+        <ChevronLeft className="h-4 w-4" /> Wstecz
+      </button>
+      <h1 className="text-[22px] font-bold text-tx">Nowy kontakt</h1>
+      <CreateContactModal variant="page" clients={clients?.clients ?? []} onClose={() => navigate('/crm')} />
     </div>
   );
 }
@@ -210,10 +237,11 @@ const schema = z.object({
 });
 type Form = z.infer<typeof schema>;
 
-function CreateContactModal({ clients, onClose }: { clients: ClientRow[]; onClose: () => void }) {
+export function CreateContactModal({ clients, onClose, variant = 'modal', clientWorkspaceIdPrefill }: { clients: ClientRow[]; onClose: () => void; variant?: 'modal' | 'page'; clientWorkspaceIdPrefill?: string }) {
   const qc = useQueryClient();
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Form>({
     resolver: zodResolver(schema),
+    defaultValues: clientWorkspaceIdPrefill ? { clientWorkspaceId: clientWorkspaceIdPrefill } : undefined,
   });
 
   const mutation = useMutation({
@@ -227,6 +255,75 @@ function CreateContactModal({ clients, onClose }: { clients: ClientRow[]; onClos
     onSuccess: () => { toast.success('Kontakt dodany'); qc.invalidateQueries({ queryKey: ['contacts'] }); onClose(); },
     onError: () => toast.error('Błąd'),
   });
+
+  const formBody = (
+    <>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-[10px] font-semibold text-tx3 mb-1">Imię *</label>
+          <Input {...register('firstName')} />
+          {errors.firstName && <p className="text-[11px] text-er mt-1">{errors.firstName.message}</p>}
+        </div>
+        <div>
+          <label className="block text-[10px] font-semibold text-tx3 mb-1">Nazwisko *</label>
+          <Input {...register('lastName')} />
+          {errors.lastName && <p className="text-[11px] text-er mt-1">{errors.lastName.message}</p>}
+        </div>
+      </div>
+      <div>
+        <label className="block text-[10px] font-semibold text-tx3 mb-1">Klient (firma)</label>
+        <Select {...register('clientWorkspaceId')}>
+          <option value="">—</option>
+          {clients.map((c) => <option key={c.client.id} value={c.client.id}>{c.client.name}</option>)}
+        </Select>
+      </div>
+      <div>
+        <label className="block text-[10px] font-semibold text-tx3 mb-1">Stanowisko</label>
+        <Input {...register('position')} placeholder="np. Dyrektor, Księgowa, IT" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-[10px] font-semibold text-tx3 mb-1">Email</label>
+          <Input type="email" {...register('email')} />
+        </div>
+        <div>
+          <label className="block text-[10px] font-semibold text-tx3 mb-1">Telefon</label>
+          <Input {...register('phone')} />
+        </div>
+      </div>
+      <div>
+        <label className="block text-[10px] font-semibold text-tx3 mb-1">Tagi (po przecinku)</label>
+        <Input {...register('tags')} placeholder="VIP, Decydent, Księgowość" />
+      </div>
+      <label className="flex items-center gap-2 text-[12px] text-tx2 cursor-pointer">
+        <input type="checkbox" {...register('isMainContact')} className="accent-[color:var(--pri)]" />
+        <Star className="h-3 w-3" />
+        Oznacz jako główny kontakt (jeden na firmę)
+      </label>
+    </>
+  );
+
+  const actions = (
+    <>
+      <Button type="button" variant="ghost" onClick={onClose}>Anuluj</Button>
+      <Button type="submit" disabled={isSubmitting}>
+        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Utwórz'}
+      </Button>
+    </>
+  );
+
+  if (variant === 'page') {
+    return (
+      <Card className="p-0 overflow-hidden">
+        <form className="px-6 py-5 space-y-4" onSubmit={handleSubmit((d) => mutation.mutate(d))}>
+          {formBody}
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-bd">
+            {actions}
+          </div>
+        </form>
+      </Card>
+    );
+  }
 
   return (
     <Dialog.Root open onOpenChange={(o) => !o && onClose()}>
@@ -243,53 +340,9 @@ function CreateContactModal({ clients, onClose }: { clients: ClientRow[]; onClos
             </Dialog.Close>
           </div>
           <form className="px-6 py-5 space-y-4" onSubmit={handleSubmit((d) => mutation.mutate(d))}>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-semibold text-tx3 mb-1">Imię *</label>
-                <Input {...register('firstName')} />
-                {errors.firstName && <p className="text-[11px] text-er mt-1">{errors.firstName.message}</p>}
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-tx3 mb-1">Nazwisko *</label>
-                <Input {...register('lastName')} />
-                {errors.lastName && <p className="text-[11px] text-er mt-1">{errors.lastName.message}</p>}
-              </div>
-            </div>
-            <div>
-              <label className="block text-[10px] font-semibold text-tx3 mb-1">Klient (firma)</label>
-              <Select {...register('clientWorkspaceId')}>
-                <option value="">—</option>
-                {clients.map((c) => <option key={c.client.id} value={c.client.id}>{c.client.name}</option>)}
-              </Select>
-            </div>
-            <div>
-              <label className="block text-[10px] font-semibold text-tx3 mb-1">Stanowisko</label>
-              <Input {...register('position')} placeholder="np. Dyrektor, Księgowa, IT" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-semibold text-tx3 mb-1">Email</label>
-                <Input type="email" {...register('email')} />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-tx3 mb-1">Telefon</label>
-                <Input {...register('phone')} />
-              </div>
-            </div>
-            <div>
-              <label className="block text-[10px] font-semibold text-tx3 mb-1">Tagi (po przecinku)</label>
-              <Input {...register('tags')} placeholder="VIP, Decydent, Księgowość" />
-            </div>
-            <label className="flex items-center gap-2 text-[12px] text-tx2 cursor-pointer">
-              <input type="checkbox" {...register('isMainContact')} className="accent-[color:var(--pri)]" />
-              <Star className="h-3 w-3" />
-              Oznacz jako główny kontakt (jeden na firmę)
-            </label>
+            {formBody}
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-bd">
-              <Button type="button" variant="ghost" onClick={onClose}>Anuluj</Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Utwórz'}
-              </Button>
+              {actions}
             </div>
           </form>
         </Dialog.Content>

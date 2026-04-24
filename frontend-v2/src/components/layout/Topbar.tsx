@@ -1,7 +1,11 @@
 import { Bell, Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { ThemeToggle } from '../ui/ThemeToggle';
+import { IrisCore } from '../iris/IrisCore';
 
 export function Topbar() {
+  const navigate = useNavigate();
+
   return (
     <header
       className="h-[52px] flex items-center justify-between px-5 sticky top-0 z-30 glass"
@@ -20,6 +24,12 @@ export function Topbar() {
         />
       </div>
       <div className="flex items-center gap-2">
+        <IrisCore
+          size="sm"
+          state="idle"
+          onClick={() => navigate('/ai')}
+          ariaLabel="Otwórz Iris"
+        />
         <ThemeToggle />
         <button
           type="button"

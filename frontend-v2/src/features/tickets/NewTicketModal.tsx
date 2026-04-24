@@ -609,7 +609,7 @@ function QuickCreateClientInline({
         <Dialog.Overlay className="fixed inset-0 z-[60] bg-black/50" />
         <Dialog.Content
           style={{
-            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            position: 'fixed', inset: 0, margin: 'auto', height: 'fit-content',
             zIndex: 61, width: 'min(92vw, 30rem)', maxHeight: '88vh',
             background: 'var(--sf)', border: '1px solid var(--bd)', borderRadius: 'var(--r-xl)',
             boxShadow: 'var(--sh4)', display: 'flex', flexDirection: 'column', overflow: 'hidden',
@@ -1133,7 +1133,7 @@ function QuickCreateLocationInline({
         <Dialog.Overlay className="fixed inset-0 z-[60] bg-black/50" />
         <Dialog.Content
           style={{
-            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            position: 'fixed', inset: 0, margin: 'auto', height: 'fit-content',
             zIndex: 61, width: 'min(92vw, 30rem)', maxHeight: '88vh',
             background: 'var(--sf)', border: '1px solid var(--bd)', borderRadius: 'var(--r-xl)',
             boxShadow: 'var(--sh4)', display: 'flex', flexDirection: 'column', overflow: 'hidden',
@@ -1235,7 +1235,7 @@ function QuickCreateDeviceInline({
         <Dialog.Overlay className="fixed inset-0 z-[60] bg-black/50" />
         <Dialog.Content
           style={{
-            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            position: 'fixed', inset: 0, margin: 'auto', height: 'fit-content',
             zIndex: 61, width: 'min(92vw, 30rem)', maxHeight: '88vh',
             background: 'var(--sf)', border: '1px solid var(--bd)', borderRadius: 'var(--r-xl)',
             boxShadow: 'var(--sh4)', display: 'flex', flexDirection: 'column', overflow: 'hidden',
@@ -1340,7 +1340,7 @@ function QuickCreateTechnicianInline({
         <Dialog.Overlay className="fixed inset-0 z-[60] bg-black/50" />
         <Dialog.Content
           style={{
-            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            position: 'fixed', inset: 0, margin: 'auto', height: 'fit-content',
             zIndex: 61, width: 'min(92vw, 28rem)', maxHeight: '88vh',
             background: 'var(--sf)', border: '1px solid var(--bd)', borderRadius: 'var(--r-xl)',
             boxShadow: 'var(--sh4)', display: 'flex', flexDirection: 'column', overflow: 'hidden',

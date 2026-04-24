@@ -201,6 +201,15 @@ async function main(): Promise<void> {
   for (const l of v1Loc) {
     const wsId = ids.workspaces.get(l.workspaceId);
     if (!wsId) { lSkipped++; continue; }
+    const existing = await prisma.location.findFirst({
+      where: { workspaceId: wsId, name: l.name, city: l.city ?? 'brak' },
+      select: { id: true },
+    });
+    if (existing) {
+      ids.locations.set(l.id, existing.id);
+      lSkipped++;
+      continue;
+    }
     if (!dryRun) {
       const created = await prisma.location.create({
         data: {
@@ -404,6 +413,11 @@ async function main(): Promise<void> {
     const v1DevId = agentToDevice.get(al.agentRegId);
     const devId = v1DevId ? ids.devices.get(v1DevId) : null;
     if (!wsId || !devId) { alSkipped++; continue; }
+    const exists = await prisma.monitoringAlert.findFirst({
+      where: { deviceId: devId, type: al.type, createdAt: al.createdAt, message: al.message ?? '' },
+      select: { id: true },
+    });
+    if (exists) { alSkipped++; continue; }
     if (!dryRun) {
       await prisma.monitoringAlert.create({
         data: {
@@ -472,6 +486,11 @@ async function main(): Promise<void> {
     if (!wsId || !techId) { sSkipped++; continue; }
     const deviceId = s.deviceId ? ids.devices.get(s.deviceId) : null;
     const locationId = s.locationId ? ids.locations.get(s.locationId) : null;
+    const exists = await prisma.workSession.findFirst({
+      where: { workspaceId: wsId, technicianId: techId, deviceId, startedAt: s.startedAt },
+      select: { id: true },
+    });
+    if (exists) { sSkipped++; continue; }
     if (!dryRun) {
       await prisma.workSession.create({
         data: {

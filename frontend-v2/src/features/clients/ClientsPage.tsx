@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,7 +8,7 @@ import { z } from 'zod';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   Plus, Building2, ExternalLink, Server as ServerIcon, MapPin, Ticket as TicketIcon,
-  X, Loader2, Copy, AlertTriangle, FileText, Wand2, Sparkles, ChevronLeft, ChevronRight, Check,
+  X, Loader2, Copy, AlertTriangle, FileText, Wand2, Sparkles, ChevronLeft, ChevronRight, Check, Pencil,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/Card';
@@ -42,8 +42,10 @@ interface ClientRow {
 }
 
 export function ClientsPage() {
+  const navigate = useNavigate();
   const [view, setView] = useViewPreference('clients', 'visual');
   const [showCreate, setShowCreate] = useState(false);
+  const [editClient, setEditClient] = useState<ClientRow | null>(null);
 
   const { data, isLoading } = useQuery<{ clients: ClientRow[] }>({
     queryKey: ['clients'],
@@ -51,6 +53,11 @@ export function ClientsPage() {
   });
 
   const clients = data?.clients ?? [];
+
+  function handleAdd() {
+    if (view === 'visual') setShowCreate(true);
+    else navigate('/clients/new');
+  }
 
   return (
     <div className="space-y-5 anim-up">
@@ -63,7 +70,7 @@ export function ClientsPage() {
         </div>
         <div className="flex items-center gap-3">
           <ViewToggle value={view} onChange={setView} />
-          <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4" /> Dodaj klienta</Button>
+          <Button onClick={handleAdd}><Plus className="h-4 w-4" /> Dodaj klienta</Button>
         </div>
       </div>
 
@@ -76,15 +83,33 @@ export function ClientsPage() {
           <Building2 className="h-10 w-10 mx-auto mb-3 text-tx3" />
           <p className="text-tx font-medium mb-2">Brak klientów</p>
           <p className="text-[13px] text-tx3 mb-4">Dodaj pierwszą firmę, którą obsługujesz — dostanie własną subdomenę.</p>
-          <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4" /> Dodaj pierwszego klienta</Button>
+          <Button onClick={handleAdd}><Plus className="h-4 w-4" /> Dodaj pierwszego klienta</Button>
         </Card>
       ) : view === 'visual' ? (
-        <ClientsGrid clients={clients} />
+        <ClientsGrid clients={clients} onEdit={setEditClient} />
       ) : (
-        <ClientsTable clients={clients} />
+        <ClientsTable clients={clients} onEdit={setEditClient} />
       )}
 
       {showCreate && <CreateClientModal onClose={() => setShowCreate(false)} />}
+      {editClient && <EditClientModal client={editClient} onClose={() => setEditClient(null)} />}
+    </div>
+  );
+}
+
+export function ClientNewPage() {
+  const navigate = useNavigate();
+  return (
+    <div className="anim-up">
+      <div className="max-w-3xl mx-auto mb-4">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-1 text-tx3 text-sm hover:text-tx press"
+        >
+          <ChevronLeft className="h-4 w-4" /> Wstecz
+        </button>
+      </div>
+      <CreateClientModal onClose={() => navigate('/clients')} />
     </div>
   );
 }
@@ -95,11 +120,12 @@ function riskBadgeVariant(score: number): 'success' | 'warning' | 'danger' {
   return 'danger';
 }
 
-function ClientsGrid({ clients }: { clients: ClientRow[] }) {
+function ClientsGrid({ clients, onEdit }: { clients: ClientRow[]; onEdit: (c: ClientRow) => void }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 stg">
       {clients.map((c) => (
-        <Link key={c.relationId} to={`/clients/${c.client.id}`} className="block">
+        <div key={c.relationId} className="relative group">
+          <Link to={`/clients/${c.client.id}`} className="block">
           <Card className="p-4 h-full">
             <div className="flex items-start justify-between gap-3 mb-3">
               <div className="flex items-center gap-2.5 min-w-0">
@@ -136,6 +162,15 @@ function ClientsGrid({ clients }: { clients: ClientRow[] }) {
             </div>
           </Card>
         </Link>
+        <button
+          type="button"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(c); }}
+          className="absolute top-2 right-2 p-1.5 rounded opacity-0 group-hover:opacity-100 bg-sf border border-bd hover:border-pri text-tx3 hover:text-pri transition-all"
+          title="Edytuj firmę"
+        >
+          <Pencil size={12} />
+        </button>
+        </div>
       ))}
     </div>
   );
@@ -151,7 +186,7 @@ function Stat({ icon: Icon, value, label }: { icon: typeof MapPin; value: number
   );
 }
 
-function ClientsTable({ clients }: { clients: ClientRow[] }) {
+function ClientsTable({ clients, onEdit }: { clients: ClientRow[]; onEdit: (c: ClientRow) => void }) {
   return (
     <Card className="overflow-hidden p-0">
       <table className="w-full text-[13px]">
@@ -166,11 +201,12 @@ function ClientsTable({ clients }: { clients: ClientRow[] }) {
             <th className="px-4 py-2.5 font-bold">Zgł.</th>
             <th className="px-4 py-2.5 font-bold">Stawka</th>
             <th className="px-4 py-2.5 font-bold">Plan</th>
+            <th className="px-4 py-2.5 font-bold w-8"></th>
           </tr>
         </thead>
         <tbody className="divide-y divide-bd">
           {clients.map((c) => (
-            <tr key={c.relationId} className="hover:bg-sf-h">
+            <tr key={c.relationId} className="hover:bg-sf-h group">
               <td className="px-4 py-3 text-tx">
                 <Link to={`/clients/${c.client.id}`} className="hover:text-pri font-medium">{c.client.name}</Link>
               </td>
@@ -182,11 +218,273 @@ function ClientsTable({ clients }: { clients: ClientRow[] }) {
               <td className="px-4 py-3 text-tx2 tabular-nums">{c.client._count.tickets}</td>
               <td className="px-4 py-3 text-tx3 text-[11px]">{c.hourlyRateNet ? `${c.hourlyRateNet} PLN/h` : c.billingType}</td>
               <td className="px-4 py-3"><Badge variant="neutral">{c.client.plan}</Badge></td>
+              <td className="px-4 py-3">
+                <button type="button" onClick={() => onEdit(c)} className="p-1.5 rounded hover:bg-pri-l text-tx3 hover:text-pri opacity-60 group-hover:opacity-100" title="Edytuj">
+                  <Pencil size={13} />
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
     </Card>
+  );
+}
+
+function EditClientModal({ client, onClose }: { client: ClientRow; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [form, setForm] = useState({
+    name: client.client.name,
+    taxId: client.client.taxId ?? '',
+    city: client.client.city ?? '',
+    email: client.client.email ?? '',
+    phone: '',
+    website: '',
+    addressLine1: '',
+    postalCode: '',
+    billingType: client.billingType,
+    billingPeriod: 'MONTHLY' as 'MONTHLY' | 'QUARTERLY' | 'YEARLY',
+    hourlyRateNet: client.hourlyRateNet ?? '',
+    overageRateNet: '' as string | number,
+    monthlyNet: '' as string | number,
+    monthlyHours: '' as string | number,
+    billingIncrementMin: 15,
+    status: client.status,
+  });
+  const [ceidgLoading, setCeidgLoading] = useState(false);
+
+  // Fetch relation detail to pre-fill billing fields beyond what list returns
+  const { data: detail } = useQuery<{ relation: { billingPeriod?: string; overageRateNet?: string | null; monthlyNet?: string | null; monthlyHours?: number | null; billingIncrementMin?: number; client?: { phone?: string | null; website?: string | null; addressLine1?: string | null; postalCode?: string | null } } }>({
+    queryKey: ['client-detail', client.client.id],
+    queryFn: async () => (await api.get(`/clients/${client.client.id}`)).data,
+  });
+  useEffect(() => {
+    if (!detail?.relation) return;
+    const r = detail.relation;
+    const c = r.client ?? {};
+    setForm((f) => ({
+      ...f,
+      monthlyNet: r.monthlyNet ?? '',
+      monthlyHours: r.monthlyHours ?? '',
+      overageRateNet: r.overageRateNet ?? '',
+      billingIncrementMin: r.billingIncrementMin ?? 15,
+      billingPeriod: (r.billingPeriod as 'MONTHLY' | 'QUARTERLY' | 'YEARLY') ?? 'MONTHLY',
+      phone: c.phone ?? f.phone,
+      website: c.website ?? f.website,
+      addressLine1: c.addressLine1 ?? f.addressLine1,
+      postalCode: c.postalCode ?? f.postalCode,
+    }));
+  }, [detail]);
+
+  async function fetchCeidg() {
+    const cleaned = form.taxId.replace(/[^0-9]/g, '');
+    if (cleaned.length !== 10) { toast.error('Podaj NIP (10 cyfr)'); return; }
+    setCeidgLoading(true);
+    try {
+      const res = await api.get<{ found: boolean; data?: { name: string; city: string | null; addressLine1: string | null; postalCode: string | null } }>(`/clients/lookup/ceidg?nip=${cleaned}`);
+      if (!res.data.found || !res.data.data) { toast.error('Nie znaleziono w CEIDG'); return; }
+      const d = res.data.data;
+      setForm((f) => ({
+        ...f,
+        name: d.name || f.name,
+        city: d.city ?? f.city,
+        addressLine1: d.addressLine1 ?? f.addressLine1,
+        postalCode: d.postalCode ?? f.postalCode,
+      }));
+      toast.success(`Pobrano: ${d.name}`);
+    } catch (err) {
+      const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Błąd CEIDG';
+      toast.error(msg);
+    } finally { setCeidgLoading(false); }
+  }
+
+  const mutation = useMutation({
+    mutationFn: async () => (await api.patch(`/clients/${client.client.id}`, {
+      status: form.status,
+      billingType: form.billingType,
+      billingPeriod: form.billingPeriod,
+      hourlyRateNet: form.hourlyRateNet === '' ? null : Number(form.hourlyRateNet),
+      overageRateNet: form.overageRateNet === '' ? null : Number(form.overageRateNet),
+      monthlyNet: form.monthlyNet === '' ? null : Number(form.monthlyNet),
+      monthlyHours: form.monthlyHours === '' ? null : Number(form.monthlyHours),
+      billingIncrementMin: Number(form.billingIncrementMin) || 15,
+      company: {
+        name: form.name,
+        taxId: form.taxId || null,
+        city: form.city || null,
+        email: form.email || null,
+        phone: form.phone || null,
+        website: form.website || null,
+        addressLine1: form.addressLine1 || null,
+        postalCode: form.postalCode || null,
+      },
+    })).data,
+    onSuccess: () => {
+      toast.success('Zapisano');
+      qc.invalidateQueries({ queryKey: ['clients'] });
+      qc.invalidateQueries({ queryKey: ['client-detail', client.client.id] });
+      qc.invalidateQueries({ queryKey: ['billing-summary'] });
+      onClose();
+    },
+    onError: (e: unknown) => {
+      const msg = (e as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Błąd';
+      toast.error(msg);
+    },
+  });
+
+  return (
+    <Dialog.Root open onOpenChange={(o) => !o && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
+        <Dialog.Content style={MODAL_SHELL_STYLE}>
+          <div className="flex items-center justify-between px-6 py-4 border-b border-bd" style={{ flexShrink: 0 }}>
+            <Dialog.Title className="text-[16px] font-bold text-tx flex items-center gap-2">
+              <Pencil className="h-4 w-4" /> Edytuj firmę — {client.client.name}
+            </Dialog.Title>
+            <Dialog.Close asChild>
+              <button className="p-2 rounded-[var(--r-s)] text-tx3 hover:bg-sf-h"><X className="h-4 w-4" /></button>
+            </Dialog.Close>
+          </div>
+          <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }} style={MODAL_BODY_STYLE} className="space-y-5">
+            <div>
+              <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-tx2 mb-3">Dane firmy</h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[10px] font-semibold text-tx3 mb-1">Nazwa *</label>
+                  <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required minLength={2} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-tx3 mb-1">NIP</label>
+                    <div className="flex items-center gap-2">
+                      <Input value={form.taxId} onChange={(e) => setForm({ ...form, taxId: e.target.value })} className="flex-1" />
+                      <Button type="button" size="sm" variant="ghost" onClick={fetchCeidg} disabled={ceidgLoading} title="Pobierz z CEIDG po NIP">
+                        {ceidgLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Sparkles className="h-3 w-3" /> CEIDG</>}
+                      </Button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-tx3 mb-1">Miasto</label>
+                    <Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-tx3 mb-1">Adres</label>
+                    <Input value={form.addressLine1} onChange={(e) => setForm({ ...form, addressLine1: e.target.value })} placeholder="ul. Przykładowa 1" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-tx3 mb-1">Kod pocztowy</label>
+                    <Input value={form.postalCode} onChange={(e) => setForm({ ...form, postalCode: e.target.value })} placeholder="00-000" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-tx3 mb-1">Email firmy</label>
+                    <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-tx3 mb-1">Telefon</label>
+                    <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-tx3 mb-1">Strona www</label>
+                  <Input value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} placeholder="https://firma.pl" />
+                </div>
+              </div>
+            </div>
+            <div className="border-t border-bd pt-5">
+              <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-tx2 mb-3">Rozliczenia</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-semibold text-tx3 mb-1">Model</label>
+                  <select
+                    value={form.billingType}
+                    onChange={(e) => setForm({ ...form, billingType: e.target.value as typeof form.billingType })}
+                    className="flex h-10 w-full rounded-[var(--r-s)] border border-bd bg-sf2 px-3 text-[13px] text-tx"
+                  >
+                    <option value="HOURLY">Godzinowo</option>
+                    <option value="SUBSCRIPTION">Abonament</option>
+                    <option value="HYBRID">Abonament + godziny ponad</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-tx3 mb-1">Okres rozliczenia</label>
+                  <select
+                    value={form.billingPeriod}
+                    onChange={(e) => setForm({ ...form, billingPeriod: e.target.value as typeof form.billingPeriod })}
+                    className="flex h-10 w-full rounded-[var(--r-s)] border border-bd bg-sf2 px-3 text-[13px] text-tx"
+                  >
+                    <option value="MONTHLY">Miesięczny</option>
+                    <option value="QUARTERLY">Kwartalny</option>
+                    <option value="YEARLY">Roczny</option>
+                  </select>
+                </div>
+              </div>
+
+              {(form.billingType === 'SUBSCRIPTION' || form.billingType === 'HYBRID') && (
+                <div className="mt-3 p-3 rounded-[var(--r-s)] bg-sf-h border border-bd">
+                  <p className="text-[10px] font-semibold text-tx3 uppercase mb-2">Abonament</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-tx3 mb-1">Kwota netto / okres</label>
+                      <Input type="number" step="0.01" value={form.monthlyNet} onChange={(e) => setForm({ ...form, monthlyNet: e.target.value })} placeholder="1500" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-tx3 mb-1">Ilość godzin w abonamencie</label>
+                      <Input type="number" step="1" value={form.monthlyHours} onChange={(e) => setForm({ ...form, monthlyHours: e.target.value })} placeholder="10" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-tx3 mb-1">Stawka ponad limit PLN/h</label>
+                      <Input type="number" step="0.01" value={form.overageRateNet} onChange={(e) => setForm({ ...form, overageRateNet: e.target.value })} placeholder="150" />
+                    </div>
+                    <div className="text-[11px] text-tx3 pt-6">
+                      Po przekroczeniu {form.monthlyHours || '—'} h/okres<br/>każda następna po {form.overageRateNet || '—'} PLN
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {(form.billingType === 'HOURLY' || form.billingType === 'HYBRID') && (
+                <div className="mt-3 p-3 rounded-[var(--r-s)] bg-sf-h border border-bd">
+                  <p className="text-[10px] font-semibold text-tx3 uppercase mb-2">Rozliczenie godzinowe</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-tx3 mb-1">Stawka PLN/h</label>
+                      <Input type="number" step="0.01" value={form.hourlyRateNet} onChange={(e) => setForm({ ...form, hourlyRateNet: e.target.value })} placeholder="120" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-tx3 mb-1">Naliczanie co [min]</label>
+                      <Input type="number" step="1" value={form.billingIncrementMin} onChange={(e) => setForm({ ...form, billingIncrementMin: Number(e.target.value) || 15 })} placeholder="15" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-3">
+                <label className="block text-[10px] font-semibold text-tx3 mb-1">Status</label>
+                <select
+                  value={form.status}
+                  onChange={(e) => setForm({ ...form, status: e.target.value as typeof form.status })}
+                  className="flex h-10 w-full rounded-[var(--r-s)] border border-bd bg-sf2 px-3 text-[13px] text-tx"
+                >
+                  <option value="ACTIVE">Aktywny</option>
+                  <option value="SUSPENDED">Zawieszony</option>
+                  <option value="TERMINATED">Zakończony</option>
+                </select>
+              </div>
+            </div>
+          </form>
+          <div className="px-6 py-4 border-t border-bd flex items-center justify-end gap-2 bg-sf-h" style={{ flexShrink: 0 }}>
+            <Button type="button" variant="ghost" onClick={onClose}>Anuluj</Button>
+            <Button type="button" onClick={() => mutation.mutate()} disabled={mutation.isPending || form.name.length < 2}>
+              {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Zapisz zmiany'}
+            </Button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 
@@ -214,9 +512,9 @@ type AddMode = null | 'form' | 'wizard' | 'ai';
 // Inline-styled modal shell — bypasses any Tailwind purge issues with arbitrary values.
 const MODAL_SHELL_STYLE: React.CSSProperties = {
   position: 'fixed',
-  top: '50%',
-  left: '50%',
-  transform: 'translate(-50%, -50%)',
+  inset: 0,
+  margin: 'auto',
+  height: 'fit-content',
   zIndex: 50,
   width: 'min(92vw, 36rem)',
   maxHeight: '90vh',
@@ -404,7 +702,7 @@ function CreateClientModal({ onClose }: { onClose: () => void }) {
             </Dialog.Close>
           </div>
           <form onSubmit={handleSubmit((d) => mutation.mutate(d))} style={MODAL_BODY_STYLE} className="space-y-5">
-            <FormSectionFirma register={register} setValue={setValue} errors={errors} autoSlug={autoSlug} slug={slug} />
+            <FormSectionFirma register={register} setValue={setValue} watch={watch} errors={errors} autoSlug={autoSlug} slug={slug} />
             <div className="border-t border-bd pt-5"><FormSectionContact register={register} errors={errors} /></div>
             <div className="border-t border-bd pt-5"><FormSectionBilling register={register} /></div>
           </form>
@@ -565,7 +863,7 @@ type WizardProps = {
 };
 
 function WizardMode({
-  register, setValue, errors, handleSubmit, mutation, autoSlug, slug, isSubmitting, onBack, onClose,
+  register, setValue, watch, errors, handleSubmit, mutation, autoSlug, slug, isSubmitting, onBack, onClose,
 }: WizardProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const STEPS = [
@@ -616,7 +914,7 @@ function WizardMode({
           </div>
 
           <div style={MODAL_BODY_STYLE}>
-            {step === 1 && <FormSectionFirma register={register} setValue={setValue} errors={errors} autoSlug={autoSlug} slug={slug} />}
+            {step === 1 && <FormSectionFirma register={register} setValue={setValue} watch={watch} errors={errors} autoSlug={autoSlug} slug={slug} />}
             {step === 2 && <FormSectionContact register={register} errors={errors} />}
             {step === 3 && <FormSectionBilling register={register} />}
           </div>
@@ -650,14 +948,37 @@ function WizardMode({
 }
 
 function FormSectionFirma({
-  register, setValue, errors, autoSlug, slug,
+  register, setValue, watch, errors, autoSlug, slug,
 }: {
   register: ReturnType<typeof useForm<ClientForm>>['register'];
   setValue: ReturnType<typeof useForm<ClientForm>>['setValue'];
+  watch: ReturnType<typeof useForm<ClientForm>>['watch'];
   errors: ReturnType<typeof useForm<ClientForm>>['formState']['errors'];
   autoSlug: string;
   slug: string | undefined;
 }) {
+  const [fetching, setFetching] = useState(false);
+  const nip = watch('taxId');
+
+  async function fetchCeidg() {
+    const cleaned = (nip ?? '').replace(/[^0-9]/g, '');
+    if (cleaned.length !== 10) { toast.error('Podaj NIP (10 cyfr)'); return; }
+    setFetching(true);
+    try {
+      const res = await api.get<{ found: boolean; data?: { name: string; taxId: string; city: string | null; addressLine1: string | null; postalCode: string | null; ownerFirstName: string; ownerLastName: string } }>(`/clients/lookup/ceidg?nip=${cleaned}`);
+      if (!res.data.found || !res.data.data) { toast.error('Nie znaleziono w CEIDG'); return; }
+      const d = res.data.data;
+      if (d.name) setValue('name', d.name);
+      if (d.city) setValue('city', d.city);
+      if (d.ownerFirstName) setValue('ownerFirstName', d.ownerFirstName);
+      if (d.ownerLastName) setValue('ownerLastName', d.ownerLastName);
+      toast.success(`Pobrano: ${d.name}`);
+    } catch (err) {
+      const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Błąd CEIDG';
+      toast.error(msg);
+    } finally { setFetching(false); }
+  }
+
   return (
     <div>
       <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-tx2 mb-3">Dane firmy</h3>
@@ -683,7 +1004,12 @@ function FormSectionFirma({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-[10px] font-semibold text-tx3 mb-1">NIP</label>
-            <Input {...register('taxId')} placeholder="123-456-78-90" />
+            <div className="flex items-center gap-2">
+              <Input {...register('taxId')} placeholder="1234567890" className="flex-1" />
+              <Button type="button" size="sm" variant="ghost" onClick={fetchCeidg} disabled={fetching} title="Pobierz z CEIDG po NIP">
+                {fetching ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Sparkles className="h-3 w-3" /> CEIDG</>}
+              </Button>
+            </div>
           </div>
           <div>
             <label className="block text-[10px] font-semibold text-tx3 mb-1">Miasto</label>

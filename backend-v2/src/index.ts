@@ -3,6 +3,7 @@ import { config } from './config';
 import { logger } from './lib/logger';
 import { prisma } from './lib/prisma';
 import { startImapScheduler } from './modules/crm-email/imap-sync';
+import { initAgentWsServer } from './modules/agents-ws/agents-ws.server';
 
 async function main(): Promise<void> {
   await prisma.$connect();
@@ -11,6 +12,10 @@ async function main(): Promise<void> {
     logger.info({ port: config.PORT, env: config.NODE_ENV }, 'InfraDesk backend v2 listening');
     startImapScheduler();
   });
+
+  // Mount WebSocket server for desktop agents at /api/agent/ws
+  // (V1-compat URL; v4.14.6 and v5.0 both connect here).
+  initAgentWsServer(server);
 
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'shutting down');

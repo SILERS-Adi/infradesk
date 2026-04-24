@@ -3,6 +3,8 @@ import { simpleParser, type ParsedMail } from 'mailparser';
 import { prisma } from '../../lib/prisma';
 import { logger } from '../../lib/logger';
 import { decrypt } from '../../lib/crypto';
+import { syncGmailForUser } from '../auth-google/gmail-sync';
+import { loadTokensForUser } from '../auth-google/google.service';
 
 export interface SyncResult {
   accountId: string;
@@ -12,20 +14,44 @@ export interface SyncResult {
 }
 
 /**
- * Sync a single IMAP mailbox. Fetches INBOX messages since lastSyncAt,
- * dedupes by messageId, stores as EmailMessage rows. Updates lastSyncAt/lastError on account.
+ * Sync a single mailbox.
+ *
+ * Dispatch order:
+ *   1. If the account's owning user has Google OAuth tokens AND the account's
+ *      email matches the connected Google email → use Gmail API (no IMAP password needed).
+ *   2. Otherwise fall back to classic IMAP (requires imapHost + encrypted password).
+ *
+ * IMAP path left intact so non-Gmail providers keep working.
  */
 export async function syncMailbox(accountId: string): Promise<SyncResult> {
   const account = await prisma.userEmailAccount.findUnique({
     where: { id: accountId },
     select: {
-      id: true, email: true, workspaceId: true,
+      id: true, email: true, workspaceId: true, userId: true,
       imapHost: true, imapPort: true, imapUsername: true,
       imapPasswordEnc: true, imapPasswordIv: true, imapPasswordAuthTag: true,
       imapUseTls: true, lastSyncAt: true,
     },
   });
   if (!account) return { accountId, email: '?', newMessages: 0, error: 'account_not_found' };
+
+  // Sprint 6: try Gmail OAuth branch first if the account's user has tokens
+  // for this exact mailbox. Falls through to IMAP on any error.
+  if (account.userId) {
+    try {
+      const tokens = await loadTokensForUser(account.userId);
+      if (tokens && tokens.email.toLowerCase() === account.email.toLowerCase()) {
+        const r = await syncGmailForUser(account.userId);
+        if (!r.error) {
+          return { accountId, email: account.email, newMessages: r.newMessages };
+        }
+        logger.warn({ accountId, err: r.error }, '[sync] gmail branch failed, falling back to IMAP');
+      }
+    } catch (err) {
+      logger.warn({ err, accountId }, '[sync] gmail check failed, falling back to IMAP');
+    }
+  }
+
   if (!account.imapHost || !account.imapUsername || !account.imapPasswordEnc) {
     return { accountId, email: account.email, newMessages: 0, error: 'imap_not_configured' };
   }

@@ -64,6 +64,7 @@ export const MODULES = {
   GPS: 'gps',
   BACKUPS: 'backups',
   INVOICES: 'invoices',          // post-MVP module
+  DOWNLOADS: 'downloads',        // plik do pobrania: installers, manuals, tools
 } as const;
 
 export type ModuleKey = typeof MODULES[keyof typeof MODULES];
@@ -91,6 +92,7 @@ const DEFAULT_MEMBER_LEVELS: Record<string, AccessLevel> = {
   [MODULES.GPS]: 'VIEW',
   [MODULES.BACKUPS]: 'NONE',
   [MODULES.INVOICES]: 'NONE',
+  [MODULES.DOWNLOADS]: 'VIEW',
 };
 
 const ADMIN_DEFAULT_LEVEL: AccessLevel = 'DELETE';

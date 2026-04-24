@@ -7,9 +7,9 @@ import { cn } from '@/lib/utils';
 
 const MODAL_SHELL_STYLE: React.CSSProperties = {
   position: 'fixed',
-  top: '50%',
-  left: '50%',
-  transform: 'translate(-50%, -50%)',
+  inset: 0,
+  margin: 'auto',
+  height: 'fit-content',
   zIndex: 50,
   width: 'min(96vw, 48rem)',
   maxHeight: '90vh',

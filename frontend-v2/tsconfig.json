@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
@@ -19,10 +23,21 @@
     "useDefineForClassFields": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@shared/canAccess": ["../backend-v2/src/utils/canAccess.ts"]
-    }
+      "@/*": [
+        "src/*"
+      ],
+      "@shared/canAccess": [
+        "../backend-v2/src/utils/canAccess.ts"
+      ]
+    },
+    "noEmit": true
   },
-  "include": ["src", "../backend-v2/src/utils/canAccess.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src",
+    "../backend-v2/src/utils/canAccess.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }

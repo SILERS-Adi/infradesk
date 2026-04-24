@@ -4,10 +4,10 @@ import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard, Ticket, CheckSquare, Calendar, Timer, Receipt, Bell, ShoppingCart, Car, Globe2,
   Building2, Users, MapPin, Handshake,
-  Server, Zap, Activity, HardDriveDownload, Scroll,
+  Server, Zap, Activity, HardDriveDownload, Scroll, HardDrive,
   Key, Brain, Radar, Lightbulb, Clock, DollarSign,
   Building, UserCog, Package2, Cog,
-  ChevronDown, LogOut,
+  ChevronDown, LogOut, Palette,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
@@ -21,6 +21,8 @@ interface NavItem {
   label: string;
   badge?: number;
   comingSoon?: boolean;
+  /** Permission module key — if set, item hides when user's effective level is NONE. */
+  moduleKey?: string;
 }
 
 interface NavGroup {
@@ -33,7 +35,7 @@ interface NavGroup {
 // only their own tickets/devices/vault + AI chat + own settings. No MSP-only admin views.
 const CLIENT_VISIBLE_PATHS = new Set<string>([
   '/', '/tickets', '/calendar',
-  '/devices', '/activity-logs',
+  '/devices', '/activity-logs', '/downloads',
   '/vault', '/vault/mine', '/vault/shared',
   '/ai',
   '/my-company', '/users', '/settings',
@@ -47,25 +49,25 @@ const GROUPS: NavGroup[] = [
     id: 'operations',
     label: 'Operacje',
     items: [
-      { to: '/', icon: LayoutDashboard, label: 'Kokpit' },
-      { to: '/tickets', icon: Ticket, label: 'Zgłoszenia' },
-      { to: '/tasks', icon: CheckSquare, label: 'Zadania' },
+      { to: '/', icon: LayoutDashboard, label: 'Kokpit', moduleKey: 'dashboard' },
+      { to: '/tickets', icon: Ticket, label: 'Zgłoszenia', moduleKey: 'tickets' },
+      { to: '/tasks', icon: CheckSquare, label: 'Zadania', moduleKey: 'tasks' },
       { to: '/calendar', icon: Calendar, label: 'Kalendarz' },
-      { to: '/sessions', icon: Timer, label: 'Sesje pracy' },
-      { to: '/billing', icon: Receipt, label: 'Rozliczenia' },
-      { to: '/alerts', icon: Bell, label: 'Alerty' },
-      { to: '/orders', icon: ShoppingCart, label: 'Zamówienia' },
-      { to: '/delegations', icon: Car, label: 'Delegacje' },
-      { to: '/portal-settings', icon: Globe2, label: 'Portal i obsługa' },
+      { to: '/sessions', icon: Timer, label: 'Sesje pracy', moduleKey: 'sessions' },
+      { to: '/billing', icon: Receipt, label: 'Rozliczenia', moduleKey: 'billing' },
+      { to: '/alerts', icon: Bell, label: 'Alerty', moduleKey: 'alerts' },
+      { to: '/orders', icon: ShoppingCart, label: 'Zamówienia', moduleKey: 'orders' },
+      { to: '/delegations', icon: Car, label: 'Delegacje', moduleKey: 'delegations' },
+      { to: '/portal-settings', icon: Globe2, label: 'Portal i obsługa', moduleKey: 'workspace.settings' },
     ],
   },
   {
     id: 'clients',
     label: 'Klienci',
     items: [
-      { to: '/clients', icon: Building2, label: 'Firmy klientów' },
-      { to: '/crm', icon: Users, label: 'CRM' },
-      { to: '/locations', icon: MapPin, label: 'Lokalizacje' },
+      { to: '/clients', icon: Building2, label: 'Firmy klientów', moduleKey: 'clients' },
+      { to: '/crm', icon: Users, label: 'CRM', moduleKey: 'crm' },
+      { to: '/locations', icon: MapPin, label: 'Lokalizacje', moduleKey: 'locations' },
       { to: '/partners', icon: Handshake, label: 'Partnerzy IT', comingSoon: true },
     ],
   },
@@ -73,41 +75,49 @@ const GROUPS: NavGroup[] = [
     id: 'infrastructure',
     label: 'Infrastruktura IT',
     items: [
-      { to: '/devices', icon: Server, label: 'Urządzenia' },
-      { to: '/agents', icon: Zap, label: 'Asystenci' },
-      { to: '/monitoring', icon: Activity, label: 'Audyt i sieć' },
-      { to: '/backups', icon: HardDriveDownload, label: 'Kopie zapasowe' },
-      { to: '/activity-logs', icon: Scroll, label: 'Logi aktywności' },
+      { to: '/devices', icon: Server, label: 'Urządzenia', moduleKey: 'devices' },
+      { to: '/agents', icon: Zap, label: 'Asystenci', moduleKey: 'agents' },
+      { to: '/monitoring', icon: Activity, label: 'Audyt i sieć', moduleKey: 'monitoring' },
+      { to: '/backups', icon: HardDriveDownload, label: 'Kopie zapasowe', moduleKey: 'backups' },
+      { to: '/activity-logs', icon: Scroll, label: 'Logi aktywności', moduleKey: 'activity-logs' },
+      { to: '/downloads', icon: HardDrive, label: 'Dysk', moduleKey: 'downloads' },
     ],
   },
   {
     id: 'vault',
     label: 'Sejf haseł',
     items: [
-      { to: '/vault', icon: Key, label: 'Wszystkie' },
-      { to: '/vault/mine', icon: Key, label: 'Moje' },
-      { to: '/vault/shared', icon: Key, label: 'Współdzielone' },
+      { to: '/vault', icon: Key, label: 'Wszystkie', moduleKey: 'vault' },
+      { to: '/vault/mine', icon: Key, label: 'Moje', moduleKey: 'vault' },
+      { to: '/vault/shared', icon: Key, label: 'Współdzielone', moduleKey: 'vault' },
     ],
   },
   {
     id: 'ai',
     label: 'Asystent AI',
     items: [
-      { to: '/ai', icon: Brain, label: 'Czat i komendy' },
-      { to: '/ai/shadow', icon: Radar, label: 'Shadow Mode' },
-      { to: '/ai/insights', icon: Lightbulb, label: 'Insights' },
+      { to: '/ai', icon: Brain, label: 'Czat i komendy', moduleKey: 'ai.copilot' },
+      { to: '/ai/shadow', icon: Radar, label: 'Shadow Mode', moduleKey: 'ai.copilot' },
+      { to: '/ai/insights', icon: Lightbulb, label: 'Insights', moduleKey: 'ai.copilot' },
       { to: '/ai/time', icon: Clock, label: 'Invisible Time', comingSoon: true },
-      { to: '/ai/usage', icon: DollarSign, label: 'Koszty AI' },
+      { to: '/ai/usage', icon: DollarSign, label: 'Koszty AI', moduleKey: 'ai.copilot' },
     ],
   },
   {
     id: 'company',
     label: 'Moja firma',
     items: [
-      { to: '/my-company', icon: Building, label: 'Moje dane' },
-      { to: '/users', icon: UserCog, label: 'Użytkownicy' },
-      { to: '/plan-and-modules', icon: Package2, label: 'Plan i moduły' },
-      { to: '/settings', icon: Cog, label: 'Ustawienia' },
+      { to: '/my-company', icon: Building, label: 'Moje dane', moduleKey: 'workspace.settings' },
+      { to: '/users', icon: UserCog, label: 'Użytkownicy', moduleKey: 'members' },
+      { to: '/plan-and-modules', icon: Package2, label: 'Plan i moduły', moduleKey: 'billing' },
+      { to: '/settings', icon: Cog, label: 'Ustawienia', moduleKey: 'workspace.settings' },
+    ],
+  },
+  {
+    id: 'system',
+    label: 'System',
+    items: [
+      { to: '/design', icon: Palette, label: 'Design' },
     ],
   },
 ];
@@ -124,16 +134,39 @@ export function Sidebar() {
   const workspace = wsQ.data?.workspace;
   const isClient = workspace?.type === 'CLIENT';
 
+  // Permissions for current user: map moduleKey → effective access level
+  const permQ = useQuery<{
+    role: 'OWNER' | 'ADMIN' | 'MEMBER';
+    effective: Record<string, 'NONE' | 'VIEW' | 'EDIT' | 'DELETE'>;
+    overrides: Array<{ moduleKey: string; level: 'NONE' | 'VIEW' | 'EDIT' | 'DELETE' }>;
+  }>({
+    queryKey: ['permissions', 'me'],
+    queryFn: async () => (await api.get('/permissions/me')).data,
+    staleTime: 60_000,
+  });
+  const perm = permQ.data;
+
+  const canSee = (moduleKey?: string): boolean => {
+    if (!moduleKey) return true;
+    if (!perm) return true; // optimistic while loading — backend still enforces
+    if (perm.role === 'OWNER') return true;
+    // Prefer explicit override, else effective map, else default VIEW
+    const override = perm.overrides.find((o) => o.moduleKey === moduleKey);
+    const level = override?.level ?? perm.effective[moduleKey] ?? 'VIEW';
+    return level !== 'NONE';
+  };
+
   const visibleGroups = useMemo(() => {
-    if (!isClient) return GROUPS;
-    return GROUPS
-      .filter((g) => !CLIENT_HIDDEN_GROUPS.has(g.id))
-      .map((g) => ({
-        ...g,
-        items: g.items.filter((it) => CLIENT_VISIBLE_PATHS.has(it.to)),
-      }))
+    const base = isClient
+      ? GROUPS
+          .filter((g) => !CLIENT_HIDDEN_GROUPS.has(g.id))
+          .map((g) => ({ ...g, items: g.items.filter((it) => CLIENT_VISIBLE_PATHS.has(it.to)) }))
+      : GROUPS;
+    return base
+      .map((g) => ({ ...g, items: g.items.filter((it) => canSee(it.moduleKey)) }))
       .filter((g) => g.items.length > 0);
-  }, [isClient]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isClient, perm]);
 
   const toggleGroup = (id: string) => {
     const next = new Set(collapsed);

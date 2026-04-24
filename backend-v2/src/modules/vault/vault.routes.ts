@@ -1,3 +1,4 @@
+import { vaultRevealLimiter } from '../../middleware/rateLimit';
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
@@ -143,7 +144,7 @@ router.get('/:id', requireAccess(MODULES.VAULT, 'view'), async (req: Request, re
  * Returns the decrypted password in plaintext.
  * Always writes a CredentialViewLog entry — auditable.
  */
-router.post('/:id/reveal', requireAccess(MODULES.VAULT, 'view'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/reveal', vaultRevealLimiter, requireAccess(MODULES.VAULT, 'view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const input = revealSchema.parse(req.body);
     const ctx = await loadMembershipContext(req.membershipId!, req.auth!.isSuperAdmin ?? false);

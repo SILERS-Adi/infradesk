@@ -31,7 +31,12 @@ router.get('/', requireAccess(MODULES.CLIENTS, 'view'), async (req: Request, res
       clientWorkspaceId: z.string().uuid().optional(),
       tag: z.string().max(50).optional(),
     }).parse(req.query);
-    const where: Record<string, unknown> = { workspaceId: req.workspaceId! };
+    const relations = await prisma.workspaceRelation.findMany({
+      where: { providerWorkspaceId: req.workspaceId!, status: 'ACTIVE' },
+      select: { clientWorkspaceId: true },
+    });
+    const visibleWsIds = [req.workspaceId!, ...relations.map((r) => r.clientWorkspaceId)];
+    const where: Record<string, unknown> = { workspaceId: { in: visibleWsIds } };
     if (q.clientWorkspaceId) where.clientWorkspaceId = q.clientWorkspaceId;
     if (q.tag) where.tags = { has: q.tag };
     if (q.search) {

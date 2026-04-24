@@ -1,11 +1,12 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Plus, MapPin, Phone, Mail, X, Loader2, Warehouse, Store, Home } from 'lucide-react';
+import { Plus, MapPin, Phone, Mail, X, Loader2, Warehouse, Store, Home, ChevronLeft } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -43,6 +44,7 @@ const TYPE_META: Record<string, { label: string; icon: typeof MapPin; color: str
 };
 
 export function LocationsPage() {
+  const navigate = useNavigate();
   const [view, setView] = useViewPreference('locations', 'visual');
   const [showCreate, setShowCreate] = useState(false);
 
@@ -52,6 +54,11 @@ export function LocationsPage() {
   });
 
   const locations = data?.locations ?? [];
+
+  function handleAdd() {
+    if (view === 'visual') setShowCreate(true);
+    else navigate('/locations/new');
+  }
 
   return (
     <div className="space-y-5 anim-up">
@@ -64,7 +71,7 @@ export function LocationsPage() {
         </div>
         <div className="flex items-center gap-3">
           <ViewToggle value={view} onChange={setView} />
-          <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4" /> Dodaj</Button>
+          <Button onClick={handleAdd}><Plus className="h-4 w-4" /> Dodaj</Button>
         </div>
       </div>
 
@@ -77,7 +84,7 @@ export function LocationsPage() {
           <MapPin className="h-10 w-10 mx-auto mb-3 text-tx3" />
           <p className="text-tx font-medium mb-2">Brak lokalizacji</p>
           <p className="text-[13px] text-tx3 mb-4">Dodaj pierwszy oddział, biuro albo magazyn. Geofence pozwala automatyczne uruchamiać sesje pracy.</p>
-          <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4" /> Dodaj pierwszą lokalizację</Button>
+          <Button onClick={handleAdd}><Plus className="h-4 w-4" /> Dodaj pierwszą lokalizację</Button>
         </Card>
       ) : view === 'visual' ? (
         <LocationsGrid locations={locations} />
@@ -86,6 +93,22 @@ export function LocationsPage() {
       )}
 
       {showCreate && <CreateLocationModal onClose={() => setShowCreate(false)} />}
+    </div>
+  );
+}
+
+export function LocationNewPage() {
+  const navigate = useNavigate();
+  return (
+    <div className="max-w-3xl mx-auto space-y-4 anim-up">
+      <button
+        onClick={() => navigate(-1)}
+        className="flex items-center gap-1 text-tx3 text-sm hover:text-tx press"
+      >
+        <ChevronLeft className="h-4 w-4" /> Wstecz
+      </button>
+      <h1 className="text-[22px] font-bold text-tx">Nowa lokalizacja</h1>
+      <CreateLocationModal variant="page" onClose={() => navigate('/locations')} />
     </div>
   );
 }
@@ -186,7 +209,7 @@ const schema = z.object({
 });
 type Form = z.infer<typeof schema>;
 
-function CreateLocationModal({ onClose }: { onClose: () => void }) {
+export function CreateLocationModal({ onClose, variant = 'modal', workspaceIdOverride }: { onClose: () => void; variant?: 'modal' | 'page'; workspaceIdOverride?: string }) {
   const qc = useQueryClient();
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Form>({
     resolver: zodResolver(schema),
@@ -197,6 +220,7 @@ function CreateLocationModal({ onClose }: { onClose: () => void }) {
     mutationFn: async (data: Form) => {
       const payload: Record<string, unknown> = { ...data };
       if (!data.contactEmail) delete payload.contactEmail;
+      if (workspaceIdOverride) payload.workspaceId = workspaceIdOverride;
       return (await api.post('/locations', payload)).data;
     },
     onSuccess: () => { toast.success('Lokalizacja dodana'); qc.invalidateQueries({ queryKey: ['locations'] }); onClose(); },
@@ -205,6 +229,103 @@ function CreateLocationModal({ onClose }: { onClose: () => void }) {
       toast.error(ax.response?.data?.message ?? 'Błąd');
     },
   });
+
+  const formBody = (
+    <>
+      <div className="grid grid-cols-3 gap-3">
+        <div className="col-span-2">
+          <label className="block text-[10px] font-semibold text-tx3 mb-1">Nazwa *</label>
+          <Input {...register('name')} placeholder="np. Biuro główne, Magazyn Osmolice" />
+          {errors.name && <p className="text-[11px] text-er mt-1">{errors.name.message}</p>}
+        </div>
+        <div>
+          <label className="block text-[10px] font-semibold text-tx3 mb-1">Typ</label>
+          <Select {...register('type')}>
+            <option value="OFFICE">Biuro</option>
+            <option value="WAREHOUSE">Magazyn</option>
+            <option value="RETAIL">Sklep</option>
+            <option value="HOME_OFFICE">Home office</option>
+            <option value="OTHER">Inne</option>
+          </Select>
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-[10px] font-semibold text-tx3 mb-1">Adres *</label>
+        <Input {...register('addressLine1')} placeholder="ul. Przykładowa 10" />
+        {errors.addressLine1 && <p className="text-[11px] text-er mt-1">{errors.addressLine1.message}</p>}
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className="block text-[10px] font-semibold text-tx3 mb-1">Kod *</label>
+          <Input {...register('postalCode')} placeholder="00-001" />
+        </div>
+        <div className="col-span-2">
+          <label className="block text-[10px] font-semibold text-tx3 mb-1">Miasto *</label>
+          <Input {...register('city')} placeholder="Warszawa" />
+        </div>
+      </div>
+
+      <div className="border-t border-bd pt-4">
+        <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-tx2 mb-3">Kontakt na miejscu</h3>
+        <div className="space-y-3">
+          <Input {...register('contactName')} placeholder="Imię i nazwisko" />
+          <div className="grid grid-cols-2 gap-3">
+            <Input {...register('contactPhone')} placeholder="Telefon" />
+            <Input type="email" {...register('contactEmail')} placeholder="Email" />
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t border-bd pt-4">
+        <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-tx2 mb-3">GPS + Geofence (dla automatycznych sesji)</h3>
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label className="block text-[10px] font-semibold text-tx3 mb-1">Szerokość GPS (lat)</label>
+            <Input type="number" step="0.000001" {...register('gpsLat')} placeholder="52.229676" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-semibold text-tx3 mb-1">Długość GPS (lon)</label>
+            <Input type="number" step="0.000001" {...register('gpsLon')} placeholder="21.012229" />
+          </div>
+        </div>
+        <div>
+          <label className="block text-[10px] font-semibold text-tx3 mb-1">Promień geofence (metry)</label>
+          <Input type="number" {...register('geofenceRadiusMeters')} />
+        </div>
+        <label className="flex items-center gap-2 text-[12px] text-tx2 cursor-pointer mt-3">
+          <input type="checkbox" {...register('autoCheckInEnabled')} className="accent-[color:var(--pri)]" />
+          Auto-rozpoczęcie sesji gdy technik wjedzie w promień
+        </label>
+        <label className="flex items-center gap-2 text-[12px] text-tx2 cursor-pointer mt-2">
+          <input type="checkbox" {...register('requireQrConfirmation')} className="accent-[color:var(--pri)]" />
+          Wymagaj potwierdzenia QR (dla klientów high-security)
+        </label>
+      </div>
+    </>
+  );
+
+  const actions = (
+    <>
+      <Button type="button" variant="ghost" onClick={onClose}>Anuluj</Button>
+      <Button type="button" onClick={handleSubmit((d) => mutation.mutate(d))} disabled={isSubmitting}>
+        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Utwórz'}
+      </Button>
+    </>
+  );
+
+  if (variant === 'page') {
+    return (
+      <Card className="p-0 overflow-hidden">
+        <form className="px-6 py-5 space-y-5" onSubmit={handleSubmit((d) => mutation.mutate(d))}>
+          {formBody}
+        </form>
+        <div className="px-6 py-4 border-t border-bd flex items-center justify-end gap-2 bg-sf-h">
+          {actions}
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Dialog.Root open onOpenChange={(o) => !o && onClose()}>
@@ -221,82 +342,10 @@ function CreateLocationModal({ onClose }: { onClose: () => void }) {
             </Dialog.Close>
           </div>
           <form className="px-6 py-5 space-y-5 overflow-y-auto flex-1 min-h-0" onSubmit={handleSubmit((d) => mutation.mutate(d))}>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-2">
-                <label className="block text-[10px] font-semibold text-tx3 mb-1">Nazwa *</label>
-                <Input {...register('name')} placeholder="np. Biuro główne, Magazyn Osmolice" />
-                {errors.name && <p className="text-[11px] text-er mt-1">{errors.name.message}</p>}
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-tx3 mb-1">Typ</label>
-                <Select {...register('type')}>
-                  <option value="OFFICE">Biuro</option>
-                  <option value="WAREHOUSE">Magazyn</option>
-                  <option value="RETAIL">Sklep</option>
-                  <option value="HOME_OFFICE">Home office</option>
-                  <option value="OTHER">Inne</option>
-                </Select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-semibold text-tx3 mb-1">Adres *</label>
-              <Input {...register('addressLine1')} placeholder="ul. Przykładowa 10" />
-              {errors.addressLine1 && <p className="text-[11px] text-er mt-1">{errors.addressLine1.message}</p>}
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-[10px] font-semibold text-tx3 mb-1">Kod *</label>
-                <Input {...register('postalCode')} placeholder="00-001" />
-              </div>
-              <div className="col-span-2">
-                <label className="block text-[10px] font-semibold text-tx3 mb-1">Miasto *</label>
-                <Input {...register('city')} placeholder="Warszawa" />
-              </div>
-            </div>
-
-            <div className="border-t border-bd pt-4">
-              <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-tx2 mb-3">Kontakt na miejscu</h3>
-              <div className="space-y-3">
-                <Input {...register('contactName')} placeholder="Imię i nazwisko" />
-                <div className="grid grid-cols-2 gap-3">
-                  <Input {...register('contactPhone')} placeholder="Telefon" />
-                  <Input type="email" {...register('contactEmail')} placeholder="Email" />
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t border-bd pt-4">
-              <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-tx2 mb-3">GPS + Geofence (dla automatycznych sesji)</h3>
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <div>
-                  <label className="block text-[10px] font-semibold text-tx3 mb-1">Szerokość GPS (lat)</label>
-                  <Input type="number" step="0.000001" {...register('gpsLat')} placeholder="52.229676" />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-semibold text-tx3 mb-1">Długość GPS (lon)</label>
-                  <Input type="number" step="0.000001" {...register('gpsLon')} placeholder="21.012229" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-tx3 mb-1">Promień geofence (metry)</label>
-                <Input type="number" {...register('geofenceRadiusMeters')} />
-              </div>
-              <label className="flex items-center gap-2 text-[12px] text-tx2 cursor-pointer mt-3">
-                <input type="checkbox" {...register('autoCheckInEnabled')} className="accent-[color:var(--pri)]" />
-                Auto-rozpoczęcie sesji gdy technik wjedzie w promień
-              </label>
-              <label className="flex items-center gap-2 text-[12px] text-tx2 cursor-pointer mt-2">
-                <input type="checkbox" {...register('requireQrConfirmation')} className="accent-[color:var(--pri)]" />
-                Wymagaj potwierdzenia QR (dla klientów high-security)
-              </label>
-            </div>
+            {formBody}
           </form>
           <div className="px-6 py-4 border-t border-bd flex items-center justify-end gap-2 bg-sf-h shrink-0">
-            <Button type="button" variant="ghost" onClick={onClose}>Anuluj</Button>
-            <Button type="button" onClick={handleSubmit((d) => mutation.mutate(d))} disabled={isSubmitting}>
-              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Utwórz'}
-            </Button>
+            {actions}
           </div>
         </Dialog.Content>
       </Dialog.Portal>

@@ -74,6 +74,7 @@ export const updateTicketSchema = z.object({
   deviceId: z.string().uuid().optional().nullable(),
   locationId: z.string().uuid().optional().nullable(),
   assignedToUserId: z.string().uuid().optional().nullable(),
+  serviceMode: z.enum(['ONSITE', 'REMOTE']).optional().nullable(),
   dueAt: z.string().datetime().optional().nullable(),
 });
 export type UpdateTicketInput = z.infer<typeof updateTicketSchema>;
@@ -94,8 +95,11 @@ export const listQuerySchema = z.object({
   priority: z.string().optional(),
   assignedToUserId: z.string().uuid().optional(),
   deviceId: z.string().uuid().optional(),
+  clientWorkspaceId: z.string().uuid().optional(),
   search: z.string().max(200).optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(25),
+  from: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
+  to: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
+  limit: z.coerce.number().int().min(1).max(500).default(100),
   cursor: z.string().uuid().optional(),
 });
 

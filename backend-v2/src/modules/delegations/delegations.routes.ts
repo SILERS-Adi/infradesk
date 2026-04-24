@@ -56,7 +56,12 @@ router.get('/', requireAccess(MODULES.TICKETS, 'view'), async (req: Request, res
       to: z.string().datetime().optional(),
     }).parse(req.query);
 
-    const where: Record<string, unknown> = { workspaceId: req.workspaceId! };
+    const relations = await prisma.workspaceRelation.findMany({
+      where: { providerWorkspaceId: req.workspaceId!, status: 'ACTIVE', canReceiveTickets: true },
+      select: { clientWorkspaceId: true },
+    });
+    const visibleWsIds = [req.workspaceId!, ...relations.map((r) => r.clientWorkspaceId)];
+    const where: Record<string, unknown> = { workspaceId: { in: visibleWsIds } };
     if (q.status) where.status = { in: q.status.split(',') };
     if (q.assignedToUserId) where.assignedToUserId = q.assignedToUserId;
     if (q.from || q.to) {
@@ -253,7 +258,7 @@ calendarRouter.get('/events', requireAccess(MODULES.TICKETS, 'view'), async (req
 // Billing — time × rate aggregation
 // ────────────────────────────────────────────────────────────────
 const billingRouter = Router();
-billingRouter.use(requireAuth, requireWorkspace);
+billingRouter.use(requireAuth, requireWorkspace, requireAccess(MODULES.BILLING, "view"));
 
 billingRouter.get('/time', requireAccess(MODULES.TICKETS, 'view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -324,6 +329,156 @@ billingRouter.get('/time', requireAccess(MODULES.TICKETS, 'view'), async (req: R
       totalBillableMinutes: sessions.reduce((a, s) => a + (s.billableMinutes ?? 0), 0),
       totalEstimatedPln: Array.from(perTech.values()).reduce((a, t) => a + t.estimatedAmountPln, 0),
     });
+  } catch (err) { next(err); }
+});
+
+// GET /billing/summary?month=YYYY-MM&billingType=HOURLY|SUBSCRIPTION|HYBRID
+// Per-client aggregation: hours worked × client-specific rate, plus subscription info.
+billingRouter.get('/summary', requireAccess(MODULES.CLIENTS, 'view'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const q = z.object({
+      month: z.string().regex(/^\d{4}-\d{2}$/).optional(),
+      billingType: z.enum(['HOURLY', 'SUBSCRIPTION', 'HYBRID']).optional(),
+    }).parse(req.query);
+
+    const monthStr = q.month ?? new Date().toISOString().slice(0, 7);
+    const [year, month] = monthStr.split('-').map(Number);
+    const start = new Date(year!, month! - 1, 1);
+    const end = new Date(year!, month!, 1);
+
+    // All client relations for this MSP workspace
+    const relations = await prisma.workspaceRelation.findMany({
+      where: {
+        providerWorkspaceId: req.workspaceId!,
+        ...(q.billingType ? { billingType: q.billingType } : {}),
+      },
+      include: {
+        client: {
+          select: {
+            id: true, slug: true, name: true, logoUrl: true, primaryColor: true, city: true,
+          },
+        },
+      },
+    });
+
+    // All billable completed sessions in month for this workspace
+    const sessions = await prisma.workSession.findMany({
+      where: {
+        workspaceId: req.workspaceId!,
+        status: 'COMPLETED',
+        billable: true,
+        endedAt: { gte: start, lt: end },
+      },
+      select: {
+        id: true, clientWorkspaceId: true, billableMinutes: true, durationMinutes: true,
+        startedAt: true, endedAt: true, hourlyRateNet: true,
+        technician: { select: { id: true, firstName: true, lastName: true } },
+        ticketLinks: { select: { ticket: { select: { id: true, ticketNumber: true } } } },
+      },
+      orderBy: { startedAt: 'desc' },
+    });
+
+    // Bucket sessions by client
+    const byClient = new Map<string, typeof sessions>();
+    for (const s of sessions) {
+      if (!s.clientWorkspaceId) continue;
+      const arr = byClient.get(s.clientWorkspaceId) ?? [];
+      arr.push(s);
+      byClient.set(s.clientWorkspaceId, arr);
+    }
+
+    // Build per-client rows
+    const rows = relations.map((r) => {
+      const clientSessions = byClient.get(r.clientWorkspaceId) ?? [];
+      const totalMinutes = clientSessions.reduce((a, s) => a + (s.durationMinutes ?? 0), 0);
+      const billableMinutes = clientSessions.reduce((a, s) => a + (s.billableMinutes ?? 0), 0);
+      const billableHours = billableMinutes / 60;
+      const sessionsCount = clientSessions.length;
+
+      const relationRate = r.hourlyRateNet ? Number(r.hourlyRateNet) : null;
+      const monthlyNet = r.monthlyNet ? Number(r.monthlyNet) : null;
+      const includedHours = r.monthlyHours ?? null;
+      const overageRate = r.overageRateNet ? Number(r.overageRateNet) : null;
+
+      // Cost calc
+      let baseCost = 0;
+      let overageHours = 0;
+      let overageCost = 0;
+      let totalValue = 0;
+
+      if (r.billingType === 'SUBSCRIPTION') {
+        baseCost = monthlyNet ?? 0;
+        if (includedHours != null) {
+          overageHours = Math.max(0, billableHours - includedHours);
+          overageCost = overageHours * (overageRate ?? relationRate ?? 0);
+        }
+        totalValue = baseCost + overageCost;
+      } else if (r.billingType === 'HOURLY') {
+        // Prefer snapshot rate from session, fall back to relation rate
+        baseCost = clientSessions.reduce((a, s) => {
+          const rate = s.hourlyRateNet ? Number(s.hourlyRateNet) : (relationRate ?? 0);
+          return a + ((s.billableMinutes ?? 0) / 60) * rate;
+        }, 0);
+        totalValue = baseCost;
+      } else {
+        // HYBRID: monthly base + hourly overage above included hours
+        baseCost = monthlyNet ?? 0;
+        if (includedHours != null) {
+          overageHours = Math.max(0, billableHours - includedHours);
+          overageCost = overageHours * (overageRate ?? relationRate ?? 0);
+        } else if (relationRate) {
+          overageCost = billableHours * relationRate;
+        }
+        totalValue = baseCost + overageCost;
+      }
+
+      return {
+        relationId: r.id,
+        status: r.status,
+        billingType: r.billingType,
+        hourlyRateNet: relationRate,
+        monthlyNet,
+        monthlyHours: includedHours,
+        overageRateNet: overageRate,
+        billingIncrementMin: r.billingIncrementMin,
+        client: r.client,
+        sessionsCount,
+        totalMinutes,
+        billableMinutes,
+        billableHours,
+        baseCost,
+        overageHours,
+        overageCost,
+        totalValue,
+        sessions: clientSessions.map((s) => ({
+          id: s.id,
+          startedAt: s.startedAt,
+          endedAt: s.endedAt,
+          durationMinutes: s.durationMinutes,
+          billableMinutes: s.billableMinutes,
+          hourlyRateNet: s.hourlyRateNet,
+          technician: s.technician,
+          ticketNumbers: s.ticketLinks.map((l) => l.ticket.ticketNumber),
+        })),
+      };
+    });
+
+    // Sort: biggest value first
+    rows.sort((a, b) => b.totalValue - a.totalValue);
+
+    const totals = {
+      clients: rows.length,
+      activeContracts: rows.filter((r) => r.status === 'ACTIVE').length,
+      subscriptionCount: rows.filter((r) => r.billingType === 'SUBSCRIPTION').length,
+      hourlyCount: rows.filter((r) => r.billingType === 'HOURLY').length,
+      hybridCount: rows.filter((r) => r.billingType === 'HYBRID').length,
+      totalBillableMinutes: rows.reduce((a, r) => a + r.billableMinutes, 0),
+      totalBillableHours: rows.reduce((a, r) => a + r.billableHours, 0),
+      totalValue: rows.reduce((a, r) => a + r.totalValue, 0),
+      totalOverageCost: rows.reduce((a, r) => a + r.overageCost, 0),
+    };
+
+    res.json({ month: monthStr, rows, totals });
   } catch (err) { next(err); }
 });
 

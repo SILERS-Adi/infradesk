@@ -248,7 +248,7 @@ export function MyEmailTab() {
 }
 
 const MODAL_SHELL: React.CSSProperties = {
-  position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+  position: 'fixed', inset: 0, margin: 'auto', height: 'fit-content',
   zIndex: 50, width: 'min(92vw, 32rem)', maxHeight: '90vh',
   display: 'flex', flexDirection: 'column',
   background: 'var(--sf)', border: '1px solid var(--bd)',

@@ -33,7 +33,12 @@ router.get('/alerts', requireAccess(MODULES.MONITORING, 'view'), async (req: Req
       deviceId: z.string().uuid().optional(),
       limit: z.coerce.number().int().min(1).max(200).default(50),
     }).parse(req.query);
-    const where: Record<string, unknown> = { workspaceId: req.workspaceId! };
+    const relations = await prisma.workspaceRelation.findMany({
+      where: { providerWorkspaceId: req.workspaceId!, status: 'ACTIVE', canAccessAlerts: true },
+      select: { clientWorkspaceId: true },
+    });
+    const visibleWsIds = [req.workspaceId!, ...relations.map((r) => r.clientWorkspaceId)];
+    const where: Record<string, unknown> = { workspaceId: { in: visibleWsIds } };
     if (q.resolved !== undefined) where.resolved = q.resolved === 'true';
     if (q.severity) where.severity = { in: q.severity.split(',') };
     if (q.deviceId) where.deviceId = q.deviceId;

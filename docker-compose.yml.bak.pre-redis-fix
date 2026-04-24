@@ -1,0 +1,78 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: infradesk-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: infradesk
+      POSTGRES_PASSWORD: infradesk
+      POSTGRES_DB: infradesk
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U infradesk"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: infradesk-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: infradesk-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql://infradesk:infradesk@db:5432/infradesk
+      REDIS_URL: redis://redis:6379
+      RUSTDESK_API_URL: http://172.18.0.1:21114
+      PORT: 3000
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: sh -c "npx prisma db push --accept-data-loss && node dist/app.js"
+    networks:
+      default:
+        ipv4_address: 172.18.0.100
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: infradesk-frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./downloads:/downloads:ro
+    depends_on:
+      - backend
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.18.0.0/16
+
+volumes:
+  postgres_data:
+  redis_data:

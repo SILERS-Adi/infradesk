@@ -68,7 +68,12 @@ function computeTotals(items: Array<{ quantity: number; unitNet: number }>, vatR
 router.get('/', requireAccess(MODULES.ORDERS, 'view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const q = z.object({ status: z.string().optional(), search: z.string().max(120).optional() }).parse(req.query);
-    const where: Record<string, unknown> = { workspaceId: req.workspaceId! };
+    const relations = await prisma.workspaceRelation.findMany({
+      where: { providerWorkspaceId: req.workspaceId!, status: 'ACTIVE', canReceiveTickets: true },
+      select: { clientWorkspaceId: true },
+    });
+    const visibleWsIds = [req.workspaceId!, ...relations.map((r) => r.clientWorkspaceId)];
+    const where: Record<string, unknown> = { workspaceId: { in: visibleWsIds } };
     if (q.status) where.status = { in: q.status.split(',') };
     if (q.search) {
       where.OR = [
@@ -79,7 +84,10 @@ router.get('/', requireAccess(MODULES.ORDERS, 'view'), async (req: Request, res:
     }
     const orders = await prisma.order.findMany({
       where, orderBy: { createdAt: 'desc' },
-      include: { items: { select: { id: true, name: true, quantity: true, unitNet: true, totalNet: true } } },
+      include: {
+        items: { select: { id: true, name: true, quantity: true, unitNet: true, totalNet: true } },
+        linkedTicket: { select: { id: true, ticketNumber: true, title: true, status: true } },
+      },
     });
     res.json({ orders });
   } catch (err) { next(err); }
@@ -124,7 +132,10 @@ router.get('/:id', requireAccess(MODULES.ORDERS, 'view'), async (req: Request, r
   try {
     const o = await prisma.order.findFirst({
       where: { id: String(req.params.id), workspaceId: req.workspaceId! },
-      include: { items: true },
+      include: {
+        items: true,
+        linkedTicket: { select: { id: true, ticketNumber: true, title: true, status: true } },
+      },
     });
     if (!o) throw HttpError.notFound();
     res.json({ order: o });

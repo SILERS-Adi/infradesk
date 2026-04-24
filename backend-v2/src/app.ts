@@ -8,8 +8,10 @@ import { requestId } from './middleware/requestId';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { globalLimiter } from './middleware/rateLimit';
 import { resolveWorkspaceFromHost } from './middleware/resolveWorkspace';
+import { requireAuth } from './middleware/auth';
 import publicRouter from './modules/public/public.routes';
 import authRouter from './modules/auth/auth.routes';
+import authGoogleRouter from './modules/auth-google/auth-google.routes';
 import workspacesRouter from './modules/workspaces/workspaces.routes';
 import membershipsRouter from './modules/memberships/memberships.routes';
 import usersRouter from './modules/users/users.routes';
@@ -27,12 +29,19 @@ import ordersRouter from './modules/orders/orders.routes';
 import monitoringRouter from './modules/monitoring/monitoring.routes';
 import vaultRouter from './modules/vault/vault.routes';
 import agentsRouter from './modules/agents/agents.routes';
+import agentCompatRouter from './modules/agent-compat/agent-compat.routes';
 import shadowRouter from './modules/shadow/shadow.routes';
 import riskRouter from './modules/risk/risk.routes';
 import activityLogsRouter from './modules/activity-logs/activity-logs.routes';
 import monitoringOverviewRouter from './modules/monitoring/monitoring-overview.routes';
 import aiRouter from './modules/ai/ai.routes';
 import crmEmailRouter from './modules/crm-email/crm-email.routes';
+import downloadsRouter from './modules/downloads/downloads.routes';
+import { irisEmbedRouter } from './modules/iris/iris-embed.controller';
+import { irisChatRouter } from './modules/iris/iris-chat.controller';
+import oauthRouter, { discoveryRouter as oauthDiscoveryRouter } from './modules/auth-oidc/auth-oidc.routes';
+import settingsRouter from './modules/settings/settings.routes';
+import path from 'path';
 
 export function buildApp(): Express {
   const app = express();
@@ -41,7 +50,7 @@ export function buildApp(): Express {
   app.use(requestId);
   app.use(helmet({ contentSecurityPolicy: false }));
   // CORS: allow explicit origins + wildcard *.infradesk.pl (production subdomains)
-  const WILDCARD_PATTERN = /^https?:\/\/[a-z0-9-]{3,40}\.infradesk\.pl$/;
+  const WILDCARD_PATTERN = /^https:\/\/([a-z0-9-]{3,40}\.)?infradesk\.pl$/;
   app.use(
     cors({
       origin: (origin, cb) => {
@@ -69,6 +78,9 @@ export function buildApp(): Express {
 
   app.use('/api/v2/public', publicRouter);
   app.use('/api/v2/auth', authRouter);
+  // Sprint 6: per-user Google OAuth (Gmail + Calendar readonly).
+  // Mounted under /api/v2/auth/google/* — does not conflict with /auth auth flows.
+  app.use('/api/v2/auth/google', authGoogleRouter);
   app.use('/api/v2/workspaces', workspacesRouter);
   app.use('/api/v2/memberships', membershipsRouter);
   app.use('/api/v2/users', usersRouter);
@@ -89,11 +101,20 @@ export function buildApp(): Express {
   app.use('/api/v2/monitoring', monitoringOverviewRouter);
   app.use('/api/v2/vault', vaultRouter);
   app.use('/api/v2/agents', agentsRouter);
+  app.use('/api/agent', agentCompatRouter); // V1 desktop agent compatibility (no /v2 prefix)
   app.use('/api/v2/ai/shadow', shadowRouter);
   app.use('/api/v2/ai', aiRouter);
   app.use('/api/v2/crm', crmEmailRouter);
   app.use('/api/v2/clients/risk', riskRouter);
   app.use('/api/v2/activity-logs', activityLogsRouter);
+  app.use('/api/v2/downloads', downloadsRouter);
+  app.use('/api/v2/iris', irisChatRouter());
+  app.use('/api/v2/iris', irisEmbedRouter(requireAuth));
+  app.use("/api/v2/settings", settingsRouter);
+  // Static uploads (logos, etc.) served under /uploads/* for the backend origin.
+  app.use("/uploads", express.static(path.resolve(process.env.UPLOADS_DIR || "/home/adrian/infradesk/backend-v2/uploads"), { maxAge: "7d", fallthrough: true }));
+  app.use('/api/v2/oauth', oauthRouter);
+  app.use('/', oauthDiscoveryRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

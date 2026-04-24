@@ -39,6 +39,13 @@ const schema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().optional(),
+  CEIDG_API_TOKEN: z.string().optional(),
+
+  // Google OAuth (per-user Gmail/Calendar read access). Optional — if any
+  // are empty the /api/v2/auth/google/* routes return 500 "not configured".
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_REDIRECT_URI: z.string().optional(),
 });
 
 const parsed = schema.safeParse(process.env);

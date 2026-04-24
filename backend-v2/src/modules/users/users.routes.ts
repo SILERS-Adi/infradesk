@@ -16,10 +16,31 @@ router.get('/me', requireAuth, async (req: Request, res: Response, next: NextFun
         avatarUrl: true, locale: true, timezone: true,
         emailVerified: true, twoFactorEnabled: true, isSuperAdmin: true,
         lastLoginAt: true, createdAt: true,
-      },
-    });
+        // Sprint 6: googleTokens is an encrypted blob — never return it directly.
+        // We expose just hasGoogle + googleEmail so the UI can show connection status.
+        googleTokens: true,
+      } as unknown as { id: true },
+    }) as unknown as (Record<string, unknown> & { googleTokens?: string | null }) | null;
     if (!user) throw HttpError.notFound();
-    res.json({ user });
+
+    // Derive public flags from the encrypted blob, then strip it from the response.
+    let hasGoogle = false;
+    let googleEmail: string | null = null;
+    if (user.googleTokens) {
+      hasGoogle = true;
+      try {
+        const { decryptTokens } = await import('../auth-google/google.service');
+        const decoded = decryptTokens(user.googleTokens);
+        googleEmail = decoded.email;
+      } catch {
+        // Malformed/undecryptable — leave email null but still mark as connected
+        // so UI offers a "disconnect" button to clear the broken entry.
+        googleEmail = null;
+      }
+    }
+    delete user.googleTokens;
+
+    res.json({ user: { ...user, hasGoogle, googleEmail } });
   } catch (err) { next(err); }
 });
 

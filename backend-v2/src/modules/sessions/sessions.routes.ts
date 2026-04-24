@@ -36,17 +36,39 @@ const endSchema = z.object({
   distanceTraveledKm: z.number().optional(),
 });
 
-// GET /sessions?status=ACTIVE
+// GET /sessions?status=ACTIVE&technicianId=...&deviceId=...&from=...&to=...&limit=...
 router.get('/', requireAccess(MODULES.SESSIONS, 'view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const q = z.object({
       status: z.string().optional(),
       technicianId: z.string().uuid().optional(),
-      limit: z.coerce.number().int().min(1).max(100).default(25),
+      deviceId: z.string().uuid().optional(),
+      clientWorkspaceId: z.string().uuid().optional(),
+      from: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
+      to: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
+      limit: z.coerce.number().int().min(1).max(500).default(200),
     }).parse(req.query);
-    const where: Record<string, unknown> = { workspaceId: req.workspaceId! };
+    const relations = await prisma.workspaceRelation.findMany({
+      where: { providerWorkspaceId: req.workspaceId!, status: 'ACTIVE', canReceiveTickets: true },
+      select: { clientWorkspaceId: true },
+    });
+    const visibleWsIds = [req.workspaceId!, ...relations.map((r) => r.clientWorkspaceId)];
+    const where: Record<string, unknown> = { workspaceId: { in: visibleWsIds } };
     if (q.status) where.status = { in: q.status.split(',') };
     if (q.technicianId) where.technicianId = q.technicianId;
+    if (q.deviceId) where.deviceId = q.deviceId;
+    if (q.clientWorkspaceId) where.clientWorkspaceId = q.clientWorkspaceId;
+    if (q.from || q.to) {
+      const range: Record<string, Date> = {};
+      if (q.from) range.gte = new Date(q.from);
+      if (q.to) {
+        const end = new Date(q.to);
+        // If date-only (YYYY-MM-DD), bump to end-of-day.
+        if (/^\d{4}-\d{2}-\d{2}$/.test(q.to)) end.setHours(23, 59, 59, 999);
+        range.lte = end;
+      }
+      where.startedAt = range;
+    }
     const sessions = await prisma.workSession.findMany({
       where,
       orderBy: { startedAt: 'desc' },
@@ -54,10 +76,81 @@ router.get('/', requireAccess(MODULES.SESSIONS, 'view'), async (req: Request, re
       include: {
         technician: { select: { id: true, firstName: true, lastName: true } },
         device: { select: { id: true, name: true } },
-        ticketLinks: { select: { ticketId: true, ticket: { select: { ticketNumber: true, title: true, status: true } } } },
+        timeEntries: { orderBy: { startedAt: 'asc' }, select: { id: true, startedAt: true, endedAt: true, durationMinutes: true } },
+        ticketLinks: { select: { ticketId: true, ticket: { select: { id: true, ticketNumber: true, title: true, status: true } } } },
       },
     });
     res.json({ sessions });
+  } catch (err) { next(err); }
+});
+
+// GET /sessions/stats?from=...&to=... — aggregate stats for header + per-technician summary.
+router.get('/stats', requireAccess(MODULES.SESSIONS, 'view'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const q = z.object({
+      technicianId: z.string().uuid().optional(),
+      from: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
+      to: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
+    }).parse(req.query);
+    const where: Record<string, unknown> = { workspaceId: req.workspaceId! };
+    if (q.technicianId) where.technicianId = q.technicianId;
+    if (q.from || q.to) {
+      const range: Record<string, Date> = {};
+      if (q.from) range.gte = new Date(q.from);
+      if (q.to) {
+        const end = new Date(q.to);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(q.to)) end.setHours(23, 59, 59, 999);
+        range.lte = end;
+      }
+      where.startedAt = range;
+    }
+    const sessions = await prisma.workSession.findMany({
+      where,
+      select: {
+        id: true, status: true, durationMinutes: true, billableMinutes: true, billable: true,
+        technicianId: true,
+        technician: { select: { firstName: true, lastName: true } },
+      },
+    });
+    let total = 0, totalMinutes = 0, billableMinutes = 0, active = 0, paused = 0, completed = 0;
+    const perTechMap = new Map<string, { technicianId: string; name: string; sessions: number; minutes: number; billableMinutes: number }>();
+    for (const s of sessions) {
+      total++;
+      totalMinutes += s.durationMinutes ?? 0;
+      billableMinutes += s.billableMinutes ?? 0;
+      if (s.status === 'ACTIVE') active++;
+      else if (s.status === 'PAUSED') paused++;
+      else if (s.status === 'COMPLETED') completed++;
+      const techName = s.technician ? `${s.technician.firstName} ${s.technician.lastName}` : 'Nieznany';
+      const row = perTechMap.get(s.technicianId) ?? { technicianId: s.technicianId, name: techName, sessions: 0, minutes: 0, billableMinutes: 0 };
+      row.sessions++;
+      row.minutes += s.durationMinutes ?? 0;
+      row.billableMinutes += s.billableMinutes ?? 0;
+      perTechMap.set(s.technicianId, row);
+    }
+    const perTechnician = Array.from(perTechMap.values()).sort((a, b) => b.minutes - a.minutes);
+    res.json({
+      stats: { total, totalMinutes, billableMinutes, active, paused, completed },
+      perTechnician,
+    });
+  } catch (err) { next(err); }
+});
+
+// GET /sessions/technicians — list workspace members for the technician filter dropdown.
+router.get('/technicians', requireAccess(MODULES.SESSIONS, 'view'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const memberships = await prisma.membership.findMany({
+      where: { workspaceId: req.workspaceId!, status: 'ACTIVE' },
+      select: {
+        user: { select: { id: true, firstName: true, lastName: true, isActive: true, avatarUrl: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+    const technicians = memberships
+      .map((m) => m.user)
+      .filter((u) => u.isActive)
+      .map((u) => ({ id: u.id, firstName: u.firstName, lastName: u.lastName, avatarUrl: u.avatarUrl }));
+    res.json({ technicians });
   } catch (err) { next(err); }
 });
 
@@ -282,6 +375,99 @@ router.post('/:id/end', requireAccess(MODULES.SESSIONS, 'edit'), async (req: Req
       },
     });
     res.json({ session: completed });
+  } catch (err) { next(err); }
+});
+
+const updateSchema = z.object({
+  startedAt: z.string().datetime({ offset: true }).optional(),
+  endedAt: z.string().datetime({ offset: true }).nullable().optional(),
+  notes: z.string().max(10_000).nullable().optional(),
+  billable: z.boolean().optional(),
+});
+
+// PATCH /sessions/:id — edit start/end times or notes (admin-level edit on completed sessions).
+router.patch('/:id', requireAccess(MODULES.SESSIONS, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const input = updateSchema.parse(req.body);
+    const s = await prisma.workSession.findFirst({
+      where: { id: String(req.params.id), workspaceId: req.workspaceId! },
+      select: { id: true, status: true, startedAt: true, endedAt: true },
+    });
+    if (!s) throw HttpError.notFound();
+
+    const data: Record<string, unknown> = {};
+    const newStart = input.startedAt ? new Date(input.startedAt) : s.startedAt;
+    const newEnd = input.endedAt === null
+      ? null
+      : input.endedAt
+        ? new Date(input.endedAt)
+        : s.endedAt;
+
+    if (input.startedAt) data.startedAt = newStart;
+    if (input.endedAt !== undefined) data.endedAt = newEnd;
+    if (input.notes !== undefined) data.notes = input.notes;
+
+    // Recompute duration if we have both start & end (only meaningful for COMPLETED sessions).
+    if (newEnd && s.status === 'COMPLETED') {
+      const minutes = Math.max(0, Math.round((newEnd.getTime() - newStart.getTime()) / 60_000));
+      data.durationMinutes = minutes;
+      if (input.billable === false) data.billableMinutes = 0;
+      else if (input.billable === true) data.billableMinutes = minutes;
+    }
+    if (input.billable !== undefined) data.billable = input.billable;
+
+    const updated = await prisma.workSession.update({
+      where: { id: s.id },
+      data,
+      include: {
+        technician: { select: { id: true, firstName: true, lastName: true } },
+        device: { select: { id: true, name: true } },
+        timeEntries: { orderBy: { startedAt: 'asc' }, select: { id: true, startedAt: true, endedAt: true, durationMinutes: true } },
+        ticketLinks: { select: { ticketId: true, ticket: { select: { id: true, ticketNumber: true, title: true, status: true } } } },
+      },
+    });
+
+    void logActivity({
+      workspaceId: req.workspaceId!,
+      entityType: 'session',
+      entityId: s.id,
+      actionType: 'session_edited',
+      description: 'Edytowano sesję pracy',
+      performedByUserId: req.auth!.sub,
+      ...reqContext(req),
+      metadata: { fields: Object.keys(data) },
+    });
+
+    res.json({ session: updated });
+  } catch (err) { next(err); }
+});
+
+// DELETE /sessions/:id — hard delete (admins only, via requireAccess delete).
+router.delete('/:id', requireAccess(MODULES.SESSIONS, 'delete'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const s = await prisma.workSession.findFirst({
+      where: { id: String(req.params.id), workspaceId: req.workspaceId! },
+      select: { id: true },
+    });
+    if (!s) throw HttpError.notFound();
+
+    await prisma.$transaction(async (tx) => {
+      await tx.ticketSessionLink.deleteMany({ where: { workSessionId: s.id } });
+      await tx.sessionTimeEntry.deleteMany({ where: { workSessionId: s.id } });
+      await tx.workSession.delete({ where: { id: s.id } });
+    });
+
+    void logActivity({
+      workspaceId: req.workspaceId!,
+      entityType: 'session',
+      entityId: s.id,
+      actionType: 'session_deleted',
+      description: 'Usunięto sesję pracy',
+      performedByUserId: req.auth!.sub,
+      ...reqContext(req),
+    });
+
+    res.json({ success: true });
   } catch (err) { next(err); }
 });
 

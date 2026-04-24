@@ -21,13 +21,15 @@ interface Props {
   variant?: Variant;
   /** Gdy podane → tryb edycji istniejącego membership (inaczej: zaproszenie nowego). */
   membershipId?: string;
+  /** MSP zapraszający członka do workspace klienta — backend zweryfikuje WorkspaceRelation. */
+  workspaceIdOverride?: string;
 }
 
 export function MemberForm(props: Props) {
   return <MemberFormCore variant="modal" {...props} />;
 }
 
-export function MemberFormCore({ onClose, variant = 'modal', membershipId }: Props) {
+export function MemberFormCore({ onClose, variant = 'modal', membershipId, workspaceIdOverride }: Props) {
   const qc = useQueryClient();
   const nav = useNavigate();
 
@@ -55,12 +57,13 @@ export function MemberFormCore({ onClose, variant = 'modal', membershipId }: Pro
 
   // Pre-fill z istniejącego membership (tryb edycji)
   const memberQ = useQuery({
-    queryKey: ['membership', membershipId],
+    queryKey: ['membership', membershipId, workspaceIdOverride],
     queryFn: async () => {
+      const params = workspaceIdOverride ? { workspaceId: workspaceIdOverride } : undefined;
       const list = await api.get<{ memberships: Array<{
         id: string; role: string; scope: string; status: string;
         user: { id: string; email: string; firstName: string | null; lastName: string | null; phone?: string | null };
-      }> }>('/memberships');
+      }> }>('/memberships', { params });
       const m = list.data.memberships.find((x) => x.id === membershipId);
       if (!m) throw new Error('Membership nie znaleziony');
       const ov = await api.get<{ overrides: Array<{ moduleKey: string; level: string }> }>(`/permissions/${membershipId}/overrides`);
@@ -137,6 +140,7 @@ export function MemberFormCore({ onClose, variant = 'modal', membershipId }: Pro
         const invite = await api.post('/memberships/invite', {
           email, firstName, lastName, role, scope,
           phone: phone || undefined,
+          ...(workspaceIdOverride ? { workspaceId: workspaceIdOverride } : {}),
         });
         targetMembershipId = invite.data?.membership?.id;
       }
@@ -362,7 +366,7 @@ export function MemberFormCore({ onClose, variant = 'modal', membershipId }: Pro
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
         <Dialog.Content style={{
-          position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+          position: 'fixed', inset: 0, margin: 'auto', height: 'fit-content',
           zIndex: 50, width: 'min(96vw, 44rem)', maxHeight: '92vh',
           display: 'flex', flexDirection: 'column',
           background: 'var(--sf)', border: '1px solid var(--bd)',

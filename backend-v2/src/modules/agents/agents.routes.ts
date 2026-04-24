@@ -7,6 +7,10 @@ import { requireAccess } from '../../middleware/requireAccess';
 import { HttpError } from '../../utils/httpError';
 import { MODULES } from '../../utils/canAccess';
 import { randomToken, hashToken } from '../../lib/crypto';
+import {
+  isAgentOnline, notifyAgent, sendCommandAndWait, findRelayAgents,
+} from '../agents-ws/agents-ws.server';
+import { logActivity, reqContext } from '../activity-logs/logActivity';
 
 const router = Router();
 
@@ -212,6 +216,218 @@ adminRouter.post('/:id/reject', requireAccess(MODULES.DEVICES, 'edit'), async (r
       data: { status: 'REJECTED', rejectedAt: new Date(), rejectedByUserId: req.auth!.sub },
     });
     res.json({ agent: updated });
+  } catch (err) { next(err); }
+});
+
+// --------------------------------------------------------------------------
+// Push-command admin endpoints (restored from V1)
+// Target: /api/v2/agents/admin/:id/<action>
+// All require MODULES.DEVICES:edit (same gate as approve/reject).
+// --------------------------------------------------------------------------
+
+// Helper: find an agent that belongs to the caller's workspace.
+async function findAgentInWorkspace(agentId: string, workspaceId: string) {
+  return prisma.agentRegistration.findFirst({
+    where: { id: agentId, workspaceId },
+    select: {
+      id: true, workspaceId: true, status: true, hostname: true,
+      deviceId: true, agentToken: true,
+      device: { select: { id: true, macAddress: true, name: true } },
+    },
+  });
+}
+
+// Map known agent error codes to HTTP status.
+function mapAgentError(err: unknown): { status: number; code: string; message: string } {
+  const e = err as Error & { code?: string };
+  const code = e?.code ?? '';
+  const message = e?.message ?? 'Agent command failed';
+  if (code === 'AGENT_OFFLINE') return { status: 503, code: 'agent_offline', message: 'Agent jest offline' };
+  if (code === 'AGENT_TIMEOUT') return { status: 504, code: 'agent_timeout', message: 'Agent nie odpowiedzial w czasie' };
+  return { status: 500, code: 'agent_error', message };
+}
+
+// -----------------------------------------------------------------
+// POST /admin/:id/wake -- Wake-on-LAN via LAN-peer agent relay
+// Body: {} (uses Device.macAddress if available)
+// Response: { ok: true, mac, relayAgents }
+// -----------------------------------------------------------------
+adminRouter.post('/:id/wake', requireAccess(MODULES.DEVICES, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const reg = await findAgentInWorkspace(String(req.params.id), req.workspaceId!);
+    if (!reg) throw HttpError.notFound();
+    const mac = reg.device?.macAddress;
+    if (!mac) throw HttpError.badRequest('Urzadzenie nie ma zapisanego adresu MAC', 'no_mac');
+
+    // Find other online agents in the same workspace to relay the magic packet.
+    const relayAgentIds = await findRelayAgents(reg.workspaceId, reg.id);
+    if (relayAgentIds.length === 0) {
+      throw HttpError.conflict('Brak innych aktywnych agentow na tej sieci -- nie mozna wyslac pakietu WoL');
+    }
+
+    let relayed = 0;
+    for (const agentId of relayAgentIds) {
+      if (notifyAgent(agentId, { type: 'wake', mac })) relayed += 1;
+    }
+
+    await logActivity({
+      workspaceId: reg.workspaceId,
+      entityType: 'agent',
+      entityId: reg.id,
+      actionType: 'wake',
+      description: `WoL: ${reg.hostname ?? ''} (${mac})`,
+      performedByUserId: req.auth!.sub,
+      ...reqContext(req),
+      metadata: { mac, relayAgents: relayed },
+    });
+
+    res.json({ ok: true, mac, relayAgents: relayed });
+  } catch (err) { next(err); }
+});
+
+// -----------------------------------------------------------------
+// POST /admin/:id/push-command -- generic push with ack/timeout
+// Body: { type, payload? }  where type in {
+//   'windows_update' | 'restart_service' | 'system_reboot' | 'install_software' | 'schedule_task'
+// }
+// Response: { ok: true, ack?: <agent reply> }   on success
+//           503 agent_offline | 504 agent_timeout on failure
+// -----------------------------------------------------------------
+const pushCommandSchema = z.object({
+  type: z.enum([
+    'windows_update', 'restart_service', 'system_reboot',
+    'install_software', 'schedule_task', 'backup_run', 'update',
+  ]),
+  payload: z.record(z.unknown()).optional(),
+  timeoutMs: z.number().int().min(1000).max(120000).optional(),
+});
+
+adminRouter.post('/:id/push-command', requireAccess(MODULES.DEVICES, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const body = pushCommandSchema.parse(req.body);
+    const reg = await findAgentInWorkspace(String(req.params.id), req.workspaceId!);
+    if (!reg) throw HttpError.notFound();
+    if (reg.status !== 'ACTIVE') throw HttpError.conflict('Agent nie jest aktywny', 'not_active');
+    if (!isAgentOnline(reg.id)) throw HttpError.conflict('Agent jest offline', 'agent_offline');
+
+    // Command-specific validation + payload assembly.
+    const payload: Record<string, unknown> = { type: body.type, ...(body.payload ?? {}) };
+    switch (body.type) {
+      case 'restart_service': {
+        const svc = (body.payload?.serviceName ?? body.payload?.service_name) as string | undefined;
+        if (!svc || typeof svc !== 'string' || !svc.trim()) {
+          throw HttpError.badRequest('serviceName required');
+        }
+        payload.serviceName = svc.trim();
+        break;
+      }
+      case 'install_software': {
+        const pkg = body.payload?.package as string | undefined;
+        if (!pkg || !/^[A-Za-z0-9._\-+]{1,128}$/.test(pkg)) {
+          throw HttpError.badRequest('package invalid');
+        }
+        payload.package = pkg;
+        break;
+      }
+      case 'system_reboot': {
+        const delay = Number(body.payload?.delay ?? body.payload?.delaySec ?? 60);
+        payload.delay = Math.max(0, Math.min(3600, delay));
+        break;
+      }
+      case 'windows_update': {
+        // passthrough of scheduleTime if provided
+        break;
+      }
+    }
+
+    let ack: Record<string, unknown> | undefined;
+    try {
+      ack = await sendCommandAndWait(reg.id, payload, { timeoutMs: body.timeoutMs ?? 30000 });
+    } catch (err) {
+      await logActivity({
+        workspaceId: reg.workspaceId,
+        entityType: 'agent',
+        entityId: reg.id,
+        actionType: `push_${body.type}_failed`,
+        description: `Push ${body.type} -> ${reg.hostname ?? ''} FAILED: ${(err as Error).message}`,
+        performedByUserId: req.auth!.sub,
+        ...reqContext(req),
+        metadata: { type: body.type, error: (err as Error).message },
+      });
+      const mapped = mapAgentError(err);
+      res.status(mapped.status).json({ error: mapped.message, code: mapped.code });
+      return;
+    }
+
+    await logActivity({
+      workspaceId: reg.workspaceId,
+      entityType: 'agent',
+      entityId: reg.id,
+      actionType: `push_${body.type}`,
+      description: `Push ${body.type} -> ${reg.hostname ?? ''}`,
+      performedByUserId: req.auth!.sub,
+      ...reqContext(req),
+      metadata: { type: body.type, payload: Object.keys(body.payload ?? {}) },
+    });
+
+    res.json({ ok: true, ack });
+  } catch (err) { next(err); }
+});
+
+// -----------------------------------------------------------------
+// POST /admin/:id/run-speedtest -- synchronous speedtest
+// Response: { ok: true, result: { download_mbps, upload_mbps, ping_ms } }
+// -----------------------------------------------------------------
+adminRouter.post('/:id/run-speedtest', requireAccess(MODULES.DEVICES, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const reg = await findAgentInWorkspace(String(req.params.id), req.workspaceId!);
+    if (!reg) throw HttpError.notFound();
+    if (reg.status !== 'ACTIVE') throw HttpError.conflict('Agent nie jest aktywny', 'not_active');
+    if (!isAgentOnline(reg.id)) throw HttpError.conflict('Agent jest offline', 'agent_offline');
+
+    let ack: Record<string, unknown>;
+    try {
+      // Speedtest takes longer -- give it up to 90s.
+      ack = await sendCommandAndWait(reg.id, { type: 'speedtest' }, { timeoutMs: 90_000 });
+    } catch (err) {
+      const mapped = mapAgentError(err);
+      res.status(mapped.status).json({ error: mapped.message, code: mapped.code });
+      return;
+    }
+
+    await logActivity({
+      workspaceId: reg.workspaceId,
+      entityType: 'agent',
+      entityId: reg.id,
+      actionType: 'speedtest',
+      description: `Speedtest -> ${reg.hostname ?? ''}`,
+      performedByUserId: req.auth!.sub,
+      ...reqContext(req),
+      metadata: { result: ack },
+    });
+
+    // Shape a clean result: agent may reply with { data: {...} } or flat fields.
+    const result = (ack.data as Record<string, unknown>) ?? ack;
+    res.json({ ok: true, result });
+  } catch (err) { next(err); }
+});
+
+// -----------------------------------------------------------------
+// GET /admin/:id/online -- cheap online check used by UI to enable/disable buttons
+// -----------------------------------------------------------------
+adminRouter.get('/:id/online', requireAccess(MODULES.DEVICES, 'view'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const reg = await prisma.agentRegistration.findFirst({
+      where: { id: String(req.params.id), workspaceId: req.workspaceId! },
+      select: { id: true, status: true, lastSeen: true },
+    });
+    if (!reg) throw HttpError.notFound();
+    res.json({
+      id: reg.id,
+      status: reg.status,
+      online: isAgentOnline(reg.id),
+      lastSeen: reg.lastSeen,
+    });
   } catch (err) { next(err); }
 });
 

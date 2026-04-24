@@ -32,3 +32,41 @@ export const passwordResetLimiter = make({
   legacyHeaders: false,
   message: { error: 'rate_limited', message: 'Too many password reset requests' },
 });
+
+// Per-IP, publiczny endpoint rejestracji agenta — nie pozwala na masowe tworzenie rejestracji.
+export const agentRegisterLimiter = make({
+  windowMs: 60 * 1000,
+  max: 5,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'rate_limited', message: 'Too many agent registrations — spróbuj za minutę' },
+});
+
+// Ujawnianie hasła w vault — per user (z tokena), zapobiega eksfiltracji skryptem.
+export const vaultRevealLimiter = make({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => (req as Request & { auth?: { sub: string } }).auth?.sub ?? req.ip ?? 'anon',
+  message: { error: 'rate_limited', message: 'Too many credential reveals — spróbuj za minutę' },
+});
+
+// Iris (Anthropic) — każdy request to 508$, limitujemy per user.
+export const irisLimiter = make({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => (req as Request & { auth?: { sub: string } }).auth?.sub ?? req.ip ?? 'anon',
+  message: { error: 'rate_limited', message: 'Iris: zbyt wiele zapytań — spróbuj za minutę' },
+});
+
+// Download endpointy — per IP.
+export const downloadLimiter = make({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'rate_limited', message: 'Too many downloads' },
+});

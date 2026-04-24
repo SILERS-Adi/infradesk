@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, CheckCircle2, Clock, User, Calendar, Loader2, CheckSquare, X } from 'lucide-react';
+import { Plus, CheckCircle2, Clock, User, Calendar, Loader2, CheckSquare, X, ChevronLeft } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/Card';
@@ -36,6 +36,7 @@ interface Task {
 
 export function TasksPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [view, setView] = useViewPreference('tasks', 'visual');
   const [filter, setFilter] = useState<'all' | 'today' | 'week' | 'unscheduled'>('all');
   const [showCreate, setShowCreate] = useState(false);
@@ -63,6 +64,11 @@ export function TasksPage() {
     CANCELLED: items.filter((t) => t.status === 'CANCELLED'),
   };
 
+  function handleAdd() {
+    if (view === 'visual') setShowCreate(true);
+    else navigate('/tasks/new');
+  }
+
   return (
     <div className="space-y-5 anim-up">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -74,7 +80,7 @@ export function TasksPage() {
         </div>
         <div className="flex items-center gap-3">
           <ViewToggle value={view} onChange={setView} />
-          <Button onClick={() => setShowCreate(true)}>
+          <Button onClick={handleAdd}>
             <Plus className="h-4 w-4" /> Nowe
           </Button>
         </div>
@@ -118,6 +124,22 @@ export function TasksPage() {
       )}
 
       {showCreate && <CreateTaskModal onClose={() => setShowCreate(false)} />}
+    </div>
+  );
+}
+
+export function TaskNewPage() {
+  const navigate = useNavigate();
+  return (
+    <div className="max-w-3xl mx-auto space-y-4 anim-up">
+      <button
+        onClick={() => navigate(-1)}
+        className="flex items-center gap-1 text-tx3 text-sm hover:text-tx press"
+      >
+        <ChevronLeft className="h-4 w-4" /> Wstecz
+      </button>
+      <h1 className="text-[22px] font-bold text-tx">Nowe zadanie</h1>
+      <CreateTaskModal variant="page" onClose={() => navigate('/tasks')} />
     </div>
   );
 }
@@ -175,9 +197,12 @@ function TaskCard({ task, onToggle }: { task: Task; onToggle: (id: string, done:
           </p>
           <div className="flex items-center gap-2 mt-1.5 flex-wrap text-[10px] text-tx3">
             {task.linkedTicket && (
-              <Link to={`/tickets/${task.linkedTicket.id}`}>
-                <Badge variant="accent" className="text-[9px]">{task.linkedTicket.ticketNumber}</Badge>
-              </Link>
+              <span className="inline-flex items-center gap-1">
+                <span>Origin:</span>
+                <Link to={`/tickets/${task.linkedTicket.id}`}>
+                  <Badge variant="accent" className="text-[9px]">{task.linkedTicket.ticketNumber}</Badge>
+                </Link>
+              </span>
             )}
             {task.assignedTo && (
               <span className="inline-flex items-center gap-1">
@@ -267,7 +292,7 @@ const createSchema = z.object({
 });
 type CreateForm = z.infer<typeof createSchema>;
 
-function CreateTaskModal({ onClose }: { onClose: () => void }) {
+export function CreateTaskModal({ onClose, variant = 'modal' }: { onClose: () => void; variant?: 'modal' | 'page' }) {
   const qc = useQueryClient();
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<CreateForm>({
     resolver: zodResolver(createSchema),
@@ -288,6 +313,61 @@ function CreateTaskModal({ onClose }: { onClose: () => void }) {
     onError: () => toast.error('Błąd tworzenia zadania'),
   });
 
+  const formBody = (
+    <>
+      <div>
+        <label className="block text-[11px] font-bold uppercase tracking-[0.12em] mb-1.5 text-tx2">Tytuł</label>
+        <Input {...register('title')} placeholder="Co trzeba zrobić?" />
+        {errors.title && <p className="text-[11px] text-er mt-1">{errors.title.message}</p>}
+      </div>
+      <div>
+        <label className="block text-[11px] font-bold uppercase tracking-[0.12em] mb-1.5 text-tx2">Opis</label>
+        <Textarea rows={3} {...register('description')} placeholder="Szczegóły, kroki, uwagi…" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-[11px] font-bold uppercase tracking-[0.12em] mb-1.5 text-tx2">Priorytet</label>
+          <Select {...register('priority')}>
+            <option value="LOW">Niski</option>
+            <option value="MEDIUM">Średni</option>
+            <option value="HIGH">Wysoki</option>
+            <option value="CRITICAL">Krytyczny</option>
+          </Select>
+        </div>
+        <div>
+          <label className="block text-[11px] font-bold uppercase tracking-[0.12em] mb-1.5 text-tx2">Czas (min)</label>
+          <Input type="number" {...register('estimatedMinutes')} placeholder="np. 30" />
+        </div>
+      </div>
+      <div>
+        <label className="block text-[11px] font-bold uppercase tracking-[0.12em] mb-1.5 text-tx2">Zaplanowane na</label>
+        <Input type="datetime-local" {...register('scheduledAt')} />
+      </div>
+    </>
+  );
+
+  const actions = (
+    <>
+      <Button type="button" variant="ghost" onClick={onClose}>Anuluj</Button>
+      <Button type="submit" disabled={isSubmitting}>
+        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Utwórz'}
+      </Button>
+    </>
+  );
+
+  if (variant === 'page') {
+    return (
+      <Card className="p-0 overflow-hidden">
+        <form className="px-6 py-5 space-y-4" onSubmit={handleSubmit((d) => mutation.mutate(d))}>
+          {formBody}
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-bd">
+            {actions}
+          </div>
+        </form>
+      </Card>
+    );
+  }
+
   return (
     <Dialog.Root open onOpenChange={(o) => !o && onClose()}>
       <Dialog.Portal>
@@ -305,40 +385,9 @@ function CreateTaskModal({ onClose }: { onClose: () => void }) {
             </Dialog.Close>
           </div>
           <form className="px-6 py-5 space-y-4" onSubmit={handleSubmit((d) => mutation.mutate(d))}>
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-[0.12em] mb-1.5 text-tx2">Tytuł</label>
-              <Input {...register('title')} placeholder="Co trzeba zrobić?" />
-              {errors.title && <p className="text-[11px] text-er mt-1">{errors.title.message}</p>}
-            </div>
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-[0.12em] mb-1.5 text-tx2">Opis</label>
-              <Textarea rows={3} {...register('description')} placeholder="Szczegóły, kroki, uwagi…" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-[0.12em] mb-1.5 text-tx2">Priorytet</label>
-                <Select {...register('priority')}>
-                  <option value="LOW">Niski</option>
-                  <option value="MEDIUM">Średni</option>
-                  <option value="HIGH">Wysoki</option>
-                  <option value="CRITICAL">Krytyczny</option>
-                </Select>
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-[0.12em] mb-1.5 text-tx2">Czas (min)</label>
-                <Input type="number" {...register('estimatedMinutes')} placeholder="np. 30" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-[0.12em] mb-1.5 text-tx2">Zaplanowane na</label>
-              <Input type="datetime-local" {...register('scheduledAt')} />
-            </div>
-
+            {formBody}
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-bd">
-              <Button type="button" variant="ghost" onClick={onClose}>Anuluj</Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Utwórz'}
-              </Button>
+              {actions}
             </div>
           </form>
         </Dialog.Content>

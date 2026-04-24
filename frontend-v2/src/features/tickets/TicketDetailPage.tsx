@@ -4,7 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
   ArrowLeft, Clock, User, Server as ServerIcon, Send, Lock, MessageSquare,
-  CheckCircle2, Loader2, AlertCircle, RefreshCw,
+  CheckCircle2, Loader2, AlertCircle, RefreshCw, Globe, Mail, Phone, Bot,
+  Cpu, PenLine, Wallet, Building2, TrendingUp, Timer,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -74,6 +75,29 @@ interface TicketDetail {
     followUpRequired: boolean; followUpAt: string | null;
     billable: boolean; quoteValueNet: string | null;
   }>;
+  requesterName?: string | null;
+  requesterEmail?: string | null;
+  requesterPhone?: string | null;
+  clientWorkspaceId?: string | null;
+  clientBilling?: {
+    billingType: 'HOURLY' | 'SUBSCRIPTION' | 'HYBRID';
+    hourlyRateNet: string | null;
+    monthlyNet: string | null;
+    monthlyHours: number | null;
+    overageRateNet: string | null;
+    billingIncrementMin: number;
+    billingPeriod: string;
+  } | null;
+  billing?: {
+    sessionCount: number;
+    totalBillableMinutes: number;
+    totalDurationMinutes: number;
+    billableHours: number;
+    effectiveHourlyRateNet: number | null;
+    costNet: number | null;
+    monthToDateMinutes: number | null;
+    monthlyLimitMinutes: number | null;
+  };
 }
 
 // State machine order — for the stepper UI.
@@ -189,6 +213,9 @@ export function TicketDetailPage() {
         </div>
       </div>
 
+      {/* Origin header — who/where ticket came from */}
+      <OriginHeaderCard ticket={t} />
+
       {/* State machine stepper */}
       <Card className="p-5">
         <div className="flex items-center gap-2 flex-wrap">
@@ -288,6 +315,8 @@ export function TicketDetailPage() {
           </Card>
 
           <GeneratedArtifactsCard ticket={t} />
+
+          <BillingAggregateCard ticket={t} />
 
           <Card>
             <CardHeader className="flex items-center justify-between">
@@ -639,6 +668,214 @@ function GeneratedArtifactsCard({ ticket }: { ticket: TicketDetail }) {
             Zgłoszenie nie wygenerowało jeszcze artefaktów (np. nie przypisano technika dla usługi serwisowej).
           </div>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Origin header — who + source + reporter info
+// ─────────────────────────────────────────────────────────────────────────────
+const SOURCE_META: Record<string, { label: string; icon: typeof Globe; variant: 'accent' | 'info' | 'warning' | 'success' | 'neutral' }> = {
+  PORTAL:  { label: 'Portal klienta', icon: Globe,    variant: 'accent'  },
+  EMAIL:   { label: 'E-mail',         icon: Mail,     variant: 'info'    },
+  AGENT:   { label: 'Desktop agent',  icon: Cpu,      variant: 'warning' },
+  PHONE:   { label: 'Telefon',        icon: Phone,    variant: 'neutral' },
+  AI_CHAT: { label: 'IDO (AI chat)',  icon: Bot,      variant: 'accent'  },
+  MANUAL:  { label: 'Technik (ręcznie)', icon: PenLine, variant: 'success' },
+  API:     { label: 'API / Integracja', icon: Globe,  variant: 'neutral' },
+};
+
+function OriginHeaderCard({ ticket }: { ticket: TicketDetail }) {
+  const meta = SOURCE_META[ticket.source] ?? { label: ticket.source, icon: Globe, variant: 'neutral' as const };
+  const Icon = meta.icon;
+  const hasRequester = !!(ticket.requesterName || ticket.requesterEmail || ticket.requesterPhone);
+  const isExternal = ticket.source === 'PORTAL' || ticket.source === 'EMAIL' || ticket.source === 'AI_CHAT';
+
+  return (
+    <Card className="p-4">
+      <div className="flex items-start gap-3 flex-wrap">
+        <div
+          className="h-10 w-10 rounded-[var(--r-s)] flex items-center justify-center shrink-0"
+          style={{ background: 'linear-gradient(135deg, var(--pri), #7c3aed)' }}
+        >
+          <Icon className="h-5 w-5 text-white" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-tx3">Pochodzenie</span>
+            <Badge variant={meta.variant}>{meta.label}</Badge>
+            {ticket.clientName && (
+              <Badge variant="neutral">
+                <Building2 className="h-3 w-3" /> {ticket.clientName}
+              </Badge>
+            )}
+            {isExternal && <Badge variant="info">Klient zewnętrzny</Badge>}
+          </div>
+          <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1 text-[12px]">
+            <div className="flex items-center gap-2">
+              <span className="text-tx3">Utworzone przez:</span>
+              <span className="text-tx font-medium">
+                {ticket.createdBy.firstName} {ticket.createdBy.lastName}
+              </span>
+              <span className="text-tx3 text-[11px]">· {formatRelativePl(ticket.createdAt)}</span>
+            </div>
+            {hasRequester && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-tx3">Zgłaszający:</span>
+                {ticket.requesterName && <span className="text-tx font-medium">{ticket.requesterName}</span>}
+                {ticket.requesterEmail && (
+                  <a href={`mailto:${ticket.requesterEmail}`} className="text-[11px] hover:underline" style={{ color: 'var(--pri)' }}>
+                    <Mail className="inline h-3 w-3 mr-0.5" />{ticket.requesterEmail}
+                  </a>
+                )}
+                {ticket.requesterPhone && (
+                  <a href={`tel:${ticket.requesterPhone}`} className="text-[11px] hover:underline" style={{ color: 'var(--pri)' }}>
+                    <Phone className="inline h-3 w-3 mr-0.5" />{ticket.requesterPhone}
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Billing aggregate — sessions × hourly rate OR subscription counter
+// ─────────────────────────────────────────────────────────────────────────────
+function formatHoursPl(totalMinutes: number): string {
+  if (totalMinutes <= 0) return '0 min';
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  if (h === 0) return `${m} min`;
+  if (m === 0) return `${h} godz`;
+  return `${h} godz ${m} min`;
+}
+
+function BillingAggregateCard({ ticket }: { ticket: TicketDetail }) {
+  const b = ticket.billing;
+  const cb = ticket.clientBilling;
+  if (!b || b.sessionCount === 0) {
+    // Show hint that no sessions yet are linked
+    return (
+      <Card>
+        <CardHeader className="flex items-center justify-between">
+          <CardTitle>Rozliczenie</CardTitle>
+          <span className="text-[11px] text-tx3">Brak powiązanych sesji serwisowych</span>
+        </CardHeader>
+        <CardContent>
+          <p className="text-[13px] text-tx3 text-center py-3">
+            <Timer className="inline h-3.5 w-3.5 mr-1" />
+            Koszt pojawi się po zakończeniu pierwszej sesji (WorkSession) powiązanej z tym zgłoszeniem.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const isSubscription = cb?.billingType === 'SUBSCRIPTION';
+  const usedMinutes = b.monthToDateMinutes ?? 0;
+  const limitMinutes = b.monthlyLimitMinutes ?? 0;
+  const pct = limitMinutes > 0 ? Math.min(100, Math.round((usedMinutes / limitMinutes) * 100)) : 0;
+  const overLimit = limitMinutes > 0 && usedMinutes > limitMinutes;
+
+  return (
+    <Card>
+      <CardHeader className="flex items-center justify-between">
+        <CardTitle>
+          <Wallet className="inline h-4 w-4 mr-1.5" />
+          Rozliczenie
+        </CardTitle>
+        {cb && (
+          <Badge variant={isSubscription ? 'accent' : 'neutral'}>
+            {cb.billingType === 'HOURLY' ? 'Rozliczenie godzinowe' :
+             cb.billingType === 'SUBSCRIPTION' ? 'Abonament' : 'Hybrydowe'}
+          </Badge>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Cost headline */}
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-tx3 mb-1">Koszt tego zgłoszenia</div>
+            {b.costNet != null ? (
+              <div className="text-[24px] font-bold text-tx leading-none">
+                {b.costNet.toFixed(2)} <span className="text-[14px] text-tx3 font-medium">PLN netto</span>
+              </div>
+            ) : (
+              <div className="text-[13px] text-tx3">Stawka nieustalona — skonfiguruj WorkspaceRelation</div>
+            )}
+            <div className="text-[11px] text-tx3 mt-1">
+              {formatHoursPl(b.totalBillableMinutes)} bilowane
+              {b.effectiveHourlyRateNet != null && (
+                <> @ <strong className="text-tx2">{Number(b.effectiveHourlyRateNet).toFixed(2)} PLN/h</strong></>
+              )}
+              <> · {b.sessionCount} {b.sessionCount === 1 ? 'sesja' : 'sesji'}</>
+            </div>
+          </div>
+          {cb?.billingIncrementMin && (
+            <div className="text-[11px] text-tx3 text-right">
+              Zaokrąglenie: <strong className="text-tx2">{cb.billingIncrementMin} min</strong>
+            </div>
+          )}
+        </div>
+
+        {/* Subscription usage bar */}
+        {isSubscription && limitMinutes > 0 && (
+          <div className="pt-3 border-t border-bd">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-tx3">
+                <TrendingUp className="inline h-3 w-3 mr-1" />
+                Zużycie abonamentu (ten miesiąc)
+              </span>
+              <span className={cn('text-[12px] font-semibold', overLimit ? 'text-er' : 'text-tx')}>
+                {formatHoursPl(usedMinutes)} / {formatHoursPl(limitMinutes)}
+                <span className="text-tx3 font-normal"> ({pct}%)</span>
+              </span>
+            </div>
+            <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--sf-h)' }}>
+              <div
+                className="h-full transition-all"
+                style={{
+                  width: `${Math.min(100, pct)}%`,
+                  background: overLimit ? 'var(--er)' : pct > 80 ? 'var(--wr)' : 'var(--ok)',
+                }}
+              />
+            </div>
+            {overLimit && cb?.overageRateNet && (
+              <p className="text-[11px] text-er mt-1.5">
+                Przekroczono limit abonamentu o {formatHoursPl(usedMinutes - limitMinutes)} —
+                {' '}stawka nadgodzinowa: <strong>{Number(cb.overageRateNet).toFixed(2)} PLN/h</strong>
+              </p>
+            )}
+            {cb?.monthlyNet && !overLimit && (
+              <p className="text-[11px] text-tx3 mt-1.5">
+                Abonament: <strong>{Number(cb.monthlyNet).toFixed(2)} PLN/m-c</strong>
+                {cb.overageRateNet && <> · nadgodziny: {Number(cb.overageRateNet).toFixed(2)} PLN/h</>}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Session breakdown */}
+        <div className="pt-3 border-t border-bd">
+          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-tx3 mb-2">
+            Sesje ({b.sessionCount})
+          </div>
+          <div className="text-[11px] text-tx3 grid grid-cols-2 gap-2">
+            <div>
+              <span className="block text-tx2">Czas pracy (total):</span>
+              <strong className="text-tx">{formatHoursPl(b.totalDurationMinutes)}</strong>
+            </div>
+            <div>
+              <span className="block text-tx2">Czas bilowany:</span>
+              <strong className="text-tx">{formatHoursPl(b.totalBillableMinutes)}</strong>
+            </div>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

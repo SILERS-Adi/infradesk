@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
@@ -7,7 +8,7 @@ import { z } from 'zod';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   Plus, Search, Server as ServerIcon, Monitor, Router, HardDrive, Printer, Camera,
-  Smartphone, X, Loader2, QrCode,
+  Smartphone, X, Loader2, QrCode, ChevronLeft,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/Card';
@@ -50,6 +51,7 @@ const CATEGORY_META: Record<string, { label: string; icon: typeof ServerIcon }> 
 interface Location { id: string; name: string; city: string | null }
 
 export function DevicesPage() {
+  const navigate = useNavigate();
   const [view, setView] = useViewPreference('devices', 'visual');
   const [search, setSearch] = useState('');
   const [locationFilter, setLocationFilter] = useState<string>('');
@@ -73,6 +75,11 @@ export function DevicesPage() {
 
   const devices = data?.devices ?? [];
 
+  function handleAdd() {
+    if (view === 'visual') setShowCreate(true);
+    else navigate('/devices/new');
+  }
+
   return (
     <div className="space-y-5 anim-up">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -84,7 +91,7 @@ export function DevicesPage() {
         </div>
         <div className="flex items-center gap-3">
           <ViewToggle value={view} onChange={setView} />
-          <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4" /> Dodaj</Button>
+          <Button onClick={handleAdd}><Plus className="h-4 w-4" /> Dodaj</Button>
         </div>
       </div>
 
@@ -108,7 +115,7 @@ export function DevicesPage() {
           <ServerIcon className="h-10 w-10 mx-auto mb-3 text-tx3" />
           <p className="text-tx font-medium mb-2">Brak urządzeń</p>
           <p className="text-[13px] text-tx3 mb-4">Dodaj pierwsze urządzenie albo zatwierdź agenta (który je auto-doda).</p>
-          <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4" /> Dodaj urządzenie</Button>
+          <Button onClick={handleAdd}><Plus className="h-4 w-4" /> Dodaj urządzenie</Button>
         </Card>
       ) : view === 'visual' ? (
         <DevicesGrid devices={devices} onQr={setQrDevice} />
@@ -118,6 +125,26 @@ export function DevicesPage() {
 
       {showCreate && <CreateDeviceModal locations={locs?.locations ?? []} onClose={() => setShowCreate(false)} />}
       {qrDevice && <QrCodeDialog device={qrDevice} onClose={() => setQrDevice(null)} />}
+    </div>
+  );
+}
+
+export function DeviceNewPage() {
+  const navigate = useNavigate();
+  const { data: locs } = useQuery<{ locations: Location[] }>({
+    queryKey: ['locations'],
+    queryFn: async () => (await api.get('/locations')).data,
+  });
+  return (
+    <div className="max-w-3xl mx-auto space-y-4 anim-up">
+      <button
+        onClick={() => navigate(-1)}
+        className="flex items-center gap-1 text-tx3 text-sm hover:text-tx press"
+      >
+        <ChevronLeft className="h-4 w-4" /> Wstecz
+      </button>
+      <h1 className="text-[22px] font-bold text-tx">Nowe urządzenie</h1>
+      <CreateDeviceModal variant="page" locations={locs?.locations ?? []} onClose={() => navigate('/devices')} />
     </div>
   );
 }
@@ -226,7 +253,7 @@ const deviceSchema = z.object({
 });
 type DForm = z.infer<typeof deviceSchema>;
 
-function CreateDeviceModal({ locations, onClose }: { locations: Location[]; onClose: () => void }) {
+export function CreateDeviceModal({ locations, onClose, variant = 'modal', workspaceIdOverride }: { locations: Location[]; onClose: () => void; variant?: 'modal' | 'page'; workspaceIdOverride?: string }) {
   const qc = useQueryClient();
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<DForm>({
     resolver: zodResolver(deviceSchema),
@@ -234,13 +261,108 @@ function CreateDeviceModal({ locations, onClose }: { locations: Location[]; onCl
   });
 
   const mutation = useMutation({
-    mutationFn: async (data: DForm) => (await api.post('/devices', data)).data,
+    mutationFn: async (data: DForm) => {
+      const payload: Record<string, unknown> = { ...data };
+      if (workspaceIdOverride) payload.workspaceId = workspaceIdOverride;
+      return (await api.post('/devices', payload)).data;
+    },
     onSuccess: () => { toast.success('Urządzenie dodane'); qc.invalidateQueries({ queryKey: ['devices'] }); onClose(); },
     onError: (err: unknown) => {
       const ax = err as { response?: { data?: { message?: string } } };
       toast.error(ax.response?.data?.message ?? 'Błąd');
     },
   });
+
+  const formBody = (
+    <>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-[10px] font-semibold text-tx3 mb-1">Nazwa *</label>
+          <Input {...register('name')} placeholder="np. srv-prod-01" />
+          {errors.name && <p className="text-[11px] text-er mt-1">{errors.name.message}</p>}
+        </div>
+        <div>
+          <label className="block text-[10px] font-semibold text-tx3 mb-1">Hostname</label>
+          <Input {...register('hostname')} placeholder="LAPTOP-ANNA-K" />
+        </div>
+      </div>
+      <div>
+        <label className="block text-[10px] font-semibold text-tx3 mb-1">Lokalizacja *</label>
+        <Select {...register('locationId')}>
+          <option value="">—</option>
+          {locations.map((l) => <option key={l.id} value={l.id}>{l.name} {l.city && `(${l.city})`}</option>)}
+        </Select>
+        {errors.locationId && <p className="text-[11px] text-er mt-1">{errors.locationId.message}</p>}
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-[10px] font-semibold text-tx3 mb-1">Kategoria</label>
+          <Select {...register('category')}>
+            {Object.entries(CATEGORY_META).map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
+          </Select>
+        </div>
+        <div>
+          <label className="block text-[10px] font-semibold text-tx3 mb-1">Priorytet</label>
+          <Select {...register('criticality')}>
+            <option value="LOW">Niski</option>
+            <option value="MEDIUM">Średni</option>
+            <option value="HIGH">Wysoki</option>
+            <option value="CRITICAL">Krytyczny</option>
+          </Select>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className="block text-[10px] font-semibold text-tx3 mb-1">Producent</label>
+          <Input {...register('manufacturer')} placeholder="Dell" />
+        </div>
+        <div>
+          <label className="block text-[10px] font-semibold text-tx3 mb-1">Model</label>
+          <Input {...register('model')} placeholder="Latitude 5530" />
+        </div>
+        <div>
+          <label className="block text-[10px] font-semibold text-tx3 mb-1">Serial</label>
+          <Input {...register('serialNumber')} />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-[10px] font-semibold text-tx3 mb-1">IP</label>
+          <Input {...register('ipAddress')} placeholder="192.168.1.10" />
+        </div>
+        <div>
+          <label className="block text-[10px] font-semibold text-tx3 mb-1">MAC</label>
+          <Input {...register('macAddress')} placeholder="AA:BB:CC:DD:EE:FF" />
+        </div>
+      </div>
+      <div>
+        <label className="block text-[10px] font-semibold text-tx3 mb-1">System</label>
+        <Input {...register('operatingSystem')} placeholder="Windows 11 Pro" />
+      </div>
+    </>
+  );
+
+  const actions = (
+    <>
+      <Button type="button" variant="ghost" onClick={onClose}>Anuluj</Button>
+      <Button type="button" onClick={handleSubmit((d) => mutation.mutate(d))} disabled={isSubmitting}>
+        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Utwórz'}
+      </Button>
+    </>
+  );
+
+  if (variant === 'page') {
+    return (
+      <Card className="p-0 overflow-hidden">
+        <form className="px-6 py-5 space-y-4" onSubmit={handleSubmit((d) => mutation.mutate(d))}>
+          {formBody}
+        </form>
+        <div className="px-6 py-4 border-t border-bd flex items-center justify-end gap-2 bg-sf-h">
+          {actions}
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Dialog.Root open onOpenChange={(o) => !o && onClose()}>
@@ -255,76 +377,10 @@ function CreateDeviceModal({ locations, onClose }: { locations: Location[]; onCl
             <Dialog.Close asChild><button className="p-2 rounded-[var(--r-s)] text-tx3 hover:bg-sf-h press"><X className="h-4 w-4" /></button></Dialog.Close>
           </div>
           <form className="px-6 py-5 space-y-4 overflow-y-auto flex-1 min-h-0" onSubmit={handleSubmit((d) => mutation.mutate(d))}>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-semibold text-tx3 mb-1">Nazwa *</label>
-                <Input {...register('name')} placeholder="np. srv-prod-01" />
-                {errors.name && <p className="text-[11px] text-er mt-1">{errors.name.message}</p>}
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-tx3 mb-1">Hostname</label>
-                <Input {...register('hostname')} placeholder="LAPTOP-ANNA-K" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-[10px] font-semibold text-tx3 mb-1">Lokalizacja *</label>
-              <Select {...register('locationId')}>
-                <option value="">—</option>
-                {locations.map((l) => <option key={l.id} value={l.id}>{l.name} {l.city && `(${l.city})`}</option>)}
-              </Select>
-              {errors.locationId && <p className="text-[11px] text-er mt-1">{errors.locationId.message}</p>}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-semibold text-tx3 mb-1">Kategoria</label>
-                <Select {...register('category')}>
-                  {Object.entries(CATEGORY_META).map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
-                </Select>
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-tx3 mb-1">Priorytet</label>
-                <Select {...register('criticality')}>
-                  <option value="LOW">Niski</option>
-                  <option value="MEDIUM">Średni</option>
-                  <option value="HIGH">Wysoki</option>
-                  <option value="CRITICAL">Krytyczny</option>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-[10px] font-semibold text-tx3 mb-1">Producent</label>
-                <Input {...register('manufacturer')} placeholder="Dell" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-tx3 mb-1">Model</label>
-                <Input {...register('model')} placeholder="Latitude 5530" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-tx3 mb-1">Serial</label>
-                <Input {...register('serialNumber')} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-semibold text-tx3 mb-1">IP</label>
-                <Input {...register('ipAddress')} placeholder="192.168.1.10" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-tx3 mb-1">MAC</label>
-                <Input {...register('macAddress')} placeholder="AA:BB:CC:DD:EE:FF" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-[10px] font-semibold text-tx3 mb-1">System</label>
-              <Input {...register('operatingSystem')} placeholder="Windows 11 Pro" />
-            </div>
+            {formBody}
           </form>
           <div className="px-6 py-4 border-t border-bd flex items-center justify-end gap-2 bg-sf-h shrink-0">
-            <Button type="button" variant="ghost" onClick={onClose}>Anuluj</Button>
-            <Button type="button" onClick={handleSubmit((d) => mutation.mutate(d))} disabled={isSubmitting}>
-              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Utwórz'}
-            </Button>
+            {actions}
           </div>
         </Dialog.Content>
       </Dialog.Portal>

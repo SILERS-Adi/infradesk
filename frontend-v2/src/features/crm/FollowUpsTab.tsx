@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { BellRing, ExternalLink, Phone, Mail, Calendar, FileText, Clock } from 'lucide-react';
+import { BellRing, Phone, Mail, Calendar, FileText, Clock } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { formatRelativePl } from '@/lib/utils';
 
@@ -92,9 +93,12 @@ function FollowUpSection({ title, items, color }: { title: string; items: CrmAct
                     <span className="inline-flex items-center gap-1"><Clock className="h-2.5 w-2.5" /> {formatRelativePl(a.followUpAt)}</span>
                   )}
                   {a.linkedTicket && (
-                    <Link to={`/tickets/${a.linkedTicket.id}`} className="hover:text-pri inline-flex items-center gap-0.5">
-                      <ExternalLink className="h-2.5 w-2.5" /> {a.linkedTicket.ticketNumber}
-                    </Link>
+                    <span className="inline-flex items-center gap-1 text-[10px]">
+                      <span>Origin:</span>
+                      <Link to={`/tickets/${a.linkedTicket.id}`}>
+                        <Badge variant="accent" className="text-[9px]">{a.linkedTicket.ticketNumber}</Badge>
+                      </Link>
+                    </span>
                   )}
                 </div>
               </div>

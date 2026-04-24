@@ -1,58 +1,84 @@
 import { useState, useRef, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Sparkles, Send, User as UserIcon, Loader2, Trash2, Zap } from 'lucide-react';
+import { Sparkles, Send, User as UserIcon, Trash2, Zap, Wrench, CheckCircle2, AlertTriangle, ExternalLink } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
+import { IrisCore } from '@/components/iris/IrisCore';
+
+interface ToolCall {
+  tool: string;
+  input: Record<string, unknown>;
+  result: Record<string, unknown>;
+}
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
   costPln?: number;
   tokens?: number;
+  toolCalls?: ToolCall[];
+}
+
+interface ChatResponse {
+  message: { role: 'assistant'; content: string };
+  toolCalls: ToolCall[];
+  stopReason: string | null;
+  usage: { inputTokens: number; outputTokens: number; costPln: number; model: string };
 }
 
 const MODELS = [
-  { key: 'claude-haiku-4-5-20251001', label: 'Haiku (szybki)', color: 'var(--ok)' },
-  { key: 'claude-sonnet-4-6', label: 'Sonnet (balans)', color: 'var(--pri)' },
-  { key: 'claude-opus-4-7', label: 'Opus (maksimum)', color: 'var(--wn)' },
+  { key: 'claude-haiku-4-5-20251001', label: 'Haiku (szybki)' },
+  { key: 'claude-sonnet-4-6', label: 'Sonnet (balans)' },
+  { key: 'claude-opus-4-7', label: 'Opus (maksimum)' },
 ] as const;
 
 const SUGGESTIONS = [
-  'Podsumuj ticket z ostatniego tygodnia dla serwera w Silers',
-  'Jak zdiagnozować powolny RDP na Windows Server 2019?',
-  'Napisz polską odpowiedź do klienta o konieczności wymiany dysku',
-  'Jakie są typowe przyczyny failed backup MSSQL?',
+  'Pokaż moje ostatnie 3 zgłoszenia',
+  'Sprawdź status T-2026-0001',
+  'Mam problem z drukarką HP — nie drukuje',
+  'Poproś o oddzwonienie w sprawie wymiany dysku',
 ];
+
+const TOOL_LABELS: Record<string, string> = {
+  utworz_zgloszenie: 'Utworz zgłoszenie',
+  sprawdz_status: 'Sprawdź status',
+  lista_moich_zgloszen: 'Lista zgłoszeń',
+  zglos_problem_z_urzadzeniem: 'Zgłoś problem z urządzeniem',
+  popros_o_oddzwonienie: 'Prośba o oddzwonienie',
+  dodaj_komentarz_do_zgloszenia: 'Dodaj komentarz',
+  anuluj_zgloszenie: 'Anuluj zgłoszenie',
+  ocen_zakonczone: 'Oceń zakończone',
+};
 
 export function IrisChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [model, setModel] = useState<(typeof MODELS)[number]['key']>('claude-sonnet-4-6');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const sendMut = useMutation({
     mutationFn: async (userMsg: string) => {
       const newMessages: Message[] = [...messages, { role: 'user' as const, content: userMsg }];
       setMessages(newMessages);
       setInput('');
-      const res = await api.post<{ text: string; inputTokens: number; outputTokens: number; costPln: number; model: string }>(
-        '/ai/chat',
-        {
-          model,
-          messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
-        },
-      );
+      const res = await api.post<ChatResponse>('/iris/chat', {
+        model,
+        messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
+      });
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant' as const,
-          content: res.data.text,
-          costPln: res.data.costPln,
-          tokens: res.data.inputTokens + res.data.outputTokens,
+          content: res.data.message.content,
+          costPln: res.data.usage.costPln,
+          tokens: res.data.usage.inputTokens + res.data.usage.outputTokens,
+          toolCalls: res.data.toolCalls,
         },
       ]);
       return res.data;
@@ -68,6 +94,16 @@ export function IrisChatPage() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, sendMut.isPending]);
 
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q && q.trim() && messages.length === 0 && !sendMut.isPending) {
+      sendMut.mutate(q.trim());
+      searchParams.delete('q');
+      setSearchParams(searchParams, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function send() {
     const trimmed = input.trim();
     if (!trimmed || sendMut.isPending) return;
@@ -80,9 +116,9 @@ export function IrisChatPage() {
     <div className="flex flex-col h-[calc(100vh-120px)] max-w-[900px] mx-auto">
       <div className="flex items-center justify-between gap-[var(--sp-3)] mb-[var(--sp-3)]">
         <div className="flex items-center gap-2">
-          <Sparkles size={18} className="text-[var(--pri)]" />
+          <IrisCore size="sm" state={sendMut.isPending ? 'thinking' : 'idle'} ariaLabel="Iris" />
           <h1 className="text-[18px] font-semibold leading-tight">Iris — AI Copilot</h1>
-          <Badge variant="info">v1</Badge>
+          <Badge variant="info">v2 tools</Badge>
         </div>
         <div className="flex items-center gap-2">
           <Select value={model} onChange={(e) => setModel(e.target.value as typeof model)} className="w-[180px]">
@@ -102,10 +138,10 @@ export function IrisChatPage() {
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-[var(--sp-4)] space-y-[var(--sp-4)]">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center text-[var(--tx3)]">
-              <Sparkles size={48} className="opacity-30 mb-3" />
+              <div className="mb-4"><IrisCore size="lg" state="idle" ariaLabel="Iris" /></div>
               <div className="text-[15px] font-medium text-[var(--tx2)] mb-2">Cześć, jestem Iris</div>
               <div className="text-[13px] mb-[var(--sp-4)] max-w-[400px]">
-                Pomogę Ci z ticketami, diagnostyką urządzeń, pisaniem odpowiedzi do klientów i szukaniem rozwiązań.
+                Pomogę Ci zgłosić problem, sprawdzić status zgłoszenia, anulować lub ocenić zakończone.
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-[600px]">
                 {SUGGESTIONS.map((s) => (
@@ -126,9 +162,7 @@ export function IrisChatPage() {
           )}
           {sendMut.isPending && (
             <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-[var(--pri-l)]">
-                <Loader2 size={14} className="animate-spin text-[var(--pri)]" />
-              </div>
+              <div className="shrink-0"><IrisCore size="sm" state="thinking" ariaLabel="Iris" /></div>
               <div className="flex-1 pt-1 text-[13px] text-[var(--tx3)]">Iris myśli…</div>
             </div>
           )}
@@ -178,17 +212,24 @@ function MessageBubble({ m }: { m: Message }) {
       >
         {isUser ? <UserIcon size={14} /> : <Sparkles size={14} />}
       </div>
-      <div className={`max-w-[75%] ${isUser ? 'text-right' : ''}`}>
-        <div
-          className="inline-block text-left rounded-[var(--r-s)] px-3 py-2 text-[13px] whitespace-pre-wrap"
-          style={{
-            background: isUser ? 'var(--pri-l)' : 'var(--sf-h)',
-            color: 'var(--tx)',
-            border: '1px solid var(--bd)',
-          }}
-        >
-          {m.content}
-        </div>
+      <div className={`max-w-[78%] ${isUser ? 'text-right' : ''}`}>
+        {m.toolCalls && m.toolCalls.length > 0 && (
+          <div className="flex flex-col gap-2 mb-2 text-left">
+            {m.toolCalls.map((tc, idx) => <ToolCallCard key={idx} tc={tc} />)}
+          </div>
+        )}
+        {m.content && (
+          <div
+            className="inline-block text-left rounded-[var(--r-s)] px-3 py-2 text-[13px] whitespace-pre-wrap"
+            style={{
+              background: isUser ? 'var(--pri-l)' : 'var(--sf-h)',
+              color: 'var(--tx)',
+              border: '1px solid var(--bd)',
+            }}
+          >
+            {m.content}
+          </div>
+        )}
         {m.costPln !== undefined && (
           <div className="text-[10px] text-[var(--tx3)] mt-1">
             {m.tokens} tokenów · {m.costPln.toFixed(4)} PLN
@@ -197,4 +238,94 @@ function MessageBubble({ m }: { m: Message }) {
       </div>
     </div>
   );
+}
+
+function ToolCallCard({ tc }: { tc: ToolCall }) {
+  const label = TOOL_LABELS[tc.tool] ?? tc.tool;
+  const isError = typeof tc.result?.error !== 'undefined';
+  const color = isError ? 'var(--er)' : 'var(--ok)';
+  const bg = isError ? 'color-mix(in oklab, var(--er) 12%, var(--sf))' : 'color-mix(in oklab, var(--ok) 12%, var(--sf))';
+  const url = typeof tc.result?.url === 'string' ? tc.result.url as string : null;
+
+  return (
+    <div
+      className="rounded-[var(--r-s)] border p-3 text-[12px]"
+      style={{ background: bg, borderColor: color }}
+    >
+      <div className="flex items-center gap-2 mb-1">
+        {isError ? <AlertTriangle size={13} style={{ color }} /> : <CheckCircle2 size={13} style={{ color }} />}
+        <Wrench size={11} className="text-[var(--tx3)]" />
+        <span className="font-medium" style={{ color: 'var(--tx)' }}>{label}</span>
+        <span className="text-[var(--tx3)]">·</span>
+        <span className="text-[var(--tx3)] text-[11px]">{isError ? 'błąd' : 'ok'}</span>
+      </div>
+      <ToolResultBody tc={tc} />
+      {url && (
+        <a
+          href={url}
+          className="inline-flex items-center gap-1 mt-2 text-[11px] text-[var(--pri)] hover:underline"
+          target="_self"
+        >
+          <ExternalLink size={10} /> Otwórz
+        </a>
+      )}
+    </div>
+  );
+}
+
+function ToolResultBody({ tc }: { tc: ToolCall }) {
+  const r = tc.result ?? {};
+  if (typeof r.error !== 'undefined') {
+    return <div className="text-[var(--tx2)]">{String(r.message ?? r.error)}</div>;
+  }
+  switch (tc.tool) {
+    case 'utworz_zgloszenie':
+    case 'zglos_problem_z_urzadzeniem': {
+      const n = r.ticketNumber as string | undefined;
+      const dev = r.deviceName as string | undefined;
+      return (
+        <div className="text-[var(--tx2)]">
+          Utworzono zgłoszenie <span className="font-mono font-semibold">{n}</span>
+          {dev ? ` (urządzenie: ${dev})` : ''}.
+        </div>
+      );
+    }
+    case 'sprawdz_status': {
+      const n = r.ticketNumber as string | undefined;
+      const st = r.status as string | undefined;
+      const a = r.assignedTo as string | null | undefined;
+      return (
+        <div className="text-[var(--tx2)]">
+          <div><span className="font-mono font-semibold">{n}</span> — {r.title as string}</div>
+          <div>Status: <span className="font-medium">{st}</span> · priorytet: {r.priority as string} {a ? `· przypisane: ${a}` : ''}</div>
+        </div>
+      );
+    }
+    case 'lista_moich_zgloszen': {
+      const tks = (r.tickets as Array<{ number: string; title: string; status: string; priority: string }>) ?? [];
+      if (tks.length === 0) return <div className="text-[var(--tx3)]">Brak zgłoszeń.</div>;
+      return (
+        <div className="flex flex-col gap-1">
+          {tks.map((t) => (
+            <div key={t.number} className="flex items-center gap-2 text-[var(--tx2)]">
+              <span className="font-mono text-[11px] font-semibold">{t.number}</span>
+              <span className="truncate flex-1">{t.title}</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'var(--sf)', border: '1px solid var(--bd)' }}>{t.status}</span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    case 'popros_o_oddzwonienie': {
+      return <div className="text-[var(--tx2)]">{(r.message as string) ?? 'Prośba zarejestrowana.'}</div>;
+    }
+    case 'dodaj_komentarz_do_zgloszenia':
+      return <div className="text-[var(--tx2)]">Komentarz dodany do <span className="font-mono font-semibold">{r.ticketNumber as string}</span>.</div>;
+    case 'anuluj_zgloszenie':
+      return <div className="text-[var(--tx2)]">Zgłoszenie <span className="font-mono font-semibold">{r.ticketNumber as string}</span> anulowane.</div>;
+    case 'ocen_zakonczone':
+      return <div className="text-[var(--tx2)]">Oceniono zgłoszenie <span className="font-mono font-semibold">{r.ticketNumber as string}</span>.</div>;
+    default:
+      return <div className="text-[var(--tx3)] font-mono text-[11px]">{JSON.stringify(r)}</div>;
+  }
 }

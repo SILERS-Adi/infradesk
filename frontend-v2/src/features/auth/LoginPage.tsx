@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -30,6 +30,8 @@ interface WorkspaceHint {
 export function LoginPage() {
   const { user, setSession } = useAuthStore();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nextUrl = searchParams.get("next");
   const [twoFactorRequired, setTwoFactorRequired] = useState(false);
   const [hint, setHint] = useState<WorkspaceHint['workspace']>(null);
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginForm>({
@@ -40,14 +42,14 @@ export function LoginPage() {
     api.get<WorkspaceHint>('/public/workspace').then((r) => setHint(r.data.workspace)).catch(() => {});
   }, []);
 
-  if (user) return <Navigate to="/" replace />;
+  if (user) { if (nextUrl && nextUrl.startsWith("/")) { window.location.href = nextUrl; return null; } return <Navigate to="/" replace />; }
 
   const onSubmit = async (data: LoginForm) => {
     try {
       const res = await api.post('/auth/login', data);
       setSession(res.data.user, res.data.accessToken, res.data.defaultWorkspaceId);
       toast.success('Zalogowano');
-      navigate('/');
+      if (nextUrl && nextUrl.startsWith("/")) { window.location.href = nextUrl; } else { navigate("/"); };
     } catch (err: unknown) {
       const axiosErr = err as { response?: { status?: number; data?: { error?: string; message?: string } } };
       const code = axiosErr.response?.data?.error;

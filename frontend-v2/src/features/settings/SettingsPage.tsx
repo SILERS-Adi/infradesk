@@ -1,141 +1,138 @@
-import { useState } from 'react';
-import { useThemeStore } from '@/store/theme';
-import { useAuthStore } from '@/store/auth';
-import { Settings, Sun, Moon, Monitor, LogOut } from 'lucide-react';
-import toast from 'react-hot-toast';
-import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { api } from '@/lib/api';
+import { useEffect, useMemo, useState } from 'react';
+import { Settings, User2, Shield, Bell, Plug, Palette, AlertTriangle } from 'lucide-react';
+import { AccountSection } from './sections/AccountSection';
+import { SecuritySection } from './sections/SecuritySection';
+import { NotificationsSection } from './sections/NotificationsSection';
+import { IntegrationsSection } from './sections/IntegrationsSection';
+import { AppearanceSection } from './sections/AppearanceSection';
+import { DangerZoneSection } from './sections/DangerZoneSection';
 
-const THEME_OPTIONS = [
-  { key: 'light', label: 'Jasny', icon: Sun },
-  { key: 'dark', label: 'Ciemny', icon: Moon },
-  { key: 'auto', label: 'Auto (system)', icon: Monitor },
-] as const;
+interface TocEntry {
+  id: string;
+  label: string;
+  icon: typeof User2;
+}
+
+const TOC: TocEntry[] = [
+  { id: 'konto', label: 'Konto', icon: User2 },
+  { id: 'bezpieczenstwo', label: 'Bezpieczeństwo', icon: Shield },
+  { id: 'powiadomienia', label: 'Powiadomienia', icon: Bell },
+  { id: 'integracje', label: 'Integracje', icon: Plug },
+  { id: 'wyglad', label: 'Wygląd', icon: Palette },
+  { id: 'strefa-niebezpieczna', label: 'Strefa niebezpieczna', icon: AlertTriangle },
+];
 
 export function SettingsPage() {
-  const theme = useThemeStore((s) => s.theme);
-  const setTheme = useThemeStore((s) => s.setTheme);
-  const user = useAuthStore((s) => s.user);
-  const logout = useAuthStore((s) => s.logout);
+  const [active, setActive] = useState<string>(TOC[0]!.id);
 
-  const [currentPwd, setCurrentPwd] = useState('');
-  const [newPwd, setNewPwd] = useState('');
-  const [saving, setSaving] = useState(false);
+  // Scroll-spy: update TOC highlight as the user scrolls through sections.
+  useEffect(() => {
+    const sections = TOC.map((t) => document.getElementById(t.id)).filter(
+      (el): el is HTMLElement => !!el,
+    );
+    if (sections.length === 0) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+        if (visible[0]?.target.id) setActive(visible[0].target.id);
+      },
+      { rootMargin: '-96px 0px -55% 0px', threshold: [0, 0.25, 0.5, 1] },
+    );
+    for (const el of sections) observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
-  async function changePassword() {
-    if (!currentPwd || !newPwd) return;
-    if (newPwd.length < 10) {
-      toast.error('Nowe hasło musi mieć co najmniej 10 znaków');
-      return;
-    }
-    setSaving(true);
-    try {
-      await api.post('/auth/change-password', { currentPassword: currentPwd, newPassword: newPwd });
-      toast.success('Hasło zmienione. Zaloguj się ponownie.');
-      setCurrentPwd('');
-      setNewPwd('');
-      logout();
-      window.location.href = '/login';
-    } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Błąd zmiany hasła';
-      toast.error(msg);
-    } finally {
-      setSaving(false);
-    }
+  function handleJump(id: string, e: React.MouseEvent<HTMLAnchorElement>) {
+    e.preventDefault();
+    const el = document.getElementById(id);
+    if (!el) return;
+    const top = el.getBoundingClientRect().top + window.scrollY - 80;
+    window.scrollTo({ top, behavior: 'smooth' });
+    setActive(id);
+    // Update URL hash without triggering native jump
+    history.replaceState(null, '', `#${id}`);
   }
 
-  async function doLogout() {
-    try {
-      await api.post('/auth/logout');
-    } catch {
-      // ignore
+  // Initial hash navigation
+  useEffect(() => {
+    const hash = window.location.hash.replace('#', '');
+    if (hash && TOC.some((t) => t.id === hash)) {
+      setTimeout(() => {
+        const el = document.getElementById(hash);
+        if (el) {
+          const top = el.getBoundingClientRect().top + window.scrollY - 80;
+          window.scrollTo({ top, behavior: 'auto' });
+          setActive(hash);
+        }
+      }, 50);
     }
-    logout();
-    window.location.href = '/login';
-  }
+  }, []);
 
-  return (
-    <div className="space-y-[var(--sp-4)] max-w-[640px]">
-      <div>
+  const header = useMemo(
+    () => (
+      <div className="mb-[var(--sp-5)]">
         <h1 className="text-[22px] font-semibold leading-tight flex items-center gap-2">
           <Settings size={18} className="text-[var(--pri)]" /> Ustawienia
         </h1>
-        <p className="text-[13px] text-[var(--tx3)] mt-0.5">
-          Twoje preferencje i bezpieczeństwo konta.
+        <p className="text-[13px] text-[var(--tx3)] mt-1">
+          Twoje konto, bezpieczeństwo, powiadomienia i integracje.
         </p>
       </div>
+    ),
+    [],
+  );
 
-      <Card className="p-[var(--sp-4)]">
-        <h2 className="text-[14px] font-semibold mb-[var(--sp-3)]">Twoje konto</h2>
-        <div className="space-y-1.5 text-[13px]">
-          <div className="flex justify-between">
-            <span className="text-[var(--tx3)]">Imię i nazwisko</span>
-            <span>{user?.firstName} {user?.lastName}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-[var(--tx3)]">Email</span>
-            <span className="font-mono">{user?.email}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-[var(--tx3)]">2FA</span>
-            <span>{user?.twoFactorEnabled ? 'Włączone' : 'Wyłączone'}</span>
-          </div>
-        </div>
-      </Card>
+  return (
+    <div className="max-w-5xl mx-auto">
+      {header}
+      <div className="grid grid-cols-1 md:grid-cols-[220px,1fr] gap-[var(--sp-6)]">
+        <aside className="hidden md:block">
+          <nav className="sticky top-20 space-y-0.5">
+            {TOC.map(({ id, label, icon: Icon }) => {
+              const isActive = active === id;
+              return (
+                <a
+                  key={id}
+                  href={`#${id}`}
+                  onClick={(e) => handleJump(id, e)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-[var(--r-s)] text-[13px] transition-colors"
+                  style={{
+                    background: isActive ? 'var(--pri-l)' : 'transparent',
+                    color: isActive ? 'var(--pri)' : 'var(--tx2)',
+                    fontWeight: isActive ? 600 : 500,
+                  }}
+                >
+                  <Icon size={14} />
+                  <span>{label}</span>
+                </a>
+              );
+            })}
+          </nav>
+        </aside>
 
-      <Card className="p-[var(--sp-4)]">
-        <h2 className="text-[14px] font-semibold mb-[var(--sp-3)]">Motyw kolorystyczny</h2>
-        <div className="grid grid-cols-3 gap-[var(--sp-3)]">
-          {THEME_OPTIONS.map(({ key, label, icon: Icon }) => {
-            const active = theme === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setTheme(key)}
-                className="p-[var(--sp-3)] rounded-[var(--r-s)] border transition-colors text-center"
-                style={{
-                  borderColor: active ? 'var(--pri)' : 'var(--bd)',
-                  background: active ? 'var(--pri-l)' : 'transparent',
-                  color: active ? 'var(--pri)' : 'var(--tx2)',
-                }}
-              >
-                <Icon size={18} className="mx-auto mb-1" />
-                <div className="text-[12px]">{label}</div>
-              </button>
-            );
-          })}
-        </div>
-      </Card>
-
-      <Card className="p-[var(--sp-4)]">
-        <h2 className="text-[14px] font-semibold mb-[var(--sp-3)]">Zmień hasło</h2>
-        <div className="space-y-[var(--sp-3)]">
-          <div>
-            <label className="text-[11px] text-[var(--tx3)] uppercase tracking-wider block mb-1">Obecne hasło</label>
-            <Input type="password" value={currentPwd} onChange={(e) => setCurrentPwd(e.target.value)} />
-          </div>
-          <div>
-            <label className="text-[11px] text-[var(--tx3)] uppercase tracking-wider block mb-1">Nowe hasło</label>
-            <Input type="password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} placeholder="Min. 10 znaków" />
-          </div>
-          <Button onClick={changePassword} disabled={saving || !currentPwd || !newPwd}>
-            {saving ? 'Zapisywanie…' : 'Zmień hasło'}
-          </Button>
-        </div>
-      </Card>
-
-      <Card className="p-[var(--sp-4)] border-[var(--er-b)]">
-        <h2 className="text-[14px] font-semibold mb-1 text-[var(--er)]">Wyloguj ze wszystkich sesji</h2>
-        <p className="text-[12px] text-[var(--tx3)] mb-[var(--sp-3)]">
-          Zakończy sesję na tym urządzeniu i unieważni wszystkie odświeżające tokeny.
-        </p>
-        <Button variant="ghost" onClick={doLogout} className="gap-1.5 text-[var(--er)]">
-          <LogOut size={14} /> Wyloguj
-        </Button>
-      </Card>
+        <main className="space-y-[var(--sp-5)] min-w-0">
+          <section id="konto" className="scroll-mt-20">
+            <AccountSection />
+          </section>
+          <section id="bezpieczenstwo" className="scroll-mt-20">
+            <SecuritySection />
+          </section>
+          <section id="powiadomienia" className="scroll-mt-20">
+            <NotificationsSection />
+          </section>
+          <section id="integracje" className="scroll-mt-20">
+            <IntegrationsSection />
+          </section>
+          <section id="wyglad" className="scroll-mt-20">
+            <AppearanceSection />
+          </section>
+          <section id="strefa-niebezpieczna" className="scroll-mt-20">
+            <DangerZoneSection />
+          </section>
+        </main>
+      </div>
     </div>
   );
 }

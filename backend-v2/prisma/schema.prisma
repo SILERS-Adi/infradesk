@@ -61,6 +61,11 @@ model User {
   dataExportedAt   DateTime?
   erasureRequestedAt DateTime?
 
+  // Sprint 6: Per-user Google OAuth tokens, encrypted with VAULT_MASTER_KEY
+  // (AES-256-GCM, stored as "iv.authTag.ciphertext"). JSON payload is
+  // { accessToken, refreshToken, expiresAt, scope, email }.
+  googleTokens     String?
+
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -87,6 +92,8 @@ model User {
   timeSlots        TimeSlot[]
   emailAccounts    UserEmailAccount[]
   emailMessagesAdded EmailMessage[] @relation("EmailMessageAddedBy")
+  uploadedDownloads  DownloadFile[]
+  oauthAuthCodes   OauthAuthCode[]
 
   @@index([email])
   @@index([isSuperAdmin])
@@ -197,6 +204,7 @@ model Workspace {
   emailAccounts  UserEmailAccount[]
   emailMessages  EmailMessage[]
   permissionSchemas PermissionSchema[]
+  downloadFiles     DownloadFile[]
 
   // MSP relations
   asProvider    WorkspaceRelation[] @relation("AsProvider")
@@ -242,6 +250,7 @@ model WorkspaceRelation {
   overageRateNet      Decimal?            @db.Decimal(10, 2)
   hourlyRateNet       Decimal?            @db.Decimal(10, 2)
   billingIncrementMin Int                 @default(15)
+  billingPeriod       BillingPeriod       @default(MONTHLY)
   contractFileUrl     String?
 
   createdAt           DateTime            @default(now())
@@ -260,6 +269,12 @@ enum RelationStatus {
   SUSPENDED
   TERMINATED
 }
+enum BillingPeriod {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
 enum BillingType {
   HOURLY
   SUBSCRIPTION
@@ -1850,3 +1865,68 @@ model PermissionSchema {
   @@index([workspaceId])
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DOWNLOADS CENTER — installers, manuals, tools
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model DownloadFile {
+  id                       String             @id @default(uuid())
+  workspaceId              String             // owned by provider MSP workspace
+  category                 String             // free-form: "Instalatory", "Dokumenty", "TeamViewer", etc.
+  name                     String             // display name
+  description              String?
+  fileName                 String             // original filename
+  storedName               String             // sanitized name on disk
+  mimeType                 String?
+  sizeBytes                BigInt
+  visibility               DownloadVisibility @default(INTERNAL)
+  targetClientWorkspaceIds String[]           @default([]) // when visibility=CLIENT: empty = all clients of MSP, non-empty = only these client workspaces
+  uploadedByUserId         String
+  downloadCount            Int                @default(0)
+  deletedAt                DateTime?
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+
+  workspace                Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  uploadedBy               User               @relation(fields: [uploadedByUserId], references: [id])
+
+  @@index([workspaceId, deletedAt])
+  @@index([category])
+  @@index([targetClientWorkspaceIds], type: Gin)
+}
+
+enum DownloadVisibility {
+  INTERNAL
+  CLIENT
+  PUBLIC
+}
+
+// ─────────────────────────── OIDC Provider ────────────────────────────
+// V2 acts as an OpenID Connect provider for first-party apps (Nextcloud
+// on dysk.silers.pl, etc). Clients are registered here with a bcrypt-hashed
+// client_secret; auth codes are short-lived (10 min) and single-use.
+
+model OauthClient {
+  id               String   @id @default(uuid())
+  clientId         String   @unique
+  clientSecretHash String
+  redirectUris     String[]
+  name             String
+  createdAt        DateTime @default(now()) @db.Timestamp(3)
+}
+
+model OauthAuthCode {
+  code        String   @id
+  clientId    String
+  userId      String
+  redirectUri String
+  scope       String
+  expiresAt   DateTime @db.Timestamp(3)
+  used        Boolean  @default(false)
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}

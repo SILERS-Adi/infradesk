@@ -7,6 +7,14 @@ export const api: AxiosInstance = axios.create({
 });
 
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  // Iris embed mode: short-lived Bearer token injected by IrisEmbedPage on window.
+  const embedToken = (typeof window !== 'undefined'
+    ? (window as unknown as { __IRIS_EMBED_TOKEN__?: string }).__IRIS_EMBED_TOKEN__
+    : undefined);
+  if (embedToken) {
+    config.headers.set('Authorization', `Bearer ${embedToken}`);
+    return config;
+  }
   const { accessToken, workspaceId } = useAuthStore.getState();
   if (accessToken) config.headers.set('Authorization', `Bearer ${accessToken}`);
   if (workspaceId) config.headers.set('X-Workspace-Id', workspaceId);
@@ -32,6 +40,9 @@ api.interceptors.response.use(
     const original = error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined;
     if (!original || original._retry) throw error;
     if (error.response?.status !== 401) throw error;
+    // Don't try to refresh in embed mode (no session cookie).
+    const hasEmbed = typeof window !== 'undefined' && (window as unknown as { __IRIS_EMBED_TOKEN__?: string }).__IRIS_EMBED_TOKEN__;
+    if (hasEmbed) throw error;
 
     original._retry = true;
     refreshing ??= refreshAccessToken().finally(() => { refreshing = null; });

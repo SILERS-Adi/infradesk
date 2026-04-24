@@ -32,6 +32,6 @@ export const useAuthStore = create<AuthState>()(
       setWorkspaceId: (workspaceId) => set({ workspaceId }),
       logout: () => set({ user: null, accessToken: null, workspaceId: null }),
     }),
-    { name: 'idesk-auth', partialize: (s) => ({ user: s.user, workspaceId: s.workspaceId }) },
+    { name: 'idesk-auth', partialize: (s) => ({ user: s.user, workspaceId: s.workspaceId, accessToken: s.accessToken }) },
   ),
 );

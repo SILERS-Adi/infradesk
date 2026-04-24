@@ -9,9 +9,46 @@ import { HttpError } from '../../utils/httpError';
 import { MODULES } from '../../utils/canAccess';
 import { hashPassword, validatePasswordStrength } from '../../lib/password';
 import { randomToken } from '../../lib/crypto';
+import { config } from '../../config';
 
 const router = Router();
 router.use(requireAuth, requireWorkspace);
+
+// GET /clients/lookup/ceidg?nip=X — fetch company data from Biznes.gov.pl hurtownia
+router.get('/lookup/ceidg', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const nipRaw = String(req.query.nip ?? '').replace(/[^0-9]/g, '');
+    if (nipRaw.length !== 10) throw HttpError.badRequest('NIP musi mieć 10 cyfr');
+    if (!config.CEIDG_API_TOKEN) throw HttpError.internal('Brak tokenu CEIDG w konfiguracji (.env)');
+    const url = `https://dane.biznes.gov.pl/api/ceidg/v3/firmy?nip=${nipRaw}`;
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${config.CEIDG_API_TOKEN}`, Accept: 'application/json' } });
+    if (r.status === 204) { res.json({ found: false }); return; }
+    if (!r.ok) {
+      const body = await r.text();
+      throw HttpError.internal(`CEIDG API ${r.status}: ${body.slice(0, 200)}`);
+    }
+    const data = await r.json() as { firmy?: Array<Record<string, unknown>> };
+    const firma = data.firmy?.[0];
+    if (!firma) { res.json({ found: false }); return; }
+    const adres = (firma.adresDzialalnosci ?? {}) as Record<string, string>;
+    const wlasciciel = (firma.wlasciciel ?? {}) as Record<string, string>;
+    res.json({
+      found: true,
+      data: {
+        name: (firma.nazwa as string) ?? '',
+        taxId: (firma.nip as string) ?? nipRaw,
+        regon: (firma.regon as string) ?? null,
+        status: (firma.status as string) ?? null,
+        addressLine1: [adres.ulica, adres.budynek].filter(Boolean).join(' ') || null,
+        postalCode: adres.kod ?? null,
+        city: adres.miasto ?? null,
+        ownerFirstName: wlasciciel.imie ?? '',
+        ownerLastName: wlasciciel.nazwisko ?? '',
+        startDate: (firma.dataRozpoczecia as string) ?? null,
+      },
+    });
+  } catch (err) { next(err); }
+});
 
 /**
  * Clients module — for MSP workspaces to manage their client companies.
@@ -65,7 +102,17 @@ router.get('/', requireAccess(MODULES.CLIENTS, 'view'), async (req: Request, res
         relationId: r.id,
         status: r.status,
         billingType: r.billingType,
+        billingPeriod: r.billingPeriod,
         hourlyRateNet: r.hourlyRateNet,
+        monthlyNet: r.monthlyNet,
+        monthlyHours: r.monthlyHours,
+        canViewDevices: r.canViewDevices,
+        canViewUsers: r.canViewUsers,
+        canViewLocations: r.canViewLocations,
+        canReceiveTickets: r.canReceiveTickets,
+        canCreateTicketsOnBehalf: r.canCreateTicketsOnBehalf,
+        canAccessAlerts: r.canAccessAlerts,
+        canAccessCredentials: r.canAccessCredentials,
         client: r.client,
         risk: byClient.get(r.clientWorkspaceId) ?? null,
       })),
@@ -271,9 +318,12 @@ router.get('/:id', requireAccess(MODULES.CLIENTS, 'view'), async (req: Request, 
 const updateRelationSchema = z.object({
   status: z.enum(['ACTIVE', 'SUSPENDED', 'TERMINATED']).optional(),
   billingType: z.enum(['HOURLY', 'SUBSCRIPTION', 'HYBRID']).optional(),
+  billingPeriod: z.enum(['MONTHLY', 'QUARTERLY', 'YEARLY']).optional(),
   hourlyRateNet: z.number().nonnegative().optional().nullable(),
+  overageRateNet: z.number().nonnegative().optional().nullable(),
   monthlyNet: z.number().nonnegative().optional().nullable(),
   monthlyHours: z.number().int().positive().optional().nullable(),
+  billingIncrementMin: z.number().int().positive().optional(),
   canViewDevices: z.boolean().optional(),
   canViewUsers: z.boolean().optional(),
   canViewLocations: z.boolean().optional(),
@@ -281,6 +331,16 @@ const updateRelationSchema = z.object({
   canCreateTicketsOnBehalf: z.boolean().optional(),
   canAccessAlerts: z.boolean().optional(),
   canAccessCredentials: z.boolean().optional(),
+  company: z.object({
+    name: z.string().min(2).max(120).optional(),
+    taxId: z.string().max(20).optional().nullable(),
+    city: z.string().max(80).optional().nullable(),
+    email: z.string().email().max(120).optional().nullable().or(z.literal('')),
+    phone: z.string().max(40).optional().nullable(),
+    website: z.string().max(200).optional().nullable().or(z.literal('')),
+    addressLine1: z.string().max(200).optional().nullable(),
+    postalCode: z.string().max(20).optional().nullable(),
+  }).optional(),
 });
 
 router.patch('/:id', requireAccess(MODULES.CLIENTS, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
@@ -291,13 +351,22 @@ router.patch('/:id', requireAccess(MODULES.CLIENTS, 'edit'), async (req: Request
         providerWorkspaceId: req.workspaceId!,
         clientWorkspaceId: String(req.params.id),
       },
-      select: { id: true },
+      select: { id: true, clientWorkspaceId: true },
     });
     if (!relation) throw HttpError.notFound();
-    const data: Record<string, unknown> = { ...input };
-    if (input.hourlyRateNet !== undefined) data.hourlyRateNet = input.hourlyRateNet === null ? null : new Prisma.Decimal(input.hourlyRateNet.toFixed(2));
-    if (input.monthlyNet !== undefined) data.monthlyNet = input.monthlyNet === null ? null : new Prisma.Decimal(input.monthlyNet.toFixed(2));
+    const { company, ...relationInput } = input;
+    const data: Record<string, unknown> = { ...relationInput };
+    if (relationInput.hourlyRateNet !== undefined) data.hourlyRateNet = relationInput.hourlyRateNet === null ? null : new Prisma.Decimal(relationInput.hourlyRateNet.toFixed(2));
+    if (relationInput.overageRateNet !== undefined) data.overageRateNet = relationInput.overageRateNet === null ? null : new Prisma.Decimal(relationInput.overageRateNet.toFixed(2));
+    if (relationInput.monthlyNet !== undefined) data.monthlyNet = relationInput.monthlyNet === null ? null : new Prisma.Decimal(relationInput.monthlyNet.toFixed(2));
     const updated = await prisma.workspaceRelation.update({ where: { id: relation.id }, data });
+    if (company && Object.keys(company).length > 0) {
+      const companyData: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(company)) {
+        if (v !== undefined) companyData[k] = v === '' ? null : v;
+      }
+      await prisma.workspace.update({ where: { id: relation.clientWorkspaceId }, data: companyData });
+    }
     res.json({ relation: updated });
   } catch (err) { next(err); }
 });

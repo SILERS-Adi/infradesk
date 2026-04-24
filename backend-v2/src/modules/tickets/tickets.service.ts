@@ -226,15 +226,23 @@ export function derivedTabStatus(
   return 'nowe';
 }
 
-export async function listTickets(workspaceId: string, opts: {
+export async function listTickets(workspaceId: string, opts: { visibleWsIds?: string[];
   status?: string; priority?: string; assignedToUserId?: string; deviceId?: string;
+  clientWorkspaceId?: string; from?: string; to?: string;
   search?: string; limit: number; cursor?: string;
 }) {
-  const where: Record<string, unknown> = { workspaceId, deletedAt: null };
+  const where: Record<string, unknown> = { workspaceId: opts.visibleWsIds && opts.visibleWsIds.length > 1 ? { in: opts.visibleWsIds } : workspaceId, deletedAt: null };
   if (opts.status) where.status = { in: opts.status.split(',') };
   if (opts.priority) where.priority = { in: opts.priority.split(',') };
   if (opts.assignedToUserId) where.assignedToUserId = opts.assignedToUserId;
   if (opts.deviceId) where.deviceId = opts.deviceId;
+  if (opts.clientWorkspaceId) where.clientWorkspaceId = opts.clientWorkspaceId;
+  if (opts.from || opts.to) {
+    const range: Record<string, Date> = {};
+    if (opts.from) range.gte = new Date(opts.from.length === 10 ? opts.from + 'T00:00:00.000Z' : opts.from);
+    if (opts.to) range.lte = new Date(opts.to.length === 10 ? opts.to + 'T23:59:59.999Z' : opts.to);
+    where.createdAt = range;
+  }
   if (opts.search) {
     where.OR = [
       { title: { contains: opts.search, mode: 'insensitive' } },
@@ -249,9 +257,9 @@ export async function listTickets(workspaceId: string, opts: {
     cursor: opts.cursor ? { id: opts.cursor } : undefined,
     skip: opts.cursor ? 1 : 0,
     select: {
-      id: true, ticketNumber: true, title: true, status: true, priority: true,
+      id: true, workspaceId: true, ticketNumber: true, title: true, status: true, priority: true,
       category: true, createdAt: true, updatedAt: true, dueAt: true,
-      assignedToUserId: true, deviceId: true,
+      assignedToUserId: true, deviceId: true, serviceMode: true,
       clientWorkspaceId: true, hasService: true, hasOrder: true, hasCrm: true,
       assignedTo: { select: { id: true, firstName: true, lastName: true } },
       device: { select: { id: true, name: true } },
@@ -263,6 +271,21 @@ export async function listTickets(workspaceId: string, opts: {
   const hasMore = items.length > opts.limit;
   const slice = hasMore ? items.slice(0, -1) : items;
   const nextCursor = hasMore ? slice[slice.length - 1]!.id : null;
+
+  // Bulk-fetch workspace info so we can show the client name
+  // Priority: clientWorkspaceId (explicit) > workspaceId if it's a CLIENT type
+  const allWsIds = Array.from(new Set([
+    ...slice.map((t) => t.clientWorkspaceId).filter((x): x is string => !!x),
+    ...slice.map((t) => t.workspaceId),
+  ]));
+  const allWs = allWsIds.length > 0
+    ? await prisma.workspace.findMany({ where: { id: { in: allWsIds } }, select: { id: true, name: true, slug: true, type: true } })
+    : [];
+  const wsMap = new Map(allWs.map((w) => [w.id, w]));
+  const clientWsMap = new Map<string, { id: string; name: string; slug: string }>();
+  for (const [id, w] of wsMap) {
+    clientWsMap.set(id, { id: w.id, name: w.name, slug: w.slug });
+  }
 
   // Compute derived tab status per item based on child states.
   // fresh  = child exists but work has not started
@@ -278,17 +301,28 @@ export async function listTickets(workspaceId: string, opts: {
     const orderActive = (s: string) => s === 'ORDERED' || s === 'IN_TRANSIT';
     const crmDone = (c: { completedAt: Date | null }) => c.completedAt !== null;
     const total = tasks.length + orders.length + crms.length;
-    const done = tasks.filter((x) => taskDone(x.status)).length
-      + orders.filter((x) => orderDone(x.status)).length
+    const done = tasks.filter((x: { status: string }) => taskDone(x.status)).length
+      + orders.filter((x: { status: string }) => orderDone(x.status)).length
       + crms.filter(crmDone).length;
-    const active = tasks.filter((x) => taskActive(x.status)).length
-      + orders.filter((x) => orderActive(x.status)).length;
+    const active = tasks.filter((x: { status: string }) => taskActive(x.status)).length
+      + orders.filter((x: { status: string }) => orderActive(x.status)).length;
     let tab: 'nowe' | 'w_toku' | 'zakonczone' | 'anulowane';
     if (t.status === 'CANCELLED') tab = 'anulowane';
-    else if (total > 0 && done === total) tab = 'zakonczone';
+    else if (t.status === 'RESOLVED' || t.status === 'CLOSED') tab = 'zakonczone';
+    else if (t.status === 'ASSIGNED' || t.status === 'IN_PROGRESS' || t.status === 'WAITING') tab = 'w_toku';
     else if (active > 0) tab = 'w_toku';
     else tab = 'nowe';
-    return { ...t, tab, childCounts: { total, done, active } };
+    let clientWorkspace: { id: string; name: string; slug: string } | null = null;
+    if (t.clientWorkspaceId) {
+      clientWorkspace = clientWsMap.get(t.clientWorkspaceId) ?? null;
+    } else {
+      // Fallback: if ticket workspaceId is a CLIENT/INTERNAL_IT workspace, use that as the client
+      const own = wsMap.get(t.workspaceId);
+      if (own && (own.type === 'CLIENT' || own.type === 'INTERNAL_IT')) {
+        clientWorkspace = { id: own.id, name: own.name, slug: own.slug };
+      }
+    }
+    return { ...t, tab, childCounts: { total, done, active }, clientWorkspace };
   });
 
   return { items: enriched, nextCursor };
@@ -329,32 +363,128 @@ export async function getTicket(workspaceId: string, id: string) {
           followUpRequired: true, followUpAt: true, billable: true, quoteValueNet: true,
         },
       },
+      sessionLinks: {
+        select: {
+          id: true, notes: true, createdAt: true,
+          session: {
+            select: {
+              id: true, status: true, startedAt: true, endedAt: true,
+              durationMinutes: true, billableMinutes: true, billable: true,
+              hourlyRateNet: true, serviceMode: true,
+              technician: { select: { id: true, firstName: true, lastName: true } },
+            },
+          },
+        },
+      },
     },
   });
   if (!t) throw HttpError.notFound('Ticket not found');
 
-  // Resolve client workspace name
+  // Resolve client workspace name + billing relation (provider=this workspace, client=ticket.clientWorkspaceId)
   let clientName: string | null = null;
+  let clientBilling: {
+    billingType: string;
+    hourlyRateNet: string | null;
+    monthlyNet: string | null;
+    monthlyHours: number | null;
+    overageRateNet: string | null;
+    billingIncrementMin: number;
+    billingPeriod: string;
+  } | null = null;
+
   if (t.clientWorkspaceId) {
     const w = await prisma.workspace.findUnique({
       where: { id: t.clientWorkspaceId },
       select: { name: true, slug: true },
     });
     clientName = w ? `${w.name}` : null;
+
+    const rel = await prisma.workspaceRelation.findUnique({
+      where: {
+        providerWorkspaceId_clientWorkspaceId: {
+          providerWorkspaceId: workspaceId,
+          clientWorkspaceId: t.clientWorkspaceId,
+        },
+      },
+      select: {
+        billingType: true, hourlyRateNet: true, monthlyNet: true,
+        monthlyHours: true, overageRateNet: true,
+        billingIncrementMin: true, billingPeriod: true,
+      },
+    });
+    if (rel) {
+      clientBilling = {
+        billingType: rel.billingType,
+        hourlyRateNet: rel.hourlyRateNet?.toString() ?? null,
+        monthlyNet: rel.monthlyNet?.toString() ?? null,
+        monthlyHours: rel.monthlyHours,
+        overageRateNet: rel.overageRateNet?.toString() ?? null,
+        billingIncrementMin: rel.billingIncrementMin,
+        billingPeriod: rel.billingPeriod,
+      };
+    }
   }
 
-  return { ...t, clientName };
+  // Billing aggregate across all linked work sessions
+  const sessions = (t.sessionLinks ?? []).map((l) => l.session).filter((s) => !!s);
+  const totalBillableMinutes = sessions.reduce((acc, s) => acc + (s!.billableMinutes ?? 0), 0);
+  const totalDurationMinutes = sessions.reduce((acc, s) => acc + (s!.durationMinutes ?? 0), 0);
+  // Effective rate: prefer relation's hourlyRateNet; fallback to first session's snapshot rate.
+  const firstWithRate = sessions.find((s) => s!.hourlyRateNet != null);
+  const effectiveRate = clientBilling?.hourlyRateNet
+    ? Number(clientBilling.hourlyRateNet)
+    : firstWithRate
+      ? Number(firstWithRate!.hourlyRateNet)
+      : null;
+  const billableHours = totalBillableMinutes / 60;
+  const costNet = effectiveRate != null ? Number((billableHours * effectiveRate).toFixed(2)) : null;
+
+  // Subscription-mode monthly counter: sum billable minutes of this client's sessions this month
+  let monthToDateMinutes: number | null = null;
+  if (clientBilling && clientBilling.billingType === 'SUBSCRIPTION' && t.clientWorkspaceId) {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const mtd = await prisma.workSession.aggregate({
+      _sum: { billableMinutes: true },
+      where: {
+        workspaceId,
+        clientWorkspaceId: t.clientWorkspaceId,
+        billable: true,
+        startedAt: { gte: monthStart },
+      },
+    });
+    monthToDateMinutes = mtd._sum.billableMinutes ?? 0;
+  }
+
+  const billing = {
+    sessionCount: sessions.length,
+    totalBillableMinutes,
+    totalDurationMinutes,
+    billableHours: Number(billableHours.toFixed(2)),
+    effectiveHourlyRateNet: effectiveRate,
+    costNet,
+    monthToDateMinutes,
+    monthlyLimitMinutes: clientBilling?.monthlyHours != null ? clientBilling.monthlyHours * 60 : null,
+  };
+
+  return { ...t, clientName, clientBilling, billing };
 }
 
 export async function updateTicket(workspaceId: string, userId: string, id: string, patch: UpdateTicketInput) {
-  const t = await prisma.ticket.findFirst({ where: { id, workspaceId, deletedAt: null } });
+  // MSP can edit tickets in any client workspace they provide for
+  const relations = await prisma.workspaceRelation.findMany({
+    where: { providerWorkspaceId: workspaceId, canReceiveTickets: true, status: 'ACTIVE' },
+    select: { clientWorkspaceId: true },
+  });
+  const visibleWsIds = [workspaceId, ...relations.map((r) => r.clientWorkspaceId)];
+  const t = await prisma.ticket.findFirst({ where: { id, workspaceId: { in: visibleWsIds }, deletedAt: null } });
   if (!t) throw HttpError.notFound();
 
   const data: Record<string, unknown> = { ...patch };
   if (patch.dueAt !== undefined) data.dueAt = patch.dueAt ? new Date(patch.dueAt) : null;
 
   // Auto-transition OPEN→ASSIGNED when a user is assigned.
-  if (patch.assignedToUserId && t.status === 'OPEN') {
+  if (patch.assignedToUserId && (t.status === 'OPEN' || t.status === 'NEW' || t.status === 'WAITING')) {
     data.status = 'ASSIGNED';
   }
 

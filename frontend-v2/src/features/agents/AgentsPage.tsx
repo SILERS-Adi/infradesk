@@ -8,6 +8,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import {
   Zap, CheckCircle2, XCircle, Clock, Monitor,
   X, Loader2, Wifi, WifiOff,
+  Power, RefreshCw, Download, Gauge, Package,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/Card';
@@ -133,6 +134,9 @@ export function AgentsPage() {
                   <RejectButton id={a.id} />
                 </div>
               )}
+              {a.status === 'ACTIVE' && a.deviceId && (
+                <AgentActionBar agent={a} online={isOnline(a.lastSeen)} />
+              )}
             </Card>
           ))}
         </div>
@@ -153,6 +157,162 @@ function RejectButton({ id }: { id: string }) {
     <Button size="sm" variant="danger" onClick={() => reject.mutate()} disabled={reject.isPending} title="Odrzuć">
       <XCircle className="h-3 w-3" />
     </Button>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Agent action bar — push commands via V2 WS bridge (wake/reboot/update/...)
+// ════════════════════════════════════════════════════════════════════════════
+
+type PushCommandType =
+  | 'windows_update' | 'restart_service' | 'system_reboot'
+  | 'install_software';
+
+function AgentActionBar({ agent, online }: { agent: AgentReg; online: boolean }) {
+  const [serviceModalOpen, setServiceModalOpen] = useState(false);
+  const [installModalOpen, setInstallModalOpen] = useState(false);
+
+  const wake = useMutation({
+    mutationFn: async () => (await api.post(`/agents/admin/${agent.id}/wake`)).data,
+    onSuccess: (d: { relayAgents: number }) => toast.success(`WoL wysłany (relay: ${d.relayAgents})`),
+    onError: (err: unknown) => toast.error(agentErrorText(err)),
+  });
+
+  const speedtest = useMutation({
+    mutationFn: async () => (await api.post(`/agents/admin/${agent.id}/run-speedtest`)).data,
+    onSuccess: (d: { result?: { download_mbps?: number; upload_mbps?: number; ping_ms?: number } }) => {
+      const r = d.result;
+      if (r?.download_mbps != null) {
+        toast.success(`↓ ${r.download_mbps?.toFixed(1)} Mb/s  ↑ ${r.upload_mbps?.toFixed(1)} Mb/s  ${r.ping_ms?.toFixed(0)} ms`);
+      } else {
+        toast.success('Speedtest zakończony');
+      }
+    },
+    onError: (err: unknown) => toast.error(agentErrorText(err)),
+  });
+
+  const push = useMutation({
+    mutationFn: async (v: { type: PushCommandType; payload?: Record<string, unknown> }) =>
+      (await api.post(`/agents/admin/${agent.id}/push-command`, v)).data,
+    onSuccess: (_d, v) => toast.success(`Wysłano: ${v.type}`),
+    onError: (err: unknown) => toast.error(agentErrorText(err)),
+  });
+
+  const reboot = () => {
+    if (!confirm(`Zrestartować ${agent.hostname} za 60s?`)) return;
+    push.mutate({ type: 'system_reboot', payload: { delay: 60 } });
+  };
+  const winUpdate = () => push.mutate({ type: 'windows_update' });
+
+  return (
+    <div className="pt-3 border-t border-bd space-y-2">
+      <div className="grid grid-cols-2 gap-1.5">
+        <Button size="sm" variant="ghost" title="Wake-on-LAN (relay przez inny agent w LAN)"
+                onClick={() => wake.mutate()} disabled={wake.isPending}>
+          <Power className="h-3 w-3" /> Wake
+        </Button>
+        <Button size="sm" variant="ghost" title="Speedtest" disabled={!online || speedtest.isPending}
+                onClick={() => speedtest.mutate()}>
+          {speedtest.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Gauge className="h-3 w-3" />} Speedtest
+        </Button>
+        <Button size="sm" variant="ghost" title="Restart komputera" disabled={!online || push.isPending} onClick={reboot}>
+          <RefreshCw className="h-3 w-3" /> Reboot
+        </Button>
+        <Button size="sm" variant="ghost" title="Windows Update" disabled={!online || push.isPending} onClick={winUpdate}>
+          <Download className="h-3 w-3" /> Win Update
+        </Button>
+        <Button size="sm" variant="ghost" title="Restart usługi" disabled={!online || push.isPending}
+                onClick={() => setServiceModalOpen(true)}>
+          <RefreshCw className="h-3 w-3" /> Usługa…
+        </Button>
+        <Button size="sm" variant="ghost" title="Zainstaluj program" disabled={!online || push.isPending}
+                onClick={() => setInstallModalOpen(true)}>
+          <Package className="h-3 w-3" /> Instaluj…
+        </Button>
+      </div>
+      {!online && (
+        <p className="text-[10px] text-tx3 italic">Agent offline — akcje wymagające WS są wyłączone (Wake działa)</p>
+      )}
+
+      {serviceModalOpen && (
+        <SimpleInputModal
+          title="Restart usługi Windows"
+          label="Nazwa usługi (np. MSSQLSERVER)"
+          placeholder="MSSQLSERVER"
+          submitLabel="Restart"
+          onClose={() => setServiceModalOpen(false)}
+          onSubmit={(value) => {
+            push.mutate({ type: 'restart_service', payload: { serviceName: value } });
+            setServiceModalOpen(false);
+          }}
+        />
+      )}
+      {installModalOpen && (
+        <SimpleInputModal
+          title="Zainstaluj program"
+          label="ID pakietu winget (np. Mozilla.Firefox)"
+          placeholder="Mozilla.Firefox"
+          submitLabel="Instaluj"
+          onClose={() => setInstallModalOpen(false)}
+          onSubmit={(value) => {
+            push.mutate({ type: 'install_software', payload: { package: value } });
+            setInstallModalOpen(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function agentErrorText(err: unknown): string {
+  const ax = err as { response?: { data?: { error?: string; message?: string; code?: string }; status?: number } };
+  const data = ax.response?.data;
+  if (data?.code === 'agent_offline') return 'Agent jest offline';
+  if (data?.code === 'agent_timeout') return 'Agent nie odpowiedział w czasie';
+  return data?.error ?? data?.message ?? 'Błąd';
+}
+
+function SimpleInputModal({
+  title, label, placeholder, submitLabel, onClose, onSubmit,
+}: {
+  title: string;
+  label: string;
+  placeholder: string;
+  submitLabel: string;
+  onClose: () => void;
+  onSubmit: (value: string) => void;
+}) {
+  const [value, setValue] = useState('');
+  return (
+    <Dialog.Root open onOpenChange={(o) => !o && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm anim-up" />
+        <Dialog.Content
+          className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-[var(--r-xl)] anim-scale"
+          style={{ background: 'var(--sf)', boxShadow: 'var(--sh4)', border: '1px solid var(--bd)' }}
+        >
+          <div className="flex items-center justify-between px-6 py-4 border-b border-bd">
+            <Dialog.Title className="text-[16px] font-bold text-tx">{title}</Dialog.Title>
+            <Dialog.Close asChild>
+              <button className="p-2 rounded-[var(--r-s)] text-tx3 hover:bg-sf-h press"><X className="h-4 w-4" /></button>
+            </Dialog.Close>
+          </div>
+          <form
+            className="px-6 py-5 space-y-4"
+            onSubmit={(e) => { e.preventDefault(); if (value.trim()) onSubmit(value.trim()); }}
+          >
+            <div>
+              <label className="block text-[10px] font-semibold text-tx3 mb-1">{label}</label>
+              <Input placeholder={placeholder} value={value} onChange={(e) => setValue(e.target.value)} autoFocus />
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-bd">
+              <Button type="button" variant="ghost" onClick={onClose}>Anuluj</Button>
+              <Button type="submit" variant="primary" disabled={!value.trim()}>{submitLabel}</Button>
+            </div>
+          </form>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 
