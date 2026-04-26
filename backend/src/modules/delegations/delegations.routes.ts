@@ -1,14 +1,14 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/auth';
-import { withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
+import { withWorkspaceMembership, authorizeWorkspace, requireWorkspace } from '../../middleware/workspace';
 import { validate } from '../../middleware/validate';
 import { requireFeature } from '../../middleware/planLimits';
 import { createDelegationSchema, updateDelegationSchema } from './delegations.validation';
 import * as ctrl from './delegations.controller';
 const router = Router();
-router.use(authenticate, requireFeature('delegations'));
-router.get('/', ctrl.list);
-router.get('/:id', ctrl.get);
+router.use(authenticate, requireWorkspace, requireFeature('delegations'));
+router.get('/', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), ctrl.list);
+router.get('/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), ctrl.get);
 router.post('/', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), validate(createDelegationSchema), ctrl.create);
 router.patch('/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), validate(updateDelegationSchema), ctrl.update);
 router.delete('/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), ctrl.remove);

@@ -31,7 +31,7 @@ export const registerLimiter = rateLimit({
 /** Agent registration: public endpoint — tight limit to prevent mass enrollment */
 export const agentRegisterLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 minutes
-  max: 3,
+  max: 20,
   standardHeaders: true,
   legacyHeaders: false,
   ...rateLimitResponse('Zbyt wiele rejestracji agenta. Spróbuj ponownie za 5 minut.'),

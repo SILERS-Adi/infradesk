@@ -202,8 +202,32 @@ export async function createTicket(
   requestingUser: { userId: string },
   workspaceId?: string,
 ) {
-  const resolvedWorkspaceId = workspaceId || data.workspaceId;
-  if (!resolvedWorkspaceId) throw new AppError('workspaceId is required', 400);
+  const callerWorkspaceId = workspaceId || data.workspaceId;
+  if (!callerWorkspaceId) throw new AppError('workspaceId is required', 400);
+
+  // ── MSP "on behalf of" support ─────────────────────────────────
+  // If MSP passes clientWorkspaceId, the ticket lives in the client's workspace
+  // and the MSP is recorded as providerWorkspaceId.
+  let resolvedWorkspaceId = callerWorkspaceId;
+  let onBehalfOfClient = false;
+  if (data.clientWorkspaceId && data.clientWorkspaceId !== callerWorkspaceId) {
+    const relation = await prisma.workspaceRelation.findFirst({
+      where: {
+        providerWorkspaceId: callerWorkspaceId,
+        clientWorkspaceId: data.clientWorkspaceId,
+        status: 'ACTIVE',
+      },
+      select: { id: true, canCreateTicketsOnBehalf: true },
+    });
+    if (!relation) {
+      throw new AppError('Brak relacji z tym klientem', 403);
+    }
+    if (relation.canCreateTicketsOnBehalf === false) {
+      throw new AppError('Brak uprawnień do tworzenia zgłoszeń dla tego klienta', 403);
+    }
+    resolvedWorkspaceId = data.clientWorkspaceId;
+    onBehalfOfClient = true;
+  }
 
   // Auto-fill locationId — find first location for workspace if not provided
   if (!data.locationId) {
@@ -237,14 +261,20 @@ export async function createTicket(
   // Auto-resolve ticket provider (multi-tenant routing)
   let requesterWorkspaceId: string | null = null;
   let providerWorkspaceId: string | null = null;
-  try {
-    const { resolveTicketProvider } = require('../../utils/ticketRouting');
-    const routing = await resolveTicketProvider(resolvedWorkspaceId);
-    if (!routing.isInternal && routing.providerWorkspaceId) {
-      requesterWorkspaceId = resolvedWorkspaceId;
-      providerWorkspaceId = routing.providerWorkspaceId;
-    }
-  } catch (_) { /* ticketRouting not available — skip */ }
+  if (onBehalfOfClient) {
+    // MSP creating on behalf of client — explicit routing
+    requesterWorkspaceId = resolvedWorkspaceId;        // client (where ticket lives)
+    providerWorkspaceId  = callerWorkspaceId;          // MSP
+  } else {
+    try {
+      const { resolveTicketProvider } = require('../../utils/ticketRouting');
+      const routing = await resolveTicketProvider(resolvedWorkspaceId);
+      if (!routing.isInternal && routing.providerWorkspaceId) {
+        requesterWorkspaceId = resolvedWorkspaceId;
+        providerWorkspaceId = routing.providerWorkspaceId;
+      }
+    } catch (_) { /* ticketRouting not available — skip */ }
+  }
 
   const ticket = await prisma.ticket.create({
     data: {

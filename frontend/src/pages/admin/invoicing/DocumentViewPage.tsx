@@ -34,6 +34,23 @@ export function DocumentViewPage() {
   const [doc, setDoc] = useState<Document | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState('');
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [emailTo, setEmailTo] = useState('');
+  const [emailMessage, setEmailMessage] = useState('');
+  const [emailSending, setEmailSending] = useState(false);
+
+  async function sendEmail() {
+    if (!emailTo.trim() || !/@/.test(emailTo)) { toast.error('Podaj prawidłowy email'); return; }
+    setEmailSending(true);
+    try {
+      await api.post(`/invoicing/documents/${id}/send-email`, { to: emailTo.trim(), customMessage: emailMessage.trim() || undefined });
+      toast.success(`Wysłano do ${emailTo}`);
+      setEmailModalOpen(false);
+      setEmailMessage('');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Nie udało się wysłać');
+    } finally { setEmailSending(false); }
+  }
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -163,19 +180,31 @@ export function DocumentViewPage() {
             </Link>
             <Button size="sm" loading={actionLoading === 'pdf'} onClick={downloadPdf} icon={<Download size={14} />}>PDF</Button>
             <Button size="sm" variant="secondary" loading={actionLoading === 'print'} onClick={printDoc} icon={<Printer size={14} />}>Drukuj</Button>
-            <Button size="sm" variant="secondary" onClick={() => toast('Funkcja w przygotowaniu')} icon={<Mail size={14} />}>Email</Button>
+            <Button size="sm" variant="secondary" onClick={() => { setEmailTo((doc as any)?.buyer_email || ''); setEmailModalOpen(true); }} icon={<Mail size={14} />}>Email</Button>
           </div>
         }
       />
 
       <div style={{ padding: '0 24px 24px', maxWidth: 1100 }}>
         {/* Status badges */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
           <Badge color={sb.color}>{sb.label}</Badge>
           {doc.ksef_number && <Badge color="purple">KSeF: {doc.ksef_number}</Badge>}
-          {doc.split_payment && <Badge color="yellow">MPP</Badge>}
+          {doc.split_payment && <Badge color="yellow">Mechanizm podzielonej płatności</Badge>}
+          {(doc as any).cash_method && <Badge color="orange">Metoda kasowa</Badge>}
           {doc.reverse_charge && <Badge color="blue">Odwrotne obciążenie</Badge>}
+          {(doc as any).buyer_country && (doc as any).buyer_country !== 'PL' && <Badge color="gray">{(doc as any).buyer_country}</Badge>}
         </div>
+
+        {/* Annotation alert for MPP */}
+        {doc.split_payment && (
+          <div style={{ padding: '12px 16px', marginBottom: 16, borderRadius: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 18 }}>⚠️</span>
+            <div style={{ fontSize: 12, color: 'var(--ts)' }}>
+              <strong style={{ color: '#FBBF24' }}>Mechanizm podzielonej płatności</strong> — faktura obowiązkowo płatna w MPP (kwota brutto powyżej 15 000 zł lub towary z załącznika 15 do ustawy VAT)
+            </div>
+          </div>
+        )}
 
         {/* Two columns: parties + payment */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
@@ -191,8 +220,11 @@ export function DocumentViewPage() {
               <InfoBlock icon={User} label="Nabywca">
                 <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--t)' }}>{doc.buyer_name}</div>
                 {doc.buyer_nip && <div>NIP: {doc.buyer_nip}</div>}
+                {(doc as any).buyer_regon && <div>REGON: {(doc as any).buyer_regon}</div>}
                 {doc.buyer_street && <div>{doc.buyer_street}</div>}
                 {(doc.buyer_zip || doc.buyer_city) && <div>{doc.buyer_zip} {doc.buyer_city}</div>}
+                {(doc as any).buyer_email && <div style={{ color: 'var(--tm)', marginTop: 4, fontSize: 12 }}>✉ {(doc as any).buyer_email}</div>}
+                {(doc as any).buyer_phone && <div style={{ color: 'var(--tm)', fontSize: 12 }}>☎ {(doc as any).buyer_phone}</div>}
               </InfoBlock>
             </div>
           </Card>
@@ -314,7 +346,7 @@ export function DocumentViewPage() {
         </div>
 
         {/* Notes */}
-        {(doc.notes || doc.internal_notes) && (
+        {(doc.notes || doc.internal_notes || (doc as any).footer_note) && (
           <div style={{ display: 'grid', gridTemplateColumns: doc.internal_notes ? '1fr 1fr' : '1fr', gap: 20, marginBottom: 20 }}>
             {doc.notes && (
               <Card title="Uwagi">
@@ -326,6 +358,11 @@ export function DocumentViewPage() {
                 <div style={{ fontSize: 13, color: 'var(--ts)', whiteSpace: 'pre-wrap' }}>{doc.internal_notes}</div>
               </Card>
             )}
+            {(doc as any).footer_note && !doc.notes && !doc.internal_notes && (
+              <Card title="Stopka">
+                <div style={{ fontSize: 12, color: 'var(--tm)', whiteSpace: 'pre-wrap' }}>{(doc as any).footer_note}</div>
+              </Card>
+            )}
           </div>
         )}
 
@@ -334,7 +371,7 @@ export function DocumentViewPage() {
           <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <Button size="sm" onClick={downloadPdf} loading={actionLoading === 'pdf'} icon={<Download size={14} />}>PDF</Button>
             <Button size="sm" variant="secondary" onClick={printDoc} loading={actionLoading === 'print'} icon={<Printer size={14} />}>Drukuj</Button>
-            <Button size="sm" variant="secondary" onClick={() => toast('Funkcja w przygotowaniu')} icon={<Mail size={14} />}>Wyślij email</Button>
+            <Button size="sm" variant="secondary" onClick={() => { setEmailTo((doc as any)?.buyer_email || ''); setEmailModalOpen(true); }} icon={<Mail size={14} />}>Wyślij email</Button>
             <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
             {doc.type.includes('invoice') && (
               <Button size="sm" variant="secondary" onClick={correctDoc} loading={actionLoading === 'correct'} icon={<RotateCcw size={14} />}>Korekta</Button>
@@ -347,6 +384,50 @@ export function DocumentViewPage() {
           </div>
         </Card>
       </div>
+
+      {/* ── Email modal ── */}
+      {emailModalOpen && (
+        <div onClick={() => !emailSending && setEmailModalOpen(false)} style={{
+          position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, backdropFilter: 'blur(4px)',
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14,
+            width: '100%', maxWidth: 520, padding: 24, boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Mail size={18} style={{ color: '#818CF8' }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--t)' }}>Wyślij email</div>
+                <div style={{ fontSize: 11, color: 'var(--tm)' }}>Dokument: {doc.number}</div>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: 'block', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--td)', marginBottom: 6 }}>Email odbiorcy *</label>
+              <input type="email" value={emailTo} onChange={e => setEmailTo(e.target.value)} placeholder="np. biuro@klient.pl"
+                style={{ width: '100%', padding: '10px 14px', fontSize: 13, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--hover-bg)', color: 'var(--t)', outline: 'none' }} />
+            </div>
+
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ display: 'block', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--td)', marginBottom: 6 }}>Dodatkowa wiadomość (opcjonalna)</label>
+              <textarea value={emailMessage} onChange={e => setEmailMessage(e.target.value)} placeholder="Dodatkowy tekst w treści maila..."
+                rows={4} style={{ width: '100%', padding: '10px 14px', fontSize: 13, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--hover-bg)', color: 'var(--t)', outline: 'none', resize: 'vertical', fontFamily: 'inherit' }} />
+            </div>
+
+            <div style={{ fontSize: 11, color: 'var(--tm)', marginBottom: 14, padding: 10, background: 'var(--hover-bg)', borderRadius: 8 }}>
+              📎 Do maila zostanie dołączona faktura jako plik HTML (do wydruku).
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <Button variant="ghost" onClick={() => setEmailModalOpen(false)} disabled={emailSending}>Anuluj</Button>
+              <Button variant="primary" icon={<Mail size={14} />} onClick={sendEmail} loading={emailSending}>Wyślij</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

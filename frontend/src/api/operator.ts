@@ -59,9 +59,57 @@ export interface OperatorTicket {
 export interface OperatorStats {
   clientCount: number;
   deviceCount: number;
+  devicesOnline: number;
   ticketCount: number;
-  activeTickets: number;
+  openTickets: number;
+  overdueTickets: number;
+  criticalTickets: number;
   agentCount: number;
+  agentsOnline: number;
+  activeSessions: number;
+  slaCompliance: number | null;
+  slaSampleSize: number;
+  weeklyRatio: number | null;
+  weeklyResolved: number;
+  weeklyCreated: number;
+  backupTotal: number;
+  backupSuccess: number;
+  backupFailed: number;
+  backupStale: number;
+  alertsTotal: number;
+  alertsCritical: number;
+  alertsHigh: number;
+  alertsMedium: number;
+  recentTickets: Array<{
+    id: string; ticketNumber: string; title: string; status: string; priority: string;
+    createdAt: string; dueAt?: string | null;
+    workspace?: { id: string; name: string } | null;
+    location?: { id: string; name: string } | null;
+  }>;
+  topClients: Array<{ workspaceId: string; name: string; city?: string | null; openTickets: number }>;
+  unassignedTickets: number;
+  avgResponseHours: number | null;
+  trends: {
+    createdToday: number;
+    createdYesterday: number;
+    closedToday: number;
+    closedYesterday: number;
+    closedThisWeek: number;
+    closedLastWeek: number;
+  };
+  chartData: Array<{ date: string; created: number; closed: number }>;
+  recentActivity: Array<{
+    id: string; ticketNumber: string; title: string; resolvedAt: string;
+    assignedTo?: { firstName: string; lastName: string } | null;
+    workspace?: { name: string } | null;
+  }>;
+  upcomingDeadlines: Array<{
+    id: string; ticketNumber: string; title: string; priority: string; dueAt: string;
+    workspace?: { name: string } | null;
+    assignedTo?: { firstName: string; lastName: string } | null;
+  }>;
+  // legacy
+  activeTickets?: number;
 }
 
 export interface CreateClientPayload {
@@ -109,6 +157,9 @@ export const operatorApi = {
 
   getDevices: (params?: { clientWorkspaceId?: string }) =>
     apiClient.get<any[]>('/operator/devices', { params }).then(r => r.data),
+
+  getLocations: (params?: { clientWorkspaceId?: string }) =>
+    apiClient.get<any[]>('/operator/locations', { params }).then(r => r.data),
 
   getStats: () =>
     apiClient.get<OperatorStats>('/operator/stats').then(r => r.data),

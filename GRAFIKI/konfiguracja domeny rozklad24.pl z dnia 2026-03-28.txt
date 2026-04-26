@@ -1,0 +1,14 @@
+Parametry domeny rozklad24.pl
+
+Dane podstawowe
+  Hasło administratora poczty: z7O.x1P)s3
+  Konto FTP: nfkfybhu
+  Podkatalog z plikami strony: rozklad24.pl
+  Profil domeny: 
+
+Bezpieczeństwo
+  Obsługuj nieskonfigurowane subdomeny: nie
+  Zabezpiecz witrynę certyfikatem SSL: nie
+  Zabezpieczenie statystyk WWW hasłem: tak
+  Hasło do statystyk: z7O.x1P)s3
+

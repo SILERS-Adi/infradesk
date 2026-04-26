@@ -1,12 +1,14 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../../middleware/auth';
+import { requireWorkspace } from '../../middleware/workspace';
 import prisma from '../../lib/prisma';
 import { sendMail, emailTemplate, emailButton, emailHeading, emailText, emailMuted, emailInfoBox } from '../../lib/mailer';
 import { AppError } from '../../middleware/errorHandler';
 import crypto from 'crypto';
 
 const router = Router();
-router.use(authenticate);
+// Security: sharing routes are workspace-scoped to the caller's workspace. Cross-workspace access (MSP ↔ company) is validated per-endpoint via WorkspaceManagement relations and invitation tokens.
+router.use(authenticate, requireWorkspace);
 
 // ── List sharing relationships for current workspace ──
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {

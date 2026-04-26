@@ -16,24 +16,23 @@ async function generateDelegationNumber(): Promise<string> {
   return `DEL-${year}-${String(count + 1).padStart(4, '0')}`;
 }
 
-export async function listDelegations(params: { assignedToUserId?: string; workspaceId?: string | null }) {
-  const where: Record<string, unknown> = {};
-  if (params.workspaceId) where.workspaceId = params.workspaceId;
+export async function listDelegations(params: { assignedToUserId?: string; workspaceId: string }) {
+  const where: Record<string, unknown> = { workspaceId: params.workspaceId };
   if (params.assignedToUserId) where.assignedToUserId = params.assignedToUserId;
   return prisma.delegation.findMany({ where, orderBy: { createdAt: 'desc' }, select: delegationSelect });
 }
 
-export async function getDelegationById(id: string) {
-  const d = await prisma.delegation.findUnique({ where: { id }, select: delegationSelect });
+export async function getDelegationById(id: string, workspaceId: string) {
+  const d = await prisma.delegation.findFirst({ where: { id, workspaceId }, select: delegationSelect });
   if (!d) throw new AppError('Delegation not found', 404);
   return d;
 }
 
-export async function createDelegation(data: CreateDelegationInput, createdByUserId: string) {
+export async function createDelegation(data: CreateDelegationInput, createdByUserId: string, workspaceId: string) {
   const delegationNumber = await generateDelegationNumber();
   const d = await prisma.delegation.create({
     data: {
-      delegationNumber, workspaceId: data.workspaceId, createdByUserId,
+      delegationNumber, workspaceId, createdByUserId,
       assignedToUserId: data.assignedToUserId,
       title: data.title, description: data.description,
       scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : undefined,
@@ -48,8 +47,8 @@ export async function createDelegation(data: CreateDelegationInput, createdByUse
   return d;
 }
 
-export async function updateDelegation(id: string, data: UpdateDelegationInput, performedByUserId: string) {
-  const existing = await prisma.delegation.findUnique({ where: { id } });
+export async function updateDelegation(id: string, data: UpdateDelegationInput, performedByUserId: string, workspaceId: string) {
+  const existing = await prisma.delegation.findFirst({ where: { id, workspaceId } });
   if (!existing) throw new AppError('Delegation not found', 404);
   return prisma.delegation.update({
     where: { id },
@@ -58,8 +57,8 @@ export async function updateDelegation(id: string, data: UpdateDelegationInput, 
   });
 }
 
-export async function deleteDelegation(id: string, performedByUserId: string) {
-  const d = await prisma.delegation.findUnique({ where: { id } });
+export async function deleteDelegation(id: string, performedByUserId: string, workspaceId: string) {
+  const d = await prisma.delegation.findFirst({ where: { id, workspaceId } });
   if (!d) throw new AppError('Delegation not found', 404);
   await prisma.delegation.delete({ where: { id } });
   await logActivity(prisma, {

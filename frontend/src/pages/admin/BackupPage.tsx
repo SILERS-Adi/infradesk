@@ -290,8 +290,8 @@ function BackupFormModal({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
-            label="Agent Reg ID"
-            placeholder="ID agenta"
+            label="Asystent ID"
+            placeholder="ID asystenta"
             value={form.agentRegId ?? ''}
             onChange={e => set('agentRegId', e.target.value)}
           />

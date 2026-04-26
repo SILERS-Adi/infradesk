@@ -16,7 +16,7 @@ from PIL import Image, ImageGrab, ImageDraw
 
 APP_NAME    = "Asystent Home"
 APP_NAME_HOME = "Asystent Home"
-APP_VERSION = "6.0.0"
+APP_VERSION = "6.1.0"
 _OLD_INSTALL_DIR = os.path.join(os.environ.get("APPDATA", ""), "InfraDesk")
 INSTALL_DIR = os.path.join(os.environ.get("APPDATA", ""), "SILERS", "Asystent Home")
 INSTALL_EXE = os.path.join(INSTALL_DIR, "Asystent Home.exe")

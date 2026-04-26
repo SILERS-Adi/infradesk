@@ -1116,7 +1116,7 @@ export default function BackupWizard({ open, onClose, companyFilter }: { open: b
               <p style={{ fontSize: 12, color: 'var(--tm)', margin: '0 0 20px' }}>Sprawdź i zatwierdź konfigurację backupu</p>
 
               <div style={{ borderRadius: 14, border: '1px solid var(--border)', padding: '4px 18px', marginBottom: 20 }}>
-                <SumRow icon={<Server size={14} />} label="Agent" value={selectedAgent?.hostname || '—'} />
+                <SumRow icon={<Server size={14} />} label="Asystent" value={selectedAgent?.hostname || '—'} />
                 <SumRow icon={<Database size={14} />} label="Źródło"
                   value={sourceType === 'folder'
                     ? `Folder: ${folderPath}`

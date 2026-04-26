@@ -15,3 +15,45 @@ backend/pg-data/
 agent/build/
 agent/dist/
 agent/dist_onefile/
+agent/__pycache__/
+agent/v5/__pycache__/
+agent/v5/**/__pycache__/
+
+# Build artifacts (v2 — added via tar from server, deps not committed)
+backend-v2/node_modules/
+backend-v2/dist/
+backend-v2/.env
+backend-v2/.env.bak.*
+backend-v2/uploads/
+frontend-v2/node_modules/
+frontend-v2/dist/
+frontend-v2/tsconfig.tsbuildinfo
+
+# Tmp scripts from session work
+tmp-*.py
+tmp-*.tsx
+tmp-*.ts
+tmp-*.sql
+tmp-*.txt
+
+# Security — sensitive data
+pakops_migration/
+tmp/
+dw-work/
+*.sql
+*.dump
+*.bak
+*.bak.*
+*.bak-*
+agent/tmp-design/
+agent/*.spec.bak*
+
+# Binaries / installers — never commit
+*.msi
+*.exe
+
+# Root clutter
+/build/
+new_*.tsx
+new_*.css
+screenshot*.png

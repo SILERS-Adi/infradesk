@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, Building2, User, Server, Shield } from 'lucide-react';
+import { ChevronDown, Building2, User, Server, Shield, Pencil, Search } from 'lucide-react';
 import { useWorkspace } from '../../store/workspaceStore';
 import { workspacesApi } from '../../api/workspaces';
 import { useAuth } from '../../store/authStore';
@@ -31,7 +32,9 @@ export function WorkspaceSwitcher() {
   const { isAuthenticated } = useAuth();
   const { workspaces, current, switchWorkspace, setWorkspaces, markResolved, isLoading } = useWorkspace();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const [dropPos, setDropPos] = useState({ top: 0, left: 0 });
   const ref = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -122,50 +125,96 @@ export function WorkspaceSwitcher() {
       {open && createPortal(
         <div ref={dropRef} style={{
           position: 'fixed', top: dropPos.top, left: dropPos.left,
-          minWidth: 280, maxHeight: 400, overflowY: 'auto',
-          background: 'var(--bg2)', border: '1px solid var(--border-l)',
-          borderRadius: 12, padding: 4,
-          boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
-          backdropFilter: 'blur(12px)',
+          width: 360, maxHeight: 500, overflowY: 'auto',
+          background: '#0F1628', border: '1px solid var(--border-l)',
+          borderRadius: 12,
+          boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
           zIndex: 99999,
-        }}>
-          {workspaces.map(ws => {
+        }} className="workspace-switcher-dropdown">
+          {/* Search */}
+          {workspaces.length > 5 && (
+            <div style={{ padding: 10, borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: '#0F1628', zIndex: 2 }}>
+              <div style={{ position: 'relative' }}>
+                <Search size={12} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--td)' }} />
+                <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+                  placeholder="Szukaj firmy lub NIP..." autoFocus
+                  style={{
+                    width: '100%', padding: '8px 12px 8px 30px', fontSize: 12, borderRadius: 8,
+                    border: '1px solid var(--border)', background: 'var(--hover-bg)', color: 'var(--t)', outline: 'none',
+                  }} />
+              </div>
+            </div>
+          )}
+
+          <div style={{ padding: 4 }}>
+          {workspaces
+            .filter(ws => {
+              if (!search) return true;
+              const q = search.toLowerCase();
+              return ws.name.toLowerCase().includes(q) || ((ws as any).taxId || '').toLowerCase().includes(q);
+            })
+            .map(ws => {
             const Icon = TYPE_ICONS[ws.type] ?? Building2;
             const isActive = ws.workspaceId === current.workspaceId;
             return (
-              <button
+              <div
                 key={ws.workspaceId}
-                onClick={() => { switchWorkspace(ws.workspaceId); setOpen(false); window.location.reload(); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8,
-                  width: '100%', padding: '8px 10px', borderRadius: 8,
+                  width: '100%', padding: '10px 10px', borderRadius: 8,
                   background: isActive ? 'var(--accent-g)' : 'transparent',
-                  border: 'none', cursor: 'pointer',
-                  transition: 'background 0.12s',
+                  transition: 'background 0.12s', cursor: 'pointer',
                 }}
-                onMouseEnter={e => !isActive && ((e.target as HTMLElement).style.background = 'rgba(255,255,255,0.03)')}
-                onMouseLeave={e => !isActive && ((e.target as HTMLElement).style.background = 'transparent')}
+                onMouseEnter={e => !isActive && ((e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)')}
+                onMouseLeave={e => !isActive && ((e.currentTarget as HTMLElement).style.background = 'transparent')}
               >
-                <Icon style={{ width: 14, height: 14, color: isActive ? 'var(--accent)' : 'var(--tm)', flexShrink: 0 }} />
-                <div style={{ textAlign: 'left', flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 11, fontWeight: isActive ? 600 : 400, color: isActive ? 'var(--accent)' : 'var(--t)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {ws.name}
-                  </div>
-                  <div style={{ fontSize: 9, color: 'var(--td)', display: 'flex', gap: 6 }}>
-                    <span>{TYPE_LABELS[ws.type]}</span>
-                    <span>{ROLE_LABELS[ws.role]}</span>
-                    {ws.scopeType === 'SCOPED' && <span style={{ color: 'var(--accent)' }}>Ograniczony</span>}
-                  </div>
-                  {ws.managedBy && (
-                    <div style={{ fontSize: 8, color: 'var(--td)', display: 'flex', alignItems: 'center', gap: 3, marginTop: 1 }}>
-                      <Shield style={{ width: 8, height: 8 }} />
-                      {ws.managedBy}
+                <div
+                  onClick={() => { switchWorkspace(ws.workspaceId); setOpen(false); window.location.reload(); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                  {(ws as any).logoUrl ? (
+                    <img src={(ws as any).logoUrl} alt="" style={{ width: 28, height: 28, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} />
+                  ) : (
+                    <div style={{ width: 28, height: 28, borderRadius: 6, background: isActive ? 'var(--accent-g)' : 'var(--hover-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Icon style={{ width: 14, height: 14, color: isActive ? 'var(--accent)' : 'var(--tm)' }} />
                     </div>
                   )}
+                  <div style={{ textAlign: 'left', flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: isActive ? 600 : 500, color: isActive ? 'var(--accent-s, var(--accent))' : 'var(--t)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {ws.name}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--td)', display: 'flex', gap: 8, alignItems: 'center', marginTop: 1 }}>
+                      {(ws as any).taxId && (
+                        <span style={{ fontFamily: 'monospace', color: 'var(--tm)' }}>NIP: {(ws as any).taxId}</span>
+                      )}
+                      <span>{TYPE_LABELS[ws.type]}</span>
+                      {(ws as any).city && <span>· {(ws as any).city}</span>}
+                    </div>
+                    {ws.managedBy && (
+                      <div style={{ fontSize: 9, color: 'var(--td)', display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                        <Shield style={{ width: 9, height: 9 }} />
+                        {ws.managedBy}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </button>
+                {/* Edit button */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); setOpen(false); if (!isActive) { switchWorkspace(ws.workspaceId); setTimeout(() => navigate('/company'), 100); } else { navigate('/company'); } }}
+                  title="Edytuj firmę"
+                  style={{
+                    padding: 6, borderRadius: 6, border: '1px solid var(--border)',
+                    background: 'transparent', color: 'var(--td)', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    transition: 'all .15s',
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--accent)'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--td)'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; }}>
+                  <Pencil size={12} />
+                </button>
+              </div>
             );
           })}
+          </div>
         </div>,
         document.body
       )}

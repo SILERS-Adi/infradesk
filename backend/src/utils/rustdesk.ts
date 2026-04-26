@@ -2,8 +2,13 @@ import { PrismaClient } from '@prisma/client';
 
 const RUSTDESK_API   = process.env.RUSTDESK_API_URL   || 'http://localhost:21114';
 const RUSTDESK_TOKEN = process.env.RUSTDESK_API_TOKEN || '';
-const RUSTDESK_USER  = process.env.RUSTDESK_API_USER  || 'admin';
+const RUSTDESK_USER  = process.env.RUSTDESK_API_USER  || '';
 const RUSTDESK_PASS  = process.env.RUSTDESK_API_PASS  || '';
+
+// Security: warn if using defaults (no credentials configured)
+if (!RUSTDESK_TOKEN && !RUSTDESK_USER) {
+  console.warn('[SECURITY] RUSTDESK_API_USER/RUSTDESK_API_TOKEN not configured — RustDesk integration will fail');
+}
 
 let cachedToken: string | null = null;
 let tokenExpiry = 0;
@@ -173,7 +178,7 @@ export async function syncPeersWithDevices(prisma: PrismaClient, workspaceId?: s
 /**
  * Get active RustDesk connections (running sessions) enriched with InfraDesk data.
  */
-export async function getActiveRustDeskSessions(prisma: PrismaClient) {
+export async function getActiveRustDeskSessions(prisma: PrismaClient, workspaceId?: string | null) {
   const { data: conns } = await getRustDeskAuditConns(1, 100);
   const allActive = conns.filter(c => !c.end_time);
 
@@ -204,9 +209,11 @@ export async function getActiveRustDeskSessions(prisma: PrismaClient) {
   }
   const active = Array.from(best.values());
 
-  // Get all devices with rustdeskId for matching
+  // Get devices with rustdeskId — filtered by workspace when provided
+  const deviceWhere: any = { rustdeskId: { not: null } };
+  if (workspaceId) deviceWhere.workspaceId = workspaceId;
   const devices = await prisma.device.findMany({
-    where: { rustdeskId: { not: null } },
+    where: deviceWhere,
     select: { id: true, name: true, rustdeskId: true, workspaceId: true },
   });
   const deviceByRustdesk = new Map(devices.map(d => [d.rustdeskId, d]));

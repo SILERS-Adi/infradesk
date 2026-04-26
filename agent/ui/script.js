@@ -1918,32 +1918,31 @@ function drawHeroBackground(){const c=document.getElementById('heroCanvas');if(!
 /* ══ BACKUP PAGE ══ */
 function renderBackup(c){
   c.innerHTML=`
-    <div class="page-card fade-up">
-      <div class="page-card-header">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/></svg>
-        Kopie zapasowe
-      </div>
-      <div class="page-card-body" id="backupContent" style="padding:16px">
-        <div style="text-align:center;padding:20px;color:var(--tm)">
-          <div class="spinner"></div> Pobieranie konfiguracji...
-        </div>
-      </div>
+    ${pageTitle('backup','Kopie zapasowe','Konfiguracje i historia backupów')}
+    <div id="backupContent" class="fade-up" style="display:flex;flex-direction:column;gap:10px">
+      <div style="text-align:center;padding:32px;color:var(--tm)"><div class="spinner"></div> Pobieranie konfiguracji...</div>
     </div>
-    <div class="page-card fade-up" style="margin-top:12px">
-      <div class="page-card-header">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        Historia backupów
+    <div style="margin-top:18px">
+      <div style="font-size:12px;font-weight:700;color:var(--t);margin-bottom:10px;display:flex;align-items:center;gap:6px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Historia
       </div>
-      <div class="page-card-body" id="backupHistory" style="padding:16px">
-        <div style="text-align:center;padding:20px;color:var(--tm)">
-          <div class="spinner"></div> Ładowanie...
-        </div>
+      <div id="backupHistory" class="fade-up">
+        <div style="text-align:center;padding:20px;color:var(--tm);font-size:12px"><div class="spinner"></div> Ładowanie...</div>
       </div>
     </div>`;
   loadBackupData();
 }
 
 async function loadBackupData(){
+  const _ico={
+    sql:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/></svg>',
+    folder:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>',
+    ok:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+    fail:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#F87171" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+    run:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" stroke-width="2" class="spinning"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>',
+    play:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
+  };
   try{
     const data=await py('get_backup_status');
     const el=document.getElementById('backupContent');
@@ -1951,10 +1950,12 @@ async function loadBackupData(){
 
     if(!data||!data.configs||data.configs.length===0){
       el.innerHTML=`
-        <div style="text-align:center;padding:32px;color:var(--tm)">
-          <div style="font-size:36px;margin-bottom:12px">📦</div>
-          <div style="font-size:14px;font-weight:600;color:var(--t);margin-bottom:4px">Brak konfiguracji backupu</div>
-          <div style="font-size:11px">Skonfiguruj backup w panelu InfraDesk → Kopie zapasowe</div>
+        <div style="text-align:center;padding:40px 20px">
+          <div style="width:48px;height:48px;border-radius:14px;background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.12);display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(139,92,246,.5)" stroke-width="1.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/></svg>
+          </div>
+          <div style="font-size:13px;font-weight:600;color:var(--t);margin-bottom:4px">Brak konfiguracji</div>
+          <div style="font-size:11px;color:var(--tm)">Skonfiguruj backup w panelu InfraDesk</div>
         </div>`;
       document.getElementById('backupHistory').innerHTML='<div style="text-align:center;padding:20px;color:var(--tm);font-size:12px">Brak historii</div>';
       return;
@@ -1962,24 +1963,33 @@ async function loadBackupData(){
 
     let html='';
     data.configs.forEach(cfg=>{
-      const typeIcon=cfg.type.startsWith('SQL')?'🗄️':'📁';
-      const statusDot=cfg.lastStatus==='SUCCESS'?'🟢':cfg.lastStatus==='FAILED'?'🔴':cfg.lastStatus==='RUNNING'?'🔵':'⚪';
+      const isSql=cfg.type.startsWith('SQL');
+      const iconBg=isSql?'rgba(139,92,246,.1)':'rgba(59,130,246,.1)';
+      const iconColor=isSql?'#A78BFA':'#60A5FA';
+      const icon=isSql?_ico.sql:_ico.folder;
+      const stIcon=cfg.lastStatus==='SUCCESS'?_ico.ok:cfg.lastStatus==='FAILED'?_ico.fail:cfg.lastStatus==='RUNNING'?_ico.run:'';
+      const stColor=cfg.lastStatus==='SUCCESS'?'#4ADE80':cfg.lastStatus==='FAILED'?'#F87171':cfg.lastStatus==='RUNNING'?'#60A5FA':'var(--td)';
+      const stBg=cfg.lastStatus==='SUCCESS'?'rgba(74,222,128,.08)':cfg.lastStatus==='FAILED'?'rgba(248,113,113,.08)':cfg.lastStatus==='RUNNING'?'rgba(96,165,250,.08)':'var(--hover-bg)';
       const lastRun=cfg.lastRunAt?new Date(cfg.lastRunAt).toLocaleString('pl'):'Nigdy';
       const schedule=cfg.cronLabel||cfg.cronSchedule||'—';
 
       html+=`
-        <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;border:1px solid var(--border-l,rgba(255,255,255,.08));margin-bottom:8px">
-          <div style="width:38px;height:38px;border-radius:10px;background:rgba(139,92,246,.12);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${typeIcon}</div>
+        <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:14px;background:var(--bg-card,rgba(10,16,38,.5));border:1px solid var(--border);transition:all .2s;cursor:default" onmouseover="this.style.borderColor='var(--border-l)';this.style.transform='translateY(-1px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='none'">
+          <div style="width:40px;height:40px;border-radius:12px;background:${iconBg};display:flex;align-items:center;justify-content:center;flex-shrink:0;color:${iconColor}">${icon}</div>
           <div style="flex:1;min-width:0">
-            <div style="font-size:13px;font-weight:600;color:var(--t,#EEF2FA);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${cfg.name}</div>
-            <div style="font-size:10px;color:var(--tm,#576380);margin-top:2px">${cfg.type} · ${schedule}</div>
+            <div style="font-size:13px;font-weight:600;color:var(--t);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${cfg.name}</div>
+            <div style="font-size:10px;color:var(--tm);margin-top:3px;display:flex;align-items:center;gap:8px">
+              <span style="display:inline-flex;align-items:center;gap:3px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${schedule}</span>
+              <span style="opacity:.4">·</span>
+              <span>${lastRun}</span>
+            </div>
           </div>
-          <div style="text-align:right;flex-shrink:0">
-            <div style="font-size:11px;font-weight:600">${statusDot} ${cfg.lastStatus||'—'}</div>
-            <div style="font-size:10px;color:var(--td,#3D4660);margin-top:2px">${lastRun}</div>
+          <div style="display:flex;align-items:center;gap:3px;padding:4px 10px;border-radius:20px;background:${stBg};flex-shrink:0">
+            ${stIcon}
+            <span style="font-size:10px;font-weight:600;color:${stColor}">${cfg.lastStatus||'—'}</span>
           </div>
-          <button onclick="runBackupNow('${cfg.id}')" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border-l,rgba(255,255,255,.08));background:rgba(255,255,255,.03);color:var(--ts,#8B95AD);font-size:10px;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border-l)'">
-            ▶ Uruchom
+          <button onclick="event.stopPropagation();runBackupNow('${cfg.id}')" style="display:flex;align-items:center;gap:5px;padding:7px 14px;border-radius:9px;border:none;background:var(--cta,linear-gradient(135deg,#4F8CFF,#6366F1));color:#fff;font-size:10px;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit;box-shadow:0 2px 8px rgba(99,102,241,.2);flex-shrink:0" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 16px rgba(99,102,241,.3)'" onmouseout="this.style.transform='none';this.style.boxShadow='0 2px 8px rgba(99,102,241,.2)'">
+            ${_ico.play} Uruchom
           </button>
         </div>`;
     });
@@ -1988,28 +1998,29 @@ async function loadBackupData(){
     // History
     const hEl=document.getElementById('backupHistory');
     if(data.history&&data.history.length>0){
-      let hHtml='';
-      data.history.slice(0,20).forEach(h=>{
-        const st=h.status==='SUCCESS'?'✅':h.status==='FAILED'?'❌':'⏳';
+      let hHtml='<div style="display:flex;flex-direction:column;gap:2px">';
+      data.history.slice(0,15).forEach(h=>{
+        const stI=h.status==='SUCCESS'?_ico.ok:h.status==='FAILED'?_ico.fail:_ico.run;
         const dt=new Date(h.startedAt).toLocaleString('pl');
         const sz=h.sizeBytes?formatBytes(h.sizeBytes):'—';
-        const dur=h.completedAt?Math.round((new Date(h.completedAt)-new Date(h.startedAt))/1000)+'s':'—';
+        const dur=h.completedAt?Math.round((new Date(h.completedAt)-new Date(h.startedAt))/1000)+'s':'...';
         hHtml+=`
-          <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-l,rgba(255,255,255,.05));font-size:11px">
-            <span style="flex-shrink:0">${st}</span>
-            <span style="flex:1;color:var(--t,#EEF2FA);font-weight:500">${h.configName||'Backup'}</span>
-            <span style="color:var(--tm,#576380)">${sz}</span>
-            <span style="color:var(--td,#3D4660)">${dur}</span>
-            <span style="color:var(--td,#3D4660)">${dt}</span>
+          <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:10px;transition:background .15s" onmouseover="this.style.background='var(--hover-bg)'" onmouseout="this.style.background='transparent'">
+            <span style="flex-shrink:0;display:flex">${stI}</span>
+            <span style="flex:1;font-size:12px;color:var(--t);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${h.configName||'Backup'}</span>
+            <span style="font-size:11px;color:var(--ts);font-weight:500;font-family:monospace;flex-shrink:0">${sz}</span>
+            <span style="font-size:10px;color:var(--td);flex-shrink:0;min-width:32px;text-align:right">${dur}</span>
+            <span style="font-size:10px;color:var(--td);flex-shrink:0">${dt}</span>
           </div>`;
       });
+      hHtml+='</div>';
       hEl.innerHTML=hHtml;
     }else{
-      hEl.innerHTML='<div style="text-align:center;padding:20px;color:var(--tm);font-size:12px">Brak historii backupów</div>';
+      hEl.innerHTML='<div style="text-align:center;padding:24px;color:var(--tm);font-size:12px">Brak historii backupów</div>';
     }
   }catch(e){
     const el=document.getElementById('backupContent');
-    if(el)el.innerHTML=`<div style="text-align:center;padding:20px;color:#F87171;font-size:12px">Błąd: ${e.message||e}</div>`;
+    if(el)el.innerHTML=`<div style="text-align:center;padding:24px;color:#F87171;font-size:12px">Błąd: ${e.message||e}</div>`;
   }
 }
 

@@ -461,6 +461,30 @@ router.get('/devices', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADM
   } catch (err) { next(err); }
 });
 
+// GET /api/operator/locations — all locations of MSP's clients (or specific client)
+router.get('/locations', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), requireOperator, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const wsId = req.workspaceId!;
+    const { clientWorkspaceId } = req.query as Record<string, string>;
+
+    const relations = await prisma.workspaceRelation.findMany({
+      where: { providerWorkspaceId: wsId, status: 'ACTIVE', canViewLocations: true, ...(clientWorkspaceId ? { clientWorkspaceId } : {}) },
+      select: { clientWorkspaceId: true },
+    });
+    const clientIds = relations.map(r => r.clientWorkspaceId);
+    if (clientIds.length === 0) { res.json([]); return; }
+
+    const locations = await prisma.location.findMany({
+      where: { workspaceId: { in: clientIds } },
+      include: { workspace: { select: { id: true, name: true } } },
+      orderBy: { name: 'asc' },
+      take: 500,
+    });
+
+    res.json(locations);
+  } catch (err) { next(err); }
+});
+
 // GET /api/operator/stats — dashboard stats across all clients
 router.get('/stats', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), requireOperator, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -468,19 +492,293 @@ router.get('/stats', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN
 
     const clientIds = await getClientWorkspaceIds(wsId);
     if (clientIds.length === 0) {
-      res.json({ clientCount: 0, deviceCount: 0, ticketCount: 0, activeTickets: 0, agentCount: 0 });
+      res.json({
+        clientCount: 0, deviceCount: 0, devicesOnline: 0,
+        ticketCount: 0, openTickets: 0, overdueTickets: 0, criticalTickets: 0,
+        agentCount: 0, agentsOnline: 0, activeSessions: 0,
+        backupTotal: 0, backupSuccess: 0, backupFailed: 0, backupStale: 0,
+        alertsTotal: 0, alertsCritical: 0, alertsHigh: 0, alertsMedium: 0,
+        recentTickets: [], topClients: [],
+      });
       return;
     }
 
-    const [clientCount, deviceCount, ticketCount, activeTickets, agentCount] = await Promise.all([
-      clientIds.length,
+    const now = new Date();
+    const fiveMinAgo = new Date(now.getTime() - 5 * 60 * 1000);
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    // Start of current ISO week (Mon 00:00) — Sunday=0, Mon=1...
+    const weekStart = new Date(now);
+    const dow = weekStart.getDay();
+    const offsetToMon = dow === 0 ? 6 : dow - 1;
+    weekStart.setDate(weekStart.getDate() - offsetToMon);
+    weekStart.setHours(0, 0, 0, 0);
+    // Trend date ranges
+    const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+    const yesterdayStart = new Date(todayStart.getTime() - 86400000);
+    const lastWeekStart = new Date(weekStart.getTime() - 7 * 86400000);
+
+    const [
+      deviceCount,
+      ticketCount,
+      openTickets,
+      overdueTickets,
+      criticalTickets,
+      agentCount,
+      agentsOnline,
+      activeSessions,
+      recentTicketsRaw,
+      topClientsRaw,
+      // SLA: tickets resolved in last 30 days (need both resolvedAt and dueAt)
+      slaSampleResolved,
+      // Weekly ratio
+      weeklyResolved,
+      weeklyCreated,
+      // Backups
+      backupTotal,
+      backupSuccess,
+      backupFailed,
+      backupStale,
+      // Monitoring alerts
+      alertsTotal,
+      alertsCritical,
+      alertsHigh,
+      alertsMedium,
+      // Unassigned
+      unassignedTickets,
+      // Trends
+      createdToday,
+      createdYesterday,
+      closedToday,
+      closedYesterday,
+      closedThisWeek,
+      closedLastWeek,
+      responseTimeSample,
+    ] = await Promise.all([
       prisma.device.count({ where: { workspaceId: { in: clientIds } } }),
       prisma.ticket.count({ where: { workspaceId: { in: clientIds } } }),
       prisma.ticket.count({ where: { workspaceId: { in: clientIds }, status: { in: ['NEW', 'PENDING', 'ASSIGNED', 'IN_PROGRESS'] } } }),
-      prisma.agentRegistration.count({ where: { workspaceId: { in: clientIds }, status: 'APPROVED' } }),
+      prisma.ticket.count({
+        where: {
+          workspaceId: { in: clientIds },
+          status: { in: ['NEW', 'PENDING', 'ASSIGNED', 'IN_PROGRESS'] },
+          dueAt: { lt: now },
+        },
+      }),
+      prisma.ticket.count({
+        where: {
+          workspaceId: { in: clientIds },
+          status: { in: ['NEW', 'PENDING', 'ASSIGNED', 'IN_PROGRESS'] },
+          priority: 'CRITICAL',
+        },
+      }),
+      prisma.agentRegistration.count({ where: { workspaceId: { in: clientIds }, status: 'ACTIVE' } }),
+      prisma.agentRegistration.count({
+        where: { workspaceId: { in: clientIds }, status: 'ACTIVE', lastSeen: { gt: fiveMinAgo } },
+      }),
+      prisma.workSession.count({ where: { workspaceId: { in: clientIds }, status: 'ACTIVE' } }).catch(() => 0),
+      prisma.ticket.findMany({
+        where: { workspaceId: { in: clientIds } },
+        orderBy: { createdAt: 'desc' },
+        take: 8,
+        select: {
+          id: true, ticketNumber: true, title: true, status: true, priority: true,
+          createdAt: true, dueAt: true,
+          workspace: { select: { id: true, name: true } },
+          location: { select: { id: true, name: true } },
+        },
+      }),
+      // Top clients by open ticket count
+      prisma.ticket.groupBy({
+        by: ['workspaceId'],
+        where: { workspaceId: { in: clientIds }, status: { in: ['NEW', 'PENDING', 'ASSIGNED', 'IN_PROGRESS'] } },
+        _count: { id: true },
+        orderBy: { _count: { id: 'desc' } },
+        take: 5,
+      }),
+      // SLA sample: tickets resolved in last 30 days, with dueAt set
+      prisma.ticket.findMany({
+        where: {
+          workspaceId: { in: clientIds },
+          status: { in: ['RESOLVED', 'CLOSED', 'COMPLETED'] },
+          resolvedAt: { gte: thirtyDaysAgo },
+          dueAt: { not: null },
+        },
+        select: { resolvedAt: true, dueAt: true },
+      }),
+      // Weekly resolved count
+      prisma.ticket.count({
+        where: {
+          workspaceId: { in: clientIds },
+          status: { in: ['RESOLVED', 'CLOSED', 'COMPLETED'] },
+          resolvedAt: { gte: weekStart },
+        },
+      }),
+      // Weekly created count
+      prisma.ticket.count({
+        where: { workspaceId: { in: clientIds }, createdAt: { gte: weekStart } },
+      }),
+      // Backups: total enabled configs across all clients
+      prisma.backupConfig.count({
+        where: { workspaceId: { in: clientIds }, enabled: true },
+      }),
+      // Backups: last status SUCCESS
+      prisma.backupConfig.count({
+        where: { workspaceId: { in: clientIds }, enabled: true, lastStatus: 'SUCCESS' },
+      }),
+      // Backups: last status FAILED
+      prisma.backupConfig.count({
+        where: { workspaceId: { in: clientIds }, enabled: true, lastStatus: 'FAILED' },
+      }),
+      // Backups: never run OR stale (not run in last 48h for enabled configs)
+      prisma.backupConfig.count({
+        where: {
+          workspaceId: { in: clientIds },
+          enabled: true,
+          OR: [
+            { lastRunAt: null },
+            { lastRunAt: { lt: new Date(now.getTime() - 48 * 60 * 60 * 1000) } },
+          ],
+        },
+      }),
+      // Monitoring alerts — unresolved, per severity
+      prisma.monitoringAlert.count({ where: { workspaceId: { in: clientIds }, resolved: false } }),
+      prisma.monitoringAlert.count({ where: { workspaceId: { in: clientIds }, resolved: false, severity: 'critical' } }),
+      prisma.monitoringAlert.count({ where: { workspaceId: { in: clientIds }, resolved: false, severity: 'high' } }),
+      prisma.monitoringAlert.count({ where: { workspaceId: { in: clientIds }, resolved: false, severity: 'medium' } }),
+      // Unassigned tickets
+      prisma.ticket.count({ where: { workspaceId: { in: clientIds }, status: { in: ['NEW', 'PENDING'] }, assignedToUserId: null } }),
+      // ── Trend queries ──
+      prisma.ticket.count({ where: { workspaceId: { in: clientIds }, createdAt: { gte: todayStart } } }),
+      prisma.ticket.count({ where: { workspaceId: { in: clientIds }, createdAt: { gte: yesterdayStart, lt: todayStart } } }),
+      prisma.ticket.count({ where: { workspaceId: { in: clientIds }, status: { in: ['RESOLVED', 'CLOSED', 'COMPLETED'] }, resolvedAt: { gte: todayStart } } }),
+      prisma.ticket.count({ where: { workspaceId: { in: clientIds }, status: { in: ['RESOLVED', 'CLOSED', 'COMPLETED'] }, resolvedAt: { gte: yesterdayStart, lt: todayStart } } }),
+      prisma.ticket.count({ where: { workspaceId: { in: clientIds }, status: { in: ['RESOLVED', 'CLOSED', 'COMPLETED'] }, resolvedAt: { gte: weekStart } } }),
+      prisma.ticket.count({ where: { workspaceId: { in: clientIds }, status: { in: ['RESOLVED', 'CLOSED', 'COMPLETED'] }, resolvedAt: { gte: lastWeekStart, lt: weekStart } } }),
+      // Avg response time: tickets resolved today with firstResponseAt
+      prisma.ticket.findMany({
+        where: { workspaceId: { in: clientIds }, firstResponseAt: { not: null }, createdAt: { gte: new Date(now.getTime() - 7 * 86400000) } },
+        select: { createdAt: true, firstResponseAt: true },
+        take: 200,
+      }),
     ]);
 
-    res.json({ clientCount, deviceCount, ticketCount, activeTickets, agentCount });
+    // SLA compliance %: of resolved-with-due in last 30 days, how many resolved before due
+    let slaCompliance: number | null = null;
+    let slaSampleSize = slaSampleResolved.length;
+    if (slaSampleSize > 0) {
+      const onTime = slaSampleResolved.filter(t =>
+        t.resolvedAt && t.dueAt && t.resolvedAt.getTime() <= t.dueAt.getTime()
+      ).length;
+      slaCompliance = Math.round((onTime / slaSampleSize) * 100);
+    }
+
+    // Weekly ratio: resolved/created (capped at 200% for sanity)
+    let weeklyRatio: number | null = null;
+    if (weeklyCreated > 0) {
+      weeklyRatio = Math.min(200, Math.round((weeklyResolved / weeklyCreated) * 100));
+    } else if (weeklyResolved > 0) {
+      weeklyRatio = 200; // resolved without new ones — burning down backlog
+    }
+
+    // Resolve top clients with workspace names
+    const topClientWsIds = topClientsRaw.map(t => t.workspaceId);
+    const topClientWorkspaces = topClientWsIds.length > 0
+      ? await prisma.workspace.findMany({
+          where: { id: { in: topClientWsIds } },
+          select: { id: true, name: true, city: true },
+        })
+      : [];
+    const topClients = topClientsRaw.map(t => {
+      const ws = topClientWorkspaces.find(w => w.id === t.workspaceId);
+      return { workspaceId: t.workspaceId, name: ws?.name ?? '—', city: ws?.city ?? null, openTickets: t._count.id };
+    });
+
+    // Avg response time (hours)
+    let avgResponseHours: number | null = null;
+    if (responseTimeSample.length > 0) {
+      const totalMs = responseTimeSample.reduce((sum: number, t: any) => sum + (new Date(t.firstResponseAt).getTime() - new Date(t.createdAt).getTime()), 0);
+      avgResponseHours = Math.round((totalMs / responseTimeSample.length / 3600000) * 10) / 10;
+    }
+
+    // estimate "devices online" as approved + recent agent registrations
+    const devicesOnline = agentsOnline;
+
+    res.json({
+      clientCount: clientIds.length,
+      deviceCount,
+      devicesOnline,
+      ticketCount,
+      openTickets,
+      overdueTickets,
+      criticalTickets,
+      agentCount,
+      agentsOnline,
+      activeSessions,
+      slaCompliance,            // 0..100 or null if no sample
+      slaSampleSize,            // how many tickets used to compute
+      weeklyRatio,              // 0..200 or null if no activity
+      weeklyResolved,
+      weeklyCreated,
+      backupTotal,
+      backupSuccess,
+      backupFailed,
+      backupStale,
+      alertsTotal,
+      alertsCritical,
+      alertsHigh,
+      alertsMedium,
+      unassignedTickets,
+      recentTickets: recentTicketsRaw,
+      topClients,
+      avgResponseHours,
+      // Recent activity (last 10 ticket state changes)
+      recentActivity: await prisma.ticket.findMany({
+        where: { workspaceId: { in: clientIds }, status: { in: ['RESOLVED', 'CLOSED', 'COMPLETED'] }, resolvedAt: { not: null } },
+        orderBy: { resolvedAt: 'desc' },
+        take: 8,
+        select: {
+          id: true, ticketNumber: true, title: true, resolvedAt: true,
+          assignedTo: { select: { firstName: true, lastName: true } },
+          workspace: { select: { name: true } },
+        },
+      }),
+      // Upcoming deadlines (tickets with dueAt in next 7 days)
+      upcomingDeadlines: await prisma.ticket.findMany({
+        where: {
+          workspaceId: { in: clientIds },
+          status: { in: ['NEW', 'PENDING', 'ASSIGNED', 'IN_PROGRESS'] },
+          dueAt: { gte: now, lte: new Date(now.getTime() + 7 * 86400000) },
+        },
+        orderBy: { dueAt: 'asc' },
+        take: 6,
+        select: {
+          id: true, ticketNumber: true, title: true, priority: true, dueAt: true,
+          workspace: { select: { name: true } },
+          assignedTo: { select: { firstName: true, lastName: true } },
+        },
+      }),
+      chartData: await (async () => {
+        const days: { date: string; created: number; closed: number }[] = [];
+        for (let i = 6; i >= 0; i--) {
+          const dayStart = new Date(todayStart.getTime() - i * 86400000);
+          const dayEnd = new Date(dayStart.getTime() + 86400000);
+          const [c, r] = await Promise.all([
+            prisma.ticket.count({ where: { workspaceId: { in: clientIds }, createdAt: { gte: dayStart, lt: dayEnd } } }),
+            prisma.ticket.count({ where: { workspaceId: { in: clientIds }, status: { in: ['RESOLVED', 'CLOSED', 'COMPLETED'] }, resolvedAt: { gte: dayStart, lt: dayEnd } } }),
+          ]);
+          days.push({ date: dayStart.toISOString().slice(0, 10), created: c, closed: r });
+        }
+        return days;
+      })(),
+      trends: {
+        createdToday,
+        createdYesterday,
+        closedToday,
+        closedYesterday,
+        closedThisWeek,
+        closedLastWeek,
+      },
+    });
   } catch (err) { next(err); }
 });
 

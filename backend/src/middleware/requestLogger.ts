@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
+import { recordRequest } from '../utils/monitoring';
 
 const SENSITIVE_PATHS = ['/api/credentials', '/api/auth'];
 const IS_PROD = process.env.NODE_ENV === 'production';
@@ -17,8 +18,11 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
     const duration = Date.now() - start;
     const status = res.statusCode;
 
+    // Feed metrics collector
+    recordRequest(status, duration);
+
     // Skip health checks and static files in production
-    if (IS_PROD && (req.path === '/health' || req.path.startsWith('/uploads'))) {
+    if (IS_PROD && (req.path === '/health' || req.path.startsWith('/uploads') || req.path === '/metrics')) {
       return originalEnd.apply(res, args);
     }
 
@@ -31,14 +35,16 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
       ms: duration,
       ws: req.workspaceId?.slice(0, 8) ?? null,
       uid: req.user?.userId?.slice(0, 8) ?? null,
+      ip: req.ip || req.socket?.remoteAddress || null,
     };
 
-    // Log based on status
+    // Structured log output
     if (status >= 500) {
       console.error('[REQ]', JSON.stringify(logLine));
     } else if (status >= 400 || duration > 2000) {
       console.warn('[REQ]', JSON.stringify(logLine));
-    } else if (!IS_PROD) {
+    } else if (!IS_PROD || duration > 500) {
+      // In prod: only log slow requests (>500ms). In dev: log everything.
       console.log('[REQ]', JSON.stringify(logLine));
     }
 

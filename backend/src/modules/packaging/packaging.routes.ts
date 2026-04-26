@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/auth';
-import { withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
+import { requireWorkspace, withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
 import { validate } from '../../middleware/validate';
 import { createShipmentSchema, updateShipmentSchema } from './packaging.validation';
 import * as ctrl from './packaging.controller';
 
 const router = Router();
-router.use(authenticate);
+router.use(authenticate, requireWorkspace);
 
 router.get('/', ctrl.listShipments);
 router.get('/:id', ctrl.getShipment);

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { authenticate } from '../../middleware/auth';
+import { requireWorkspace } from '../../middleware/workspace';
 
 const router = Router();
 
@@ -8,7 +9,7 @@ const STUB_MSG = { error: 'Tenant module removed — use Workspace API instead' 
 router.post('/register', (_req: Request, res: Response) => { res.status(410).json(STUB_MSG); });
 router.get('/download-agent', (_req: Request, res: Response) => { res.status(410).json(STUB_MSG); });
 router.get('/current', authenticate, (_req: Request, res: Response) => { res.status(410).json(STUB_MSG); });
-router.get('/current/usage', authenticate, async (req: Request, res: Response) => {
+router.get('/current/usage', authenticate, requireWorkspace, async (req: Request, res: Response) => {
   try {
     const workspaceId = req.workspaceId;
     if (!workspaceId) { res.status(400).json({ error: 'Workspace context required' }); return; }

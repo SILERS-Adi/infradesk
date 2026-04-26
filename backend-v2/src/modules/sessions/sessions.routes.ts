@@ -1,0 +1,490 @@
+import { Router, type Request, type Response, type NextFunction } from 'express';
+import { z } from 'zod';
+import { prisma } from '../../lib/prisma';
+import { requireAuth } from '../../middleware/auth';
+import { requireWorkspace } from '../../middleware/requireWorkspace';
+import { requireAccess } from '../../middleware/requireAccess';
+import { HttpError } from '../../utils/httpError';
+import { MODULES } from '../../utils/canAccess';
+import { canTransition, type TicketStatus } from '../../utils/ticketStateMachine';
+import { logActivity, reqContext } from '../activity-logs/logActivity';
+
+const router = Router();
+router.use(requireAuth, requireWorkspace);
+
+const startSchema = z.object({
+  deviceId: z.string().uuid().optional(),
+  locationId: z.string().uuid().optional(),
+  clientWorkspaceId: z.string().uuid().optional(),
+  serviceMode: z.enum(['REMOTE', 'ONSITE']).default('REMOTE'),
+  ticketIds: z.array(z.string().uuid()).max(50).optional(),
+  notes: z.string().max(2000).optional(),
+  autoStartedByGeofence: z.boolean().default(false),
+  arrivalGpsLat: z.number().optional(),
+  arrivalGpsLon: z.number().optional(),
+  arrivalAccuracy: z.number().optional(),
+});
+
+const endSchema = z.object({
+  notes: z.string().max(10_000).optional(),
+  billable: z.boolean().optional(),
+  aiSummary: z.string().max(5000).optional(),
+  bulkCloseTicketIds: z.array(z.string().uuid()).max(50).optional(),
+  bulkResolutionSummary: z.string().max(2000).optional(),
+  departureGpsLat: z.number().optional(),
+  departureGpsLon: z.number().optional(),
+  distanceTraveledKm: z.number().optional(),
+});
+
+// GET /sessions?status=ACTIVE&technicianId=...&deviceId=...&from=...&to=...&limit=...
+router.get('/', requireAccess(MODULES.SESSIONS, 'view'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const q = z.object({
+      status: z.string().optional(),
+      technicianId: z.string().uuid().optional(),
+      deviceId: z.string().uuid().optional(),
+      clientWorkspaceId: z.string().uuid().optional(),
+      from: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
+      to: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
+      limit: z.coerce.number().int().min(1).max(500).default(200),
+    }).parse(req.query);
+    const relations = await prisma.workspaceRelation.findMany({
+      where: { providerWorkspaceId: req.workspaceId!, status: 'ACTIVE', canReceiveTickets: true },
+      select: { clientWorkspaceId: true },
+    });
+    const visibleWsIds = [req.workspaceId!, ...relations.map((r) => r.clientWorkspaceId)];
+    const where: Record<string, unknown> = { workspaceId: { in: visibleWsIds } };
+    if (q.status) where.status = { in: q.status.split(',') };
+    if (q.technicianId) where.technicianId = q.technicianId;
+    if (q.deviceId) where.deviceId = q.deviceId;
+    if (q.clientWorkspaceId) where.clientWorkspaceId = q.clientWorkspaceId;
+    if (q.from || q.to) {
+      const range: Record<string, Date> = {};
+      if (q.from) range.gte = new Date(q.from);
+      if (q.to) {
+        const end = new Date(q.to);
+        // If date-only (YYYY-MM-DD), bump to end-of-day.
+        if (/^\d{4}-\d{2}-\d{2}$/.test(q.to)) end.setHours(23, 59, 59, 999);
+        range.lte = end;
+      }
+      where.startedAt = range;
+    }
+    const sessions = await prisma.workSession.findMany({
+      where,
+      orderBy: { startedAt: 'desc' },
+      take: q.limit,
+      include: {
+        technician: { select: { id: true, firstName: true, lastName: true } },
+        device: { select: { id: true, name: true } },
+        timeEntries: { orderBy: { startedAt: 'asc' }, select: { id: true, startedAt: true, endedAt: true, durationMinutes: true } },
+        ticketLinks: { select: { ticketId: true, ticket: { select: { id: true, ticketNumber: true, title: true, status: true } } } },
+      },
+    });
+    res.json({ sessions });
+  } catch (err) { next(err); }
+});
+
+// GET /sessions/stats?from=...&to=... — aggregate stats for header + per-technician summary.
+router.get('/stats', requireAccess(MODULES.SESSIONS, 'view'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const q = z.object({
+      technicianId: z.string().uuid().optional(),
+      from: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
+      to: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
+    }).parse(req.query);
+    const where: Record<string, unknown> = { workspaceId: req.workspaceId! };
+    if (q.technicianId) where.technicianId = q.technicianId;
+    if (q.from || q.to) {
+      const range: Record<string, Date> = {};
+      if (q.from) range.gte = new Date(q.from);
+      if (q.to) {
+        const end = new Date(q.to);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(q.to)) end.setHours(23, 59, 59, 999);
+        range.lte = end;
+      }
+      where.startedAt = range;
+    }
+    const sessions = await prisma.workSession.findMany({
+      where,
+      select: {
+        id: true, status: true, durationMinutes: true, billableMinutes: true, billable: true,
+        technicianId: true,
+        technician: { select: { firstName: true, lastName: true } },
+      },
+    });
+    let total = 0, totalMinutes = 0, billableMinutes = 0, active = 0, paused = 0, completed = 0;
+    const perTechMap = new Map<string, { technicianId: string; name: string; sessions: number; minutes: number; billableMinutes: number }>();
+    for (const s of sessions) {
+      total++;
+      totalMinutes += s.durationMinutes ?? 0;
+      billableMinutes += s.billableMinutes ?? 0;
+      if (s.status === 'ACTIVE') active++;
+      else if (s.status === 'PAUSED') paused++;
+      else if (s.status === 'COMPLETED') completed++;
+      const techName = s.technician ? `${s.technician.firstName} ${s.technician.lastName}` : 'Nieznany';
+      const row = perTechMap.get(s.technicianId) ?? { technicianId: s.technicianId, name: techName, sessions: 0, minutes: 0, billableMinutes: 0 };
+      row.sessions++;
+      row.minutes += s.durationMinutes ?? 0;
+      row.billableMinutes += s.billableMinutes ?? 0;
+      perTechMap.set(s.technicianId, row);
+    }
+    const perTechnician = Array.from(perTechMap.values()).sort((a, b) => b.minutes - a.minutes);
+    res.json({
+      stats: { total, totalMinutes, billableMinutes, active, paused, completed },
+      perTechnician,
+    });
+  } catch (err) { next(err); }
+});
+
+// GET /sessions/technicians — list workspace members for the technician filter dropdown.
+router.get('/technicians', requireAccess(MODULES.SESSIONS, 'view'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const memberships = await prisma.membership.findMany({
+      where: { workspaceId: req.workspaceId!, status: 'ACTIVE' },
+      select: {
+        user: { select: { id: true, firstName: true, lastName: true, isActive: true, avatarUrl: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+    const technicians = memberships
+      .map((m) => m.user)
+      .filter((u) => u.isActive)
+      .map((u) => ({ id: u.id, firstName: u.firstName, lastName: u.lastName, avatarUrl: u.avatarUrl }));
+    res.json({ technicians });
+  } catch (err) { next(err); }
+});
+
+router.get('/current', requireAccess(MODULES.SESSIONS, 'view'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const current = await prisma.workSession.findFirst({
+      where: { workspaceId: req.workspaceId!, technicianId: req.auth!.sub, status: 'ACTIVE' },
+      include: {
+        device: { select: { id: true, name: true } },
+        ticketLinks: { select: { ticketId: true, ticket: { select: { id: true, ticketNumber: true, title: true, status: true } } } },
+      },
+    });
+    res.json({ session: current });
+  } catch (err) { next(err); }
+});
+
+router.post('/start', requireAccess(MODULES.SESSIONS, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const input = startSchema.parse(req.body);
+    // Only one ACTIVE session per technician in a workspace.
+    const active = await prisma.workSession.findFirst({
+      where: { workspaceId: req.workspaceId!, technicianId: req.auth!.sub, status: 'ACTIVE' },
+      select: { id: true },
+    });
+    if (active) throw HttpError.conflict('Masz już aktywną sesję', 'session_active');
+
+    const session = await prisma.$transaction(async (tx) => {
+      const s = await tx.workSession.create({
+        data: {
+          workspaceId: req.workspaceId!,
+          technicianId: req.auth!.sub,
+          deviceId: input.deviceId,
+          locationId: input.locationId,
+          clientWorkspaceId: input.clientWorkspaceId,
+          serviceMode: input.serviceMode,
+          status: 'ACTIVE',
+          startedAt: new Date(),
+          notes: input.notes,
+          autoStartedByGeofence: input.autoStartedByGeofence,
+          arrivalGpsLat: input.arrivalGpsLat,
+          arrivalGpsLon: input.arrivalGpsLon,
+          arrivalAccuracy: input.arrivalAccuracy,
+          timeEntries: { create: { startedAt: new Date() } },
+        },
+      });
+      if (input.ticketIds?.length) {
+        await tx.ticketSessionLink.createMany({
+          data: input.ticketIds.map((ticketId) => ({ ticketId, workSessionId: s.id })),
+        });
+        // Auto-transition linked tickets toward IN_PROGRESS.
+        // Chain OPEN → ASSIGNED → IN_PROGRESS if needed (state machine does not allow OPEN → IN_PROGRESS directly).
+        const tickets = await tx.ticket.findMany({
+          where: { id: { in: input.ticketIds }, workspaceId: req.workspaceId! },
+          select: { id: true, status: true, assignedToUserId: true, firstResponseAt: true },
+        });
+        for (const t of tickets) {
+          let current = t.status as TicketStatus;
+          const updates: Record<string, unknown> = {};
+          if (current === 'OPEN' && canTransition(current, 'ASSIGNED')) {
+            updates.status = 'ASSIGNED';
+            if (!t.assignedToUserId) updates.assignedToUserId = req.auth!.sub;
+            await tx.ticketEvent.create({
+              data: { ticketId: t.id, userId: req.auth!.sub, eventType: 'status_changed', fromValue: current, toValue: 'ASSIGNED', metadata: { reason: 'session_started', sessionId: s.id } },
+            });
+            current = 'ASSIGNED';
+          }
+          if (canTransition(current, 'IN_PROGRESS')) {
+            updates.status = 'IN_PROGRESS';
+            if (!t.firstResponseAt) updates.firstResponseAt = new Date();
+            await tx.ticketEvent.create({
+              data: { ticketId: t.id, userId: req.auth!.sub, eventType: 'status_changed', fromValue: current, toValue: 'IN_PROGRESS', metadata: { reason: 'session_started', sessionId: s.id } },
+            });
+          }
+          if (Object.keys(updates).length > 0) {
+            await tx.ticket.update({ where: { id: t.id }, data: updates });
+          }
+        }
+      }
+      return s;
+    });
+    void logActivity({
+      workspaceId: req.workspaceId!,
+      entityType: 'session',
+      entityId: session.id,
+      actionType: 'session_started',
+      description: `Rozpoczęto sesję pracy (${input.serviceMode})`,
+      performedByUserId: req.auth!.sub,
+      ...reqContext(req),
+      metadata: {
+        deviceId: input.deviceId ?? null,
+        locationId: input.locationId ?? null,
+        ticketIds: input.ticketIds ?? [],
+        serviceMode: input.serviceMode,
+      },
+    });
+    res.status(201).json({ session });
+  } catch (err) { next(err); }
+});
+
+router.post('/:id/pause', requireAccess(MODULES.SESSIONS, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const s = await prisma.workSession.findFirst({
+      where: { id: String(req.params.id), workspaceId: req.workspaceId!, technicianId: req.auth!.sub },
+      include: { timeEntries: { where: { endedAt: null }, orderBy: { startedAt: 'desc' }, take: 1 } },
+    });
+    if (!s) throw HttpError.notFound();
+    if (s.status !== 'ACTIVE') throw HttpError.badRequest('Sesja nie jest aktywna', 'not_active');
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const now = new Date();
+      const open = s.timeEntries[0];
+      if (open) {
+        const minutes = Math.round((now.getTime() - open.startedAt.getTime()) / 60_000);
+        await tx.sessionTimeEntry.update({ where: { id: open.id }, data: { endedAt: now, durationMinutes: minutes } });
+      }
+      return tx.workSession.update({ where: { id: s.id }, data: { status: 'PAUSED' } });
+    });
+    res.json({ session: updated });
+  } catch (err) { next(err); }
+});
+
+router.post('/:id/resume', requireAccess(MODULES.SESSIONS, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const s = await prisma.workSession.findFirst({
+      where: { id: String(req.params.id), workspaceId: req.workspaceId!, technicianId: req.auth!.sub },
+      select: { id: true, status: true },
+    });
+    if (!s) throw HttpError.notFound();
+    if (s.status !== 'PAUSED') throw HttpError.badRequest('Sesja nie jest wstrzymana', 'not_paused');
+
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.sessionTimeEntry.create({ data: { workSessionId: s.id, startedAt: new Date() } });
+      return tx.workSession.update({ where: { id: s.id }, data: { status: 'ACTIVE' } });
+    });
+    res.json({ session: updated });
+  } catch (err) { next(err); }
+});
+
+router.post('/:id/end', requireAccess(MODULES.SESSIONS, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const input = endSchema.parse(req.body);
+    const s = await prisma.workSession.findFirst({
+      where: { id: String(req.params.id), workspaceId: req.workspaceId!, technicianId: req.auth!.sub },
+      include: { timeEntries: true, ticketLinks: { select: { ticketId: true } } },
+    });
+    if (!s) throw HttpError.notFound();
+    if (s.status === 'COMPLETED') throw HttpError.badRequest('Sesja już zakończona', 'already_completed');
+
+    const now = new Date();
+
+    const completed = await prisma.$transaction(async (tx) => {
+      // Close any open time entry.
+      const open = s.timeEntries.find((e) => !e.endedAt);
+      if (open) {
+        const minutes = Math.round((now.getTime() - open.startedAt.getTime()) / 60_000);
+        await tx.sessionTimeEntry.update({ where: { id: open.id }, data: { endedAt: now, durationMinutes: minutes } });
+      }
+      // Sum durations (re-read after update).
+      const entries = await tx.sessionTimeEntry.findMany({ where: { workSessionId: s.id } });
+      const totalMin = entries.reduce((acc, e) => acc + (e.durationMinutes ?? 0), 0);
+
+      const updated = await tx.workSession.update({
+        where: { id: s.id },
+        data: {
+          status: 'COMPLETED',
+          endedAt: now,
+          durationMinutes: totalMin,
+          billableMinutes: input.billable === false ? 0 : totalMin,
+          notes: input.notes ?? s.notes,
+          aiSummary: input.aiSummary ?? s.aiSummary,
+          departureGpsLat: input.departureGpsLat,
+          departureGpsLon: input.departureGpsLon,
+          distanceTraveledKm: input.distanceTraveledKm,
+        },
+      });
+
+      // Bulk close tickets requested by the user.
+      // Walk the state machine forward toward RESOLVED — handle any legal starting state
+      // (OPEN → ASSIGNED → IN_PROGRESS → RESOLVED).
+      if (input.bulkCloseTicketIds?.length) {
+        const tickets = await tx.ticket.findMany({
+          where: { id: { in: input.bulkCloseTicketIds }, workspaceId: req.workspaceId!, deletedAt: null },
+          select: { id: true, status: true, firstResponseAt: true },
+        });
+        const chain: TicketStatus[] = ['ASSIGNED', 'IN_PROGRESS', 'RESOLVED'];
+        for (const t of tickets) {
+          const origin = t.status as TicketStatus;
+          let current = origin;
+          for (const target of chain) {
+            if (current === target) continue;
+            if (!canTransition(current, target)) continue;
+            const data: Record<string, unknown> = { status: target };
+            if (target === 'RESOLVED') {
+              data.resolvedAt = now;
+              data.resolvedByUserId = req.auth!.sub;
+              if (input.bulkResolutionSummary) data.resolutionSummary = input.bulkResolutionSummary;
+            }
+            if (!t.firstResponseAt) data.firstResponseAt = now;
+            await tx.ticket.update({ where: { id: t.id }, data });
+            await tx.ticketEvent.create({
+              data: { ticketId: t.id, userId: req.auth!.sub, eventType: 'status_changed', fromValue: current, toValue: target, metadata: { reason: 'session_bulk_close', sessionId: s.id } },
+            });
+            current = target;
+            if (target === 'RESOLVED') break;
+          }
+        }
+      }
+      return updated;
+    });
+
+    void logActivity({
+      workspaceId: req.workspaceId!,
+      entityType: 'session',
+      entityId: String(req.params.id),
+      actionType: 'session_ended',
+      description: `Zakończono sesję pracy`,
+      performedByUserId: req.auth!.sub,
+      ...reqContext(req),
+      metadata: {
+        bulkClosedTicketIds: input.bulkCloseTicketIds ?? [],
+        billable: input.billable ?? null,
+      },
+    });
+    res.json({ session: completed });
+  } catch (err) { next(err); }
+});
+
+const updateSchema = z.object({
+  startedAt: z.string().datetime({ offset: true }).optional(),
+  endedAt: z.string().datetime({ offset: true }).nullable().optional(),
+  notes: z.string().max(10_000).nullable().optional(),
+  billable: z.boolean().optional(),
+});
+
+// PATCH /sessions/:id — edit start/end times or notes (admin-level edit on completed sessions).
+router.patch('/:id', requireAccess(MODULES.SESSIONS, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const input = updateSchema.parse(req.body);
+    const s = await prisma.workSession.findFirst({
+      where: { id: String(req.params.id), workspaceId: req.workspaceId! },
+      select: { id: true, status: true, startedAt: true, endedAt: true },
+    });
+    if (!s) throw HttpError.notFound();
+
+    const data: Record<string, unknown> = {};
+    const newStart = input.startedAt ? new Date(input.startedAt) : s.startedAt;
+    const newEnd = input.endedAt === null
+      ? null
+      : input.endedAt
+        ? new Date(input.endedAt)
+        : s.endedAt;
+
+    if (input.startedAt) data.startedAt = newStart;
+    if (input.endedAt !== undefined) data.endedAt = newEnd;
+    if (input.notes !== undefined) data.notes = input.notes;
+
+    // Recompute duration if we have both start & end (only meaningful for COMPLETED sessions).
+    if (newEnd && s.status === 'COMPLETED') {
+      const minutes = Math.max(0, Math.round((newEnd.getTime() - newStart.getTime()) / 60_000));
+      data.durationMinutes = minutes;
+      if (input.billable === false) data.billableMinutes = 0;
+      else if (input.billable === true) data.billableMinutes = minutes;
+    }
+    if (input.billable !== undefined) data.billable = input.billable;
+
+    const updated = await prisma.workSession.update({
+      where: { id: s.id },
+      data,
+      include: {
+        technician: { select: { id: true, firstName: true, lastName: true } },
+        device: { select: { id: true, name: true } },
+        timeEntries: { orderBy: { startedAt: 'asc' }, select: { id: true, startedAt: true, endedAt: true, durationMinutes: true } },
+        ticketLinks: { select: { ticketId: true, ticket: { select: { id: true, ticketNumber: true, title: true, status: true } } } },
+      },
+    });
+
+    void logActivity({
+      workspaceId: req.workspaceId!,
+      entityType: 'session',
+      entityId: s.id,
+      actionType: 'session_edited',
+      description: 'Edytowano sesję pracy',
+      performedByUserId: req.auth!.sub,
+      ...reqContext(req),
+      metadata: { fields: Object.keys(data) },
+    });
+
+    res.json({ session: updated });
+  } catch (err) { next(err); }
+});
+
+// DELETE /sessions/:id — hard delete (admins only, via requireAccess delete).
+router.delete('/:id', requireAccess(MODULES.SESSIONS, 'delete'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const s = await prisma.workSession.findFirst({
+      where: { id: String(req.params.id), workspaceId: req.workspaceId! },
+      select: { id: true },
+    });
+    if (!s) throw HttpError.notFound();
+
+    await prisma.$transaction(async (tx) => {
+      await tx.ticketSessionLink.deleteMany({ where: { workSessionId: s.id } });
+      await tx.sessionTimeEntry.deleteMany({ where: { workSessionId: s.id } });
+      await tx.workSession.delete({ where: { id: s.id } });
+    });
+
+    void logActivity({
+      workspaceId: req.workspaceId!,
+      entityType: 'session',
+      entityId: s.id,
+      actionType: 'session_deleted',
+      description: 'Usunięto sesję pracy',
+      performedByUserId: req.auth!.sub,
+      ...reqContext(req),
+    });
+
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+router.get('/:id', requireAccess(MODULES.SESSIONS, 'view'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const s = await prisma.workSession.findFirst({
+      where: { id: String(req.params.id), workspaceId: req.workspaceId! },
+      include: {
+        technician: { select: { id: true, firstName: true, lastName: true } },
+        device: { select: { id: true, name: true } },
+        timeEntries: { orderBy: { startedAt: 'asc' } },
+        ticketLinks: { include: { ticket: { select: { id: true, ticketNumber: true, title: true, status: true } } } },
+      },
+    });
+    if (!s) throw HttpError.notFound();
+    res.json({ session: s });
+  } catch (err) { next(err); }
+});
+
+export default router;

@@ -32,6 +32,12 @@ export function errorHandler(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   next: NextFunction
 ): void {
+  // Tenant isolation errors — always 403, no details leaked
+  if (err.name === 'TenantIsolationError') {
+    errorResponse(res, req, 403, 'Access denied');
+    return;
+  }
+
   // Operational errors (thrown intentionally)
   if (err instanceof AppError) {
     errorResponse(res, req, err.statusCode, err.message);

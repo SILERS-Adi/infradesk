@@ -1,0 +1,34 @@
+/* ============================================================
+   Iris Core — premium SVG + Framer Motion plazma orb.
+   Canonical "Rdzeń ID" visual across InfraDesk V2, ID CORE,
+   Asystent Biznes. The orb itself is rendered as SVG by
+   IrisCore.tsx; this stylesheet only covers the wrapper
+   element, focus state and hover affordance.
+   ============================================================ */
+
+.iris-core {
+  position: relative;
+  display: inline-block;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  flex-shrink: 0;
+  transition: transform .2s cubic-bezier(.4,0,.2,1);
+  isolation: isolate;
+  line-height: 0;
+}
+
+.iris-core:focus-visible {
+  outline: 2px solid var(--pri);
+  outline-offset: 3px;
+  border-radius: 9999px;
+}
+
+.iris-core[role="button"]:hover {
+  transform: scale(1.03);
+}
+
+.iris-core svg {
+  display: block;
+  overflow: visible;
+}

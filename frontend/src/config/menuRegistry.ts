@@ -13,7 +13,7 @@ import {
   Receipt, Plane, Users, CalendarDays, Share2,
   Shield, Activity, Sparkles, Lock,
   FileText, Package, Warehouse, CreditCard, BarChart3, Upload, Car, ClipboardCheck,
-  Truck, Layers, Waves, Contact, Link2, Headphones, Bell, Plus,
+  Truck, Layers, Waves, Contact, Link2, Headphones, Bell, Plus, Settings2,
 } from 'lucide-react';
 
 // ── Workspace Types ───────────────────────────────────────────
@@ -197,6 +197,8 @@ export const SYSTEM_ITEMS: SystemMenuItem[] = [
   { id: 'inv-payments',    to: '/invoicing/payments',   label: 'Płatności',            icon: CreditCard,      groupId: 'invoicing',    defaultOrder: 5, module: 'invoicing' },
   { id: 'inv-reports',     to: '/invoicing/reports',    label: 'Raporty',              icon: BarChart3,       groupId: 'invoicing',    defaultOrder: 6, module: 'invoicing' },
   { id: 'inv-import',      to: '/invoicing/import',     label: 'Import',               icon: Upload,          groupId: 'invoicing',    defaultOrder: 7, module: 'invoicing' },
+  { id: 'inv-jpk',         to: '/invoicing/jpk',        label: 'JPK',                  icon: FileText,        groupId: 'invoicing',    defaultOrder: 8, module: 'invoicing' },
+  { id: 'inv-settings',   to: '/invoicing/settings',   label: 'Ustawienia',           icon: Settings2,       groupId: 'invoicing',    defaultOrder: 9, module: 'invoicing' },
 
   // ── PAKOWANIE ──
   { id: 'pkg-dashboard',   to: '/packaging',            label: 'Dashboard',            icon: LayoutDashboard, groupId: 'packaging',    defaultOrder: 0, module: 'packaging' },

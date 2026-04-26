@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/auth';
-import { withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
+import { withWorkspaceMembership, authorizeWorkspace, requireWorkspace } from '../../middleware/workspace';
 import { validate } from '../../middleware/validate';
 import { createInspectionSchema, updateInspectionSchema } from './inspections.validation';
 import * as ctrl from './inspections.controller';
 
 const router = Router();
-router.use(authenticate);
+router.use(authenticate, requireWorkspace);
 router.get('/', ctrl.list);
 router.get('/:id', ctrl.get);
 router.post('/', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), validate(createInspectionSchema), ctrl.create);

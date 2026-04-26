@@ -7,7 +7,7 @@ import { withWorkspaceMembership, authorizeWorkspace } from '../../middleware/wo
 import { validate } from '../../middleware/validate';
 import {
   agentAuth, postRegister, postMetrics, postTicket,
-  getRegistrations, getAuditData, postApprove, postApproveNewClient, postPushUpdate, postWindowsUpdate, postRestartService, postSystemReboot, postWakeDevice, deleteReg, getStatus, getConnectPassword,
+  getRegistrations, getAuditData, postApprove, postApproveNewClient, postPushUpdate, postWindowsUpdate, postRestartService, postSystemReboot, postWakeDevice, postNotify, deleteReg, getStatus, getConnectPassword,
   getRustdeskPeers, getRustdeskSessions, postRustdeskSync, getRustdeskActiveSessions, postRustdeskSyncSessions,
 } from './agent.controller';
 import {
@@ -45,6 +45,29 @@ router.post('/register', agentRegisterLimiter, validate(registerSchema), postReg
 router.get('/status',   agentAuth, getStatus);
 router.post('/metrics', agentAuth, validate(metricsSchema), postMetrics);
 router.post('/ticket',  agentAuth, validate(agentTicketSchema), postTicket);
+router.get('/tickets',  agentAuth, async (req, res, next) => {
+  try {
+    const token = (req as any).agentToken as string;
+    const reg = await prisma.agentRegistration.findUnique({
+      where: { agentToken: token },
+      select: { workspaceId: true, deviceId: true },
+    });
+    if (!reg?.workspaceId) { res.status(401).json({ error: 'unauthorized' }); return; }
+    const tickets = await prisma.ticket.findMany({
+      where: {
+        workspaceId: reg.workspaceId,
+        ...(reg.deviceId ? { deviceId: reg.deviceId } : {}),
+      },
+      select: {
+        id: true, ticketNumber: true, title: true, status: true,
+        priority: true, source: true, createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+    res.json(tickets.map(t => ({ ...t, number: t.ticketNumber })));
+  } catch (err) { next(err); }
+});
 router.post('/upload',  agentAuth, upload.single('file'), (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.file) { res.status(400).json({ error: 'Brak pliku' }); return; }
@@ -53,11 +76,28 @@ router.post('/upload',  agentAuth, upload.single('file'), (req: Request, res: Re
 });
 
 // Agent backup endpoints
-import { agentGetConfigs, agentReportStart, agentReportComplete, agentReportFailed } from '../backup/backup.controller';
-router.get('/backup-configs',    agentAuth, agentGetConfigs);
+import { agentGetConfigs, agentReportStart, agentReportComplete, agentReportFailed, getHistory as agentGetHistory } from '../backup/backup.controller';
+router.get('/backup-configs',               agentAuth, agentGetConfigs);
+router.get('/backup-configs/:id/history',   agentAuth, async (req, res, next) => {
+  try {
+    const token = (req as any).agentToken as string;
+    const reg = await prisma.agentRegistration.findUnique({ where: { agentToken: token } });
+    if (!reg) { res.status(404).json({ error: 'Not found' }); return; }
+    // Agent-authenticated: verify config belongs to this agent, skip workspace check
+    const config = await prisma.backupConfig.findFirst({ where: { id: req.params.id, agentRegId: reg.id } });
+    if (!config) { res.status(404).json({ error: 'Config not found' }); return; }
+    const history = await prisma.backupHistory.findMany({
+      where: { backupConfigId: config.id },
+      orderBy: { startedAt: 'desc' },
+      take: 50,
+    });
+    res.json(JSON.parse(JSON.stringify(history, (_, v) => typeof v === 'bigint' ? Number(v) : v)));
+  } catch (err) { next(err); }
+});
 router.post('/backup/start',     agentAuth, agentReportStart);
 router.post('/backup/complete',  agentAuth, agentReportComplete);
 router.post('/backup/failed',    agentAuth, agentReportFailed);
+router.post('/backup/run-now',   agentAuth, agentReportStart); // alias for agent-initiated run
 
 // Admin auth — waiting room management
 router.get('/audit',                authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), getAuditData);
@@ -78,6 +118,7 @@ router.post('/:id/windows-update',   authenticate, withWorkspaceMembership, auth
 router.post('/:id/restart-service',  authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), postRestartService);
 router.post('/:id/system-reboot',    authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), postSystemReboot);
 router.post('/:id/wake',             authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), postWakeDevice);
+router.post('/:id/notify',           authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), postNotify);
 router.delete('/:id',               authenticate, withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN'), deleteReg);
 
 // ── Secure Remote Commands ──────────────────────────────────────
@@ -92,12 +133,18 @@ router.post('/:id/command', authenticate, withWorkspaceMembership, authorizeWork
 
     if (!command) { res.status(400).json({ error: 'command is required' }); return; }
 
-    // Get agent token
-    const agent = await prisma.agentRegistration.findUnique({
-      where: { id },
+    // Get agent token — verify workspace ownership (MSP can access client agents)
+    let agentWhere: any = { id };
+    if (req.workspaceId) {
+      const { getMspWorkspaceIds } = require('../../utils/mspScope');
+      const wsIds = await getMspWorkspaceIds(req.workspaceId);
+      agentWhere.workspaceId = wsIds.length > 1 ? { in: wsIds } : req.workspaceId;
+    }
+    const agent = await prisma.agentRegistration.findFirst({
+      where: agentWhere,
       select: { agentToken: true, hostname: true },
     });
-    if (!agent) { res.status(404).json({ error: 'Agent not found' }); return; }
+    if (!agent) { res.status(404).json({ error: 'Asystent nie znaleziony' }); return; }
 
     const result = await sendCommand({
       agentToken: agent.agentToken,
@@ -111,9 +158,9 @@ router.post('/:id/command', authenticate, withWorkspaceMembership, authorizeWork
     res.json({ success: true, data: result });
   } catch (err: any) {
     if (err.message.includes('not connected')) {
-      res.status(503).json({ error: 'Agent jest offline', code: 'AGENT_OFFLINE' });
+      res.status(503).json({ error: 'Asystent nie jest połączony — może wymagać aktualizacji lub restartu', code: 'AGENT_OFFLINE' });
     } else if (err.message.includes('timed out')) {
-      res.status(504).json({ error: 'Agent nie odpowiedział w czasie', code: 'TIMEOUT' });
+      res.status(504).json({ error: 'Asystent nie odpowiedział w czasie', code: 'TIMEOUT' });
     } else if (err.message.includes('not allowed')) {
       res.status(403).json({ error: err.message, code: 'COMMAND_NOT_ALLOWED' });
     } else {

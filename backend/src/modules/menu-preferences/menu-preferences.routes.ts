@@ -1,10 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../../middleware/auth';
+import { requireWorkspace } from '../../middleware/workspace';
 import { getMenuPreference, saveMenuPreference, deleteMenuPreference } from './menu-preferences.service';
 import { menuLayoutSchema } from './menu-preferences.validation';
 
 const router = Router();
-router.use(authenticate);
+router.use(authenticate, requireWorkspace);
 
 // GET — fetch user's menu layout for active workspace
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {

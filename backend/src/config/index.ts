@@ -1,13 +1,22 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+function requireEnv(name: string): string {
+  const val = process.env[name];
+  if (!val) {
+    console.error(`FATAL: Missing required environment variable: ${name}`);
+    process.exit(1);
+  }
+  return val;
+}
+
 export const config = {
   port: process.env.PORT || 3000,
-  jwtSecret: process.env.JWT_SECRET || 'changeme-secret-key',
-  jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || 'changeme-refresh-secret',
+  jwtSecret: requireEnv('JWT_SECRET'),
+  jwtRefreshSecret: requireEnv('JWT_REFRESH_SECRET'),
   jwtExpiresIn: '15m',
   jwtRefreshExpiresIn: '7d',
-  encryptionKey: process.env.ENCRYPTION_KEY || 'changeme-32-char-encryption-key!',
+  encryptionKey: requireEnv('ENCRYPTION_KEY'),
   nodeEnv: process.env.NODE_ENV || 'development',
   baseDomain: process.env.BASE_DOMAIN || 'infradesk.pl',
   cookieDomain: process.env.COOKIE_DOMAIN || '.infradesk.pl',

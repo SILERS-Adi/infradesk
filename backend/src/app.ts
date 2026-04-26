@@ -49,6 +49,10 @@ import contractorsRouter from './modules/invoicing/contractors.routes';
 import productsRouter from './modules/invoicing/products.routes';
 import invoicingReportsRouter from './modules/invoicing/reports.routes';
 import invoicingPaymentsRouter from './modules/invoicing/payments.routes';
+import invoicingSettingsRouter from './modules/invoicing/settings.routes';
+import invoicingJpkRouter from './modules/invoicing/jpk.routes';
+import invoicingImportRouter from './modules/invoicing/import.routes';
+import invoicingPurchaseImportRouter from './modules/invoicing/purchase-import.routes';
 import serviceVehiclesRouter from './modules/service/vehicles.routes';
 import serviceInspectionsRouter from './modules/service/inspections.routes';
 import packagingRouter from './modules/packaging/packaging.routes';
@@ -278,8 +282,6 @@ app.use('/api/agent', agentRoutes);                        // Agent has mixed pu
 app.use('/api/activity-logs', authenticate, requireModule('infrastructure'), activityLogsRoutes);
 // Agent cloud upload — uses agent token, no JWT required (must be before authenticated backup routes)
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
 const INFRADESK_BACKUP_PATH = process.env.INFRADESK_BACKUP_PATH || '/var/backups/infradesk';
 app.post('/api/backup/cloud/upload', async (req, res, next) => {
   try {
@@ -331,6 +333,10 @@ app.use('/api/invoicing/contractors', authenticate, requireModule('invoicing'), 
 app.use('/api/invoicing/products', authenticate, requireModule('invoicing'), productsRouter);
 app.use('/api/invoicing/reports', authenticate, requireModule('invoicing'), invoicingReportsRouter);
 app.use('/api/invoicing/payments', authenticate, requireModule('invoicing'), invoicingPaymentsRouter);
+app.use('/api/invoicing/settings', authenticate, requireModule('invoicing'), invoicingSettingsRouter);
+app.use('/api/invoicing/jpk', authenticate, requireModule('invoicing'), invoicingJpkRouter);
+app.use('/api/invoicing/import', authenticate, requireModule('invoicing'), invoicingImportRouter);
+app.use('/api/invoicing/purchase-import', authenticate, requireModule('invoicing'), invoicingPurchaseImportRouter);
 app.use('/api/packaging/shipments', authenticate, requireModule('packaging'), packagingRouter);
 app.use('/api/packaging/reports', authenticate, requireModule('packaging'), packagingReportsRouter);
 app.use('/api/packaging/orders', authenticate, requireModule('packaging'), packagingOrdersRouter);
@@ -472,6 +478,7 @@ app.get('/api/workspaces/my', authenticate, async (req, res, next) => {
         workspace: {
           select: {
             id: true, name: true, slug: true, type: true, plan: true,
+            taxId: true, city: true, addressLine1: true,
             logoUrl: true, primaryColor: true, isActive: true, enabledModules: true, organizationType: true,
             orgType: true, platformBillingMode: true, accountManagedBy: true,
             modules: { select: { moduleKey: true, state: true, activatedAt: true, expiresAt: true } },
@@ -493,6 +500,9 @@ app.get('/api/workspaces/my', authenticate, async (req, res, next) => {
       slug: m.workspace.slug,
       type: m.workspace.type,
       plan: m.workspace.plan,
+      taxId: m.workspace.taxId,
+      city: m.workspace.city,
+      address: m.workspace.addressLine1,
       logoUrl: m.workspace.logoUrl,
       primaryColor: m.workspace.primaryColor,
       role: m.role,
@@ -588,6 +598,53 @@ app.post('/api/workspaces/save-config', authenticate, async (req, res, next) => 
 });
 
 // Get workspace subscription info (public for renewal flow)
+// PUT /api/workspaces/:id — update workspace data (MSP can edit client workspaces)
+app.put('/api/workspaces/:id', authenticate, async (req, res, next) => {
+  try {
+    const wsId = req.params.id;
+    const { name, legalName, taxId, email, phone, city, addressLine1, postalCode } = req.body;
+
+    // Check: user has access to this workspace (member or MSP managing it)
+    const userMembership = await prisma.workspaceMembership.findFirst({
+      where: { userId: req.user!.userId, workspaceId: wsId, status: 'ACTIVE' },
+    });
+    let canEdit = !!userMembership && (userMembership.role === 'OWNER' || userMembership.role === 'ADMIN');
+
+    if (!canEdit) {
+      // Check if user is MSP owner that manages this client workspace
+      const mspMember = await prisma.workspaceMembership.findFirst({
+        where: { userId: req.user!.userId, status: 'ACTIVE', role: { in: ['OWNER', 'ADMIN'] } },
+        select: { workspaceId: true },
+      });
+      if (mspMember) {
+        const relation = await prisma.workspaceRelation.findFirst({
+          where: { providerWorkspaceId: mspMember.workspaceId, clientWorkspaceId: wsId, status: 'ACTIVE' },
+        });
+        canEdit = !!relation;
+      }
+    }
+
+    if (!canEdit) { res.status(403).json({ error: 'Brak uprawnień' }); return; }
+
+    const updated = await prisma.workspace.update({
+      where: { id: wsId },
+      data: {
+        ...(name !== undefined ? { name } : {}),
+        ...(legalName !== undefined ? { legalName } : {}),
+        ...(taxId !== undefined ? { taxId } : {}),
+        ...(email !== undefined ? { email } : {}),
+        ...(phone !== undefined ? { phone } : {}),
+        ...(city !== undefined ? { city } : {}),
+        ...(addressLine1 !== undefined ? { addressLine1 } : {}),
+        ...(postalCode !== undefined ? { postalCode } : {}),
+      },
+      select: { id: true, name: true, legalName: true, taxId: true, email: true, phone: true, city: true },
+    });
+
+    res.json(updated);
+  } catch (err) { next(err); }
+});
+
 app.get('/api/workspaces/:id/subscription', authenticate, async (req, res, next) => {
   try {
     const userId = req.user!.userId;

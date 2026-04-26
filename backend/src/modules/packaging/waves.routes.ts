@@ -1,9 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../../middleware/auth';
+import { requireWorkspace } from '../../middleware/workspace';
 import prisma from '../../lib/prisma';
 
 const router = Router();
-router.use(authenticate);
+router.use(authenticate, requireWorkspace);
 
 // Wave statuses
 const WAVE_STATUSES: Record<string, string> = {

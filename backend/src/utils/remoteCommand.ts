@@ -26,6 +26,12 @@ export const ALLOWED_COMMANDS = new Set([
   'test_db_connection',
   'scan_system',
   'get_services',
+  'get_processes',
+  'get_installed_software',
+  'get_event_log',
+  'get_network_info',
+  'get_scheduled_tasks',
+  'restart_print_spooler',
   // Handled inline by agent WebSocket handler (fire-and-forget via mtype)
   'restart_service',
   'system_reboot',

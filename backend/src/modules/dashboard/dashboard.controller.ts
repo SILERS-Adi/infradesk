@@ -3,7 +3,7 @@ import { getAdminDashboard, getClientDashboard } from './dashboard.service';
 
 export async function adminDashboard(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const data = await getAdminDashboard(req.workspaceId);
+    const data = await getAdminDashboard(req.workspaceId!);
     res.status(200).json(data);
   } catch (err) {
     next(err);
@@ -12,12 +12,12 @@ export async function adminDashboard(req: Request, res: Response, next: NextFunc
 
 export async function clientDashboard(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const workspaceId = (req.query.workspaceId as string) || req.workspaceId;
-    if (!workspaceId) {
-      res.status(400).json({ error: 'workspaceId required' });
+    // Always use workspace from auth context — never from query params
+    if (!req.workspaceId) {
+      res.status(400).json({ error: 'Workspace context required' });
       return;
     }
-    const data = await getClientDashboard(workspaceId);
+    const data = await getClientDashboard(req.workspaceId);
     res.status(200).json(data);
   } catch (err) {
     next(err);

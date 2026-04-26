@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { useWorkspace } from '../store/workspaceStore';
 
 interface BadgeData {
   ticketQueue: number;
@@ -15,13 +16,15 @@ export function useEventStream() {
   const [connected, setConnected] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const retriesRef = useRef(0);
+  const workspaceId = useWorkspace(s => s.current?.workspaceId);
 
   const connect = useCallback(() => {
     if (eventSourceRef.current) return;
+    if (!workspaceId) return; // wait for workspace to be loaded
 
     try {
       const baseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/api\/?$/, '');
-      const es = new EventSource(`${baseUrl}/api/events/stream`, { withCredentials: true });
+      const es = new EventSource(`${baseUrl}/api/events/stream?ws=${encodeURIComponent(workspaceId)}`, { withCredentials: true });
 
       es.addEventListener('connected', () => {
         setConnected(true);
@@ -53,12 +56,17 @@ export function useEventStream() {
   }, []);
 
   useEffect(() => {
+    // Reconnect when workspace changes
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
     connect();
     return () => {
       eventSourceRef.current?.close();
       eventSourceRef.current = null;
     };
-  }, [connect]);
+  }, [connect, workspaceId]);
 
   return { badges, connected };
 }

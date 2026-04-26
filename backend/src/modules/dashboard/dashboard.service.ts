@@ -60,6 +60,28 @@ export async function getAdminDashboard(workspaceId?: string | null) {
     }),
   ]);
 
+  // ── Trend data: today vs yesterday, this week vs last week ──
+  const now = new Date();
+  const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+  const yesterdayStart = new Date(todayStart.getTime() - 86400000);
+  const dow = now.getDay();
+  const offsetToMon = dow === 0 ? 6 : dow - 1;
+  const weekStart = new Date(now); weekStart.setDate(weekStart.getDate() - offsetToMon); weekStart.setHours(0, 0, 0, 0);
+  const lastWeekStart = new Date(weekStart.getTime() - 7 * 86400000);
+
+  const [
+    createdToday, createdYesterday,
+    closedToday, closedYesterday,
+    closedThisWeek, closedLastWeek,
+  ] = await Promise.all([
+    prisma.ticket.count({ where: { ...wf, createdAt: { gte: todayStart } } }),
+    prisma.ticket.count({ where: { ...wf, createdAt: { gte: yesterdayStart, lt: todayStart } } }),
+    prisma.ticket.count({ where: { ...wf, status: { in: ['RESOLVED', 'CLOSED', 'COMPLETED'] }, resolvedAt: { gte: todayStart } } }),
+    prisma.ticket.count({ where: { ...wf, status: { in: ['RESOLVED', 'CLOSED', 'COMPLETED'] }, resolvedAt: { gte: yesterdayStart, lt: todayStart } } }),
+    prisma.ticket.count({ where: { ...wf, status: { in: ['RESOLVED', 'CLOSED', 'COMPLETED'] }, resolvedAt: { gte: weekStart } } }),
+    prisma.ticket.count({ where: { ...wf, status: { in: ['RESOLVED', 'CLOSED', 'COMPLETED'] }, resolvedAt: { gte: lastWeekStart, lt: weekStart } } }),
+  ]);
+
   // Rating stats
   const ratedTickets = await prisma.ticket.findMany({
     where: { ...wf, rating: { not: null } },
@@ -122,6 +144,49 @@ export async function getAdminDashboard(workspaceId?: string | null) {
     ratingCount,
     onboarding,
     sla,
+    recentActivity: await prisma.ticket.findMany({
+      where: { ...wf, status: { in: ['RESOLVED', 'CLOSED', 'COMPLETED'] }, resolvedAt: { not: null } },
+      orderBy: { resolvedAt: 'desc' },
+      take: 8,
+      select: {
+        id: true, ticketNumber: true, title: true, resolvedAt: true,
+        assignedTo: { select: { firstName: true, lastName: true } },
+      },
+    }),
+    upcomingDeadlines: await prisma.ticket.findMany({
+      where: {
+        ...wf,
+        status: { in: ['NEW', 'PENDING', 'ASSIGNED', 'IN_PROGRESS'] },
+        dueAt: { gte: now, lte: new Date(now.getTime() + 7 * 86400000) },
+      },
+      orderBy: { dueAt: 'asc' },
+      take: 6,
+      select: {
+        id: true, ticketNumber: true, title: true, priority: true, dueAt: true,
+        assignedTo: { select: { firstName: true, lastName: true } },
+      },
+    }),
+    chartData: await (async () => {
+      const days: { date: string; created: number; closed: number }[] = [];
+      for (let i = 6; i >= 0; i--) {
+        const dayStart = new Date(todayStart.getTime() - i * 86400000);
+        const dayEnd = new Date(dayStart.getTime() + 86400000);
+        const [c, r] = await Promise.all([
+          prisma.ticket.count({ where: { ...wf, createdAt: { gte: dayStart, lt: dayEnd } } }),
+          prisma.ticket.count({ where: { ...wf, status: { in: ['RESOLVED', 'CLOSED', 'COMPLETED'] }, resolvedAt: { gte: dayStart, lt: dayEnd } } }),
+        ]);
+        days.push({ date: dayStart.toISOString().slice(0, 10), created: c, closed: r });
+      }
+      return days;
+    })(),
+    trends: {
+      createdToday,
+      createdYesterday,
+      closedToday,
+      closedYesterday,
+      closedThisWeek,
+      closedLastWeek,
+    },
   };
 }
 

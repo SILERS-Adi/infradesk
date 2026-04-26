@@ -72,7 +72,7 @@ export function InvoicingDashboardPage() {
         subtitle="Przegląd modułu fakturowego"
         actions={
           <Link to="/invoicing/documents/new" style={{ textDecoration: 'none' }}>
-            <Button variant="primary" icon={<Plus size={14} />}>Nowa faktura</Button>
+            <Button variant="primary" icon={<Plus size={14} />}>Nowy dokument</Button>
           </Link>
         }
       />
@@ -121,7 +121,7 @@ export function InvoicingDashboardPage() {
                 description="Utwórz pierwszy dokument."
                 action={
                   <Link to="/invoicing/documents/new" style={{ textDecoration: 'none' }}>
-                    <Button variant="primary" size="sm" icon={<Plus size={14} />}>Nowa faktura</Button>
+                    <Button variant="primary" size="sm" icon={<Plus size={14} />}>Nowy dokument</Button>
                   </Link>
                 }
               />
@@ -187,7 +187,7 @@ export function InvoicingDashboardPage() {
             <Card title="Szybkie akcje">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <Link to="/invoicing/documents/new" style={{ textDecoration: 'none' }}>
-                  <Button variant="primary" size="sm" icon={<FileText size={14} />} style={{ width: '100%' }}>Nowa faktura</Button>
+                  <Button variant="primary" size="sm" icon={<FileText size={14} />} style={{ width: '100%' }}>Nowy dokument</Button>
                 </Link>
                 <Link to="/invoicing/contractors" style={{ textDecoration: 'none' }}>
                   <Button variant="secondary" size="sm" style={{ width: '100%' }}>Kontrahenci</Button>

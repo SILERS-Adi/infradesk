@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { Monitor, Check, Trash2, Wifi, WifiOff, Clock, ChevronDown, ChevronUp, Cpu, HardDrive, Network, Package, RefreshCw, Search, ExternalLink } from 'lucide-react';
@@ -9,7 +10,7 @@ import { MspCompanyFilter } from '../../../components/ui/MspCompanyFilter';
 import { Button } from '../../../components/ui/Button';
 import { getErrorMessage } from '../../../utils/helpers';
 import { clsx } from 'clsx';
-import { useTheme } from '../../../store/themeStore';
+import { useWorkspace } from '../../../store/workspaceStore';
 
 /* ── helper: dark glass card ─────────────────────────────── */
 const glass = 'rounded-xl border' as const;
@@ -100,7 +101,7 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
     mutationFn: () => agentsApi.pushUpdate(reg.id),
     onSuccess: () => {
       setUpdateSent(true);
-      toast.success('Komenda aktualizacji wysłana — agent restartuje się za chwilę');
+      toast.success('Komenda aktualizacji wysłana — asystent restartuje się za chwilę');
       // Po 30s odśwież listę żeby zobaczyć nową wersję
       setTimeout(() => {
         qc.invalidateQueries({ queryKey: ['agents'] });
@@ -231,16 +232,20 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
             {reg.status === 'PENDING' && (
               reg.clientId
                 ? (
-                  <Button size="sm" onClick={() => onQuickApprove(reg)} className="bg-emerald-600 hover:bg-emerald-700">
-                    <Check className="h-4 w-4" />
-                    Zatwierdz
-                  </Button>
+                  <button onClick={() => onQuickApprove(reg)}
+                    className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-full border transition-all active:scale-[0.97]"
+                    style={{ background: 'rgba(34,197,94,0.1)', borderColor: 'rgba(34,197,94,0.25)', color: '#4ADE80' }}>
+                    <Check className="h-3.5 w-3.5" />
+                    Aktywuj
+                  </button>
                 )
                 : (
-                  <Button size="sm" onClick={() => onApprove(reg)}>
-                    <Check className="h-4 w-4" />
-                    Przypisz
-                  </Button>
+                  <button onClick={() => onApprove(reg)}
+                    className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-full border transition-all active:scale-[0.97]"
+                    style={{ background: 'rgba(139,92,246,0.1)', borderColor: 'rgba(139,92,246,0.25)', color: '#A78BFA' }}>
+                    <Monitor className="h-3.5 w-3.5" />
+                    Dodaj do firmy
+                  </button>
                 )
             )}
             <button
@@ -447,7 +452,7 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
                 style={{ color: 'var(--td)' }}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)'; (e.currentTarget as HTMLElement).style.color = '#F87171'; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--td)'; }}
-                title="Usuń agenta"
+                title="Usuń asystenta"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -504,15 +509,17 @@ function AgentRow({ reg, latestVersion, onApprove, onQuickApprove, onDelete }: {
   );
 }
 
-/* ── ApproveModal v4 — ultra proste, workspace lista z /superadmin/tenants ── */
+/* ── ApproveModal v6 — uses workspace store (no extra fetch) ── */
 
 function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () => void }) {
   const qc = useQueryClient();
-  const { resolved: themeMode } = useTheme();
-  const isLight = themeMode === 'light';
-  const [mode, setMode] = useState<'existing' | 'new'>('existing');
+  const { workspaces: wsMemberships } = useWorkspace();
+  const [tab, setTab] = useState<'existing' | 'new'>('existing');
   const [selectedWsId, setSelectedWsId] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Build workspace list from store — already loaded, no fetch needed
+  const workspaces = wsMemberships.map(m => ({ id: m.workspaceId, name: m.name }));
 
   // New client form
   const [newName, setNewName] = useState(reg.companyName ?? '');
@@ -521,61 +528,18 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
   const [newEmail, setNewEmail] = useState(reg.contactEmail ?? '');
   const [newCity, setNewCity] = useState('');
 
-  // Load ALL workspaces — two sources, use whichever works
-  const { data: workspaces = [], isLoading: loadingWs } = useQuery({
-    queryKey: ['approve-workspaces', reg.id],
-    staleTime: 0,
-    queryFn: async () => {
-      const byName = (a: any, b: any) => (a.name ?? '').localeCompare(b.name ?? '', 'pl');
-      // Try operator clients first (works if current workspace is MSP)
-      try {
-        const clients = await apiClient.get('/operator/clients').then(r => r.data);
-        if (clients?.length > 0) {
-          return clients
-            .map((c: any) => ({ id: c.workspace?.id, name: c.workspace?.name, taxId: c.workspace?.taxId }))
-            .filter((w: any) => w.id)
-            .sort(byName);
-        }
-      } catch {}
-      // Fallback: superadmin full list (works for superadmin in any context)
-      try {
-        const all = await apiClient.get('/superadmin/workspaces-list').then(r => r.data);
-        if (all?.length > 0) {
-          return all
-            .map((w: any) => ({ id: w.id, name: w.name, taxId: w.taxId }))
-            .sort(byName);
-        }
-      } catch {}
-      // Last resort: workspace relations
-      try {
-        const rels = await apiClient.get('/workspace-relations').then(r => r.data);
-        if (rels?.length > 0) {
-          return rels
-            .map((r: any) => ({ id: r.clientWorkspaceId ?? r.id, name: r.clientWorkspace?.name ?? r.name ?? '?', taxId: r.clientWorkspace?.taxId ?? null }))
-            .sort(byName);
-        }
-      } catch {}
-      return [];
-    },
-  });
-
-  // Auto-match by NIP
-  useEffect(() => {
-    if (selectedWsId || !reg.nip || workspaces.length === 0) return;
-    const match = workspaces.find((w: any) => w.taxId === reg.nip);
-    if (match) setSelectedWsId(match.id);
-  }, [workspaces, reg.nip, selectedWsId]);
-
   const handleApproveExisting = async () => {
     if (!selectedWsId) { toast.error('Wybierz firmę'); return; }
     setSaving(true);
     try {
       await agentsApi.approve(reg.id, selectedWsId);
-      toast.success('Agent zatwierdzony');
+      toast.success('Asystent zatwierdzony');
       qc.invalidateQueries({ queryKey: ['agents'] });
       onClose();
-    } catch (e) { toast.error(getErrorMessage(e)); }
-    finally { setSaving(false); }
+    } catch (e: any) {
+      const msg = e?.response?.data?.error || e?.response?.data?.message || e?.message || 'Błąd';
+      toast.error(msg);
+    } finally { setSaving(false); }
   };
 
   const handleApproveNew = async () => {
@@ -583,115 +547,119 @@ function ApproveModal({ reg, onClose }: { reg: AgentRegistration; onClose: () =>
     setSaving(true);
     try {
       await agentsApi.approveNewClient(reg.id, { name: newName, taxId: newNip, phone: newPhone, email: newEmail, city: newCity });
-      toast.success('Firma utworzona i agent zatwierdzony');
+      toast.success('Firma utworzona i asystent zatwierdzony');
       qc.invalidateQueries({ queryKey: ['agents'] });
       onClose();
     } catch (e) { toast.error(getErrorMessage(e)); }
     finally { setSaving(false); }
   };
 
-  // Explicit colors — no CSS variables (Chrome <option> issue)
-  const c = {
-    bg: isLight ? '#ffffff' : '#0c1324',
-    bgAlt: isLight ? '#f3f4f6' : '#1c2536',
-    text: isLight ? '#111827' : '#f3f4f6',
-    muted: isLight ? '#6b7280' : '#9ca3af',
-    border: isLight ? '#e5e7eb' : '#1f2937',
-    accent: isLight ? '#6366f1' : '#818cf8',
-    accentBg: isLight ? 'rgba(99,102,241,0.08)' : 'rgba(129,140,248,0.12)',
-    selected: isLight ? '#eef2ff' : 'rgba(99,102,241,0.15)',
-  };
-  const inputS: React.CSSProperties = { width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, background: c.bgAlt, border: `1px solid ${c.border}`, color: c.text, outline: 'none' };
-  const labelS: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 600, color: c.muted, marginBottom: 4 };
-  const btnSecondary: React.CSSProperties = { padding: '8px 20px', borderRadius: 10, border: `1px solid ${c.border}`, background: 'transparent', color: c.muted, cursor: 'pointer', fontSize: 12, fontWeight: 500 };
-  const btnPrimary: React.CSSProperties = { padding: '8px 20px', borderRadius: 10, border: 'none', background: c.accent, color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600 };
+  return createPortal(
+    <div
+      id="approve-overlay"
+      onClick={onClose}
+      className="fixed inset-0 flex items-center justify-center p-4"
+      style={{ zIndex: 99999, background: 'rgba(0,0,0,0.6)' }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        className="rounded-2xl shadow-2xl w-full max-w-md"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', padding: 24, maxHeight: '85vh', overflowY: 'auto' }}
+      >
+        {/* Title */}
+        <h2 className="text-base font-bold mb-4" style={{ color: 'var(--t)' }}>
+          Przypisz asystenta
+        </h2>
 
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{ background: c.bg, border: `1px solid ${c.border}`, borderRadius: 16, padding: 24, width: '100%', maxWidth: 500, maxHeight: '90vh', overflowY: 'auto' }}>
-
-        <div style={{ fontSize: 16, fontWeight: 700, color: c.text, marginBottom: 16 }}>Zatwierdź urządzenie</div>
-
-        {/* Info */}
-        <div style={{ padding: 12, borderRadius: 10, background: c.bgAlt, border: `1px solid ${c.border}`, marginBottom: 16, fontSize: 12 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: '4px 8px' }}>
-            {reg.companyName && <><span style={{ color: c.muted }}>Firma</span><span style={{ color: c.text, fontWeight: 500 }}>{reg.companyName}</span></>}
-            {reg.nip && <><span style={{ color: c.muted }}>NIP</span><span style={{ color: c.text, fontWeight: 500 }}>{reg.nip}</span></>}
-            {reg.hostname && <><span style={{ color: c.muted }}>Komputer</span><span style={{ color: c.text, fontWeight: 500 }}>{reg.hostname}</span></>}
-            {reg.ipAddress && <><span style={{ color: c.muted }}>IP</span><span style={{ color: c.text, fontWeight: 500 }}>{reg.ipAddress}</span></>}
-          </div>
+        {/* Agent info */}
+        <div className="rounded-xl p-3 mb-4 text-xs space-y-1" style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)' }}>
+          {reg.hostname && <div><span style={{ color: 'var(--tm)' }}>Komputer: </span><strong style={{ color: 'var(--t)' }}>{reg.hostname}</strong></div>}
+          {reg.companyName && <div><span style={{ color: 'var(--tm)' }}>Firma: </span><strong style={{ color: 'var(--t)' }}>{reg.companyName}</strong></div>}
+          {reg.ipAddress && <div><span style={{ color: 'var(--tm)' }}>IP: </span><span style={{ color: 'var(--t)' }}>{reg.ipAddress}</span></div>}
         </div>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: `1px solid ${c.border}`, marginBottom: 16 }}>
-          {(['existing', 'new'] as const).map(m => (
-            <button key={m} type="button" onClick={() => setMode(m)}
-              style={{ flex: 1, padding: '10px 0', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none',
-                background: mode === m ? c.accentBg : 'transparent', color: mode === m ? c.accent : c.muted }}>
-              {m === 'existing' ? 'Istniejąca firma' : 'Nowa firma'}
-            </button>
-          ))}
+        <div className="flex rounded-lg overflow-hidden mb-4" style={{ border: '1px solid var(--border)' }}>
+          <button type="button" onClick={() => setTab('existing')}
+            className="flex-1 py-2.5 text-xs font-semibold transition-colors"
+            style={{ background: tab === 'existing' ? 'rgba(139,92,246,0.12)' : 'transparent', color: tab === 'existing' ? '#A78BFA' : 'var(--tm)', border: 'none', cursor: 'pointer' }}>
+            Istniejąca firma
+          </button>
+          <button type="button" onClick={() => setTab('new')}
+            className="flex-1 py-2.5 text-xs font-semibold transition-colors"
+            style={{ background: tab === 'new' ? 'rgba(139,92,246,0.12)' : 'transparent', color: tab === 'new' ? '#A78BFA' : 'var(--tm)', border: 'none', cursor: 'pointer' }}>
+            Nowa firma
+          </button>
         </div>
 
-        {mode === 'existing' ? (
-          <>
-            <div style={labelS}>Wybierz firmę *</div>
-            {loadingWs ? (
-              <div style={{ padding: 16, textAlign: 'center', color: c.muted, fontSize: 12 }}>Ładowanie...</div>
-            ) : workspaces.length === 0 ? (
-              <div style={{ padding: 16, textAlign: 'center', color: c.muted, fontSize: 12 }}>Brak firm — dodaj klienta w sekcji Firmy klientów</div>
+        {tab === 'existing' ? (
+          <div>
+            <div className="text-xs font-semibold mb-2" style={{ color: 'var(--tm)' }}>Wybierz firmę *</div>
+            {workspaces.length === 0 ? (
+              <div className="text-xs text-center py-6" style={{ color: 'var(--tm)' }}>Brak firm. Użyj zakładki "Nowa firma".</div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 220, overflowY: 'auto', border: `1px solid ${c.border}`, borderRadius: 8, padding: 4, marginBottom: 16 }}>
-                {workspaces.map((ws: any) => {
-                  const wsId = ws.id;
-                  const wsName = ws.name ?? '—';
-                  const wsTaxId = ws.taxId;
-                  const isSelected = selectedWsId === wsId;
-                  const isMatch = reg.nip && wsTaxId === reg.nip;
-                  return (
-                    <div key={wsId} onClick={() => setSelectedWsId(wsId)}
-                      style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 6, cursor: 'pointer',
-                        background: isSelected ? c.selected : 'transparent', border: isSelected ? `2px solid ${c.accent}` : '2px solid transparent',
-                      }}>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: c.text }}>{wsName}</div>
-                        {wsTaxId && <div style={{ fontSize: 10, color: c.muted }}>NIP: {wsTaxId}</div>}
-                      </div>
-                      {isMatch && <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: 'rgba(34,197,94,0.12)', color: '#22C55E' }}>NIP pasuje</span>}
-                    </div>
-                  );
-                })}
+              <div className="space-y-1 max-h-52 overflow-y-auto rounded-lg mb-4 p-1" style={{ border: '1px solid var(--border)' }}>
+                {workspaces.map(ws => (
+                  <div
+                    key={ws.id}
+                    onClick={() => setSelectedWsId(ws.id)}
+                    className="flex items-center px-3 py-2.5 rounded-lg cursor-pointer transition-colors"
+                    style={{
+                      background: selectedWsId === ws.id ? 'rgba(139,92,246,0.15)' : 'transparent',
+                      border: selectedWsId === ws.id ? '2px solid #A78BFA' : '2px solid transparent',
+                    }}
+                  >
+                    <div className="text-sm font-semibold" style={{ color: 'var(--t)' }}>{ws.name}</div>
+                  </div>
+                ))}
               </div>
             )}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button type="button" onClick={onClose} style={btnSecondary}>Anuluj</button>
+            <div className="flex justify-end gap-2 mt-4">
+              <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-xs font-medium" style={{ color: 'var(--tm)', border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer' }}>Anuluj</button>
               <button type="button" onClick={handleApproveExisting} disabled={saving || !selectedWsId}
-                style={{ ...btnPrimary, opacity: saving || !selectedWsId ? 0.5 : 1 }}>
+                className="px-4 py-2 rounded-lg text-xs font-semibold text-white disabled:opacity-40"
+                style={{ background: '#7C3AED', border: 'none', cursor: saving || !selectedWsId ? 'default' : 'pointer' }}>
                 {saving ? 'Zapisuję...' : 'Zatwierdź'}
               </button>
             </div>
-          </>
+          </div>
         ) : (
-          <>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-              <div style={{ gridColumn: 'span 2' }}><label style={labelS}>Nazwa firmy *</label><input style={inputS} value={newName} onChange={e => setNewName(e.target.value)} /></div>
-              <div><label style={labelS}>NIP</label><input style={inputS} value={newNip} onChange={e => setNewNip(e.target.value)} /></div>
-              <div><label style={labelS}>Telefon</label><input style={inputS} value={newPhone} onChange={e => setNewPhone(e.target.value)} /></div>
-              <div style={{ gridColumn: 'span 2' }}><label style={labelS}>E-mail</label><input style={inputS} type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} /></div>
-              <div style={{ gridColumn: 'span 2' }}><label style={labelS}>Miasto</label><input style={inputS} value={newCity} onChange={e => setNewCity(e.target.value)} /></div>
+          <div>
+            <div className="grid grid-cols-2 gap-2.5 mb-4">
+              <div className="col-span-2">
+                <label className="text-[11px] font-semibold block mb-1" style={{ color: 'var(--tm)' }}>Nazwa firmy *</label>
+                <input className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none" style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }} value={newName} onChange={e => setNewName(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold block mb-1" style={{ color: 'var(--tm)' }}>NIP</label>
+                <input className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none" style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }} value={newNip} onChange={e => setNewNip(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold block mb-1" style={{ color: 'var(--tm)' }}>Telefon</label>
+                <input className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none" style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }} value={newPhone} onChange={e => setNewPhone(e.target.value)} />
+              </div>
+              <div className="col-span-2">
+                <label className="text-[11px] font-semibold block mb-1" style={{ color: 'var(--tm)' }}>E-mail</label>
+                <input type="email" className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none" style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }} value={newEmail} onChange={e => setNewEmail(e.target.value)} />
+              </div>
+              <div className="col-span-2">
+                <label className="text-[11px] font-semibold block mb-1" style={{ color: 'var(--tm)' }}>Miasto</label>
+                <input className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none" style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }} value={newCity} onChange={e => setNewCity(e.target.value)} />
+              </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button type="button" onClick={onClose} style={btnSecondary}>Anuluj</button>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-xs font-medium" style={{ color: 'var(--tm)', border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer' }}>Anuluj</button>
               <button type="button" onClick={handleApproveNew} disabled={saving || !newName.trim()}
-                style={{ ...btnPrimary, opacity: saving || !newName.trim() ? 0.5 : 1 }}>
+                className="px-4 py-2 rounded-lg text-xs font-semibold text-white disabled:opacity-40"
+                style={{ background: '#7C3AED', border: 'none', cursor: saving || !newName.trim() ? 'default' : 'pointer' }}>
                 {saving ? 'Zapisuję...' : 'Utwórz i zatwierdź'}
               </button>
             </div>
-          </>
+          </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -719,7 +687,7 @@ export function WaitingRoomPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => agentsApi.delete(id),
-    onSuccess: () => { toast.success('Usunieto agenta'); qc.invalidateQueries({ queryKey: ['agents'] }); },
+    onSuccess: () => { toast.success('Usunięto asystenta'); qc.invalidateQueries({ queryKey: ['agents'] }); },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
 
@@ -730,7 +698,7 @@ export function WaitingRoomPage() {
       return agentsApi.approve(reg.id, reg.workspaceId, undefined);
     },
     onSuccess: () => {
-      toast.success('Agent zatwierdzony — urządzenie dodane automatycznie');
+      toast.success('Asystent zatwierdzony — urządzenie dodane automatycznie');
       qc.invalidateQueries({ queryKey: ['agents'] });
       qc.invalidateQueries({ queryKey: ['devices'] });
     },
@@ -759,7 +727,7 @@ export function WaitingRoomPage() {
         <h1 className="text-2xl font-bold" style={{ color: 'var(--t)' }}>Asystenci systemowi</h1>
         <div className="flex items-center gap-3 mt-1">
           <p className="text-sm" style={{ color: 'var(--tm)' }}>
-            {registrations.length} {registrations.length === 1 ? 'agent' : 'agentow'} zarejestrowanych
+            {registrations.length} {registrations.length === 1 ? 'asystent' : 'asystentów'} zarejestrowanych
           </p>
           {latestVersion?.version && (() => {
             const activeRegs = registrations.filter(r => r.status === 'ACTIVE');
@@ -789,7 +757,7 @@ export function WaitingRoomPage() {
                       const outdatedRegs = activeRegs.filter(r => r.appVersion && r.appVersion !== latestVersion.version);
                       try {
                         await Promise.all(outdatedRegs.map(r => agentsApi.pushUpdate(r.id)));
-                        toast.success(`Aktualizacja wysłana do ${outdatedRegs.length} agentów`);
+                        toast.success(`Aktualizacja wysłana do ${outdatedRegs.length} asystentów`);
                         setTimeout(() => {
                           qc.invalidateQueries({ queryKey: ['agents'] });
                           setBulkUpdating(false);
@@ -903,7 +871,7 @@ export function WaitingRoomPage() {
       {!isLoading && registrations.length === 0 && (
         <div className="text-center py-16" style={{ color: 'var(--tm)' }}>
           <Monitor className="h-12 w-12 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">Brak agentow</p>
+          <p className="font-medium">Brak asystentów</p>
           <p className="text-sm mt-1">Zainstaluj aplikacje na komputerach klientow, aby monitorowac sprzet.</p>
         </div>
       )}

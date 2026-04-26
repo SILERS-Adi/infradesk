@@ -88,6 +88,36 @@ export async function getDocument(id: string, workspaceId: string) {
   });
   if (!doc) return null;
 
+  // Try to enrich buyer data from Contractor table (match by NIP or name)
+  let buyerContractor: any = null;
+  if (doc.contractorNip || doc.contractorName) {
+    buyerContractor = await prisma.invoicingContractor.findFirst({
+      where: {
+        workspaceId,
+        OR: [
+          doc.contractorNip ? { nip: doc.contractorNip } : undefined,
+          doc.contractorName ? { name: doc.contractorName } : undefined,
+        ].filter(Boolean) as any,
+      },
+    });
+  }
+
+  // Get workspace info + invoicing settings for seller details
+  const ws = await prisma.workspace.findUnique({
+    where: { id: workspaceId },
+    select: { name: true, legalName: true, taxId: true, city: true, addressLine1: true, postalCode: true, email: true, phone: true },
+  });
+  const invSettings = await prisma.workspaceSetting.findMany({
+    where: { workspaceId, key: { startsWith: 'inv_' } },
+  });
+  const sm: Record<string, string> = {};
+  for (const s of invSettings) sm[s.key] = s.value;
+
+  // Parse bank accounts
+  let bankAccounts: any[] = [];
+  try { bankAccounts = JSON.parse(sm['inv_bank_accounts'] || '[]'); } catch {}
+  const defaultBank = bankAccounts.find((a: any) => a.isDefault) || bankAccounts[0];
+
   // Map to frontend-compatible format
   return {
     id: doc.id,
@@ -97,26 +127,35 @@ export async function getDocument(id: string, workspaceId: string) {
     issue_date: doc.issuedAt.toISOString().slice(0, 10),
     sale_date: doc.issuedAt.toISOString().slice(0, 10),
     due_date: doc.dueDate?.toISOString().slice(0, 10) || null,
-    payment_method: 'przelew',
-    currency: 'PLN',
-    seller_name: 'Moja Firma Sp. z o.o.',
-    seller_nip: null,
-    seller_street: null,
-    seller_city: null,
-    seller_zip: null,
-    seller_bank_name: null,
-    seller_bank_account: null,
+    payment_method: sm['inv_default_payment_method'] || 'przelew',
+    currency: sm['inv_default_currency'] || 'PLN',
+    seller_name: ws?.legalName || ws?.name || 'Brak danych sprzedawcy',
+    seller_nip: ws?.taxId || null,
+    seller_regon: sm['inv_regon'] || null,
+    seller_street: ws?.addressLine1 || null,
+    seller_city: ws?.city || null,
+    seller_zip: ws?.postalCode || null,
+    seller_email: ws?.email || null,
+    seller_phone: ws?.phone || null,
+    seller_bank_name: defaultBank?.bankName || null,
+    seller_bank_account: defaultBank?.accountNumber || null,
     buyer_name: doc.contractorName,
     buyer_nip: doc.contractorNip,
-    buyer_street: null,
-    buyer_city: null,
-    buyer_zip: null,
+    buyer_regon: buyerContractor?.regon || null,
+    buyer_street: buyerContractor?.address || null,
+    buyer_city: buyerContractor?.city || null,
+    buyer_zip: (buyerContractor as any)?.postalCode || null,
+    buyer_email: buyerContractor?.email || null,
+    buyer_phone: buyerContractor?.phone || null,
+    buyer_country: (buyerContractor as any)?.country || 'PL',
     net_total: Number(doc.totalNet),
     vat_total: Number(doc.totalVat),
     gross_total: Number(doc.totalGross),
     paid_amount: doc.status === 'PAID' ? Number(doc.totalGross) : 0,
-    split_payment: false,
-    reverse_charge: false,
+    split_payment: sm['inv_split_payment'] === 'true' || Number(doc.totalGross) > 15000,
+    cash_method: sm['inv_cash_method'] === 'true',
+    reverse_charge: sm['inv_reverse_charge'] === 'true',
+    footer_note: sm['inv_footer_note'] || null,
     is_tp: false,
     ksef_number: null,
     ksef_status: null,
@@ -144,11 +183,40 @@ export async function getDocument(id: string, workspaceId: string) {
   };
 }
 
+const TYPE_PREFIX: Record<string, string> = {
+  SALE_INVOICE: 'FV', PROFORMA: 'PRO', ADVANCE: 'FZ', FINAL: 'FK',
+  RECEIPT: 'PAR', PURCHASE_INVOICE: 'FVZ', CORRECTION: 'KOR',
+  VAT_MARGIN: 'FVM', BILL: 'R',
+  WDT: 'WDT', WNT: 'WNT', EXPORT: 'FEXP', IMPORT: 'FIMP',
+  WZ: 'WZ', PZ: 'PZ', MM: 'MM', KP: 'KP', KW: 'KW',
+  ESTIMATE: 'OF', ORDER: 'ZAM',
+  ACCOUNTING_NOTE: 'NK', CORRECTION_NOTE: 'NKor',
+};
+
+async function generateNumber(type: string, workspaceId: string): Promise<string> {
+  const prefix = TYPE_PREFIX[type] || 'DOC';
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const year = now.getFullYear();
+
+  // Count docs of this type in current month
+  const startOfMonth = new Date(year, now.getMonth(), 1);
+  const endOfMonth = new Date(year, now.getMonth() + 1, 1);
+  const count = await prisma.invoiceDocument.count({
+    where: { workspaceId, type: type as any, issuedAt: { gte: startOfMonth, lt: endOfMonth } },
+  });
+
+  return `${prefix}/${count + 1}/${month}/${year}`;
+}
+
 export async function createDocument(data: CreateDocumentInput, workspaceId: string, userId: string) {
+  // Auto-generate number if not provided
+  const number = data.number?.trim() || await generateNumber(data.type, workspaceId);
+
   const doc = await prisma.invoiceDocument.create({
     data: {
       workspaceId,
-      number: data.number,
+      number,
       type: data.type as any,
       status: data.status as any,
       contractorName: data.contractorName,

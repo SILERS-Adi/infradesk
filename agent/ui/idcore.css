@@ -1,0 +1,187 @@
+/* ═══════════════════════════════════════════════════════════
+   idcore.css — Rdzeń ID (vanilla JS port of IrisCore v2).
+   ═══════════════════════════════════════════════════════════
+
+   The orb itself is rendered by idcore.js on <canvas>, so no
+   CSS is required for visuals. This file keeps the auxiliary
+   styles previously shipped as aicore.css (buttons, panels,
+   action feed, repair-offer cards, chat input, etc.) which
+   are still consumed by script.js + Asystent Home UI.
+*/
+
+:root{
+  --core-h:210;--core-s:100%;--core-l:60%;
+  --core:hsl(var(--core-h),var(--core-s),var(--core-l));
+  --core-soft:hsla(var(--core-h),var(--core-s),var(--core-l),.15);
+  --core-glow:hsla(var(--core-h),var(--core-s),var(--core-l),.35);
+  --core-ring:hsla(var(--core-h),var(--core-s),var(--core-l),.1);
+  --core-dim:hsla(var(--core-h),var(--core-s),var(--core-l),.06);
+  --core-bright:hsl(var(--core-h),var(--core-s),78%);
+  --core-mid:hsl(var(--core-h),80%,45%);
+  --success-h:142;--warn-h:35;--error-h:0;
+  --glass:rgba(255,255,255,.03);
+  --glass-border:rgba(255,255,255,.06);
+  --glass-border-hi:rgba(255,255,255,.1);
+}
+
+/* ── IdCore wrapper ── */
+.idcore{display:inline-block;line-height:0;border-radius:9999px;vertical-align:middle}
+.idcore canvas{display:block}
+
+/* ── Permission Screen ── */
+.aicore-perm{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:40px;gap:12px}
+.aicore-perm-icon{font-size:48px;margin-bottom:8px}
+.aicore-perm-title{font-size:18px;font-weight:700;color:var(--t,#fff)}
+.aicore-perm-desc{font-size:12px;color:var(--ts,#999);max-width:420px;line-height:1.6;margin-bottom:8px}
+.aicore-perm-btns{display:flex;gap:12px;margin-top:8px}
+.aicore-perm-note{font-size:10px;color:var(--td,#555);margin-top:12px}
+
+/* ── Two-column Layout ── */
+.aicore-layout{display:flex;height:100%;overflow:hidden}
+.aicore-left{width:300px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:24px 20px 16px;border-right:1px solid var(--glass-border);background:transparent;overflow-y:auto;gap:0}
+.aicore-right{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+
+/* ═══════════════════════════════════════════
+   THE CORE — Canvas-powered (legacy anchors)
+   ═══════════════════════════════════════════ */
+.aicore-orb-wrap{width:220px;height:220px;position:relative;display:flex;align-items:center;justify-content:center;margin-bottom:12px;flex-shrink:0}
+.aicore-orb{width:200px;height:200px;position:relative;display:flex;align-items:center;justify-content:center}
+.aicore-canvas-wrap{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+.aicore-canvas-wrap canvas{display:block}
+
+.aicore-admin-badge{font-size:9px;padding:3px 10px;border-radius:4px;margin-bottom:4px}
+.aicore-admin-badge.ok{background:rgba(74,222,128,.08);color:#4ADE80;border:1px solid rgba(74,222,128,.12)}
+.aicore-admin-badge.warn{background:rgba(251,146,60,.08);color:#FB923C;border:1px solid rgba(251,146,60,.12)}
+
+/* LEFT PANEL — Status + Controls */
+.aicore-badge{display:inline-flex;align-items:center;gap:5px;font-size:9px;padding:4px 12px;border-radius:20px;background:var(--core-dim);color:var(--core);font-weight:600;letter-spacing:.8px;text-transform:uppercase;border:1px solid var(--core-ring);margin-bottom:6px}
+.aicore-badge::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--core);animation:coreDot 2s ease-in-out infinite}
+.aicore-title{font-size:15px;font-weight:700;color:var(--t,#fff);line-height:1.3;margin-bottom:2px;transition:color .5s}
+.aicore-desc{font-size:10px;color:var(--ts,#999);line-height:1.4;margin-bottom:14px;max-width:240px}
+
+.aicore-controls{display:flex;flex-direction:column;gap:6px;width:100%}
+.aicore-btn{padding:9px 16px;border-radius:8px;border:none;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .25s;position:relative;overflow:hidden}
+.aicore-btn::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.06),transparent);pointer-events:none}
+.aicore-btn-primary{background:linear-gradient(135deg,var(--core),var(--core-mid));color:#fff;box-shadow:0 2px 12px var(--core-dim),0 1px 3px rgba(0,0,0,.2)}
+.aicore-btn-primary:hover{filter:brightness(1.12);transform:translateY(-1px);box-shadow:0 6px 24px var(--core-soft)}
+.aicore-btn-secondary{background:var(--glass);color:var(--ts,#aaa);border:1px solid var(--glass-border-hi)}
+.aicore-btn-secondary:hover{background:var(--core-dim);color:var(--core);border-color:var(--core-ring)}
+.aicore-btn:disabled{opacity:.35;cursor:not-allowed;transform:none;filter:none}
+
+.aicore-mode{display:flex;border-radius:8px;overflow:hidden;border:1px solid var(--glass-border-hi);margin-top:10px;width:100%}
+.aicore-mode-opt{flex:1;padding:7px 0;font-size:10px;font-weight:500;cursor:pointer;background:transparent;color:var(--ts,#888);border:none;font-family:inherit;transition:all .25s;text-align:center}
+.aicore-mode-opt.active{background:var(--core-soft);color:var(--core)}
+.aicore-mode-opt:hover:not(.active){background:var(--glass)}
+
+.aicore-sep{width:100%;height:1px;background:var(--glass-border);margin:12px 0}
+
+.aicore-admin{font-size:9px;padding:3px 8px;border-radius:4px;margin-top:4px}
+.aicore-admin.ok{background:rgba(74,222,128,.08);color:#4ADE80;border:1px solid rgba(74,222,128,.12)}
+.aicore-admin.warn{background:rgba(251,146,60,.08);color:#FB923C;border:1px solid rgba(251,146,60,.12)}
+
+/* RIGHT PANEL — Live Actions & Chat */
+.aicore-right-inner{flex:1;overflow-y:auto;padding:0;min-height:0;display:flex;flex-direction:column}
+
+.aicore-section{padding:14px 18px 8px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:2;background:var(--bg,#040810);border-bottom:1px solid var(--glass-border)}
+.aicore-section-title{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--tm,#666);font-weight:600}
+.aicore-section-tag{font-size:9px;color:var(--td,#444);font-weight:500;padding:2px 8px;border-radius:10px;background:var(--glass)}
+
+.aicore-actions{padding:6px 18px;flex:1}
+.aicore-action{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.03);animation:actionSlideIn .35s ease-out both}
+.aicore-action:last-child{border-bottom:none}
+
+.aicore-action-dot{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0;margin-top:1px;transition:all .3s}
+.aicore-action-dot.waiting{background:rgba(255,255,255,.04);color:var(--tm,#555);border:1px solid rgba(255,255,255,.06)}
+.aicore-action-dot.running{background:var(--core-soft);color:var(--core);border:1px solid var(--core-ring);animation:dotPulse 1.2s ease-in-out infinite}
+.aicore-action-dot.success{background:rgba(74,222,128,.1);color:#4ADE80;border:1px solid rgba(74,222,128,.12)}
+.aicore-action-dot.error{background:rgba(239,68,68,.1);color:#EF4444;border:1px solid rgba(239,68,68,.12)}
+.aicore-action-dot.skipped{background:rgba(107,114,128,.06);color:#6B7280;border:1px solid rgba(107,114,128,.1)}
+
+.aicore-action-body{flex:1;min-width:0}
+.aicore-action-name{font-size:11px;font-weight:500;color:var(--t,#fff);line-height:1.3}
+.aicore-action-detail{font-size:10px;color:var(--tm,#666);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.aicore-action-time{font-size:9px;color:var(--td,#444);flex-shrink:0;margin-top:2px}
+
+/* ── Result Card ── */
+.aicore-result{margin:10px 18px;padding:14px 16px;border-radius:10px;background:var(--glass);border:1px solid var(--glass-border-hi);display:none}
+.aicore-result.visible{display:block;animation:actionSlideIn .4s ease-out}
+.aicore-result-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.aicore-result-title{font-size:12px;font-weight:600;color:var(--t,#fff)}
+.aicore-result-badge{font-size:9px;padding:3px 8px;border-radius:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.aicore-result-badge.good{background:rgba(74,222,128,.1);color:#4ADE80}
+.aicore-result-badge.warning{background:rgba(251,146,60,.1);color:#FB923C}
+.aicore-result-badge.critical{background:rgba(239,68,68,.1);color:#EF4444}
+
+.aicore-result-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.aicore-result-item{padding:8px 10px;border-radius:6px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04)}
+.aicore-result-item-label{font-size:9px;color:var(--tm,#666);text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px}
+.aicore-result-item-value{font-size:13px;font-weight:700;color:var(--t,#fff)}
+
+.aicore-result-actions{display:flex;gap:6px}
+
+/* ── Chat messages in feed ── */
+.aicore-actions .ai-msg{border-bottom:1px solid rgba(255,255,255,.03);padding:10px 0}
+.aicore-actions .ai-msg-content{font-size:11px;line-height:1.6;color:var(--ts,#aaa)}
+.aicore-actions .ai-msg.user .ai-msg-content{color:var(--t,#fff);font-weight:500}
+
+/* ── Chat Input ── */
+.aicore-input-wrap{display:flex;border-top:1px solid var(--glass-border-hi);background:rgba(255,255,255,.015)}
+.aicore-input{flex:1;background:transparent;border:none;padding:13px 18px;color:var(--t,#fff);font-size:12px;font-family:inherit;outline:none}
+.aicore-input::placeholder{color:var(--tm,#555)}
+.aicore-send{background:linear-gradient(135deg,var(--core),var(--core-mid));border:none;padding:0 18px;cursor:pointer;color:#fff;display:flex;align-items:center;justify-content:center;transition:all .2s;min-width:44px}
+.aicore-send:hover{filter:brightness(1.1)}
+.aicore-send:disabled{opacity:.25;cursor:not-allowed}
+.aicore-send svg{width:16px;height:16px}
+
+/* KEYFRAMES */
+@keyframes coreDot{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes dotPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.92)}}
+@keyframes actionSlideIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* REPAIR OFFER — Paywall after scan */
+.repair-offer{padding:4px 0}
+.repair-offer-header{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.repair-offer-score{text-align:center;flex-shrink:0}
+.repair-offer-score-num{font-size:28px;font-weight:800;line-height:1}
+.repair-offer-score-label{font-size:9px;text-transform:uppercase;color:var(--tm,#888);letter-spacing:.5px;margin-top:2px}
+.repair-offer-title{font-size:14px;font-weight:700;color:var(--t,#fff)}
+.repair-offer-sub{font-size:10px;color:var(--tm,#888);margin-top:2px}
+
+.repair-offer-problems{display:flex;flex-direction:column;gap:4px;margin-bottom:16px;max-height:120px;overflow-y:auto}
+.repair-problem{display:flex;align-items:center;gap:8px;font-size:11px;padding:5px 8px;border-radius:6px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04)}
+.repair-problem-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.repair-problem-dot.critical{background:#EF4444}
+.repair-problem-dot.high{background:#FB923C}
+.repair-problem-dot.medium{background:#FBBF24}
+.repair-problem-dot.low{background:#60A5FA}
+.repair-problem-name{flex:1;color:var(--t,#fff);font-weight:500}
+.repair-problem-sev{font-size:9px;color:var(--tm,#888);text-transform:uppercase;letter-spacing:.3px}
+.repair-problem-tag{font-size:8px;padding:2px 6px;border-radius:4px;font-weight:600;white-space:nowrap;letter-spacing:.3px}
+.repair-problem-tag.ai{background:rgba(74,222,128,.1);color:#4ADE80}
+.repair-problem-tag.tech{background:rgba(251,146,60,.1);color:#FB923C}
+
+.repair-offer-plans{display:flex;gap:10px}
+.repair-plan{flex:1;padding:14px 12px;border-radius:10px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;gap:6px;position:relative;transition:all .2s}
+.repair-plan:hover{border-color:rgba(255,255,255,.12);background:rgba(255,255,255,.04)}
+.repair-plan.featured{border-color:var(--core-ring,rgba(79,140,255,.2));background:rgba(79,140,255,.04)}
+.repair-plan.featured:hover{border-color:rgba(79,140,255,.35)}
+.repair-plan.disabled{opacity:.45;pointer-events:none}
+.repair-plan-popular{position:absolute;top:-8px;left:50%;transform:translateX(-50%);font-size:8px;padding:2px 8px;border-radius:10px;background:var(--core,#4F8CFF);color:#fff;font-weight:600;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.repair-plan-badge{font-size:9px;font-weight:600;color:var(--core,#4F8CFF);text-transform:uppercase;letter-spacing:.5px}
+.repair-plan-price{font-size:26px;font-weight:800;color:var(--t,#fff);line-height:1}
+.repair-plan-price span{font-size:12px;font-weight:500;color:var(--tm,#888)}
+.repair-plan-desc{font-size:10px;color:var(--tm,#888);line-height:1.3}
+.repair-plan-features{list-style:none;padding:0;margin:4px 0 8px;font-size:10px;color:var(--ts,#aaa);line-height:1.8}
+.repair-plan-features li::before{content:'\2713 ';color:var(--core,#4F8CFF);font-weight:700}
+.repair-plan-btn{margin-top:auto}
+
+/* RESPONSIVE */
+@media(max-width:700px){
+  .aicore-layout{flex-direction:column}
+  .aicore-left{width:100%;flex-direction:row;flex-wrap:wrap;justify-content:center;padding:16px;border-right:none;border-bottom:1px solid var(--glass-border);gap:12px}
+  .aicore-orb-wrap{width:100px;height:100px}
+  .aicore-orb{width:90px;height:90px}
+  .aicore-nucleus{width:40px;height:40px}
+  .aicore-controls{flex-direction:row;width:auto}
+  .aicore-desc{display:none}
+}

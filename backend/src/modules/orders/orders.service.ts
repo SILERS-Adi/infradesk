@@ -29,13 +29,13 @@ export async function listOrders(params: {
   return prisma.order.findMany({ where, orderBy: { createdAt: 'desc' }, select: orderSelect });
 }
 
-export async function getOrderById(id: string) {
-  const order = await prisma.order.findUnique({ where: { id }, select: orderSelect });
+export async function getOrderById(id: string, workspaceId: string) {
+  const order = await prisma.order.findFirst({ where: { id, workspaceId }, select: orderSelect });
   if (!order) throw new AppError('Order not found', 404);
   return order;
 }
 
-export async function createOrder(data: CreateOrderInput, createdByUserId: string) {
+export async function createOrder(data: CreateOrderInput & { workspaceId: string }, createdByUserId: string) {
   const orderNumber = await generateOrderNumber();
   const order = await prisma.order.create({
     data: {
@@ -57,8 +57,8 @@ export async function createOrder(data: CreateOrderInput, createdByUserId: strin
   return order;
 }
 
-export async function changeOrderStatus(id: string, data: ChangeOrderStatusInput, performedByUserId: string) {
-  const order = await prisma.order.findUnique({ where: { id } });
+export async function changeOrderStatus(id: string, data: ChangeOrderStatusInput, performedByUserId: string, workspaceId: string) {
+  const order = await prisma.order.findFirst({ where: { id, workspaceId } });
   if (!order) throw new AppError('Order not found', 404);
   const updated = await prisma.order.update({
     where: { id },
@@ -74,8 +74,8 @@ export async function changeOrderStatus(id: string, data: ChangeOrderStatusInput
   return updated;
 }
 
-export async function deleteOrder(id: string, performedByUserId: string) {
-  const order = await prisma.order.findUnique({ where: { id } });
+export async function deleteOrder(id: string, performedByUserId: string, workspaceId: string) {
+  const order = await prisma.order.findFirst({ where: { id, workspaceId } });
   if (!order) throw new AppError('Order not found', 404);
   await prisma.order.delete({ where: { id } });
   await logActivity(prisma, {

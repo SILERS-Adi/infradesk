@@ -14,7 +14,7 @@ export async function getCredentials(req: Request, res: Response, next: NextFunc
   try {
     const { locationId, deviceId, category, page, limit } = req.query as Record<string, string>;
     const result = await listCredentials({
-      workspaceId: req.workspaceId,
+      workspaceId: req.workspaceId!,
       locationId,
       deviceId,
       category: category as CredentialCategory | undefined,
@@ -31,7 +31,7 @@ export async function getCredentials(req: Request, res: Response, next: NextFunc
 
 export async function getCredential(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const credential = await getCredentialById(req.params.id, req.user!);
+    const credential = await getCredentialById(req.params.id, req.workspaceId!, req.user!);
 
     if (req.membership && !isCredentialAccessible(req.membership, {
       deviceId: credential.deviceId,
@@ -50,7 +50,7 @@ export async function getCredential(req: Request, res: Response, next: NextFunct
 
 export async function revealCredentialPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const result = await revealCredential(req.params.id, {
+    const result = await revealCredential(req.params.id, req.workspaceId!, {
       userId: req.user!.userId,
     });
     res.status(200).json(result);
@@ -61,7 +61,7 @@ export async function revealCredentialPassword(req: Request, res: Response, next
 
 export async function postCredential(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const credential = await createCredential(req.body, req.user!.userId);
+    const credential = await createCredential(req.body, req.user!.userId, req.workspaceId!);
     res.status(201).json(credential);
   } catch (err) {
     next(err);
@@ -70,7 +70,7 @@ export async function postCredential(req: Request, res: Response, next: NextFunc
 
 export async function patchCredential(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const credential = await updateCredential(req.params.id, req.body, req.user!.userId);
+    const credential = await updateCredential(req.params.id, req.body, req.user!.userId, req.workspaceId!);
     res.status(200).json(credential);
   } catch (err) {
     next(err);
@@ -79,7 +79,7 @@ export async function patchCredential(req: Request, res: Response, next: NextFun
 
 export async function removeCredential(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    await deleteCredential(req.params.id, req.user!.userId);
+    await deleteCredential(req.params.id, req.user!.userId, req.workspaceId!);
     res.status(204).send();
   } catch (err) {
     next(err);

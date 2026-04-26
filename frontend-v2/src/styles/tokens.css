@@ -1,0 +1,164 @@
+/* ══════════════════════════════════════════════════════════════
+   INFRADESK V2 — DESIGN TOKENS (PackHub standard)
+   3 tryby: light (default) / dark / auto (prefers-color-scheme)
+   Activation: document.documentElement.dataset.theme = 'dark'|'light'|'auto'
+   ══════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root, [data-theme='light'] {
+  /* Primary */
+  --pri: #6366f1;
+  --pri-h: #4f46e5;
+  --pri-l: #eef2ff;
+  --pri-50: #e0e7ff;
+  --pri-glow: rgba(99, 102, 241, .18);
+  --pri-glow2: rgba(99, 102, 241, .3);
+
+  /* Surfaces */
+  --bg:    #f0f2f5;
+  --sf:    #ffffff;
+  --sf2:   #f8f9fb;
+  --sf-h:  #f3f4f6;
+  --sf-el: #ffffff;
+
+  /* Text 3-tier */
+  --tx:  #111827;
+  --tx2: #4b5563;
+  --tx3: #9ca3af;
+
+  /* Borders */
+  --bd:    #e5e7eb;
+  --bd-l:  #f3f4f6;
+  --bd-f:  #6366f1;
+
+  /* Semantic */
+  --ok:   #10b981;
+  --ok-l: #ecfdf5;
+  --ok-b: #a7f3d0;
+  --wn:   #f59e0b;
+  --wn-l: #fffbeb;
+  --wn-b: #fde68a;
+  --er:   #ef4444;
+  --er-l: #fef2f2;
+  --er-b: #fecaca;
+  --in:   #3b82f6;
+  --in-l: #eff6ff;
+  --in-b: #bfdbfe;
+
+  /* Shadows */
+  --sh1: 0 1px 2px rgba(0,0,0,.04);
+  --sh2: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --sh3: 0 4px 12px rgba(0,0,0,.07);
+  --sh4: 0 12px 32px rgba(0,0,0,.1);
+  --sh-glow: 0 0 24px var(--pri-glow);
+
+  /* Spacing scale (used as Tailwind arbitrary values: p-[var(--sp-N)] etc) */
+  /* Compat aliases — typo'''s used in feature pages, kept for safety */
+  --rs:    var(--r-s);          /* common typo for --r-s */
+  --r-m:   12px;                /* medium radius */
+  --r-xs:  6px;                 /* extra-small radius */
+  --tm:    var(--tx2);          /* common typo for --tx2 (medium text) */
+  --token: var(--pri);          /* alias used by design pages */
+  --wr:    var(--wn);           /* common typo for --wn (warn) */
+
+  /* Spacing scale (used as Tailwind arbitrary values: p-[var(--sp-N)] etc) */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 32px;
+  --sp-8: 40px;
+
+  /* Radii */
+  --r:    14px;
+  --r-s:  10px;
+  --r-l:  18px;
+  --r-xl: 24px;
+
+  /* Sidebar */
+  --side-bg:     #ffffff;
+  --side-bd:     #e5e7eb;
+  --side-act:    #eef2ff;
+  --side-act-tx: #4f46e5;
+  --side-hv:     #f3f4f6;
+
+  /* Glass */
+  --glass:      rgba(255,255,255,.72);
+  --glass-bd:   rgba(255,255,255,.5);
+  --glass-blur: 16px;
+}
+
+[data-theme='dark'] {
+  --pri: #818cf8;
+  --pri-h: #6366f1;
+  --pri-l: rgba(99,102,241,.14);
+  --pri-50: rgba(99,102,241,.1);
+  --pri-glow: rgba(129,140,248,.22);
+  --pri-glow2: rgba(129,140,248,.4);
+
+  --bg:    #0b101b;
+  --sf:    #151c2c;
+  --sf2:   #111827;
+  --sf-h:  #1c2536;
+  --sf-el: #1c2536;
+
+  --tx:  #f3f4f6;
+  --tx2: #9ca3af;
+  --tx3: #6b7280;
+
+  --bd:    #1f2937;
+  --bd-l:  #1c2536;
+  --bd-f:  #818cf8;
+
+  --ok:   #34d399;
+  --ok-l: rgba(16,185,129,.14);
+  --ok-b: rgba(52,211,153,.25);
+  --wn:   #fbbf24;
+  --wn-l: rgba(251,191,36,.14);
+  --wn-b: rgba(251,191,36,.25);
+  --er:   #f87171;
+  --er-l: rgba(248,113,113,.14);
+  --er-b: rgba(248,113,113,.25);
+  --in:   #60a5fa;
+  --in-l: rgba(96,165,250,.14);
+  --in-b: rgba(96,165,250,.25);
+
+  --sh1: 0 1px 3px rgba(0,0,0,.4);
+  --sh2: 0 2px 6px rgba(0,0,0,.4);
+  --sh3: 0 6px 20px rgba(0,0,0,.5);
+  --sh4: 0 16px 48px rgba(0,0,0,.6);
+  --sh-glow: 0 0 30px var(--pri-glow);
+
+  --side-bg:     #151c2c;
+  --side-bd:     #1f2937;
+  --side-act:    rgba(99,102,241,.14);
+  --side-act-tx: #a5b4fc;
+  --side-hv:     #1c2536;
+
+  --glass:      rgba(21,28,44,.7);
+  --glass-bd:   rgba(31,41,55,.5);
+  --glass-blur: 20px;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme='auto'] {
+    --pri: #818cf8; --pri-h: #6366f1; --pri-l: rgba(99,102,241,.14); --pri-50: rgba(99,102,241,.1);
+    --pri-glow: rgba(129,140,248,.22); --pri-glow2: rgba(129,140,248,.4);
+    --bg: #0b101b; --sf: #151c2c; --sf2: #111827; --sf-h: #1c2536; --sf-el: #1c2536;
+    --tx: #f3f4f6; --tx2: #9ca3af; --tx3: #6b7280;
+    --bd: #1f2937; --bd-l: #1c2536; --bd-f: #818cf8;
+    --ok: #34d399; --ok-l: rgba(16,185,129,.14); --ok-b: rgba(52,211,153,.25);
+    --wn: #fbbf24; --wn-l: rgba(251,191,36,.14); --wn-b: rgba(251,191,36,.25);
+    --er: #f87171; --er-l: rgba(248,113,113,.14); --er-b: rgba(248,113,113,.25);
+    --in: #60a5fa; --in-l: rgba(96,165,250,.14); --in-b: rgba(96,165,250,.25);
+    --sh1: 0 1px 3px rgba(0,0,0,.4); --sh2: 0 2px 6px rgba(0,0,0,.4);
+    --sh3: 0 6px 20px rgba(0,0,0,.5); --sh4: 0 16px 48px rgba(0,0,0,.6);
+    --sh-glow: 0 0 30px var(--pri-glow);
+    --side-bg: #151c2c; --side-bd: #1f2937; --side-act: rgba(99,102,241,.14);
+    --side-act-tx: #a5b4fc; --side-hv: #1c2536;
+    --glass: rgba(21,28,44,.7); --glass-bd: rgba(31,41,55,.5); --glass-blur: 20px;
+  }
+}

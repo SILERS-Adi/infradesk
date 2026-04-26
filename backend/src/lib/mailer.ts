@@ -132,6 +132,9 @@ export async function sendMail(to: string, subject: string, html: string): Promi
       user: cfg.user,
       pass: cfg.pass,
     },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
 
   await transporter.sendMail({
@@ -140,4 +143,24 @@ export async function sendMail(to: string, subject: string, html: string): Promi
     subject,
     html,
   });
+}
+
+export async function sendMailWithAttachment(
+  to: string,
+  subject: string,
+  html: string,
+  attachments: { filename: string; content: Buffer | string; contentType?: string }[]
+): Promise<void> {
+  const cfg = await getSmtpConfig();
+  const transporter = nodemailer.createTransport({
+    host: cfg.host,
+    port: cfg.port,
+    secure: cfg.port === 465,
+    auth: { user: cfg.user, pass: cfg.pass },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 60000,
+  });
+
+  await transporter.sendMail({ from: cfg.from, to, subject, html, attachments });
 }

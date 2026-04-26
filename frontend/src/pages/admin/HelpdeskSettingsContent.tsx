@@ -280,7 +280,7 @@ export default function HelpdeskSettingsContent() {
       {/* Toggles — only automation options (no "user selects" — that's the manual mode) */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <ToggleRow label="Asystent AI może tworzyć zgłoszenia" desc="AI automatycznie tworzy zgłoszenia na podstawie wykrytych problemów" checked={form.allowAssistantAutoCreate} onChange={v => setForm(f => ({ ...f, allowAssistantAutoCreate: v }))} />
-        <ToggleRow label="Alerty agentów tworzą zgłoszenia" desc="Automatyczne tworzenie zgłoszeń gdy agent wykryje problem" checked={form.allowAlertAutoCreate} onChange={v => setForm(f => ({ ...f, allowAlertAutoCreate: v }))} />
+        <ToggleRow label="Alerty asystentów tworzą zgłoszenia" desc="Automatyczne tworzenie zgłoszeń gdy asystent wykryje problem" checked={form.allowAlertAutoCreate} onChange={v => setForm(f => ({ ...f, allowAlertAutoCreate: v }))} />
       </div>
     </div>
   );

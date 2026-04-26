@@ -7,12 +7,15 @@ import {
 
 /**
  * Fetch agent registration by ID, verifying it belongs to the requester's workspace.
+ * MSP operators can access agents in client workspaces.
  * Returns null if not found or workspace mismatch.
  */
 async function findAgentInWorkspace(id: string, workspaceId?: string | null) {
   if (!workspaceId) return null;
+  const { getMspWorkspaceIds } = require('../../utils/mspScope');
+  const wsIds = await getMspWorkspaceIds(workspaceId);
   return prisma.agentRegistration.findFirst({
-    where: { id, workspaceId },
+    where: { id, workspaceId: wsIds.length > 1 ? { in: wsIds } : workspaceId },
   });
 }
 
@@ -130,6 +133,26 @@ export async function postSystemReboot(req: Request, res: Response, next: NextFu
     if (!reg) { res.status(404).json({ error: 'Not found' }); return; }
     const { delay } = req.body as { delay?: number };
     notifyAgent(reg.agentToken, { type: 'system_reboot', delay: delay ?? 60 });
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+}
+
+/** Generic WS notify — panel can trigger agent commands like speedtest, schedule_task, install_software. */
+const ALLOWED_NOTIFY_TYPES = new Set([
+  'speedtest', 'schedule_task', 'install_software', 'update', 'wake',
+]);
+export async function postNotify(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const body = req.body as { type?: string; [k: string]: any };
+    const type = body?.type || '';
+    if (!ALLOWED_NOTIFY_TYPES.has(type)) {
+      res.status(400).json({ error: `type '${type}' not allowed` });
+      return;
+    }
+    const { notifyAgent } = await import('../../utils/websocket');
+    const reg = await findAgentInWorkspace(req.params.id, req.workspaceId);
+    if (!reg) { res.status(404).json({ error: 'Not found' }); return; }
+    notifyAgent(reg.agentToken, body);
     res.json({ ok: true });
   } catch (err) { next(err); }
 }

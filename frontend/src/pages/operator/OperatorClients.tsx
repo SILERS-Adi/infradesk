@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Building2, Monitor, Ticket, Plus, X, Loader2, AlertTriangle, Link2, Send, Circle, Receipt } from 'lucide-react';
+import { Building2, Monitor, Ticket, Plus, X, Loader2, AlertTriangle, Link2, Send, Receipt, Pencil, Save, Search } from 'lucide-react';
 import ClientBillingModal from './ClientBillingModal';
 import toast from 'react-hot-toast';
 import { operatorApi, operatorClientApi, type CreateClientPayload } from '../../api/operator';
@@ -9,6 +9,9 @@ import { usersApi } from '../../api/users';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { Input } from '../../components/ui/Input';
+import { Select } from '../../components/ui/Select';
+import { Button } from '../../components/ui/Button';
 import type { OperatorClient } from '../../api/operator';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -22,6 +25,7 @@ export default function OperatorClients() {
   const [showForm, setShowForm] = useState(false);
   const [showLink, setShowLink] = useState(false);
   const [billingClient, setBillingClient] = useState<{ relationId: string; name: string } | null>(null);
+  const [editClient, setEditClient] = useState<OperatorClient | null>(null);
 
   const { data: clients, isLoading, isError } = useQuery({
     queryKey: ['operator', 'clients'],
@@ -45,6 +49,9 @@ export default function OperatorClients() {
           {r.city && <div style={{ fontSize: 11, color: 'var(--td)' }}>{r.city}</div>}
         </div>
       </div>
+    )},
+    { key: 'taxId', header: 'NIP', render: (r) => (
+      r.taxId ? <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--ts)' }}>{r.taxId}</span> : <span style={{ color: 'var(--td)' }}>—</span>
     )},
     { key: 'status', header: 'Status', render: (r) => {
       const sc = STATUS_CONFIG[r.clientStatus] ?? STATUS_CONFIG.active;
@@ -70,6 +77,13 @@ export default function OperatorClients() {
     )},
     { key: 'actions', header: '', render: (r) => (
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button
+          onClick={(e) => { e.stopPropagation(); setEditClient(r); }}
+          title="Edytuj firmę"
+          style={{ fontSize: 11, fontWeight: 600, color: 'var(--tm)', background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+        >
+          <Pencil size={12} />
+        </button>
         <button
           onClick={(e) => { e.stopPropagation(); setBillingClient({ relationId: r.relationId, name: r.name }); }}
           style={{ fontSize: 11, fontWeight: 600, color: '#818CF8', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}
@@ -150,6 +164,109 @@ export default function OperatorClients() {
           clientName={billingClient.name}
         />
       )}
+
+      {editClient && (
+        <EditClientModal
+          client={editClient}
+          onClose={() => setEditClient(null)}
+          onSuccess={() => { setEditClient(null); queryClient.invalidateQueries({ queryKey: ['operator'] }); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Edit Client Modal ──
+function EditClientModal({ client, onClose, onSuccess }: { client: OperatorClient; onClose: () => void; onSuccess: () => void }) {
+  const [name, setName] = useState(client.name);
+  const [legalName, setLegalName] = useState((client as any).legalName || '');
+  const [taxId, setTaxId] = useState(client.taxId || '');
+  const [email, setEmail] = useState(client.email || '');
+  const [phone, setPhone] = useState(client.phone || '');
+  const [city, setCity] = useState(client.city || '');
+  const [saving, setSaving] = useState(false);
+  const [gusLoading, setGusLoading] = useState(false);
+
+  async function lookupGus() {
+    const cleanNip = taxId.replace(/[-\s]/g, '');
+    if (!/^\d{10}$/.test(cleanNip)) { toast.error('Wpisz poprawny NIP'); return; }
+    setGusLoading(true);
+    try {
+      const { data } = await apiClient.get(`/invoicing/contractors/nip-lookup/${cleanNip}`);
+      if (data.name) setLegalName(data.name);
+      if (data.city) setCity(data.city);
+      toast.success('Pobrano z GUS');
+    } catch { toast.error('Nie udało się pobrać'); }
+    finally { setGusLoading(false); }
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      await apiClient.put(`/workspaces/${client.id}`, {
+        name: name.trim(), legalName: legalName.trim() || undefined,
+        taxId: taxId.trim() || undefined, email: email.trim() || undefined,
+        phone: phone.trim() || undefined, city: city.trim() || undefined,
+      });
+      toast.success('Zapisano');
+      onSuccess();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Błąd zapisu');
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <div onClick={() => !saving && onClose()} style={{
+      position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, backdropFilter: 'blur(4px)',
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: 'var(--bg-card, #0F1628)', border: '1px solid var(--border)', borderRadius: 14,
+        width: '100%', maxWidth: 560, padding: 24, boxShadow: '0 24px 60px rgba(0,0,0,0.4)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: '#6366F1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Building2 size={18} color="#fff" />
+            </div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--t)' }}>Edytuj firmę klienta</div>
+              <div style={{ fontSize: 11, color: 'var(--tm)' }}>{client.name}</div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--td)', cursor: 'pointer', padding: 4 }}><X size={18} /></button>
+        </div>
+
+        {/* NIP + GUS */}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', marginBottom: 14 }}>
+          <div style={{ flex: 1 }}>
+            <Input label="NIP" placeholder="np. 1234567890" value={taxId} onChange={e => setTaxId(e.target.value)} />
+          </div>
+          <button onClick={lookupGus} disabled={gusLoading || taxId.replace(/[-\s]/g, '').length < 10}
+            style={{ padding: '9px 16px', borderRadius: 10, border: 'none', background: 'var(--cta)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: gusLoading || taxId.replace(/[-\s]/g, '').length < 10 ? 0.5 : 1 }}>
+            {gusLoading ? <Loader2 size={12} className="spinning" /> : <Search size={12} />}
+            {gusLoading ? 'Szukam' : 'GUS'}
+          </button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+          <Input label="Nazwa krótka" placeholder="np. PKS Garwolin" value={name} onChange={e => setName(e.target.value)} />
+          <Input label="Pełna nazwa (prawna)" placeholder="np. PKS Garwolin Sp. z o.o." value={legalName} onChange={e => setLegalName(e.target.value)} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+          <Input label="Email" placeholder="biuro@firma.pl" value={email} onChange={e => setEmail(e.target.value)} />
+          <Input label="Telefon" placeholder="+48 500 000 000" value={phone} onChange={e => setPhone(e.target.value)} />
+        </div>
+        <Input label="Miasto" placeholder="np. Garwolin" value={city} onChange={e => setCity(e.target.value)} />
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
+          <button onClick={onClose} disabled={saving} style={{ padding: '9px 18px', borderRadius: 9, border: '1px solid var(--border)', background: 'transparent', color: 'var(--ts)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Anuluj</button>
+          <button onClick={save} disabled={saving} style={{ padding: '9px 18px', borderRadius: 9, border: 'none', background: 'var(--cta)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 8px rgba(99,102,241,0.2)' }}>
+            {saving ? <Loader2 size={12} className="spinning" /> : <Save size={12} />}
+            {saving ? 'Zapisuję...' : 'Zapisz'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -179,68 +296,77 @@ function AddClientForm({ onClose, onSuccess }: { onClose: () => void; onSuccess:
     mutation.mutate(form);
   };
 
-  const field = (label: string, key: keyof CreateClientPayload, type = 'text', required = false) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--tm)' }}>
-        {label} {required && <span style={{ color: '#EF4444' }}>*</span>}
-      </label>
-      <input className="input" type={type} value={(form[key] as string) ?? ''} onChange={(e) => setForm(prev => ({ ...prev, [key]: e.target.value }))} required={required} />
-    </div>
-  );
+  const set = <K extends keyof CreateClientPayload>(key: K, value: CreateClientPayload[K]) =>
+    setForm(prev => ({ ...prev, [key]: value }));
+
+  const userOptions = [
+    { value: '', label: '— Brak —' },
+    ...((users ?? []) as any[]).map(u => ({ value: u.id, label: `${u.firstName} ${u.lastName}` })),
+  ];
 
   return (
     <div className="page-card" style={{ padding: 24, marginBottom: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--t)', margin: 0 }}>Dodaj firmę klienta</h3>
+        <div>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--t)', margin: 0 }}>Dodaj firmę klienta</h3>
+          <p style={{ fontSize: 12, color: 'var(--tm)', margin: '4px 0 0' }}>
+            Utwórz nową firmę obsługiwaną przez Twoje Centrum IT
+          </p>
+        </div>
         <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--tm)', padding: 4 }}><X size={18} /></button>
       </div>
       <form onSubmit={handleSubmit}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 16, marginBottom: 16 }}>
-          {field('Nazwa firmy', 'name', 'text', true)}
-          {field('NIP', 'taxId')}
-          {field('Email kontaktowy', 'email', 'email')}
-          {field('Telefon', 'phone', 'tel')}
-          {field('Osoba kontaktowa', 'contactPerson')}
-          {field('Miasto', 'city')}
-          {field('Lokalizacja główna', 'locationName')}
-        </div>
-
-        {/* Opiekun MSP */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--tm)' }}>Opiekun po stronie MSP</label>
-            <select className="input" value={form.assignedUserId ?? ''} onChange={e => setForm(prev => ({ ...prev, assignedUserId: e.target.value || undefined }))}>
-              <option value="">— Brak —</option>
-              {(users ?? []).map((u: any) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
-            </select>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          {/* Left — dane firmy */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--tm)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+              Dane firmy
+            </div>
+            <Input label="Nazwa firmy *" placeholder="np. Acme Sp. z o.o." value={form.name ?? ''} onChange={e => set('name', e.target.value)} />
+            <Input label="NIP" placeholder="123-456-78-90" value={form.taxId ?? ''} onChange={e => set('taxId', e.target.value)} />
+            <Input label="Miasto" placeholder="Warszawa" value={form.city ?? ''} onChange={e => set('city', e.target.value)} />
+            <Input label="Lokalizacja główna" placeholder="np. Biuro Warszawa" value={form.locationName ?? ''} onChange={e => set('locationName', e.target.value)} />
           </div>
 
-          {/* Aktywuj portal */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--tm)' }}>Portal klienta</label>
-            <label style={{
-              display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 10,
-              border: '1px solid var(--border)', cursor: 'pointer', fontSize: 13, color: 'var(--t)',
-            }}>
-              <input type="checkbox" checked={form.activatePortal ?? false} onChange={e => setForm(prev => ({ ...prev, activatePortal: e.target.checked }))}
-                style={{ accentColor: 'var(--accent)' }} />
-              Wyślij dostęp po utworzeniu
-            </label>
+          {/* Right — kontakt + portal */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--tm)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+              Kontakt i opiekun
+            </div>
+            <Input label="Osoba kontaktowa" placeholder="Jan Kowalski" value={form.contactPerson ?? ''} onChange={e => set('contactPerson', e.target.value)} />
+            <Input label="Email kontaktowy" type="email" placeholder="kontakt@firma.pl" value={form.email ?? ''} onChange={e => set('email', e.target.value)} />
+            <Input label="Telefon" type="tel" placeholder="+48 123 456 789" value={form.phone ?? ''} onChange={e => set('phone', e.target.value)} />
+            <Select
+              label="Opiekun po stronie MSP"
+              options={userOptions}
+              value={form.assignedUserId ?? ''}
+              onChange={e => set('assignedUserId', e.target.value || undefined)}
+            />
           </div>
         </div>
+
+        {/* Portal toggle */}
+        <label style={{
+          display: 'flex', alignItems: 'center', gap: 10, marginTop: 16, padding: '12px 16px', borderRadius: 12,
+          border: '1px solid var(--border)', background: 'var(--hover-bg)', cursor: 'pointer', fontSize: 13, color: 'var(--t)',
+        }}>
+          <input type="checkbox" checked={form.activatePortal ?? false}
+            onChange={e => set('activatePortal', e.target.checked)}
+            style={{ accentColor: 'var(--accent)', width: 16, height: 16 }} />
+          <span><strong>Aktywuj portal klienta</strong> — wyślij e-mail z dostępem od razu po utworzeniu</span>
+        </label>
 
         {!form.activatePortal && (
-          <div style={{ padding: '10px 14px', borderRadius: 10, marginBottom: 16, background: 'rgba(148,163,184,0.06)', border: '1px solid rgba(148,163,184,0.12)', fontSize: 12, color: 'var(--tm)' }}>
+          <div style={{ padding: '10px 14px', borderRadius: 10, marginTop: 12, background: 'rgba(148,163,184,0.06)', border: '1px solid rgba(148,163,184,0.12)', fontSize: 12, color: 'var(--tm)' }}>
             Klient zostanie utworzony w statusie <strong style={{ color: 'var(--t)' }}>Robocza</strong> — możesz wysłać dostęp do portalu później.
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-          <button type="button" className="btn-secondary" onClick={onClose}>Anuluj</button>
-          <button type="submit" className="btn-primary" disabled={mutation.isPending} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {mutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-            Dodaj firmę klienta
-          </button>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+          <Button variant="secondary" type="button" onClick={onClose}>Anuluj</Button>
+          <Button type="submit" loading={mutation.isPending}>
+            <Plus size={16} style={{ marginRight: 6 }} /> Dodaj firmę klienta
+          </Button>
         </div>
       </form>
     </div>

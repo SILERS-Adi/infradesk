@@ -22,7 +22,7 @@ import { ScopedAccessBanner } from '../../../components/ui/ScopedAccessBanner';
 import { useWorkspaceContext } from '../../../hooks/useWorkspaceContext';
 import { UnifiedTicketWizard } from '../../../components/wizard/UnifiedTicketWizard';
 import { FormModeToggle, useFormMode } from '../../../components/ui/FormModeToggle';
-import { QuickTicketForm } from '../../../components/forms/QuickTicketForm';
+import { TicketCreateRouter } from '../../../components/forms/TicketCreateRouter';
 import { Modal } from '../../../components/ui/Modal';
 import { formatDate } from '../../../utils/helpers';
 import type { Ticket } from '../../../types';
@@ -31,7 +31,7 @@ type TabKey = 'pending' | 'assigned' | 'completed' | 'cancelled';
 
 /* -- Source icons ---------------------------------------------------------- */
 const SOURCE_ICON: Record<string, { icon: React.ReactNode; label: string }> = {
-  AGENT:         { icon: <Bot className="h-3.5 w-3.5 text-violet-500" />, label: 'Agent' },
+  AGENT:         { icon: <Bot className="h-3.5 w-3.5 text-violet-500" />, label: 'Asystent' },
   CLIENT_PORTAL: { icon: <Globe className="h-3.5 w-3.5 text-blue-500" />, label: 'Portal' },
   PHONE:         { icon: <Phone className="h-3.5 w-3.5 text-green-500" />, label: 'Telefon' },
   EMAIL:         { icon: <Mail className="h-3.5 w-3.5 text-amber-500" />, label: 'Email' },
@@ -319,6 +319,9 @@ export function TicketsListPage() {
   const { data: allTickets = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['tickets-all'],
     queryFn: () => ticketsApi.getAll({ limit: '500' }),
+    refetchInterval: 15_000,           // auto-refresh — wykryje tickety utworzone przez asystenta
+    refetchOnWindowFocus: true,
+    staleTime: 5_000,
   });
 
   const { data: allUsers = [] } = useQuery({
@@ -680,8 +683,8 @@ export function TicketsListPage() {
         />
       ) : (
         <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Nowe zgłoszenie" size="2xl" noPadding>
-          <QuickTicketForm
-            onSuccess={() => { setShowCreate(false); }}
+          <TicketCreateRouter
+            onSuccess={() => { setShowCreate(false); qc.invalidateQueries({ queryKey: ['tickets-all'] }); }}
             onCancel={() => setShowCreate(false)}
           />
         </Modal>

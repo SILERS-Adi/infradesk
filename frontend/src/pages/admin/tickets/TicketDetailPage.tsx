@@ -26,7 +26,7 @@ function parseDescription(raw: string): { text: string; photoUrls: string } {
 }
 
 const TYPE_LABELS: Record<string, string> = { INCIDENT: 'Incydent', REQUEST: 'Prośba', MAINTENANCE: 'Konserwacja', INSTALLATION: 'Instalacja', OTHER: 'Inne' };
-const SOURCE_LABELS: Record<string, string> = { CLIENT_PORTAL: 'Portal klienta', INTERNAL: 'Wewnętrzne', PHONE: 'Telefon', EMAIL: 'Email', QR_SCAN: 'Skan QR', AGENT: 'Agent', IN_PERSON: 'Osobiście', MESSAGE: 'Wiadomość' };
+const SOURCE_LABELS: Record<string, string> = { CLIENT_PORTAL: 'Portal klienta', INTERNAL: 'Wewnętrzne', PHONE: 'Telefon', EMAIL: 'Email', QR_SCAN: 'Skan QR', AGENT: 'Asystent', IN_PERSON: 'Osobiście', MESSAGE: 'Wiadomość' };
 
 const glass = (extra?: React.CSSProperties): React.CSSProperties => ({
   background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, ...extra,

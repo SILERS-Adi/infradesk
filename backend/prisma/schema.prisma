@@ -1402,6 +1402,27 @@ enum InvoiceDocumentType {
   FINAL
   RECEIPT
   PURCHASE_INVOICE
+  // Sprzedaż specjalna
+  VAT_MARGIN      // Faktura VAT marża
+  BILL            // Rachunek (dla nievatowców)
+  // Wewnątrzwspólnotowe
+  WDT             // Wewnątrzwspólnotowa dostawa towarów
+  WNT             // Wewnątrzwspólnotowe nabycie towarów
+  EXPORT          // Faktura eksportowa
+  IMPORT          // Faktura importowa
+  // Magazynowe (WZ/PZ)
+  WZ              // Wydanie zewnętrzne
+  PZ              // Przyjęcie zewnętrzne
+  MM              // Przesunięcie międzymagazynowe
+  // Płatności
+  KP              // Kasa przyjmie (dowód wpłaty)
+  KW              // Kasa wyda (dowód wypłaty)
+  // Oferty
+  ESTIMATE        // Oferta / wycena
+  ORDER           // Zamówienie
+  // Noty
+  ACCOUNTING_NOTE // Nota księgowa
+  CORRECTION_NOTE // Nota korygująca
 }
 
 enum InvoiceDocumentStatus {
@@ -1419,16 +1440,38 @@ model InvoicingContractor {
   workspaceId String
   name        String
   nip         String?
+  regon       String?
+  krs         String?
+  type        String?  @default("company") // company | person
   email       String?
   phone       String?
+  website     String?
   city        String?
   address     String?
+  postalCode  String?
+  country     String?  @default("PL")
+  // Correspondence address
+  corrStreet     String?
+  corrPostalCode String?
+  corrCity       String?
+  // Contact person
+  contactPerson String?
+  contactEmail  String?
+  contactPhone  String?
+  // Bank account
+  bankName    String?
+  bankAccount String?
+  // Logo
+  logoUrl     String?
+  // Defaults
+  defaultPaymentDays String?
   notes       String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([workspaceId])
   @@index([workspaceId, name])
+  @@index([workspaceId, nip])
 }
 
 model InvoicingPayment {
@@ -1452,15 +1495,22 @@ model InvoicingProduct {
   workspaceId String
   name        String
   sku         String?
+  ean         String?
+  pkwiu       String?
+  productType String?  @default("service") // product | service
+  category    String?
   unit        String   @default("szt")
   priceNet    Decimal  @default(0)
   vatRate     String   @default("23")
+  imageUrl    String?
   notes       String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([workspaceId])
   @@index([workspaceId, name])
+  @@index([workspaceId, sku])
+  @@index([workspaceId, ean])
 }
 
 // ── Packaging Module ────────────────────────────────────────────────

@@ -203,29 +203,58 @@ export async function registerAgent(data: RegisterInput) {
     }
 
     // Szukaj istniejącej rejestracji — po hostname+workspace lub serial lub MAC
+    // Also search cross-workspace to prevent duplicates when agent re-registers
+    // without tenantKey (falls to default-ws or different workspace)
     const hostname = (data as any).hostname as string | undefined;
     const serial   = (data as any).serialNumber as string | undefined;
     const mac      = primaryMac((data as any).networkIfaces ?? []);
 
     let existingReg = null as any;
 
-    // 1) Po deviceId (ten sam komputer, reinstalacja)
+    // 1) Po deviceId (ten sam komputer, reinstalacja) — same workspace
     if (deviceId) {
       existingReg = await prisma.agentRegistration.findFirst({
         where: { workspaceId, deviceId },
       });
     }
-    // 2) Po hostname + workspace
+    // 2) Po hostname — same workspace first, then cross-workspace
     if (!existingReg && hostname) {
       existingReg = await prisma.agentRegistration.findFirst({
         where: { workspaceId, hostname },
       });
+      if (!existingReg) {
+        existingReg = await prisma.agentRegistration.findFirst({
+          where: { hostname, status: 'ACTIVE' },
+          orderBy: { lastSeen: 'desc' },
+        });
+        // If found cross-workspace, adopt its workspace
+        if (existingReg && existingReg.workspaceId !== workspaceId) {
+          workspaceId = existingReg.workspaceId;
+          // Also resolve device in the correct workspace
+          if (!existingReg.deviceId) {
+            const loc = await prisma.location.findFirst({ where: { workspaceId }, select: { id: true } });
+            if (loc) deviceId = await resolveDevice(workspaceId, loc.id, data);
+          } else {
+            deviceId = existingReg.deviceId;
+          }
+        }
+      }
     }
-    // 3) Po serialNumber
+    // 3) Po serialNumber — same workspace first, then cross-workspace
     if (!existingReg && serial) {
       existingReg = await prisma.agentRegistration.findFirst({
         where: { workspaceId, serialNumber: serial },
       });
+      if (!existingReg) {
+        existingReg = await prisma.agentRegistration.findFirst({
+          where: { serialNumber: serial, status: 'ACTIVE' },
+          orderBy: { lastSeen: 'desc' },
+        });
+        if (existingReg && existingReg.workspaceId !== workspaceId) {
+          workspaceId = existingReg.workspaceId;
+          deviceId = existingReg.deviceId ?? deviceId;
+        }
+      }
     }
     // 4) Po MAC — szukaj przez powiązane urządzenie
     if (!existingReg && mac) {
@@ -237,6 +266,22 @@ export async function registerAgent(data: RegisterInput) {
         existingReg = await prisma.agentRegistration.findFirst({
           where: { workspaceId, deviceId: devByMac.id },
         });
+      }
+      // Cross-workspace MAC lookup
+      if (!existingReg) {
+        const devAny = await prisma.device.findFirst({
+          where: { macAddress: mac },
+          select: { id: true, workspaceId: true },
+        });
+        if (devAny) {
+          existingReg = await prisma.agentRegistration.findFirst({
+            where: { deviceId: devAny.id, status: 'ACTIVE' },
+          });
+          if (existingReg && existingReg.workspaceId !== workspaceId) {
+            workspaceId = existingReg.workspaceId;
+            deviceId = existingReg.deviceId ?? deviceId;
+          }
+        }
       }
     }
 
@@ -326,7 +371,25 @@ export async function registerAgent(data: RegisterInput) {
 }
 
 export async function updateMetrics(token: string, data: MetricsInput) {
-  const reg = await prisma.agentRegistration.findUnique({ where: { agentToken: token } });
+  let reg = await prisma.agentRegistration.findUnique({ where: { agentToken: token } });
+
+  // Token mismatch recovery: if token not found, try to find by hostname+IP and re-bind token
+  if (!reg && (data as any).hostname) {
+    const hostname = (data as any).hostname as string;
+    const candidates = await prisma.agentRegistration.findMany({
+      where: { hostname, status: 'ACTIVE' },
+      orderBy: { lastSeen: 'desc' },
+      take: 1,
+    });
+    if (candidates.length > 0) {
+      reg = await prisma.agentRegistration.update({
+        where: { id: candidates[0].id },
+        data: { agentToken: token },
+      });
+      console.log(`[Agent] Token re-bound for ${hostname} (id=${reg.id.slice(0, 8)})`);
+    }
+  }
+
   if (!reg) throw new AppError('Agent not found', 404);
   // Security: PENDING agents can only report status — no device creation or data updates
   if (reg.status === 'REJECTED') throw new AppError('Agent rejected', 403);
@@ -375,6 +438,16 @@ export async function updateMetrics(token: string, data: MetricsInput) {
     }
     if (sm.smartDisks || sm.services || sm.criticalEvents) {
       snapshots.push({ agentRegId: reg.id, type: 'health', data: { smartDisks: sm.smartDisks, services: sm.services, criticalEvents: sm.criticalEvents } });
+    }
+    if (sm.speedtest) {
+      const st = sm.speedtest;
+      snapshots.push({ agentRegId: reg.id, type: 'speedtest', data: st, score: typeof st.downloadMbps === 'number' ? Math.round(st.downloadMbps) : undefined });
+    }
+    if (sm.logShipping?.entries?.length) {
+      snapshots.push({ agentRegId: reg.id, type: 'logs', data: sm.logShipping });
+    }
+    if (sm.licenseAudit?.licenses?.length) {
+      snapshots.push({ agentRegId: reg.id, type: 'license', data: sm.licenseAudit });
     }
     if (snapshots.length) {
       prisma.metricsSnapshot.createMany({ data: snapshots }).catch(() => {});

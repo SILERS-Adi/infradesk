@@ -4,6 +4,29 @@
    Baza: pierwsza wersja + poprawki czytelności
    ========================================= */
 
+/* ── CSS VARIABLES — override dark values ── */
+[data-theme="light"] {
+  --bg: #eef2f8;
+  --bg2: #e6ecf5;
+  --sidebar-bg: rgba(247,249,253,0.95);
+  --border: rgba(0,0,0,0.06);
+  --border-l: rgba(0,0,0,0.10);
+  --accent: #4F6AFF;
+  --accent-g: rgba(79,106,255,0.08);
+  --accent-s: #3B5BDB;
+  --t: #1E2940;
+  --ts: #475569;
+  --tm: #64748B;
+  --td: #94A3B8;
+  --bg-card: rgba(255,255,255,0.9);
+  --hover-bg: rgba(0,0,0,0.02);
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
+  --shadow-glow: 0 0 0 transparent;
+  --input-bg: rgba(0,0,0,0.02);
+  --input-border: rgba(0,0,0,0.08);
+  --input-focus: rgba(79,106,255,0.15);
+}
+
 /* ── Tło — lekko ciemniejsze dla hierarchii ── */
 [data-theme="light"] body,
 [data-theme="light"] .app,
@@ -295,3 +318,60 @@
 /* TTS float */
 [data-theme="light"] .tts-float { background: rgba(79,140,255,.1) !important; box-shadow: 0 2px 8px rgba(0,0,0,.08), inset 0 0 0 1px rgba(79,140,255,.15) !important; }
 [data-theme="light"] .tts-float.muted { background: rgba(239,68,68,.08) !important; }
+
+/* ══════════════════════════════════════════════
+   PAGE CARDS & CONTENT — LIGHT MODE FIX
+   ══════════════════════════════════════════════ */
+
+/* ── Page cards (backup, contact, about etc.) ── */
+[data-theme="light"] .page-card {
+  background: #fff !important;
+  border: 1px solid rgba(0,0,0,0.06) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03) !important;
+}
+[data-theme="light"] .page-card-header {
+  color: #1E2940 !important;
+  border-bottom-color: rgba(0,0,0,0.05) !important;
+  background: rgba(0,0,0,0.015) !important;
+}
+[data-theme="light"] .page-card-body { color: #334155 !important; }
+
+/* ── All text inside page cards — readable ── */
+[data-theme="light"] .page-card div[style*="font-weight:600"],
+[data-theme="light"] .page-card div[style*="font-weight:500"],
+[data-theme="light"] .page-card span[style*="font-weight:600"],
+[data-theme="light"] .page-card span[style*="font-weight:500"] {
+  color: #1E2940 !important;
+}
+
+/* ── Inline style overrides for JS-rendered content ── */
+[data-theme="light"] div[style*="border-radius:14px"][style*="border:1px solid var(--border)"],
+[data-theme="light"] div[style*="border-radius:12px"][style*="border:1px solid var(--border"] {
+  background: #fff !important;
+  border-color: rgba(0,0,0,0.06) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03) !important;
+}
+
+/* ── Info rows ── */
+[data-theme="light"] .info-row { border-bottom-color: rgba(0,0,0,0.04) !important; }
+[data-theme="light"] .info-label { color: #64748B !important; }
+[data-theme="light"] .info-value { color: #1E2940 !important; }
+
+/* ── Help / contact ── */
+[data-theme="light"] .help-card { color: #334155 !important; }
+[data-theme="light"] .help-company { color: #1E2940 !important; }
+[data-theme="light"] .help-contact { color: #475569 !important; }
+
+/* ── Metrics ── */
+[data-theme="light"] .metric-card { background: #fff !important; border-color: rgba(0,0,0,0.05) !important; }
+[data-theme="light"] .metric-label { color: #64748B !important; }
+[data-theme="light"] .metric-value { color: #1E2940 !important; }
+
+/* ── Scan items ── */
+[data-theme="light"] .scan-item:hover { background: rgba(0,0,0,0.02) !important; }
+[data-theme="light"] .scan-item-label { color: #1E2940 !important; }
+[data-theme="light"] .scan-item-detail { color: #64748B !important; }
+
+/* ── Page title area ── */
+[data-theme="light"] .page-title-text { color: #1E2940 !important; }
+[data-theme="light"] .page-subtitle { color: #64748B !important; }

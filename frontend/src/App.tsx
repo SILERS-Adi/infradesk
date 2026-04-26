@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { CookieConsent } from './components/CookieConsent';
+import { InstallPrompt } from './components/InstallPrompt';
 import { AuthProvider, useAuth } from './store/authStore';
 import { useWorkspace } from './store/workspaceStore';
 import { workspacesApi } from './api/workspaces';
@@ -125,7 +126,10 @@ import { ProductsPage } from './pages/admin/invoicing/ProductsPage';
 import { ProductFormPage } from './pages/admin/invoicing/ProductFormPage';
 import { ReportsPage } from './pages/admin/invoicing/ReportsPage';
 import { PaymentsPage } from './pages/admin/invoicing/PaymentsPage';
-import { WarehousesPage, ImportPage } from './pages/admin/invoicing/PlaceholderPage';
+import { WarehousesPage } from './pages/admin/invoicing/PlaceholderPage';
+import { ImportCsvPage } from './pages/admin/invoicing/ImportPage';
+import { InvoicingSettingsPage } from './pages/admin/invoicing/InvoicingSettingsPage';
+import { JpkExportPage } from './pages/admin/invoicing/JpkExportPage';
 
 // Packaging module (IDS 1.0 — PakOps Full)
 import { PackagingDashboardPage } from './pages/admin/packaging/PackagingDashboardPage';
@@ -224,7 +228,9 @@ function AdminRoutes() {
         <Route path="invoicing/warehouses" element={<WarehousesPage />} />
         <Route path="invoicing/payments" element={<PaymentsPage />} />
         <Route path="invoicing/reports" element={<ReportsPage />} />
-        <Route path="invoicing/import" element={<ImportPage />} />
+        <Route path="invoicing/import" element={<ImportCsvPage />} />
+        <Route path="invoicing/settings" element={<InvoicingSettingsPage />} />
+        <Route path="invoicing/jpk" element={<JpkExportPage />} />
         {/* Packaging module */}
         <Route path="packaging" element={<PackagingDashboardPage />} />
         <Route path="packaging/shipments" element={<ShipmentsListPage />} />
@@ -404,6 +410,7 @@ export default function App() {
             }}
           />
           <CookieConsent />
+          <InstallPrompt />
           <AutoLoginHandler />
           <UserRefresher />
           <WorkspaceResolver />

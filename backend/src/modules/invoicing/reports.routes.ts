@@ -1,9 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../../middleware/auth';
+import { requireWorkspace } from '../../middleware/workspace';
 import * as reportsService from './reports.service';
 
 const router = Router();
-router.use(authenticate);
+router.use(authenticate, requireWorkspace);
 
 router.get('/sales', async (req: Request, res: Response, next: NextFunction) => {
   try {

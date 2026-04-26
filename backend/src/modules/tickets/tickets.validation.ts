@@ -14,6 +14,8 @@ export const createTicketSchema = z.object({
   assignedToUserId: z.string().uuid().optional().nullable(),
   reporterName: z.string().optional(),
   reporterPhone: z.string().optional(),
+  /** MSP only — create ticket on behalf of a client workspace */
+  clientWorkspaceId: z.string().uuid().optional(),
 });
 
 export const updateTicketSchema = z.object({

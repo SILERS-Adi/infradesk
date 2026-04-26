@@ -118,7 +118,7 @@ function CompareModal({ open, onClose }: { open: boolean; onClose: () => void })
         <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4" style={{ background: '#0E1527', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="flex items-center gap-3">
             <GitCompareArrows className="h-5 w-5" style={{ color: '#8B5CF6' }} />
-            <h3 className="text-[16px] font-semibold text-white/90">Asystent Home vs Asystent Business</h3>
+            <h3 className="text-[16px] font-semibold text-white/90">Asystent Home vs InfraDesk Business</h3>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg transition-colors hover:bg-white/10">
             <X className="h-5 w-5 text-white/40" />
@@ -201,9 +201,9 @@ export function PublicDownloadsPage() {
       ],
       notes: ['Wymaga Windows 10 lub nowszego', 'Monitoring, audyt, czyszczenie, pomoc zdalna', 'Bezpłatny dla użytkowników domowych'],
     },
-    { icon: <Server className="h-6 w-6" />, name: 'Asystent Business', description: 'Dla firm. Monitoring sprzętu, S.M.A.R.T., RAID, Event Log, zgłoszenia serwisowe, pomoc zdalna.', color: 'violet',
+    { icon: <Server className="h-6 w-6" />, name: 'InfraDesk Business', description: 'Dla firm. Monitoring sprzętu, S.M.A.R.T., RAID, Event Log, zgłoszenia serwisowe, pomoc zdalna.', color: 'violet',
       files: [
-        { label: 'Asystent Business — Windows', url: '/downloads/Asystent%20Business%203.0.exe', badge: versionBadge, primary: true, size: '~40 MB' },
+        { label: 'InfraDesk Business — Windows', url: '/downloads/InfraDesk%20Business%203.0.exe', badge: versionBadge, primary: true, size: '~40 MB' },
       ],
       notes: ['Wymaga Windows 10 lub nowszego', 'S.M.A.R.T., RAID, Event Log, certyfikaty SSL', 'Formularz zgłoszeń ze screenshotami', 'Działa też jako usługa Windows (serwery)'],
     },
@@ -235,7 +235,7 @@ export function PublicDownloadsPage() {
             <h1 className="text-[32px] font-semibold text-white/90 mb-3">InfraDesk</h1>
             <p className="text-[13px] font-medium uppercase tracking-[0.15em] mb-10" style={{ color: 'rgba(139,92,246,0.6)' }}>Pliki do pobrania</p>
             <p className="text-[14px] leading-relaxed max-w-[320px] mx-auto" style={{ color: 'rgba(255,255,255,0.3)' }}>
-              Pobierz Asystent Home, Asystent Business, Android TV i narzędzia do zdalnej pomocy.
+              Pobierz Asystent Home, InfraDesk Business, Android TV i narzędzia do zdalnej pomocy.
             </p>
           </div>
           <p className="absolute bottom-6 text-[11px]" style={{ color: 'rgba(255,255,255,0.15)' }}>by SILERS · infradesk.pl</p>

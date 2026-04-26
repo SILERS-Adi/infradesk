@@ -18,11 +18,11 @@ export async function verifyPin(pin: string): Promise<{ valid: boolean }> {
     return { valid: true };
   }
 
-  // Check DownloadPinRequest (exact match, not expired, not used)
+  // Check DownloadPinRequest (case-insensitive, not expired, not used)
   const now = new Date();
   const pinRequest = await prisma.downloadPinRequest.findFirst({
     where: {
-      pin,
+      pin: { equals: pin, mode: 'insensitive' },
       expiresAt: { gt: now },
       usedAt: null,
     },
@@ -40,7 +40,12 @@ export async function verifyPin(pin: string): Promise<{ valid: boolean }> {
 }
 
 export async function requestPin(email: string): Promise<{ sent: boolean }> {
-  const pin = String(Math.floor(100000 + Math.random() * 900000));
+  // 8-char alphanumeric PIN — ~41 bits entropy (vs 20 bits for old 6-digit numeric)
+  const crypto = require('crypto');
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // No 0/O/1/I to avoid confusion
+  let pin = '';
+  const bytes = crypto.randomBytes(8);
+  for (let i = 0; i < 8; i++) pin += chars[bytes[i] % chars.length];
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
   await prisma.downloadPinRequest.create({

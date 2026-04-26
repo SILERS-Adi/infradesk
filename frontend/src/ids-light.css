@@ -169,3 +169,37 @@
 /* ── No icon jank ── */
 [data-theme="light"] .card:hover .card-icon svg,
 [data-theme="light"] .nav-item:hover .nav-icon { filter: none !important; transform: none !important; }
+
+/* ── Global table (light) ── */
+[data-theme="light"] thead th {
+  background: rgba(0,0,0,0.02) !important;
+  border-bottom-color: rgba(0,0,0,0.06) !important;
+  color: #64748B !important;
+}
+[data-theme="light"] tbody td {
+  border-bottom-color: rgba(0,0,0,0.04) !important;
+  color: #334155 !important;
+}
+[data-theme="light"] tbody tr:hover { background: rgba(0,0,0,0.02) !important; }
+
+/* ── Global inputs (light) ── */
+[data-theme="light"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([role]),
+[data-theme="light"] textarea,
+[data-theme="light"] select {
+  color: #1e293b !important;
+}
+[data-theme="light"] input:focus,
+[data-theme="light"] textarea:focus,
+[data-theme="light"] select:focus {
+  border-color: #6366F1 !important;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.08) !important;
+}
+
+/* ── Global page cards (light) — glass effect ── */
+[data-theme="light"] div[style*="background: var(--bg-card)"],
+[data-theme="light"] .space-y-3 > div {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.02) !important;
+}
+
+/* ── Scrollbar (light) ── */
+[data-theme="light"] .content::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.08) !important; }

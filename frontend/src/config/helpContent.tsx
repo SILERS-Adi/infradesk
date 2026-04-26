@@ -96,13 +96,13 @@ export const helpContent: Record<string, HelpPanelProps> = {
     sections: [
       { icon: <PlusCircle size={14} />, title: 'Dodawanie urządzenia', content: 'Kliknij „Dodaj urządzenie" i przejdź przez kreator krok po kroku: 1) Wybierz lub utwórz lokalizację, 2) Wpisz nazwę, tag i status urządzenia, 3) Uzupełnij dane techniczne (producent, model, numer seryjny, IP, MAC). Krok 3 jest opcjonalny — możesz go pominąć i uzupełnić później.' },
       { icon: <Search size={14} />, title: 'Wyszukiwanie', content: 'Pole wyszukiwania filtruje po nazwie urządzenia, nazwie lokalizacji, adresie IP, tagu, numerze seryjnym i nazwie hosta. Wpisz cokolwiek — wyniki filtrują się na bieżąco.' },
-      { icon: <Cpu size={14} />, title: 'Szczegóły urządzenia', content: 'Kliknij wiersz w tabeli, aby otworzyć kartę urządzenia. Widzisz tam: dane techniczne, lokalizację na mapie, powiązane zgłoszenia, hasła z sejfu i metryki agenta (jeśli zainstalowany).' },
-      { icon: <Wifi size={14} />, title: 'Status agenta', content: 'Zielona kropka przy urządzeniu oznacza, że agent InfraDesk jest zainstalowany i online. Szara = offline lub brak agenta. Agent umożliwia zdalne komendy i monitoring w czasie rzeczywistym.' },
+      { icon: <Cpu size={14} />, title: 'Szczegóły urządzenia', content: 'Kliknij wiersz w tabeli, aby otworzyć kartę urządzenia. Widzisz tam: dane techniczne, lokalizację na mapie, powiązane zgłoszenia, hasła z sejfu i metryki asystenta (jeśli zainstalowany).' },
+      { icon: <Wifi size={14} />, title: 'Status asystenta', content: 'Zielona kropka przy urządzeniu oznacza, że asystent InfraDesk jest zainstalowany i online. Szara = offline lub brak asystenta. Asystent umożliwia zdalne komendy i monitoring w czasie rzeczywistym.' },
       { icon: <Tag size={14} />, title: 'Tag i filtrowanie', content: 'Każde urządzenie może mieć unikalny tag (np. PC-BIURO-001). Tagi pomagają szybko identyfikować sprzęt. Możesz filtrować urządzenia po statusie i krytyczności.' },
     ],
     tips: [
       'Urządzenia oznaczone jako „Krytyczne" powinny mieć przypisaną osobę kontaktową i aktualną gwarancję.',
-      'Zainstaluj agenta InfraDesk Business na komputerach, aby mieć zdalny dostęp i monitoring hardware.',
+      'Zainstaluj asystenta InfraDesk Business na komputerach, aby mieć zdalny dostęp i monitoring hardware.',
       'Numer seryjny jest kluczowy przy zgłoszeniach gwarancyjnych — zawsze go uzupełniaj.',
     ],
   },
@@ -281,14 +281,14 @@ export const helpContent: Record<string, HelpPanelProps> = {
 
   /* ── MONITORING ──────────────────────────────────────────────────── */
   monitoring: {
-    description: 'Monitoring infrastruktury w czasie rzeczywistym. Sprawdzaj status agentów, metryki serwerów, alerty bezpieczeństwa i wydajność urządzeń.',
+    description: 'Monitoring infrastruktury w czasie rzeczywistym. Sprawdzaj status asystentów, metryki serwerów, alerty bezpieczeństwa i wydajność urządzeń.',
     sections: [
-      { icon: <Activity size={14} />, title: 'Metryki systemowe', content: 'Widzisz zużycie CPU, RAM, dysku i sieci dla urządzeń z zainstalowanym agentem. Dane odświeżają się co minutę.' },
-      { icon: <Shield size={14} />, title: 'Audyt bezpieczeństwa', content: 'Agent sprawdza: aktualizacje systemu, status antywirusa, konfigurację firewalla. Czerwone flagi oznaczają problemy wymagające uwagi.' },
-      { icon: <Wifi size={14} />, title: 'Status online/offline', content: 'Lista wszystkich agentów z informacją, kiedy ostatnio się odezwały. Zielone = online (< 5 min temu), szare = offline.' },
+      { icon: <Activity size={14} />, title: 'Metryki systemowe', content: 'Widzisz zużycie CPU, RAM, dysku i sieci dla urządzeń z zainstalowanym asystentem. Dane odświeżają się co minutę.' },
+      { icon: <Shield size={14} />, title: 'Audyt bezpieczeństwa', content: 'Asystent sprawdza: aktualizacje systemu, status antywirusa, konfigurację firewalla. Czerwone flagi oznaczają problemy wymagające uwagi.' },
+      { icon: <Wifi size={14} />, title: 'Status online/offline', content: 'Lista wszystkich asystentów z informacją, kiedy ostatnio się odezwały. Zielone = online (< 5 min temu), szare = offline.' },
     ],
     tips: [
-      'Ustaw alerty, żeby dostawać powiadomienia gdy agent przestanie odpowiadać.',
+      'Ustaw alerty, żeby dostawać powiadomienia gdy asystent przestanie odpowiadać.',
       'Wysoki load CPU może oznaczać złośliwe oprogramowanie — sprawdź procesy na urządzeniu.',
     ],
   },

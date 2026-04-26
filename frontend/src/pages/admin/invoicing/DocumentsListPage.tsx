@@ -159,7 +159,7 @@ export function DocumentsListPage() {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <ExportButtons entity="documents" params={statusFilter ? { status: statusFilter } : undefined} />
             <Link to="/invoicing/documents/new" style={{ textDecoration: 'none' }}>
-              <Button variant="primary" icon={<Plus size={14} />}>Nowa faktura</Button>
+              <Button variant="primary" icon={<Plus size={14} />}>Nowy dokument</Button>
             </Link>
           </div>
         }
@@ -205,10 +205,10 @@ export function DocumentsListPage() {
           onRowClick={(row) => navigate(`/invoicing/documents/${row.id}`)}
           keyExtractor={(row) => row.id}
           emptyTitle="Brak dokumentów"
-          emptyDescription='Utwórz pierwszy dokument klikając przycisk "Nowa faktura" powyżej.'
+          emptyDescription='Utwórz pierwszy dokument klikając przycisk "Nowy dokument" powyżej.'
           emptyAction={
             <Link to="/invoicing/documents/new" style={{ textDecoration: 'none' }}>
-              <Button variant="primary" size="sm" icon={<Plus size={14} />}>Nowa faktura</Button>
+              <Button variant="primary" size="sm" icon={<Plus size={14} />}>Nowy dokument</Button>
             </Link>
           }
         />

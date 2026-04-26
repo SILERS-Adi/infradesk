@@ -13,14 +13,14 @@ interface FaqItem { q: string; a: string; visibility: Visibility; }
 
 const VISIBILITY_OPTIONS: { value: Visibility; label: string; icon: React.ReactNode; desc: string }[] = [
   { value: 'panel',  label: 'Panel',        icon: <Monitor className="h-3.5 w-3.5" />, desc: 'Widoczne tylko w panelu admina' },
-  { value: 'agent',  label: 'Agent',         icon: <Bot     className="h-3.5 w-3.5" />, desc: 'Widoczne tylko w aplikacji agenta' },
-  { value: 'both',   label: 'Panel i Agent', icon: <><Monitor className="h-3.5 w-3.5" /><Bot className="h-3.5 w-3.5" /></>, desc: 'Widoczne wszędzie' },
+  { value: 'agent',  label: 'Asystent',         icon: <Bot     className="h-3.5 w-3.5" />, desc: 'Widoczne tylko w aplikacji asystenta' },
+  { value: 'both',   label: 'Panel i Asystent', icon: <><Monitor className="h-3.5 w-3.5" /><Bot className="h-3.5 w-3.5" /></>, desc: 'Widoczne wszędzie' },
 ];
 
 const VISIBILITY_BADGE: Record<Visibility, { label: string; bg: string; color: string }> = {
   panel: { label: 'Panel',       bg: 'rgba(99,102,241,0.12)', color: '#818CF8' },
-  agent: { label: 'Agent',       bg: 'rgba(16,185,129,0.12)', color: '#34D399' },
-  both:  { label: 'Panel+Agent', bg: 'rgba(234,179,8,0.12)',  color: '#FBBF24' },
+  agent: { label: 'Asystent',       bg: 'rgba(16,185,129,0.12)', color: '#34D399' },
+  both:  { label: 'Panel+Asystent', bg: 'rgba(234,179,8,0.12)',  color: '#FBBF24' },
 };
 
 function useFaq() {
@@ -92,7 +92,7 @@ export function FaqPage() {
     <div className="space-y-6 max-w-3xl">
       <PageHeader
         title="FAQ"
-        subtitle="Baza wiedzy widoczna w panelu i/lub aplikacji agenta"
+        subtitle="Baza wiedzy widoczna w panelu i/lub aplikacji asystenta"
       />
 
       <Card>

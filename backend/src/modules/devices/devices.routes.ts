@@ -8,13 +8,13 @@ import {
   removeDevice,
 } from './devices.controller';
 import { authenticate } from '../../middleware/auth';
-import { withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
+import { withWorkspaceMembership, authorizeWorkspace, requireWorkspace } from '../../middleware/workspace';
 import { validate } from '../../middleware/validate';
 import { createDeviceSchema, updateDeviceSchema } from './devices.validation';
 
 const router = Router();
 
-router.use(authenticate);
+router.use(authenticate, requireWorkspace);
 
 router.get('/', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'), getDevices);
 router.get('/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'), getDevice);

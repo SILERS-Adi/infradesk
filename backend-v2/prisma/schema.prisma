@@ -1,0 +1,1935 @@
+// InfraDesk v2 — Prisma schema (source of truth)
+//
+// Design principles:
+// 1. Jeden model uprawnień: Role (OWNER/ADMIN/MEMBER) + Scope (FULL/SCOPED) + PermissionOverride per module.
+// 2. Każda user-facing tabela ma workspaceId NOT NULL + RLS policy na poziomie DB.
+// 3. Żadnych deprecated aliasów (accountType, accessScope, organizationType, allowedModules) — gone.
+// 4. AI-first: tabele LlmUsage, KbArticle, VectorEmbedding wbudowane od dnia 1.
+// 5. KSeF-ready: schema Invoice jest FA(3) compatible nawet gdy UI invoicingu jest post-MVP.
+// 6. GDPR-ready: soft delete + deletedAt na kluczowych tabelach, AuditEvent retention policies.
+//
+// Schema version: 2.0.0-alpha.1
+// Last updated: 2026-04-21
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector")]
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AUTH & IDENTITY
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model User {
+  id               String    @id @default(uuid())
+  email            String    @unique
+  firstName        String
+  lastName         String
+  phone            String?
+  passwordHash     String
+  avatarUrl        String?
+  locale           String    @default("pl-PL")
+  timezone         String    @default("Europe/Warsaw")
+
+  // Email verification
+  emailVerified    Boolean   @default(false)
+  emailVerifyToken String?   @unique
+  emailVerifySentAt DateTime?
+
+  // 2FA
+  twoFactorEnabled Boolean   @default(false)
+  twoFactorSecret  String?   // TOTP secret, encrypted
+  twoFactorBackupCodes Json?  // array of one-time codes, hashed
+
+  // Account state
+  isActive         Boolean   @default(true)
+  isSuperAdmin     Boolean   @default(false)  // platform-level role
+  lockedUntil      DateTime?
+  loginAttempts    Int       @default(0)
+  tokenVersion     Int       @default(0)      // for refresh token revocation
+  lastLoginAt      DateTime?
+  lastLoginIp      String?
+
+  // GDPR
+  deletedAt        DateTime?  // soft delete, hard delete 30d later
+  dataExportedAt   DateTime?
+  erasureRequestedAt DateTime?
+
+  // Sprint 6: Per-user Google OAuth tokens, encrypted with VAULT_MASTER_KEY
+  // (AES-256-GCM, stored as "iv.authTag.ciphertext"). JSON payload is
+  // { accessToken, refreshToken, expiresAt, scope, email }.
+  googleTokens     String?
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  memberships      Membership[]
+  createdTickets   Ticket[]       @relation("TicketCreatedBy")
+  assignedTickets  Ticket[]       @relation("TicketAssignedTo")
+  ticketComments   TicketComment[]
+  workSessions     WorkSession[]
+  auditEvents      AuditEvent[]
+  credentialViews  CredentialViewLog[]
+  passwordResets   PasswordResetToken[]
+  refreshTokens    RefreshToken[]
+  gpsConsent       TechnicianGpsConsent?
+  locationLogs     TechnicianLocationLog[]
+  locationVisits   LocationVisit[]
+  createdTasks     Task[]             @relation("TaskCreatedBy")
+  assignedTasks    Task[]             @relation("TaskAssignedTo")
+  createdDelegations    Delegation[] @relation("DelegationCreatedBy")
+  assignedDelegations   Delegation[] @relation("DelegationAssignedTo")
+  createdCrmActivities  CrmActivity[] @relation("CrmCreatedBy")
+  assignedCrmActivities CrmActivity[] @relation("CrmAssignedTo")
+  activityLogs     ActivityLog[]
+  timeSignals      TimeSignal[]
+  timeSlots        TimeSlot[]
+  emailAccounts    UserEmailAccount[]
+  emailMessagesAdded EmailMessage[] @relation("EmailMessageAddedBy")
+  uploadedDownloads  DownloadFile[]
+  oauthAuthCodes   OauthAuthCode[]
+
+  @@index([email])
+  @@index([isSuperAdmin])
+}
+
+model RefreshToken {
+  id           String    @id @default(uuid())
+  userId       String
+  tokenHash    String    @unique
+  tokenVersion Int       // matches User.tokenVersion at issue time
+  userAgent    String?
+  ipAddress    String?
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id         String   @id @default(uuid())
+  userId     String
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// WORKSPACES & MULTI-TENANT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model Workspace {
+  id            String        @id @default(uuid())
+  slug          String        @unique  // URL-friendly, e.g. "silers"
+  name          String
+  type          WorkspaceType
+  taxId         String?       // NIP
+  regon         String?
+  krs           String?
+  logoUrl       String?
+  primaryColor  String        @default("#3B82F6")
+  locale        String        @default("pl-PL")
+  timezone      String        @default("Europe/Warsaw")
+  currency      String        @default("PLN")
+
+  // Storage quota — null = unlimited (default for MSP/INTERNAL_IT). Clients default 5 GiB.
+  storageQuotaBytes BigInt?       // bytes; null = unlimited
+
+  // Plan & subscription
+  plan          Plan          @default(STARTER)
+  planStartedAt DateTime?
+  planExpiresAt DateTime?
+  trialEndsAt   DateTime?
+  subscriptionId String?      // Stripe subscription ID (when Stripe integrated)
+
+  // Address (for invoicing)
+  addressLine1  String?
+  addressLine2  String?
+  postalCode    String?
+  city          String?
+  country       String        @default("PL")
+
+  // Contact
+  email         String?
+  phone         String?
+  website       String?
+
+  // Status
+  isActive      Boolean       @default(true)
+  deletedAt     DateTime?
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  memberships   Membership[]
+  locations     Location[]
+  devices       Device[]
+  tickets       Ticket[]
+  workSessions  WorkSession[]
+  credentials   Credential[]
+  monitoringAlerts MonitoringAlert[]
+  agentRegistrations AgentRegistration[]
+  contacts      Contact[]
+  orders        Order[]
+  invoices      Invoice[]
+  auditEvents   AuditEvent[]
+  kbArticles    KbArticle[]
+  llmUsage      LlmUsage[]
+  locationLogs  TechnicianLocationLog[]
+  locationVisits LocationVisit[]
+  gpsConsents   TechnicianGpsConsent[]
+  shadowDecisions  ShadowDecision[]
+  clientRiskScores ClientRiskScore[]
+  tasks          Task[]
+  delegations    Delegation[]
+  crmActivities  CrmActivity[]
+  backupConfigs  BackupConfig[]
+  activityLogs   ActivityLog[]
+  slaPolicies    SlaPolicy[]
+  wsModules      WorkspaceModule[]
+  wsSettings     WorkspaceSetting[]
+  timeSignals    TimeSignal[]
+  timeSlots      TimeSlot[]
+  failureClusters FailureCluster[]
+  emailAccounts  UserEmailAccount[]
+  emailMessages  EmailMessage[]
+  permissionSchemas PermissionSchema[]
+  downloadFiles     DownloadFile[]
+
+  // MSP relations
+  asProvider    WorkspaceRelation[] @relation("AsProvider")
+  asClient      WorkspaceRelation[] @relation("AsClient")
+
+  @@index([slug])
+  @@index([type])
+  @@index([plan])
+}
+
+enum WorkspaceType {
+  MSP          // firma IT obsługująca klientów
+  CLIENT       // klient MSP
+  INTERNAL_IT  // wewnętrzne IT firmy (sam dla siebie)
+}
+
+enum Plan {
+  STARTER    // do 3 techs, 100 endpointów
+  PRO        // unlimited, pełen AI
+  ENTERPRISE // white-label, SOC-2, pioneer features
+}
+
+// MSP ↔ klient relacja
+model WorkspaceRelation {
+  id                  String              @id @default(uuid())
+  providerWorkspaceId String              // MSP
+  clientWorkspaceId   String              // klient
+  status              RelationStatus      @default(ACTIVE)
+
+  // Capabilities that MSP has for this client
+  canViewDevices      Boolean             @default(true)
+  canViewUsers        Boolean             @default(true)
+  canViewLocations    Boolean             @default(true)
+  canReceiveTickets   Boolean             @default(true)
+  canCreateTicketsOnBehalf Boolean        @default(true)
+  canAccessAlerts     Boolean             @default(true)
+  canAccessCredentials Boolean            @default(false)  // opt-in
+
+  // Billing relationship
+  billingType         BillingType         @default(HOURLY)
+  monthlyNet          Decimal?            @db.Decimal(10, 2)
+  monthlyHours        Int?
+  overageRateNet      Decimal?            @db.Decimal(10, 2)
+  hourlyRateNet       Decimal?            @db.Decimal(10, 2)
+  billingIncrementMin Int                 @default(15)
+  billingPeriod       BillingPeriod       @default(MONTHLY)
+  contractFileUrl     String?
+
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  provider            Workspace           @relation("AsProvider", fields: [providerWorkspaceId], references: [id], onDelete: Cascade)
+  client              Workspace           @relation("AsClient", fields: [clientWorkspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([providerWorkspaceId, clientWorkspaceId])
+  @@index([providerWorkspaceId])
+  @@index([clientWorkspaceId])
+}
+
+enum RelationStatus {
+  ACTIVE
+  SUSPENDED
+  TERMINATED
+}
+enum BillingPeriod {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum BillingType {
+  HOURLY
+  SUBSCRIPTION
+  HYBRID
+}
+// ═══════════════════════════════════════════════════════════════════════════════
+// PERMISSIONS (jeden model, 3 warstwy: Role → Scope → Overrides)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model Membership {
+  id           String           @id @default(uuid())
+  userId       String
+  workspaceId  String
+  role         Role
+  scope        Scope            @default(FULL)
+  isDefault    Boolean          @default(false)  // user login → opens this workspace
+  status       MembershipStatus @default(ACTIVE)
+
+  // Invite flow
+  invitedByUserId String?
+  invitedAt    DateTime?
+  acceptedAt   DateTime?
+
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace    Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  grants       AccessGrant[]
+  overrides    PermissionOverride[]
+
+  @@unique([userId, workspaceId])
+  @@index([workspaceId])
+  @@index([userId])
+}
+
+enum Role {
+  OWNER   // 1 per workspace, full control + delete workspace + change plan
+  ADMIN   // full operational, no billing/delete
+  MEMBER  // default: nothing, explicitly granted per module
+}
+
+enum Scope {
+  FULL    // widzi wszystkie dane w workspace
+  SCOPED  // ograniczony do AccessGrant resources
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INVITED
+  REVOKED
+}
+// Per-resource access (SCOPED users)
+model AccessGrant {
+  id           String       @id @default(uuid())
+  membershipId String
+  resourceType ResourceType
+  resourceId   String
+  level        AccessLevel  @default(VIEW)
+  createdAt    DateTime     @default(now())
+
+  membership   Membership   @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@unique([membershipId, resourceType, resourceId])
+  @@index([resourceType, resourceId])
+}
+
+enum ResourceType {
+  DEVICE
+  LOCATION
+  CLIENT_WORKSPACE
+}
+enum AccessLevel {
+  NONE
+  VIEW
+  EDIT
+  DELETE
+}
+// Per-module override (MEMBER default NONE, admin can grant specific module)
+model PermissionOverride {
+  id           String       @id @default(uuid())
+  membershipId String
+  moduleKey    String       // "tickets", "devices", "vault", "invoicing", "crm", "orders", ...
+  level        AccessLevel
+
+  membership   Membership   @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@unique([membershipId, moduleKey])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LOCATIONS & DEVICES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model Location {
+  id           String   @id @default(uuid())
+  workspaceId  String
+  name         String
+  type         LocationType  @default(OFFICE)
+  addressLine1 String
+  addressLine2 String?
+  postalCode   String
+  city         String
+  country      String   @default("PL")
+  contactName  String?
+  contactPhone String?
+  contactEmail String?
+  notes        String?
+  gpsLat       Float?
+  gpsLon       Float?
+
+  geofenceRadiusMeters  Int       @default(100)
+  autoCheckInEnabled    Boolean   @default(true)
+  requireQrConfirmation Boolean   @default(false)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  devices      Device[]
+  locationVisits LocationVisit[]
+
+  @@index([workspaceId])
+}
+
+enum LocationType {
+  OFFICE
+  WAREHOUSE
+  RETAIL
+  HOME_OFFICE
+  OTHER
+}
+model Device {
+  id            String          @id @default(uuid())
+  workspaceId   String
+  locationId    String
+  name          String
+  hostname      String?
+  category      DeviceCategory
+  criticality   Criticality     @default(MEDIUM)
+  status        DeviceStatus    @default(ACTIVE)
+
+  // Inventory
+  assetTag      String?
+  serialNumber  String?
+  manufacturer  String?
+  model         String?
+  operatingSystem String?
+  osVersion     String?
+
+  // Network
+  ipAddress     String?
+  macAddress    String?
+
+  // QR code for physical access
+  qrCodeValue   String          @unique
+
+  // Warranty
+  purchaseDate       DateTime?
+  installationDate   DateTime?
+  warrantyUntil      DateTime?
+
+  // Ownership
+  assignedUserId String?  // end user on this device
+  managerId      String?  // responsible IT person
+
+  // Remote access
+  rustdeskId     String?
+  rdpAddress     String?
+  sshAddress     String?
+  anydeskId      String?
+  teamviewerId   String?
+  customRemoteLink String?
+
+  // Notes
+  description         String?
+  internalNotes       String?  // invisible to client
+  clientVisibleNotes  String?
+
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  deletedAt     DateTime?
+
+  workspace     Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  location      Location         @relation(fields: [locationId], references: [id])
+  agent         AgentRegistration?
+  tickets       Ticket[]
+  workSessions  WorkSession[]
+  alerts        MonitoringAlert[]
+  credentials   Credential[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId, status])
+}
+
+enum DeviceCategory {
+  WORKSTATION
+  SERVER
+  ROUTER
+  SWITCH
+  FIREWALL
+  PRINTER
+  SCANNER
+  CCTV
+  PHONE
+  IOT
+  OTHER
+}
+enum Criticality {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+enum DeviceStatus {
+  ACTIVE
+  INACTIVE
+  DECOMMISSIONED
+}
+// ═══════════════════════════════════════════════════════════════════════════════
+// AGENTS (Desktop Asystent Business)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model AgentRegistration {
+  id             String       @id @default(uuid())
+  workspaceId    String
+  deviceId       String?      @unique  // 1:1 with Device after approval
+  agentToken     String       @unique  // plaintext token (used as Bearer by agent)
+  agentTokenHash String       @unique  // bcrypt hash (for server-side lookup)
+  agentVersion   String       @default("unknown")
+  status         AgentStatus  @default(PENDING)
+
+  // Hardware info
+  hostname       String
+  manufacturer   String?
+  model          String?
+  serialNumber   String?
+  osName         String?
+  osVersion      String?
+  cpuModel       String?
+  ramMb          Int?
+  diskFreeGb     Float?
+  diskTotalGb    Float?
+
+  // Telemetry
+  lastSeen       DateTime?
+  serverMetrics  Json?        // latest snapshot: audit score, disks, services, updates
+  currentUser    String?
+
+  // Contact (from registration, before approval)
+  companyName    String?
+  nip            String?
+  contactFirstName String?
+  contactLastName  String?
+  contactEmail   String?
+  contactPhone   String?
+
+  // Capabilities
+  allowRustdesk   Boolean     @default(true)
+  allowMonitoring Boolean     @default(true)
+  allowRemoteCommands Boolean @default(false)
+
+  approvedAt     DateTime?
+  approvedByUserId String?
+  rejectedAt     DateTime?
+  rejectedByUserId String?
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  workspace      Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  device         Device?      @relation(fields: [deviceId], references: [id])
+
+  @@index([workspaceId, status])
+  @@index([lastSeen])
+}
+
+enum AgentStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+  INACTIVE
+}
+// ═══════════════════════════════════════════════════════════════════════════════
+// TICKETS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model Ticket {
+  id                String         @id @default(uuid())
+  workspaceId       String
+  ticketNumber      String         // "T-2026-0001" unique per workspace
+  title             String
+  description       String         @db.Text
+  status            TicketStatus
+  priority          TicketPriority
+  category          String?        // AI-classified: "hardware", "software", "network", ...
+  type              TicketType     @default(INCIDENT)
+  source            TicketSource
+
+  // Master ticket — MSP chooses client upfront (null for client-portal tickets: workspace = client)
+  clientWorkspaceId String?
+
+  // Components — flags which artefacts are generated from this master ticket
+  hasService        Boolean @default(true)
+  hasOrder          Boolean @default(false)
+  hasCrm            Boolean @default(false)
+
+  // Requester (if from email/portal, not logged-in user)
+  requesterName     String?
+  requesterEmail    String?
+  requesterPhone    String?
+
+  // Relations
+  deviceId          String?
+  locationId        String?
+  assignedToUserId  String?
+  createdByUserId   String
+  resolvedByUserId  String?
+
+  // Time tracking
+  dueAt             DateTime?
+  firstResponseAt   DateTime?
+  resolvedAt        DateTime?
+  closedAt          DateTime?
+
+  // SLA
+  slaResponseMinutes Int?
+  slaResolveMinutes  Int?
+  slaBreached        Boolean @default(false)
+
+  // AI enrichment
+  aiClassified      Boolean @default(false)
+  aiConfidence      Float?
+  aiSummary         String? @db.Text
+  aiSuggestedAction String? @db.Text
+
+  // Resolution
+  resolutionSummary String? @db.Text
+  serviceMode       ServiceMode?
+  billedInContract  Boolean @default(false)
+
+  // Customer satisfaction
+  rating            Int?           // 1-3 (sad/neutral/happy)
+  ratingComment     String?
+  ratedAt           DateTime?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
+
+  workspace         Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  device            Device?         @relation(fields: [deviceId], references: [id])
+  createdBy         User            @relation("TicketCreatedBy", fields: [createdByUserId], references: [id])
+  assignedTo        User?           @relation("TicketAssignedTo", fields: [assignedToUserId], references: [id])
+  comments          TicketComment[]
+  events            TicketEvent[]
+  attachments       Attachment[]
+  sessionLinks      TicketSessionLink[]
+  linkedTasks       Task[]
+  linkedOrders         Order[]
+  linkedCrmActivities  CrmActivity[]
+  linkedEmails         EmailMessage[]
+
+  @@unique([workspaceId, ticketNumber])
+  @@index([workspaceId, status])
+  @@index([assignedToUserId])
+  @@index([deviceId])
+  @@index([priority, status])
+}
+
+enum TicketStatus {
+  NEW          // just created, awaiting triage
+  OPEN         // triaged, awaiting assignment
+  ASSIGNED     // assigned to tech
+  IN_PROGRESS  // tech working
+  WAITING      // waiting for client response
+  RESOLVED     // tech marked as fixed, awaiting client confirmation
+  CLOSED       // confirmed by client or auto-closed after N days
+  CANCELLED    // cancelled (by client or tech)
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+enum TicketType {
+  INCIDENT   // something broken
+  REQUEST    // new thing / change
+  MAINTENANCE
+  INSTALLATION
+  COMPLAINT  // REKLAMACJA (Polish specific)
+  OTHER
+}
+
+enum TicketSource {
+  EMAIL        // from Mail butler
+  PORTAL       // client logged into /panel
+  AGENT        // auto-created by Desktop agent
+  PHONE        // logged by tech from phone call
+  AI_CHAT      // created through IDO conversation
+  MANUAL       // tech created directly
+  API          // external integration
+}
+
+enum ServiceMode {
+  REMOTE
+  ONSITE
+}
+model TicketComment {
+  id         String   @id @default(uuid())
+  ticketId   String
+  userId     String
+  comment    String   @db.Text
+  isInternal Boolean  @default(false)  // invisible to client
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@index([ticketId])
+}
+
+// Immutable audit trail per ticket
+model TicketEvent {
+  id          String   @id @default(uuid())
+  ticketId    String
+  userId      String?   // null = system/AI
+  eventType   String    // "status_changed", "assigned", "commented", "ai_classified", ...
+  fromValue   String?
+  toValue     String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  ticket      Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+}
+
+// Files attached to tickets, comments, etc.
+model Attachment {
+  id          String   @id @default(uuid())
+  workspaceId String
+  ticketId    String?
+  uploadedByUserId String
+  fileName    String
+  fileSize    Int
+  mimeType    String
+  storageKey  String   // S3/local path
+  sha256      String?
+  createdAt   DateTime @default(now())
+
+  ticket      Ticket?  @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// WORK SESSIONS (billing time)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model WorkSession {
+  id              String          @id @default(uuid())
+  workspaceId     String
+  technicianId    String
+  deviceId        String?
+  locationId      String?
+  clientWorkspaceId String?       // for MSP: session on client's device
+
+  status          SessionStatus   @default(ACTIVE)
+  serviceMode     ServiceMode?    @default(REMOTE)
+
+  startedAt       DateTime
+  endedAt         DateTime?
+  durationMinutes Int?
+  billableMinutes Int?            // rounded up to billingIncrementMin
+
+  notes           String?         @db.Text
+  aiSummary       String?         @db.Text  // AI-generated from voice notes
+
+  billable        Boolean         @default(true)
+  hourlyRateNet   Decimal?        @db.Decimal(10, 2)  // snapshot at session time
+
+  // External references (if imported from RustDesk etc.)
+  externalSourceType  String?     // "rustdesk", "anydesk", "manual"
+  externalSessionId   String?
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  autoStartedByGeofence Boolean   @default(false)
+  arrivalGpsLat         Float?
+  arrivalGpsLon         Float?
+  arrivalAccuracy       Float?
+  departureGpsLat       Float?
+  departureGpsLon       Float?
+  distanceTraveledKm    Float?
+
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id])
+  technician      User            @relation(fields: [technicianId], references: [id])
+  device          Device?         @relation(fields: [deviceId], references: [id])
+  timeEntries     SessionTimeEntry[]
+  ticketLinks     TicketSessionLink[]
+  locationVisit   LocationVisit?  @relation("WorkSessionVisit")
+
+  @@index([workspaceId, technicianId])
+  @@index([status])
+  @@index([startedAt])
+}
+
+enum SessionStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+model SessionTimeEntry {
+  id              String       @id @default(uuid())
+  workSessionId   String
+  startedAt       DateTime
+  endedAt         DateTime?
+  durationMinutes Int?
+
+  session         WorkSession  @relation(fields: [workSessionId], references: [id], onDelete: Cascade)
+}
+
+// M:N link — session ended with bulk close of tickets
+model TicketSessionLink {
+  id            String      @id @default(uuid())
+  ticketId      String
+  workSessionId String
+  notes         String?
+  createdAt     DateTime    @default(now())
+
+  ticket        Ticket      @relation(fields: [ticketId], references: [id])
+  session       WorkSession @relation(fields: [workSessionId], references: [id], onDelete: Cascade)
+
+  @@unique([ticketId, workSessionId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MONITORING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model MonitoringAlert {
+  id           String        @id @default(uuid())
+  workspaceId  String
+  deviceId     String
+  type         String        // "disk_failing", "service_down", "score_drop", "critical_fail", ...
+  severity     AlertSeverity
+  message      String        @db.Text
+  rawData      Json?         // original metric snapshot
+
+  resolved     Boolean       @default(false)
+  resolvedAt   DateTime?
+  resolvedByUserId String?
+  autoResolveReason String?   // "condition_cleared", "stale_7d", "manual", ...
+
+  ticketId     String?       // auto-created ticket if severity HIGH+
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  device       Device        @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, resolved])
+  @@index([deviceId, type])
+  @@index([severity, resolved])
+}
+
+enum AlertSeverity {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+// ═══════════════════════════════════════════════════════════════════════════════
+// VAULT (encrypted credentials)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model Credential {
+  id                String              @id @default(uuid())
+  workspaceId       String
+  deviceId          String?
+  locationId        String?
+  category          CredentialCategory
+  name              String
+  username          String?
+  passwordEncrypted String              // AES-256-GCM
+  passwordIv        String
+  passwordAuthTag   String
+  urlOrHost         String?
+  notes             String?             @db.Text
+  tags              String[]            @default([])
+
+  // Rotation
+  expiresAt         DateTime?
+  lastRotatedAt     DateTime?
+  rotationPolicyDays Int?
+
+  // Visibility
+  visibleToRoles    Role[]              @default([OWNER, ADMIN])
+
+  createdByUserId   String
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  deletedAt         DateTime?
+
+  workspace         Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  device            Device?             @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  viewLogs          CredentialViewLog[]
+
+  @@index([workspaceId])
+  @@index([deviceId])
+}
+
+enum CredentialCategory {
+  WINDOWS
+  VPN
+  EMAIL
+  APPLICATION
+  DATABASE
+  ROUTER
+  WIFI
+  SSH
+  API_KEY
+  CERTIFICATE
+  OTHER
+}
+model CredentialViewLog {
+  id           String     @id @default(uuid())
+  credentialId String
+  userId       String
+  viewedAt     DateTime   @default(now())
+  ipAddress    String?
+  userAgent    String?
+  reason       String?    // optional reason entered by user
+
+  credential   Credential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id])
+
+  @@index([credentialId, viewedAt])
+  @@index([userId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CRM & ORDERS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model Contact {
+  id                  String    @id @default(uuid())
+  workspaceId         String    // MSP workspace (owner of CRM)
+  clientWorkspaceId   String?   // which client company this contact belongs to
+  firstName           String
+  lastName            String
+  email               String?
+  phone               String?
+  mobile              String?
+  position            String?   // "Dyrektor", "Księgowość", "Kadrowa", "IT"
+  isMainContact       Boolean   @default(false)
+  notes               String?   @db.Text
+  tags                String[]  @default([])
+
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
+
+  workspace           Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([clientWorkspaceId])
+  @@index([email])
+}
+
+model Order {
+  id                String       @id @default(uuid())
+  workspaceId       String       // MSP ordering
+  clientWorkspaceId String?      // for whom (if on behalf of client)
+  orderNumber       String       // "ORD-2026-0001"
+  title             String
+  description       String?      @db.Text
+  status            OrderStatus  @default(DRAFT)
+
+  totalNet          Decimal      @db.Decimal(12, 2) @default(0)
+  totalGross        Decimal      @db.Decimal(12, 2) @default(0)
+  vatRate           Decimal      @db.Decimal(5, 2)  @default(23)
+
+  supplierName      String?      // "x-kom", "Morele", "Action"
+  supplierOrderRef  String?
+  expectedDeliveryDate DateTime?
+  deliveredAt       DateTime?
+
+  invoiceId         String?
+
+  createdByUserId   String
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  linkedTicketId    String?
+  workspace         Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  items             OrderItem[]
+  linkedTicket      Ticket?      @relation(fields: [linkedTicketId], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, orderNumber])
+  @@index([workspaceId, status])
+  @@index([linkedTicketId])
+}
+
+enum OrderStatus {
+  DRAFT
+  QUOTE_SENT
+  APPROVED
+  ORDERED
+  IN_TRANSIT
+  DELIVERED
+  INVOICED
+  CANCELLED
+}
+model OrderItem {
+  id             String   @id @default(uuid())
+  orderId        String
+  name           String
+  description    String?
+  quantity       Int      @default(1)
+  unitNet        Decimal  @db.Decimal(10, 2)
+  totalNet       Decimal  @db.Decimal(12, 2)
+  linkedDeviceId String?  // created after delivery
+  linkUrl        String?  // URL do produktu (sklep)
+  photoUrl       String?  // URL do zdjęcia
+  withInstallation Boolean @default(false)  // gdy TRUE: po dostawie auto-generuje ticket na montaż
+
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INVOICING (schema KSeF FA(3)-ready, UI post-MVP)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model Invoice {
+  id                String        @id @default(uuid())
+  workspaceId       String
+  invoiceNumber     String        // "FV/2026/04/0001"
+  type              InvoiceType   @default(VAT)
+  status            InvoiceStatus @default(DRAFT)
+
+  // Parties
+  sellerName        String
+  sellerTaxId       String?
+  sellerAddress     String
+  buyerName         String
+  buyerTaxId        String?
+  buyerAddress      String
+
+  // Amounts
+  netTotal          Decimal       @db.Decimal(12, 2)
+  vatTotal          Decimal       @db.Decimal(12, 2)
+  grossTotal        Decimal       @db.Decimal(12, 2)
+  currency          String        @default("PLN")
+
+  // Dates
+  issueDate         DateTime
+  saleDate          DateTime
+  dueDate           DateTime
+
+  // Payment
+  paymentMethod     String?       // "TRANSFER", "CARD", "BLIK", "CASH"
+  paidAt            DateTime?
+  paidAmount        Decimal?      @db.Decimal(12, 2)
+
+  // KSeF
+  ksefSubmittedAt   DateTime?
+  ksefReferenceNumber String?
+  ksefStatus        String?       // "ACCEPTED", "REJECTED", "PENDING"
+  ksefXml           String?       @db.Text  // FA(3) XML
+
+  // PDF
+  pdfStorageKey     String?
+
+  notes             String?       @db.Text
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  workspace         Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  items             InvoiceItem[]
+
+  @@unique([workspaceId, invoiceNumber])
+  @@index([workspaceId, status])
+  @@index([issueDate])
+}
+
+enum InvoiceType {
+  VAT
+  PROFORMA
+  CORRECTION
+  ADVANCE
+}
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+model InvoiceItem {
+  id        String  @id @default(uuid())
+  invoiceId String
+  name      String
+  quantity  Decimal @db.Decimal(10, 3)
+  unitNet   Decimal @db.Decimal(10, 2)
+  vatRate   Decimal @db.Decimal(5, 2)
+  netTotal  Decimal @db.Decimal(12, 2)
+  vatTotal  Decimal @db.Decimal(12, 2)
+  grossTotal Decimal @db.Decimal(12, 2)
+  unit      String  @default("szt.")  // szt., h, km, pcs
+
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AUDIT LOG (GDPR + compliance)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model AuditEvent {
+  id           String    @id @default(uuid())
+  workspaceId  String?   // null = platform-level event
+  userId       String?   // null = system
+  entityType   String    // "Ticket", "Device", "User", "Credential", ...
+  entityId     String?
+  action       String    // "CREATE", "UPDATE", "DELETE", "LOGIN", "VIEW_SECRET", "ROLE_CHANGED", ...
+  description  String    @db.Text
+  metadata     Json?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime  @default(now())
+
+  workspace    Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  user         User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@index([entityType, entityId])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AI / LLM
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Tracking LLM costs per workspace (plan enforcement)
+model LlmUsage {
+  id            String    @id @default(uuid())
+  workspaceId   String
+  userId        String?
+  feature       String    // "ticket_classify", "copilot_chat", "kb_generate", ...
+  model         String    // "claude-opus-4-7", "claude-haiku-4-5"
+  inputTokens   Int
+  outputTokens  Int
+  costPln       Decimal   @db.Decimal(10, 4)
+  latencyMs     Int?
+  createdAt     DateTime  @default(now())
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+  @@index([feature])
+}
+
+// Auto-generated knowledge base (from solved tickets)
+model KbArticle {
+  id            String    @id @default(uuid())
+  workspaceId   String
+  title         String
+  content       String    @db.Text
+  category      String?
+  tags          String[]  @default([])
+  source        String    @default("AI_GENERATED")  // AI_GENERATED, MANUAL, IMPORTED
+  sourceTicketIds String[] @default([])
+
+  status        KbStatus  @default(PENDING_REVIEW)
+  publishedAt   DateTime?
+  reviewedByUserId String?
+
+  viewCount     Int       @default(0)
+  helpfulCount  Int       @default(0)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, status])
+}
+
+enum KbStatus {
+  PENDING_REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+// Vector embeddings (for RAG — Copilot drawer, KB search, ticket similarity)
+model VectorEmbedding {
+  id           String                      @id @default(uuid())
+  workspaceId  String                      // per-tenant memory isolation
+  entityType   String                      // "Ticket", "KbArticle", "Comment", ...
+  entityId     String
+  content      String                      @db.Text
+  embedding    Unsupported("vector(1536)")? // pgvector
+  createdAt    DateTime                    @default(now())
+
+  @@unique([workspaceId, entityType, entityId])
+  @@index([workspaceId, entityType])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIL BUTLER (inbound email → ticket conversion)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model MailboxConfig {
+  id               String    @id @default(uuid())
+  workspaceId      String
+  emailAddress     String    @unique  // biuro@silers.pl
+  imapHost         String
+  imapPort         Int       @default(993)
+  imapUser         String
+  imapPasswordEncrypted String
+  smtpHost         String
+  smtpPort         Int       @default(465)
+  active           Boolean   @default(true)
+  lastCheckAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  messages         InboundMessage[]
+}
+
+model InboundMessage {
+  id              String        @id @default(uuid())
+  mailboxId       String
+  messageId       String        @unique  // email Message-ID header
+  fromEmail       String
+  fromName        String?
+  toEmail         String
+  subject         String
+  bodyText        String?       @db.Text
+  bodyHtml        String?       @db.Text
+  receivedAt      DateTime
+  processedAt     DateTime?
+  ticketId        String?       // created ticket if classified as service request
+  skipReason      String?       // if not processed: "spam", "newsletter", "auto-reply", ...
+  createdAt       DateTime      @default(now())
+
+  mailbox         MailboxConfig @relation(fields: [mailboxId], references: [id], onDelete: Cascade)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// JOB SCHEDULER / NOTIFICATIONS (future)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model NotificationSubscription {
+  id           String    @id @default(uuid())
+  userId       String
+  endpoint     String    @unique  // Web Push endpoint
+  p256dh       String
+  auth         String
+  userAgent    String?
+  createdAt    DateTime  @default(now())
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GPS / FIELD SERVICE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model TechnicianLocationLog {
+  id            String         @id @default(uuid())
+  workspaceId   String
+  technicianId  String
+  lat           Float
+  lon           Float
+  accuracy      Float?
+  speed         Float?
+  heading       Float?
+  source        LocationSource
+  recordedAt    DateTime
+  deviceBattery Int?
+  createdAt     DateTime       @default(now())
+
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  technician    User           @relation(fields: [technicianId], references: [id])
+
+  @@index([technicianId, recordedAt(sort: Desc)])
+  @@index([workspaceId, recordedAt(sort: Desc)])
+}
+
+enum LocationSource {
+  GPS
+  NETWORK
+  MANUAL
+  QR_SCAN
+}
+model LocationVisit {
+  id                     String         @id @default(uuid())
+  workspaceId            String
+  technicianId           String
+  locationId             String
+  checkedInAt            DateTime
+  checkedOutAt           DateTime?
+  durationMinutes        Int?
+  checkInMethod          CheckInMethod
+  workSessionId          String?        @unique
+  distanceFromPreviousKm Float?
+  notes                  String?
+  createdAt              DateTime       @default(now())
+
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  technician  User         @relation(fields: [technicianId], references: [id])
+  location    Location     @relation(fields: [locationId], references: [id])
+  workSession WorkSession? @relation("WorkSessionVisit", fields: [workSessionId], references: [id])
+
+  @@index([locationId, checkedInAt])
+  @@index([technicianId, checkedInAt])
+  @@index([workspaceId, checkedInAt(sort: Desc)])
+}
+
+enum CheckInMethod {
+  AUTO_GEOFENCE
+  MANUAL
+  QR_SCAN
+  PHONE_TAP
+}
+model TechnicianGpsConsent {
+  id                        String    @id @default(uuid())
+  userId                    String    @unique
+  workspaceId               String
+  consentGiven              Boolean   @default(false)
+  consentGivenAt            DateTime?
+  consentRevokedAt          DateTime?
+  gpsEnabled                Boolean   @default(false)
+  backgroundTrackingEnabled Boolean   @default(false)
+  proximityAlertsEnabled    Boolean   @default(true)
+  workingHoursStart         String    @default("08:00")
+  workingHoursEnd           String    @default("17:00")
+  trackingOnWeekends        Boolean   @default(false)
+  offDutyActivatedAt        DateTime?
+  retentionDays             Int       @default(30)
+  batteryThresholdPercent   Int       @default(20)
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AI PIONEER FEATURES — Phase 2 (Shadow Mode + Client Risk Score)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model ShadowDecision {
+  id             String   @id @default(uuid())
+  workspaceId    String
+  feature        String   // "ticket_classify", "auto_resolve", "priority_guess", "routing", …
+  inputHash      String   // SHA-256 of input context for dedup / linking
+  aiOutput       Json
+  humanOutput    Json?    // actual decision captured later (nullable)
+  matched        Boolean? // aiOutput == humanOutput?
+  estimatedValue Decimal? @db.Decimal(10, 2)   // PLN saved if auto-applied
+  linkedTicketId String?
+  linkedSessionId String?
+  createdAt      DateTime @default(now())
+  decidedAt      DateTime?  // set when humanOutput filled in
+
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, feature, createdAt(sort: Desc)])
+  @@index([workspaceId, matched])
+}
+
+model ClientRiskScore {
+  id                String   @id @default(uuid())
+  workspaceId       String   // MSP scoring
+  clientWorkspaceId String   // scored client workspace
+  score             Int      // 0–100 (100 = highest risk)
+  trend7d           Int      // score - score(7d ago). negative = improving
+  components        Json     // {payment: 20, tickets: 15, sla: 8, churn: 30, devices: 5}
+  factors           Json     // human-readable list: ["2x late payment", "3x CRITICAL tickets last 7d"]
+  computedAt        DateTime @default(now())
+
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, clientWorkspaceId, computedAt])
+  @@index([workspaceId, score])
+  @@index([clientWorkspaceId, computedAt(sort: Desc)])
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SPRINT 1 — FEATURE PARITY WITH V1
+// Task, Delegation, CrmActivity, Backup, ActivityLog, SlaPolicy,
+// WorkspaceModule, WorkspaceSetting, TimeSignal/Slot, FailureCluster
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model Task {
+  id               String   @id @default(uuid())
+  workspaceId      String
+  taskNumber       String   // "TSK-2026-0001"
+  title            String
+  description      String?  @db.Text
+  status           TaskStatus  @default(NEW)
+  priority         TicketPriority @default(MEDIUM)
+  assignedToUserId String?
+  createdByUserId  String
+  linkedTicketId   String?
+  clientWorkspaceId String?       // which client the task is for
+  locationId       String?
+  deviceId         String?
+  dueAt            DateTime?
+  estimatedMinutes Int?
+  travelKm         Float?
+  scheduledAt      DateTime?      // shows on calendar when set
+  completedAt      DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy        User      @relation("TaskCreatedBy", fields: [createdByUserId], references: [id])
+  assignedTo       User?     @relation("TaskAssignedTo", fields: [assignedToUserId], references: [id])
+  linkedTicket     Ticket?   @relation(fields: [linkedTicketId], references: [id])
+
+  @@unique([workspaceId, taskNumber])
+  @@index([workspaceId, status])
+  @@index([assignedToUserId])
+  @@index([scheduledAt])
+}
+
+enum TaskStatus {
+  NEW
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+model Delegation {
+  id                String   @id @default(uuid())
+  workspaceId       String
+  delegationNumber  String   // "DEL-2026-0001"
+  title             String
+  description       String?  @db.Text
+  createdByUserId   String
+  assignedToUserId  String
+  clientWorkspaceId String?
+  locationId        String?
+  scheduledAt       DateTime
+  estimatedHours    Float?
+  distanceKm        Float?
+  vehicleLicensePlate String?
+  notes             String?  @db.Text
+  status            DelegationStatus @default(PLANNED)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy         User      @relation("DelegationCreatedBy", fields: [createdByUserId], references: [id])
+  assignedTo        User      @relation("DelegationAssignedTo", fields: [assignedToUserId], references: [id])
+
+  @@unique([workspaceId, delegationNumber])
+  @@index([assignedToUserId, scheduledAt])
+  @@index([workspaceId, status])
+}
+
+enum DelegationStatus {
+  PLANNED
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+model CrmActivity {
+  id                String   @id @default(uuid())
+  workspaceId       String
+  createdByUserId   String
+  assignedToUserId  String?
+  contactId         String?
+  clientWorkspaceId String?
+  type              CrmActivityType
+  title             String
+  notes             String?  @db.Text
+  scheduledAt       DateTime?
+  completedAt       DateTime?
+  followUpRequired  Boolean  @default(false)
+  followUpAt        DateTime?
+  linkedTicketId    String?
+  billable          Boolean  @default(false)
+  quoteValueNet     Decimal? @db.Decimal(12, 2)
+  quoteStatus       QuoteStatus?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy         User      @relation("CrmCreatedBy", fields: [createdByUserId], references: [id])
+  assignedTo        User?     @relation("CrmAssignedTo", fields: [assignedToUserId], references: [id])
+  linkedTicket      Ticket?   @relation(fields: [linkedTicketId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, type])
+  @@index([scheduledAt])
+  @@index([contactId])
+  @@index([linkedTicketId])
+}
+
+enum CrmActivityType {
+  PHONE
+  EMAIL
+  MEETING
+  QUOTE
+  OTHER
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+}
+
+// BACKUP — konfiguracja i historia kopii zapasowych
+model BackupConfig {
+  id                    String   @id @default(uuid())
+  workspaceId           String
+  agentRegistrationId   String?
+  deviceId              String?
+  name                  String
+  type                  BackupType
+  sqlHost               String?
+  sqlPort               Int?
+  sqlDatabase           String?
+  sqlUsername           String?
+  sqlPasswordEnc        String?  // encrypted (per-config key chained under master)
+  sqlPasswordIv         String?
+  sqlPasswordAuthTag    String?
+  folderPath            String?
+  googleDriveFolder     String?
+  useInfradeskCloud     Boolean  @default(false)
+  localBackupPath       String?
+  ftpHost               String?
+  ftpUsername           String?
+  ftpPasswordEnc        String?
+  ftpPasswordIv         String?
+  ftpPasswordAuthTag    String?
+  cronSchedule          String   // "0 2 * * *"
+  retentionDays         Int      @default(30)
+  encryptBackups        Boolean  @default(true)
+  encryptionKeyEnc      String?  // per-backup key, encrypted
+  encryptionKeyIv       String?
+  encryptionKeyAuthTag  String?
+  clientProvidedKey     Boolean  @default(false)  // true = klient trzyma kopię klucza u siebie
+  lastStatus            BackupStatus?
+  lastRunAt             DateTime?
+  nextRunAt             DateTime?
+  createdByUserId       String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  workspace             Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  history               BackupHistory[]
+
+  @@index([workspaceId])
+  @@index([nextRunAt])
+}
+
+enum BackupType {
+  SQL_MYSQL
+  SQL_POSTGRES
+  SQL_MSSQL
+  FOLDER
+}
+
+enum BackupStatus {
+  SUCCESS
+  FAILED
+  RUNNING
+  NEVER_RAN
+}
+
+model BackupHistory {
+  id              String       @id @default(uuid())
+  backupConfigId  String
+  status          BackupStatus
+  startedAt       DateTime
+  completedAt     DateTime?
+  sizeBytes       BigInt?
+  googleDriveId   String?
+  cloudPath       String?
+  errorMessage    String?      @db.Text
+  linkedTicketId  String?      // gdy fail → auto-ticket
+  createdAt       DateTime     @default(now())
+
+  config          BackupConfig @relation(fields: [backupConfigId], references: [id], onDelete: Cascade)
+
+  @@index([backupConfigId, startedAt(sort: Desc)])
+}
+
+// ACTIVITY LOG — szczegółowy audit dla user-facing operacji
+model ActivityLog {
+  id                String   @id @default(uuid())
+  workspaceId       String
+  entityType        String   // "ticket", "device", "location", "credential", "user", "session", ...
+  entityId          String
+  actionType        String   // "created", "updated", "deleted", "assigned", "revealed_credential", ...
+  description       String
+  performedByUserId String?
+  ipAddress         String?
+  userAgent         String?
+  metadata          Json?
+  createdAt         DateTime @default(now())
+
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  performedBy       User?     @relation(fields: [performedByUserId], references: [id])
+
+  @@index([workspaceId, entityType, entityId, createdAt(sort: Desc)])
+  @@index([performedByUserId, createdAt(sort: Desc)])
+}
+
+// SLA POLICY — reguły SLA per priorytet per workspace
+model SlaPolicy {
+  id                String   @id @default(uuid())
+  workspaceId       String
+  name              String
+  priority          TicketPriority
+  responseTimeMin   Int      // minutes to first response
+  resolveTimeMin    Int      // minutes to resolution
+  businessHoursOnly Boolean  @default(false)
+  isDefault         Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, priority])
+}
+
+// WORKSPACE MODULE — jakie moduły włączone per workspace + wymagany plan
+model WorkspaceModule {
+  id          String   @id @default(uuid())
+  workspaceId String
+  moduleKey   String   // "operations", "clients", "infrastructure", "vault", "ai", "gps", ...
+  enabled     Boolean  @default(true)
+  requiredPlan Plan    @default(STARTER)
+  config      Json?    // module-specific config
+  updatedAt   DateTime @updatedAt
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, moduleKey])
+}
+
+// WORKSPACE SETTING — dowolne key-value per workspace (SMTP per-klient, branding, portal config)
+model WorkspaceSetting {
+  id          String   @id @default(uuid())
+  workspaceId String
+  key         String   // "branding.logoUrl", "branding.primaryColor", "smtp.host", "portal.customDomain", ...
+  value       Json
+  updatedAt   DateTime @updatedAt
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId])
+}
+
+// INVISIBLE TIME TRACKING — sygnały → slots (Phase 3)
+model TimeSignal {
+  id          String       @id @default(uuid())
+  workspaceId String
+  userId      String
+  source      SignalSource
+  startedAt   DateTime
+  endedAt     DateTime?
+  context     Json         // source-specific: processName, ticketId, deviceId, recipient, gpsLat/Lon
+  createdAt   DateTime     @default(now())
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@index([workspaceId, userId, startedAt(sort: Desc)])
+  @@index([source, startedAt(sort: Desc)])
+}
+
+enum SignalSource {
+  DESKTOP_AGENT
+  GPS_VISIT
+  TICKET_COMMENT
+  SSH
+  MAIL
+  PHONE
+  BROWSER
+}
+
+model TimeSlot {
+  id            String    @id @default(uuid())
+  workspaceId   String
+  userId        String
+  startedAt     DateTime
+  endedAt       DateTime
+  minutes       Int
+  aiGuess       Json      // { ticketId, deviceId, clientWorkspaceId, confidence, reasoning, sourceSignalIds[] }
+  approvedBy    String?
+  approvedAt    DateTime?
+  rejected      Boolean   @default(false)
+  workSessionId String?   @unique
+  createdAt     DateTime  @default(now())
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id])
+
+  @@index([workspaceId, userId, startedAt(sort: Desc)])
+  @@index([approvedAt])
+}
+
+// FAILURE DNA — klastery podobnych ticketów (Phase 4)
+model FailureCluster {
+  id              String         @id @default(uuid())
+  workspaceId     String
+  label           String         // AI-generated: "TP-Link TL-R480T+ reset after firmware 3.19"
+  description     String         @db.Text
+  ticketCount     Int
+  affectedClients Int
+  opportunityPln  Decimal?       @db.Decimal(10, 2)
+  status          ClusterStatus  @default(ACTIVE)
+  dismissedAt     DateTime?
+  dismissedByUserId String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  members         FailureClusterMember[]
+
+  @@index([workspaceId, status])
+}
+
+enum ClusterStatus {
+  ACTIVE
+  DISMISSED
+  RESOLVED
+}
+
+model FailureClusterMember {
+  clusterId  String
+  ticketId   String
+  similarity Float
+
+  cluster    FailureCluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+
+  @@id([clusterId, ticketId])
+  @@index([ticketId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CRM EMAIL (Phase 1: manual; Phase 2: IMAP sync; Phase 3: OAuth)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+enum EmailAccountType {
+  PERSONAL       // osobista skrzynka serwisanta
+  SHARED         // współdzielona między wybrany zespół
+  MSP_MAIN       // główna poczta MSP (widoczna dla adminów)
+}
+
+enum EmailProvider {
+  IMAP
+  GMAIL
+  OUTLOOK
+}
+
+enum EmailDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum EmailFolder {
+  INBOX
+  SENT
+  ARCHIVE
+  SPAM
+  DRAFT
+}
+
+model UserEmailAccount {
+  id              String   @id @default(uuid())
+  workspaceId     String
+  userId          String   // właściciel skrzynki (dla SHARED może być admin MSP)
+  email           String
+  displayName     String?
+  type            EmailAccountType @default(PERSONAL)
+  provider        EmailProvider    @default(IMAP)
+
+  // IMAP
+  imapHost            String?
+  imapPort            Int?
+  imapUsername        String?
+  imapPasswordEnc     String?
+  imapPasswordIv      String?
+  imapPasswordAuthTag String?
+  imapUseTls          Boolean  @default(true)
+
+  // SMTP (Phase 2)
+  smtpHost            String?
+  smtpPort            Int?
+  smtpUsername        String?
+  smtpPasswordEnc     String?
+  smtpPasswordIv      String?
+  smtpPasswordAuthTag String?
+
+  lastSyncAt      DateTime?
+  lastErrorAt     DateTime?
+  lastErrorMsg    String?
+  isActive        Boolean  @default(true)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages        EmailMessage[]
+
+  @@unique([userId, email])
+  @@index([workspaceId, userId])
+  @@index([workspaceId, type])
+}
+
+model EmailMessage {
+  id                  String   @id @default(uuid())
+  workspaceId         String
+  accountId           String
+  messageId           String?
+  threadId            String?
+
+  direction           EmailDirection  @default(INBOUND)
+  folder              EmailFolder     @default(INBOX)
+
+  fromAddress         String
+  fromName            String?
+  toAddresses         String[]
+  ccAddresses         String[]  @default([])
+  subject             String?
+  bodyText            String?  @db.Text
+  bodyHtml            String?  @db.Text
+
+  receivedAt          DateTime
+
+  linkedTicketId      String?
+  linkedCrmActivityId String?
+
+  isRead              Boolean @default(false)
+  isStarred           Boolean @default(false)
+
+  addedManually       Boolean @default(true)
+  addedByUserId       String?
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  workspace           Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  account             UserEmailAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  linkedTicket        Ticket?          @relation(fields: [linkedTicketId], references: [id], onDelete: SetNull)
+  addedBy             User?            @relation("EmailMessageAddedBy", fields: [addedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([accountId, receivedAt(sort: Desc)])
+  @@index([workspaceId, linkedTicketId])
+  @@index([threadId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PERMISSION SCHEMAS (quick-apply templates)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model PermissionSchema {
+  id           String   @id @default(uuid())
+  workspaceId  String
+  name         String
+  description  String?
+  overrides    Json     // [{ nodeId, level, canDelete? }]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DOWNLOADS CENTER — installers, manuals, tools
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model DownloadFile {
+  id                       String             @id @default(uuid())
+  workspaceId              String             // owned by provider MSP workspace
+  category                 String             // free-form: "Instalatory", "Dokumenty", "TeamViewer", etc.
+  name                     String             // display name
+  description              String?
+  fileName                 String             // original filename
+  storedName               String             // sanitized name on disk
+  mimeType                 String?
+  sizeBytes                BigInt
+  visibility               DownloadVisibility @default(INTERNAL)
+  targetClientWorkspaceIds String[]           @default([]) // when visibility=CLIENT: empty = all clients of MSP, non-empty = only these client workspaces
+  uploadedByUserId         String
+  downloadCount            Int                @default(0)
+  deletedAt                DateTime?
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+
+  workspace                Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  uploadedBy               User               @relation(fields: [uploadedByUserId], references: [id])
+
+  @@index([workspaceId, deletedAt])
+  @@index([category])
+  @@index([targetClientWorkspaceIds], type: Gin)
+}
+
+enum DownloadVisibility {
+  INTERNAL
+  CLIENT
+  PUBLIC
+}
+
+// ─────────────────────────── OIDC Provider ────────────────────────────
+// V2 acts as an OpenID Connect provider for first-party apps (Nextcloud
+// on dysk.silers.pl, etc). Clients are registered here with a bcrypt-hashed
+// client_secret; auth codes are short-lived (10 min) and single-use.
+
+model OauthClient {
+  id               String   @id @default(uuid())
+  clientId         String   @unique
+  clientSecretHash String
+  redirectUris     String[]
+  name             String
+  createdAt        DateTime @default(now()) @db.Timestamp(3)
+}
+
+model OauthAuthCode {
+  code        String   @id
+  clientId    String
+  userId      String
+  redirectUri String
+  scope       String
+  expiresAt   DateTime @db.Timestamp(3)
+  used        Boolean  @default(false)
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}

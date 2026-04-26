@@ -8,13 +8,13 @@ import {
   removeCredential,
 } from './credentials.controller';
 import { authenticate } from '../../middleware/auth';
-import { withWorkspaceMembership, authorizeWorkspace, requirePermission } from '../../middleware/workspace';
+import { withWorkspaceMembership, authorizeWorkspace, requirePermission, requireWorkspace } from '../../middleware/workspace';
 import { validate } from '../../middleware/validate';
 import { createCredentialSchema, updateCredentialSchema } from './credentials.validation';
 
 const router = Router();
 
-router.use(authenticate);
+router.use(authenticate, requireWorkspace);
 
 router.get('/', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'), getCredentials);
 router.get('/:id', withWorkspaceMembership, authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN', 'MEMBER'), getCredential);

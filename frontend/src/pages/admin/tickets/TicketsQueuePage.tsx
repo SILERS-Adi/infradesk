@@ -13,7 +13,7 @@ const PRIORITY_ORDER: Record<string, number> = {
 };
 
 const SOURCE_LABELS: Record<string, { label: string; icon: React.ReactNode; bg: string; color: string }> = {
-  AGENT:         { label: 'Agent',   icon: <Bot className="h-3 w-3" />,    bg: 'rgba(139,92,246,0.12)',  color: '#A78BFA' },
+  AGENT:         { label: 'Asystent',   icon: <Bot className="h-3 w-3" />,    bg: 'rgba(139,92,246,0.12)',  color: '#A78BFA' },
   CLIENT_PORTAL: { label: 'Portal',  icon: <Globe className="h-3 w-3" />,  bg: 'rgba(59,130,246,0.12)',  color: '#60A5FA' },
   PHONE:         { label: 'Telefon', icon: <Phone className="h-3 w-3" />,  bg: 'rgba(34,197,94,0.12)',   color: '#4ADE80' },
   EMAIL:         { label: 'E-mail',  icon: <Mail className="h-3 w-3" />,   bg: 'rgba(245,158,11,0.12)',  color: '#FBBF24' },

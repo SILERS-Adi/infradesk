@@ -9,7 +9,11 @@ import { encrypt } from '../../utils/crypto';
 
 export async function listBackupConfigs(params: { workspaceId?: string | null; agentRegId?: string; clientId?: string; scopeFilter?: Record<string, unknown> }) {
   const where: Record<string, unknown> = {};
-  if (params.workspaceId) where.workspaceId = params.workspaceId;
+  if (params.workspaceId) {
+    const { getMspWorkspaceIds } = require('../../utils/mspScope');
+    const wsIds = await getMspWorkspaceIds(params.workspaceId);
+    where.workspaceId = wsIds.length > 1 ? { in: wsIds } : params.workspaceId;
+  }
   if (params.agentRegId) where.agentRegId = params.agentRegId;
   // MSP company filter — narrow by agent's workspace (not backup config's)
   if (params.clientId) {
@@ -48,8 +52,14 @@ export async function listBackupConfigs(params: { workspaceId?: string | null; a
 }
 
 export async function getBackupConfig(id: string, workspaceId?: string) {
+  let where: any = { id };
+  if (workspaceId) {
+    const { getMspWorkspaceIds } = require('../../utils/mspScope');
+    const wsIds = await getMspWorkspaceIds(workspaceId);
+    where.workspaceId = wsIds.length > 1 ? { in: wsIds } : workspaceId;
+  }
   const config = await prisma.backupConfig.findFirst({
-    where: workspaceId ? { id, workspaceId } : { id },
+    where,
     include: {
       agent: { select: { id: true, hostname: true, deviceId: true, device: { select: { locationId: true } } } },
     },
@@ -135,9 +145,13 @@ export async function deleteBackupConfig(id: string, performedByUserId?: string,
 }
 
 export async function getBackupHistory(configId: string, workspaceId?: string, limit = 50) {
-  // Verify config belongs to workspace before returning history
+  // Verify config belongs to workspace (MSP-aware) before returning history
   if (workspaceId) {
-    const config = await prisma.backupConfig.findFirst({ where: { id: configId, workspaceId } });
+    const { getMspWorkspaceIds } = require('../../utils/mspScope');
+    const wsIds = await getMspWorkspaceIds(workspaceId);
+    const config = await prisma.backupConfig.findFirst({
+      where: { id: configId, workspaceId: wsIds.length > 1 ? { in: wsIds } : workspaceId },
+    });
     if (!config) throw new AppError('Backup config not found', 404);
   }
   return prisma.backupHistory.findMany({

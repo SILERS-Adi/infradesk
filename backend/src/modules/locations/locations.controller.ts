@@ -20,7 +20,7 @@ export async function getLocations(req: Request, res: Response, next: NextFuncti
 
 export async function getLocation(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const location = await getLocationById(req.params.id, req.user!);
+    const location = await getLocationById(req.params.id, req.workspaceId!, req.user!);
 
     // Enforce scope on detail endpoint
     if (req.membership && !isLocationAccessible(req.membership, location.id)) {
@@ -36,7 +36,7 @@ export async function getLocation(req: Request, res: Response, next: NextFunctio
 
 export async function postLocation(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const location = await createLocation(req.body, req.user!.userId);
+    const location = await createLocation({ ...req.body, workspaceId: req.workspaceId! }, req.user!.userId);
     res.status(201).json(location);
   } catch (err) {
     next(err);
@@ -45,7 +45,7 @@ export async function postLocation(req: Request, res: Response, next: NextFuncti
 
 export async function patchLocation(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const location = await updateLocation(req.params.id, req.body, req.user!.userId);
+    const location = await updateLocation(req.params.id, req.body, req.user!.userId, req.workspaceId!);
     res.status(200).json(location);
   } catch (err) {
     next(err);
@@ -54,7 +54,7 @@ export async function patchLocation(req: Request, res: Response, next: NextFunct
 
 export async function removeLocation(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    await deleteLocation(req.params.id, req.user!.userId);
+    await deleteLocation(req.params.id, req.user!.userId, req.workspaceId!);
     res.status(204).send();
   } catch (err) {
     next(err);

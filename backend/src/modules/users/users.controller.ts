@@ -18,7 +18,7 @@ export async function getUsers(req: Request, res: Response, next: NextFunction):
 
 export async function getUser(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const user = await getUserById(req.params.id);
+    const user = await getUserById(req.params.id, req.workspaceId!);
     res.status(200).json(user);
   } catch (err) {
     next(err);
@@ -36,7 +36,7 @@ export async function postUser(req: Request, res: Response, next: NextFunction):
 
 export async function patchUser(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const user = await updateUser(req.params.id, req.body, req.user!.userId);
+    const user = await updateUser(req.params.id, req.body, req.user!.userId, req.workspaceId!);
     res.status(200).json(user);
   } catch (err) {
     next(err);
@@ -45,7 +45,7 @@ export async function patchUser(req: Request, res: Response, next: NextFunction)
 
 export async function removeUser(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    await deleteUser(req.params.id, req.user!.userId);
+    await deleteUser(req.params.id, req.user!.userId, req.workspaceId!);
     res.status(204).send();
   } catch (err) {
     next(err);

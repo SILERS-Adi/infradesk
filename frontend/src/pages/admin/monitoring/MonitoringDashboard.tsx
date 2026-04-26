@@ -287,12 +287,12 @@ export default function MonitoringDashboard({ agents }: MonitoringDashboardProps
   const stats: StatCardProps[] = [
     {
       icon: <Server size={20} />,
-      label: 'Agentów łącznie',
+      label: 'Asystentów łącznie',
       value: summary?.totalAgents ?? agents.length,
     },
     {
       icon: <Activity size={20} />,
-      label: 'Agentów online',
+      label: 'Asystentów online',
       value: summary?.onlineAgents ?? '—',
       accent: '#22c55e',
     },
@@ -458,7 +458,7 @@ export default function MonitoringDashboard({ agents }: MonitoringDashboardProps
             color: 'var(--t)',
           }}
         >
-          Ranking agentów (wg wyniku audytu)
+          Ranking asystentów (wg wyniku audytu)
         </h3>
         <AgentRankingTable agents={rankedAgents} />
       </div>

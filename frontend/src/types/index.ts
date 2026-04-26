@@ -313,6 +313,23 @@ export interface DashboardStats {
       ticket: boolean;
     };
   };
+  trends?: {
+    createdToday: number;
+    createdYesterday: number;
+    closedToday: number;
+    closedYesterday: number;
+    closedThisWeek: number;
+    closedLastWeek: number;
+  };
+  chartData?: Array<{ date: string; created: number; closed: number }>;
+  recentActivity?: Array<{
+    id: string; ticketNumber: string; title: string; resolvedAt: string;
+    assignedTo?: { firstName: string; lastName: string } | null;
+  }>;
+  upcomingDeadlines?: Array<{
+    id: string; ticketNumber: string; title: string; priority: string; dueAt: string;
+    assignedTo?: { firstName: string; lastName: string } | null;
+  }>;
 }
 
 /** Stub — Client model removed in workspace migration. Used by legacy wizard. */

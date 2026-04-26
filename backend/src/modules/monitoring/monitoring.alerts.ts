@@ -67,6 +67,141 @@ export async function checkAndCreateAlerts(agentId: string, workspaceId: string,
     }
   }
 
+  // 5. Security-specific alerts from individual audit checks
+  if (serverMetrics.securityAudit?.checks) {
+    const checkById = new Map<string, any>(
+      serverMetrics.securityAudit.checks.map((c: any) => [c.id, c])
+    );
+    const failed = (id: string) => checkById.get(id)?.status === 'fail';
+
+    if (failed('firewall')) {
+      alerts.push({
+        type: 'firewall_off',
+        severity: 'critical',
+        message: `${hostname}: Firewall Windows WYŁĄCZONY — narażenie na atak sieciowy!`,
+      });
+    }
+    if (failed('defender')) {
+      alerts.push({
+        type: 'defender_off',
+        severity: 'critical',
+        message: `${hostname}: Windows Defender WYŁĄCZONY — brak ochrony przed malware!`,
+      });
+    }
+    if (failed('smb1')) {
+      alerts.push({
+        type: 'smb1_enabled',
+        severity: 'critical',
+        message: `${hostname}: SMBv1 WŁĄCZONY — podatność na ransomware (EternalBlue/WannaCry)!`,
+      });
+    }
+    if (failed('admin_count')) {
+      const detail = checkById.get('admin_count')?.detail || '';
+      alerts.push({
+        type: 'too_many_admins',
+        severity: 'high',
+        message: `${hostname}: nadmiarowi administratorzy (${detail}) — zweryfikuj grupę Administrators`,
+      });
+    }
+    if (failed('guest')) {
+      alerts.push({
+        type: 'guest_enabled',
+        severity: 'high',
+        message: `${hostname}: konto Guest AKTYWNE — natychmiast wyłączyć`,
+      });
+    }
+    if (failed('defender_defs')) {
+      const detail = checkById.get('defender_defs')?.detail || '';
+      alerts.push({
+        type: 'defender_outdated',
+        severity: 'high',
+        message: `${hostname}: definicje antywirusa nieaktualne (${detail})`,
+      });
+    }
+  }
+
+  // 6b. Security events — failed logins, new users, admin group add, RDP new IP, USB
+  const se = serverMetrics.securityEvents;
+  if (se) {
+    if (typeof se.failedLogins === 'number' && se.failedLogins > 5) {
+      alerts.push({
+        type: 'failed_logins',
+        severity: se.failedLogins > 20 ? 'critical' : 'high',
+        message: `${hostname}: ${se.failedLogins} nieudanych prób logowania w ostatniej dobie — możliwy brute-force`,
+      });
+    }
+    if (Array.isArray(se.newAdmins) && se.newAdmins.length > 0) {
+      const accs = se.newAdmins.map((u: any) => u.account).join(', ');
+      alerts.push({
+        type: 'new_admin',
+        severity: 'critical',
+        message: `${hostname}: dodano konto do grupy Administratorzy: ${accs}`,
+      });
+    }
+    if (Array.isArray(se.newUsers) && se.newUsers.length > 0) {
+      const accs = se.newUsers.map((u: any) => u.account).join(', ');
+      alerts.push({
+        type: 'new_user',
+        severity: 'high',
+        message: `${hostname}: utworzono nowe konta lokalne: ${accs}`,
+      });
+    }
+    if (Array.isArray(se.rdpNewIp) && se.rdpNewIp.length > 0) {
+      const ips = se.rdpNewIp.map((r: any) => r.ip).join(', ');
+      alerts.push({
+        type: 'rdp_new_ip',
+        severity: 'high',
+        message: `${hostname}: logowanie RDP z nowego IP: ${ips}`,
+      });
+    }
+    if (Array.isArray(se.usbDevices) && se.usbDevices.length > 0) {
+      alerts.push({
+        type: 'usb_connected',
+        severity: 'medium',
+        message: `${hostname}: podłączono nowe urządzenie USB (${se.usbDevices.length} zdarzeń)`,
+      });
+    }
+  }
+
+  // 6d. Nowe urządzenia w LAN
+  const ns = serverMetrics.networkScan;
+  if (ns && Array.isArray(ns.newDevices) && ns.newDevices.length > 0) {
+    const preview = ns.newDevices.slice(0, 5)
+      .map((d: any) => `${d.ip}/${d.mac}${d.hostname ? ` (${d.hostname})` : ''}`).join(', ');
+    alerts.push({
+      type: 'new_lan_device',
+      severity: 'medium',
+      message: `${hostname}: wykryto ${ns.newDevices.length} nowych urządzeń w LAN: ${preview}${ns.newDevices.length > 5 ? '…' : ''}`,
+    });
+  }
+
+  // 6c. Screen lock — flagged = user left PC unlocked and idle
+  const sl = serverMetrics.screenLock;
+  if (sl?.flagged) {
+    const minutes = Math.round((sl.idleSeconds || 0) / 60);
+    alerts.push({
+      type: 'unlocked_idle',
+      severity: 'medium',
+      message: `${hostname}: odblokowany komputer bezczynny od ${minutes} min — ryzyko dostępu przez osoby trzecie`,
+    });
+  }
+
+  // 6. Critical Event Log patterns — BSOD, WHEA hardware errors
+  if (Array.isArray(serverMetrics.criticalEvents)) {
+    const bsodEvents = serverMetrics.criticalEvents.filter((e: any) => {
+      const src = (e.source || '').toLowerCase();
+      return src.includes('bugcheck') || src.includes('kernel-power') || src.includes('whea');
+    });
+    if (bsodEvents.length > 0) {
+      const first = bsodEvents[0];
+      alerts.push({
+        type: 'bsod_or_hw',
+        severity: 'critical',
+        message: `${hostname}: błąd krytyczny systemu (${first.source}) — ${bsodEvents.length} zdarzeń w ostatniej dobie`,
+      });
+    }
+  }
+
   if (alerts.length === 0) return;
 
   // Deduplicate — don't create alert if same type+agent exists unresolved in last 6h

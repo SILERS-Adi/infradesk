@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
 export const createCrmActivitySchema = z.object({
-  workspaceId:         z.string().uuid(),
   locationId:       z.string().uuid().optional().nullable(),
   deviceId:         z.string().uuid().optional().nullable(),
   assignedToUserId: z.string().uuid().optional().nullable(),
@@ -49,7 +48,6 @@ export const updateCrmActivitySchema = z.object({
 });
 
 export const listCrmQuerySchema = z.object({
-  workspaceId:  z.string().uuid().optional(),
   type:      z.enum(['PHONE', 'EMAIL', 'MEETING', 'QUOTE']).optional(),
   quoteStatus: z.enum(['NEW', 'PREPARING', 'SENT', 'ACCEPTED', 'REJECTED', 'IN_PROGRESS', 'COMPLETED']).optional(),
   followUp:  z.string().optional().transform(v => v === 'true' ? true : undefined),

@@ -10,7 +10,7 @@ router.use(authenticate, withWorkspaceMembership);
 // History — audit score trend over time
 router.get('/history', authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { agentId, type = 'audit', days = '30' } = req.query as Record<string, string>;
+    const { agentId, type = 'audit', days = '30', full } = req.query as Record<string, string>;
     const since = new Date(Date.now() - parseInt(days) * 86400000);
 
     const { getMspWorkspaceIds } = require('../../utils/mspScope');
@@ -23,9 +23,12 @@ router.get('/history', authorizeWorkspace('OWNER', 'ADMIN', 'TECHNICIAN'), async
     };
     if (agentId) where.agentRegId = agentId;
 
+    const select: any = { id: true, agentRegId: true, score: true, createdAt: true };
+    if (full === 'true' || full === '1') select.data = true;
+
     const snapshots = await prisma.metricsSnapshot.findMany({
       where,
-      select: { id: true, agentRegId: true, score: true, createdAt: true },
+      select,
       orderBy: { createdAt: 'asc' },
       take: 500,
     });

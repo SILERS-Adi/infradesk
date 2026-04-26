@@ -5,6 +5,7 @@ export interface JwtPayload {
   userId: string;
   email: string;
   isSuperAdmin?: boolean;
+  tokenVersion?: number; // For refresh token rotation — must match User.tokenVersion
 }
 
 export function signAccessToken(payload: JwtPayload): string {

@@ -1,10 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../../middleware/auth';
-import { withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
+import { requireWorkspace, withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
 import prisma from '../../lib/prisma';
 
 const router = Router();
-router.use(authenticate);
+router.use(authenticate, requireWorkspace);
 
 // GET /api/helpdesk-settings — get helpdesk config for current workspace
 router.get('/', withWorkspaceMembership, async (req: Request, res: Response, next: NextFunction) => {

@@ -2,12 +2,13 @@
   "name": "infradesk-backend",
   "version": "1.0.0",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
-    "build": "tsc",
+    "dev": "prisma generate && ts-node-dev --respawn --transpile-only src/app.ts",
+    "build": "prisma generate && tsc",
     "start": "node dist/app.js",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
-    "db:seed": "ts-node prisma/seed.ts"
+    "db:seed": "ts-node prisma/seed.ts",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

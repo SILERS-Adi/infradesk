@@ -1,14 +1,14 @@
 import { Router } from 'express';
 import { getUsers, getUser, postUser, patchUser, removeUser } from './users.controller';
 import { authenticate } from '../../middleware/auth';
-import { withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
+import { requireWorkspace, withWorkspaceMembership, authorizeWorkspace } from '../../middleware/workspace';
 import { validate } from '../../middleware/validate';
 import { createUserSchema, updateUserSchema } from './users.validation';
 import { checkLimit } from '../../middleware/planLimits';
 
 const router = Router();
 
-router.use(authenticate, withWorkspaceMembership);
+router.use(authenticate, requireWorkspace, withWorkspaceMembership);
 
 router.get('/', authorizeWorkspace('OWNER', 'ADMIN'), getUsers);
 router.get('/:id', authorizeWorkspace('OWNER', 'ADMIN'), getUser);

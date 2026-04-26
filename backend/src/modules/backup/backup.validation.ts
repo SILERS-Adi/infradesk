@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 export const createBackupConfigSchema = z.object({
   agentRegId:      z.string().uuid(),
-  workspaceId:     z.string().uuid().optional(),
   name:            z.string().min(1).max(200),
   type:            z.enum(['SQL_MYSQL', 'SQL_POSTGRES', 'SQL_MSSQL', 'FOLDER']),
   enabled:         z.boolean().default(true),

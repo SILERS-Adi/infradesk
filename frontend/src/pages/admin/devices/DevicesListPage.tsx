@@ -282,7 +282,7 @@ export function DevicesListPage() {
     { key: 'ssh', label: 'SSH', group: 'Zdalne', defaultVisible: false,
       render: (d) => d.sshAddress ? <span className="text-[11px] font-mono" style={{ color: 'var(--tm)' }}>{d.sshAddress}</span> : <span style={{ color: 'var(--td)' }}>—</span>,
     },
-    { key: 'agent', label: 'Agent', group: 'Zdalne', defaultVisible: true, align: 'center',
+    { key: 'agent', label: 'Asystent', group: 'Zdalne', defaultVisible: true, align: 'center',
       render: (d) => <AgentBadge agents={d.agents} />,
     },
     // ── Status ──
