@@ -676,9 +676,10 @@ function TicketsKanban({ items, onStatusChange }: { items: TicketListItem[]; onS
                 aria-grabbed="false"
                 aria-label={`${t.ticketNumber} ${t.title}`}
                 onKeyDown={(e) => {
-                  // Keyboard accessibility: Alt+Arrow shifts ticket between columns.
+                  // Ctrl+Shift+Arrow przesuwa ticket między kolumnami. Alt+Arrow
+                  // zarezerwowane przez przeglądarkę (Back/Forward), więc unikamy.
                   if (!onStatusChange) return;
-                  if (!e.altKey || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+                  if (!e.ctrlKey || !e.shiftKey || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
                   e.preventDefault();
                   const idx = COLUMNS.findIndex((c) => c.key === t.status);
                   const nextIdx = e.key === 'ArrowRight' ? idx + 1 : idx - 1;

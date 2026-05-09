@@ -70,6 +70,16 @@ const checkoutSchema = z.object({
 // Przy klastrze użyć Redis. Klucz: `${userId}:${idempotencyKey}` → response payload.
 const checkoutIdempotencyCache = new Map<string, { exp: number; payload: unknown }>();
 const IDEMPOTENCY_TTL_MS = 10 * 60 * 1000;
+const IDEMPOTENCY_KEY_RX = /^[A-Za-z0-9_-]{1,128}$/;
+
+// Periodic sweeper — bez tego klucze nigdy ponownie nie odczytane gniją wiecznie.
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of checkoutIdempotencyCache) {
+    if (now > v.exp) checkoutIdempotencyCache.delete(k);
+  }
+}, 60_000).unref();
+
 function getCachedIdempotency(key: string): unknown | null {
   const v = checkoutIdempotencyCache.get(key);
   if (!v) return null;
@@ -85,7 +95,8 @@ router.post('/billing/checkout', requireAuth, requireWorkspace, async (req: Requ
     if (!config.PAY_INTERNAL_API_KEY) {
       throw HttpError.internal('Gateway płatności nie jest skonfigurowany (PAY_INTERNAL_API_KEY)');
     }
-    const idempotencyKey = req.header('Idempotency-Key');
+    const rawIdemp = req.header('Idempotency-Key');
+    const idempotencyKey = rawIdemp && IDEMPOTENCY_KEY_RX.test(rawIdemp) ? rawIdemp : null;
     if (idempotencyKey) {
       const cached = getCachedIdempotency(`${req.auth!.sub}:${idempotencyKey}`);
       if (cached) {

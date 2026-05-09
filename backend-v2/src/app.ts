@@ -65,26 +65,32 @@ export function buildApp(): Express {
     'https://app.infradesk.pl',
   ]);
   const SUBDOMAIN_PATTERN = /^https:\/\/([a-z0-9-]{3,40})\.infradesk\.pl$/;
+  // Cache slug→ok decyzji żeby CORS nie był blokujący Postgres na każdy request.
+  const slugCache = new Map<string, { ok: boolean; exp: number }>();
+  const SLUG_TTL_MS = 60_000;
   app.use(
     cors({
       origin: (origin, cb) => {
         if (!origin) return cb(null, true);
         if (STATIC_ORIGINS.has(origin)) return cb(null, true);
         const match = SUBDOMAIN_PATTERN.exec(origin);
-        if (match && match[1]) {
-          // Verify slug is a known active workspace before approving with credentials.
-          import('./lib/prisma-bg').then(({ prismaBg }) => {
-            prismaBg.workspace
-              .findUnique({ where: { slug: match[1]! }, select: { id: true, isActive: true, deletedAt: true } })
-              .then((ws) => {
-                if (ws && ws.isActive && !ws.deletedAt) cb(null, true);
-                else cb(new Error('CORS: unknown workspace subdomain'));
-              })
-              .catch(() => cb(new Error('CORS: workspace lookup failed')));
-          });
-          return;
+        if (!match || !match[1]) return cb(new Error('CORS: origin not allowed'));
+        const slug = match[1];
+        const cached = slugCache.get(slug);
+        if (cached && Date.now() < cached.exp) {
+          return cached.ok ? cb(null, true) : cb(new Error('CORS: unknown workspace subdomain'));
         }
-        return cb(new Error('CORS: origin not allowed'));
+        import('./lib/prisma-bg').then(({ prismaBg }) =>
+          prismaBg.workspace.findUnique({
+            where: { slug },
+            select: { id: true, isActive: true, deletedAt: true },
+          }).then((ws) => {
+            const ok = !!(ws && ws.isActive && !ws.deletedAt);
+            slugCache.set(slug, { ok, exp: Date.now() + SLUG_TTL_MS });
+            if (ok) cb(null, true);
+            else cb(new Error('CORS: unknown workspace subdomain'));
+          })
+        ).catch(() => cb(new Error('CORS: workspace lookup failed')));
       },
       credentials: true,
     }),

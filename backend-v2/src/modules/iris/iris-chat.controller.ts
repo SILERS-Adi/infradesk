@@ -689,6 +689,10 @@ const chatBodySchema = z.object({
 
 const MAX_ITERATIONS = 5;
 
+// Cap mutations/chat to 8 — LLM hallucination loops or prompt injection could
+// mass-create/cancel tickets. 8 fits multi-step flows (utworz + komentarz + status).
+const MUTATING_TOOLS = new Set(['utworz_zgloszenie', 'dodaj_komentarz_do_zgloszenia', 'anuluj_zgloszenie', 'ocen_zakonczone', 'popros_o_oddzwonienie']);
+
 async function chatHandler(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const auth = await resolveIrisAuth(req);
@@ -750,10 +754,6 @@ async function chatHandler(req: Request, res: Response, next: NextFunction): Pro
 
       const toolResults: ContentBlockParam[] = [];
       for (const use of toolUses) {
-        // Per-chat mutation cap: LLM hallucination loops or prompt injection could
-        // mass-create/cancel tickets. 8 mutations/chat is generous for legitimate
-        // multi-step flows (e.g. utworz + dodaj_komentarz + sprawdz_status).
-        const MUTATING_TOOLS = new Set(['utworz_zgloszenie', 'dodaj_komentarz_do_zgloszenia', 'anuluj_zgloszenie', 'ocen_zakonczone', 'popros_o_oddzwonienie']);
         if (MUTATING_TOOLS.has(use.name)) {
           const mutationsSoFar = toolCallsLog.filter((c) => MUTATING_TOOLS.has(c.tool)).length;
           if (mutationsSoFar >= 8) {
