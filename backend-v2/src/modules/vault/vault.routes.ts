@@ -79,6 +79,68 @@ router.get('/', requireAccess(MODULES.VAULT, 'view'), async (req: Request, res: 
   } catch (err) { next(err); }
 });
 
+// POST /vault/bulk-import — bulk-create credentials z CSV (Chrome/Edge/Firefox export).
+// Body: { items: [{ name, category?, username?, password, urlOrHost?, notes?, deviceId? }, ...] }
+router.post('/bulk-import', requireAccess(MODULES.VAULT, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const itemSchema = z.object({
+      name: z.string().min(1).max(200).trim(),
+      category: z.enum(['WINDOWS', 'VPN', 'EMAIL', 'APPLICATION', 'DATABASE', 'ROUTER', 'WIFI', 'SSH', 'API_KEY', 'CERTIFICATE', 'OTHER']).default('APPLICATION'),
+      username: z.string().max(255).optional().nullable(),
+      password: z.string().min(1).max(2000),
+      urlOrHost: z.string().max(500).optional().nullable(),
+      notes: z.string().max(2000).optional().nullable(),
+      deviceId: z.string().uuid().optional().nullable(),
+      tags: z.array(z.string()).default([]),
+    });
+    const bodySchema = z.object({
+      items: z.array(itemSchema).min(1).max(500),
+      defaultDeviceId: z.string().uuid().optional(),
+    });
+    const input = bodySchema.parse(req.body);
+
+    // Validation device ownership (jeśli podano)
+    if (input.defaultDeviceId) {
+      const d = await prisma.device.findFirst({
+        where: { id: input.defaultDeviceId, workspaceId: req.workspaceId!, deletedAt: null },
+        select: { id: true },
+      });
+      if (!d) throw HttpError.badRequest('Device nie należy do workspace', 'invalid_device');
+    }
+
+    let imported = 0;
+    const failures: Array<{ name: string; reason: string }> = [];
+
+    for (const item of input.items) {
+      try {
+        const enc = encrypt(item.password);
+        await prisma.credential.create({
+          data: {
+            workspaceId: req.workspaceId!,
+            name: item.name,
+            category: item.category,
+            username: item.username || null,
+            urlOrHost: item.urlOrHost || null,
+            notes: item.notes || null,
+            tags: ['imported-from-browser', ...item.tags],
+            deviceId: item.deviceId ?? input.defaultDeviceId ?? null,
+            passwordEncrypted: enc.ciphertext,
+            passwordIv: enc.iv,
+            passwordAuthTag: enc.authTag,
+            createdByUserId: req.auth!.sub,
+            visibleToRoles: ['OWNER', 'ADMIN'],
+          },
+        });
+        imported++;
+      } catch (err) {
+        failures.push({ name: item.name, reason: (err as Error).message.slice(0, 200) });
+      }
+    }
+
+    res.json({ imported, total: input.items.length, failures });
+  } catch (err) { next(err); }
+});
+
 router.post('/', requireAccess(MODULES.VAULT, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const input = createSchema.parse(req.body);

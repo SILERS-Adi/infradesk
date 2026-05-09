@@ -4,6 +4,12 @@ import { logger } from './lib/logger';
 import { prisma } from './lib/prisma';
 import { prismaBg } from './lib/prisma-bg';
 import { startImapScheduler } from './modules/crm-email/imap-sync';
+import { startTrialExpiryScheduler } from './jobs/trial-expiry';
+import { startRustdeskHealthScheduler } from './jobs/rustdesk-health';
+import { startRenewalReminderScheduler } from './jobs/renewal-reminder';
+import { startAgentOfflineWatchdog } from './jobs/agent-offline-watchdog';
+import { startTicketAutoCloseScheduler } from './jobs/ticket-auto-close';
+import { startSlaBreachScheduler } from './jobs/sla-breach';
 import { initAgentWsServer } from './modules/agents-ws/agents-ws.server';
 
 async function main(): Promise<void> {
@@ -13,6 +19,12 @@ async function main(): Promise<void> {
   const server = app.listen(config.PORT, () => {
     logger.info({ port: config.PORT, env: config.NODE_ENV }, 'InfraDesk backend v2 listening');
     startImapScheduler();
+    startTrialExpiryScheduler();
+    startRustdeskHealthScheduler();
+    startRenewalReminderScheduler();
+    startAgentOfflineWatchdog();
+    startTicketAutoCloseScheduler();
+    startSlaBreachScheduler();
   });
 
   // Mount WebSocket server for desktop agents at /api/agent/ws

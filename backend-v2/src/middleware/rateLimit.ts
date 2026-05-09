@@ -70,3 +70,33 @@ export const downloadLimiter = make({
   legacyHeaders: false,
   message: { error: 'rate_limited', message: 'Too many downloads' },
 });
+
+// Rejestracja konta + nowy workspace — anty-spam DB i mailbomb.
+export const registerLimiter = make({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'rate_limited', message: 'Zbyt wiele rejestracji — spróbuj za godzinę' },
+});
+
+// /auth/refresh — globalny limiter mówi 120/min, ale refresh przy każdym page reload
+// może zalać DB updateMany na refresh-token jeśli ktoś atakuje. 30/min/IP wystarczy
+// na normalny ruch (1 user × kilka kart) i odsiewa skrypty.
+export const refreshLimiter = make({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'rate_limited', message: 'Too many refresh attempts' },
+});
+
+// Confirm/verify token endpoints — token jest 24-byte random więc brute-force
+// niemożliwy, ale spam DB write sensowny do limitowania.
+export const tokenConsumeLimiter = make({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'rate_limited', message: 'Zbyt wiele prób — spróbuj za godzinę' },
+});

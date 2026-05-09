@@ -404,8 +404,7 @@ export default function BackupWizard({ open, onClose, companyFilter }: { open: b
       window.open(url, 'gdrive_auth', 'width=500,height=700');
     } catch (err: any) {
       if (err?.response?.status === 400 || err?.response?.data?.error?.includes?.('Google')) {
-        window.open('/superadmin/pricing', '_blank');
-        toast.error('Google Drive API nie skonfigurowane — otwieram ustawienia');
+        toast.error('Google Drive API nie jest skonfigurowane — skontaktuj się z administratorem');
       } else {
         toast.error(err?.response?.data?.error || 'Błąd połączenia z Google Drive');
       }

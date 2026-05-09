@@ -94,18 +94,35 @@ router.post('/me/change-password', requireAuth, async (req: Request, res: Respon
   } catch (err) { next(err); }
 });
 
-// Live email lookup for "zaproś użytkownika" — sprawdza czy user istnieje w InfraDesk.
+// Email lookup for invite flow. SECURITY: same-workspace members get displayName,
+// cross-workspace gets only `exists` — avoids leaking PII for recon/phishing.
 router.get('/search', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const q = z.object({ email: z.string().email() }).parse(req.query);
+    const callerWsId = (req as Request & { workspaceId?: string }).workspaceId;
     const user = await prisma.user.findUnique({
       where: { email: q.email.toLowerCase() },
-      select: {
-        id: true, email: true, firstName: true, lastName: true,
-        avatarUrl: true, phone: true, isActive: true,
-      },
+      select: { id: true, isActive: true },
     });
-    res.json({ user });
+    if (!user) { res.json({ exists: false }); return; }
+    let sameWorkspace = false;
+    let displayName: string | null = null;
+    if (callerWsId) {
+      const m = await prisma.membership.findFirst({
+        where: { userId: user.id, workspaceId: callerWsId, status: 'ACTIVE' },
+        select: { user: { select: { firstName: true, lastName: true } } },
+      });
+      if (m) {
+        sameWorkspace = true;
+        displayName = `${m.user.firstName} ${m.user.lastName}`;
+      }
+    }
+    res.json({
+      exists: true,
+      isActive: user.isActive,
+      sameWorkspace,
+      ...(sameWorkspace ? { displayName } : {}),
+    });
   } catch (err) { next(err); }
 });
 

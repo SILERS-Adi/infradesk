@@ -1,27 +1,38 @@
-import { Bell, Search } from 'lucide-react';
+import { Bell, Menu } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { ThemeToggle } from '../ui/ThemeToggle';
 import { IrisCore } from '../iris/IrisCore';
+import { api } from '@/lib/api';
 
-export function Topbar() {
+interface NotifSummary { unread?: number }
+
+export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const navigate = useNavigate();
+  // Best-effort: pokażemy kropkę gdy są nieprzeczytane. Endpoint może nie istnieć
+  // we wszystkich środowiskach — nie pokazuj fałszywego alarmu, gdy 404/oczekiwanie.
+  const { data } = useQuery<NotifSummary>({
+    queryKey: ['notifications', 'unread'],
+    queryFn: async () => (await api.get('/notifications/unread')).data,
+    staleTime: 30_000,
+    retry: false,
+  });
+  const unread = data?.unread ?? 0;
 
   return (
     <header
-      className="h-[52px] flex items-center justify-between px-5 sticky top-0 z-30 glass"
+      className="h-[52px] flex items-center justify-between px-3 sm:px-5 sticky top-0 z-30 glass"
       style={{ borderBottom: '1px solid var(--bd)' }}
     >
-      <div className="relative w-64">
-        <Search
-          className="absolute left-3 top-[2vh] text-tx3"
-          style={{ width: 14, height: 14 }}
-          aria-hidden
-        />
-        <input
-          placeholder="Szukaj… (Ctrl+K)"
-          aria-label="Szukaj"
-          className="w-full pl-9 pr-3 py-[6px] text-[12px] rounded-[var(--r-s)] bg-sf2 border border-bd text-tx placeholder:text-tx3 focus:outline-none focus:ring-[3px] focus:ring-[var(--pri-glow)] focus:border-[var(--bd-f)]"
-        />
+      <div className="flex items-center gap-2 min-w-0">
+        <button
+          type="button"
+          onClick={onMenuClick}
+          className="lg:hidden p-2 rounded-[var(--r-s)] text-tx2 press hover:bg-sf-h"
+          aria-label="Menu"
+        >
+          <Menu style={{ width: 18, height: 18 }} />
+        </button>
       </div>
       <div className="flex items-center gap-2">
         <IrisCore
@@ -34,13 +45,15 @@ export function Topbar() {
         <button
           type="button"
           className="relative p-2 rounded-[var(--r-s)] text-tx2 press hover:bg-sf-h transition-colors"
-          aria-label="Powiadomienia"
+          aria-label={unread > 0 ? `Powiadomienia (${unread} nieprzeczytane)` : 'Powiadomienia'}
         >
           <Bell style={{ width: 15, height: 15, strokeWidth: 1.7 }} />
-          <span
-            className="absolute top-1 right-1 w-2 h-2 rounded-full"
-            style={{ background: 'var(--er)' }}
-          />
+          {unread > 0 && (
+            <span
+              className="absolute top-1 right-1 w-2 h-2 rounded-full"
+              style={{ background: 'var(--er)' }}
+            />
+          )}
         </button>
       </div>
     </header>

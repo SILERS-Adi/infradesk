@@ -8,6 +8,12 @@ export const registerSchema = z.object({
   phone: z.string().trim().max(40).optional(),
   workspaceName: z.string().min(2).max(120).trim().optional(),
   workspaceSlug: z.string().regex(/^[a-z0-9-]{3,40}$/).optional(),
+  // Opcjonalne dane firmy (z MF białej listy / CEIDG przy rejestracji)
+  taxId: z.string().regex(/^[0-9]{10}$/).optional(),
+  regon: z.string().max(20).optional(),
+  addressLine1: z.string().max(200).optional(),
+  postalCode: z.string().max(10).optional(),
+  city: z.string().max(80).optional(),
 });
 export type RegisterInput = z.infer<typeof registerSchema>;
 

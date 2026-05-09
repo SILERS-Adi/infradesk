@@ -50,7 +50,7 @@ const GROUPS: NavGroup[] = [
     id: 'operations',
     label: 'Operacje',
     items: [
-      { to: '/', icon: LayoutDashboard, label: 'Kokpit', moduleKey: 'dashboard' },
+      { to: '/dashboard', icon: LayoutDashboard, label: 'Kokpit', moduleKey: 'dashboard' },
       { to: '/tickets', icon: Ticket, label: 'Zgłoszenia', moduleKey: 'tickets' },
       { to: '/tasks', icon: CheckSquare, label: 'Zadania', moduleKey: 'tasks' },
       { to: '/calendar', icon: Calendar, label: 'Kalendarz' },
@@ -69,7 +69,7 @@ const GROUPS: NavGroup[] = [
       { to: '/clients', icon: Building2, label: 'Firmy klientów', moduleKey: 'clients' },
       { to: '/crm', icon: Users, label: 'CRM', moduleKey: 'crm' },
       { to: '/locations', icon: MapPin, label: 'Lokalizacje', moduleKey: 'locations' },
-      { to: '/partners', icon: Handshake, label: 'Partnerzy IT', comingSoon: true },
+      { to: '/partners', icon: Handshake, label: 'Partnerzy IT' },
     ],
   },
   {
@@ -124,12 +124,12 @@ const GROUPS: NavGroup[] = [
   },
 ];
 
-export function Sidebar() {
+export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const { user, logout } = useAuthStore();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const wsQ = useQuery<{ workspace: { id: string; name: string; slug: string; type: WorkspaceType } }>({
-    queryKey: ['workspace', 'current'],
+    queryKey: ['workspaces', 'current'],
     queryFn: async () => (await api.get<{ workspace: { id: string; name: string; slug: string; type: WorkspaceType } }>('/workspaces/current')).data,
     staleTime: 5 * 60_000,
   });
@@ -214,6 +214,7 @@ export function Sidebar() {
             group={group}
             collapsed={collapsed.has(group.id)}
             onToggle={() => toggleGroup(group.id)}
+            onNavigate={onNavigate}
           />
         ))}
       </nav>
@@ -249,7 +250,7 @@ export function Sidebar() {
   );
 }
 
-function SidebarGroup({ group, collapsed, onToggle }: { group: NavGroup; collapsed: boolean; onToggle: () => void }) {
+function SidebarGroup({ group, collapsed, onToggle, onNavigate }: { group: NavGroup; collapsed: boolean; onToggle: () => void; onNavigate?: () => void }) {
   return (
     <div className="mb-2">
       <button
@@ -266,7 +267,7 @@ function SidebarGroup({ group, collapsed, onToggle }: { group: NavGroup; collaps
       {!collapsed && (
         <div className="space-y-[1px]">
           {group.items.map((item) => (
-            <SidebarItem key={item.to} item={item} />
+            <SidebarItem key={item.to} item={item} onNavigate={onNavigate} />
           ))}
         </div>
       )}
@@ -274,7 +275,7 @@ function SidebarGroup({ group, collapsed, onToggle }: { group: NavGroup; collaps
   );
 }
 
-function SidebarItem({ item }: { item: NavItem }): ReactNode {
+function SidebarItem({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }): ReactNode {
   const loc = useLocation();
   const active = item.to === '/' ? loc.pathname === '/' : loc.pathname.startsWith(item.to) && item.to !== '/vault' || loc.pathname === item.to;
 
@@ -282,6 +283,7 @@ function SidebarItem({ item }: { item: NavItem }): ReactNode {
     <NavLink
       to={item.to}
       end={item.to === '/'}
+      onClick={onNavigate}
       className={({ isActive }) =>
         cn(
           'flex items-center gap-2.5 px-3 py-[9px] rounded-[var(--r-s)] text-[13px] font-medium transition-all',

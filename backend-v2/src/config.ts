@@ -42,6 +42,11 @@ const schema = z.object({
   SMTP_FROM: z.string().optional(),
   CEIDG_API_TOKEN: z.string().optional(),
 
+  // Payment gateway (pay.infradesk.pl)
+  PAY_GATEWAY_URL: z.string().default('https://pay.infradesk.pl'),
+  PAY_INTERNAL_API_KEY: z.string().optional(),  // shared HMAC secret z gatewayem (POST /api/payments)
+  PAY_WEBHOOK_SECRET: z.string().optional(),    // HMAC dla incoming webhook od pay-infradesk
+
   // Google OAuth (per-user Gmail/Calendar read access). Optional — if any
   // are empty the /api/v2/auth/google/* routes return 500 "not configured".
   GOOGLE_CLIENT_ID: z.string().optional(),

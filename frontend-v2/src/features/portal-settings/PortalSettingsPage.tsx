@@ -399,7 +399,7 @@ export function PortalSettingsPage() {
         <div className="flex items-center justify-between gap-2 mt-2 flex-wrap">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-[10px] font-semibold uppercase tracking-wide text-tx3">Plan:</span>
-            {['STARTER', 'PRO', 'ENTERPRISE'].map((p) => {
+            {['START', 'TEAM', 'PRO', 'ENTERPRISE'].map((p) => {
               const on = planList.includes(p);
               return (
                 <button

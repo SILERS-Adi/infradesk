@@ -66,6 +66,10 @@ model User {
   // { accessToken, refreshToken, expiresAt, scope, email }.
   googleTokens     String?
 
+  // Personalny PIN serwisanta — używany przez klientów do pobrania chronionych
+  // zasobów (np. RustDesk) na publicznej stronie. Min 4 znaki, unikalny globalnie.
+  personalDownloadPin String? @unique
+
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -93,7 +97,9 @@ model User {
   emailAccounts    UserEmailAccount[]
   emailMessagesAdded EmailMessage[] @relation("EmailMessageAddedBy")
   uploadedDownloads  DownloadFile[]
+  uploadedAttachments Attachment[]
   oauthAuthCodes   OauthAuthCode[]
+  notificationSubscriptions NotificationSubscription[]
 
   @@index([email])
   @@index([isSuperAdmin])
@@ -149,7 +155,7 @@ model Workspace {
   storageQuotaBytes BigInt?       // bytes; null = unlimited
 
   // Plan & subscription
-  plan          Plan          @default(STARTER)
+  plan          Plan          @default(START)
   planStartedAt DateTime?
   planExpiresAt DateTime?
   trialEndsAt   DateTime?
@@ -208,6 +214,11 @@ model Workspace {
   emailMessages  EmailMessage[]
   permissionSchemas PermissionSchema[]
   downloadFiles     DownloadFile[]
+  downloadPins      DownloadPin[]
+  partnerShares     PartnerShare[]
+  attachments       Attachment[]
+  vectorEmbeddings  VectorEmbedding[]
+  mailboxConfigs    MailboxConfig[]
 
   // MSP relations
   asProvider    WorkspaceRelation[] @relation("AsProvider")
@@ -225,9 +236,10 @@ enum WorkspaceType {
 }
 
 enum Plan {
-  STARTER    // do 3 techs, 100 endpointów
-  PRO        // unlimited, pełen AI
-  ENTERPRISE // white-label, SOC-2, pioneer features
+  START      // 49 zł/mc · 3 użytkowników · 25 urządzeń · 5 GB · 100 AI calls
+  TEAM       // 149 zł/mc · 10 użytkowników · 100 urządzeń · 25 GB · 500 AI calls + monitoring/CRM/fakturowanie
+  PRO        // 399 zł/mc · 30 użytkowników · 500 urządzeń · 100 GB · 2000 AI calls + backupy/AI Iris (30 dni trial)
+  ENTERPRISE // indywidualnie · ∞ + GPS, Shadow AI, on-prem, SLA 99.9%
 }
 
 // MSP ↔ klient relacja
@@ -620,8 +632,15 @@ model Ticket {
   serviceMode       ServiceMode?
   billedInContract  Boolean @default(false)
 
+  // F2.3: gdy WAITING — czego/kogo czekamy (CLIENT/SUPPLIER/INTERNAL)
+  waitingType       WaitingType?
+  waitingFor        String?        // free-form opis np. "potwierdzenie zamówienia"
+
+  // F8.2: duplicate-link parent-child. Ticket może być duplikatem innego.
+  parentTicketId    String?
+
   // Customer satisfaction
-  rating            Int?           // 1-3 (sad/neutral/happy)
+  rating            Int?           // 1-5 (NPS-style, było 1-3 → unified)
   ratingComment     String?
   ratedAt           DateTime?
 
@@ -633,6 +652,8 @@ model Ticket {
   device            Device?         @relation(fields: [deviceId], references: [id])
   createdBy         User            @relation("TicketCreatedBy", fields: [createdByUserId], references: [id])
   assignedTo        User?           @relation("TicketAssignedTo", fields: [assignedToUserId], references: [id])
+  parentTicket      Ticket?         @relation("TicketDuplicates", fields: [parentTicketId], references: [id])
+  duplicateTickets  Ticket[]        @relation("TicketDuplicates")
   comments          TicketComment[]
   events            TicketEvent[]
   attachments       Attachment[]
@@ -647,6 +668,13 @@ model Ticket {
   @@index([assignedToUserId])
   @@index([deviceId])
   @@index([priority, status])
+  @@index([parentTicketId])
+}
+
+enum WaitingType {
+  CLIENT      // czekamy na klienta (potwierdzenie / dosłanie info)
+  SUPPLIER    // czekamy na dostawcę (część, kontakt)
+  INTERNAL    // czekamy na decyzję wewnętrzną / inny dział
 }
 
 enum TicketStatus {
@@ -733,7 +761,12 @@ model Attachment {
   sha256      String?
   createdAt   DateTime @default(now())
 
-  ticket      Ticket?  @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ticket      Ticket?   @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  uploadedBy  User      @relation(fields: [uploadedByUserId], references: [id])
+
+  @@index([workspaceId])
+  @@index([ticketId])
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -977,6 +1010,7 @@ model Order {
   createdByUserId   String
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
+  deletedAt         DateTime?
 
   linkedTicketId    String?
   workspace         Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -986,6 +1020,7 @@ model Order {
   @@unique([workspaceId, orderNumber])
   @@index([workspaceId, status])
   @@index([linkedTicketId])
+  @@index([workspaceId, deletedAt])
 }
 
 enum OrderStatus {
@@ -1062,6 +1097,7 @@ model Invoice {
 
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
+  deletedAt         DateTime?
 
   workspace         Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   items             InvoiceItem[]
@@ -1069,6 +1105,7 @@ model Invoice {
   @@unique([workspaceId, invoiceNumber])
   @@index([workspaceId, status])
   @@index([issueDate])
+  @@index([workspaceId, deletedAt])
 }
 
 enum InvoiceType {
@@ -1189,6 +1226,8 @@ model VectorEmbedding {
   embedding    Unsupported("vector(1536)")? // pgvector
   createdAt    DateTime                    @default(now())
 
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
   @@unique([workspaceId, entityType, entityId])
   @@index([workspaceId, entityType])
 }
@@ -1212,7 +1251,10 @@ model MailboxConfig {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   messages         InboundMessage[]
+
+  @@index([workspaceId])
 }
 
 model InboundMessage {
@@ -1246,6 +1288,10 @@ model NotificationSubscription {
   auth         String
   userAgent    String?
   createdAt    DateTime  @default(now())
+
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 
@@ -1403,6 +1449,7 @@ model Task {
   completedAt      DateTime?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+  deletedAt        DateTime?
 
   workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdBy        User      @relation("TaskCreatedBy", fields: [createdByUserId], references: [id])
@@ -1413,6 +1460,7 @@ model Task {
   @@index([workspaceId, status])
   @@index([assignedToUserId])
   @@index([scheduledAt])
+  @@index([workspaceId, deletedAt])
 }
 
 enum TaskStatus {
@@ -1626,7 +1674,7 @@ model WorkspaceModule {
   workspaceId String
   moduleKey   String   // "operations", "clients", "infrastructure", "vault", "ai", "gps", ...
   enabled     Boolean  @default(true)
-  requiredPlan Plan    @default(STARTER)
+  requiredPlan Plan    @default(START)
   config      Json?    // module-specific config
   updatedAt   DateTime @updatedAt
 
@@ -1903,6 +1951,62 @@ enum DownloadVisibility {
   INTERNAL
   CLIENT
   PUBLIC
+}
+
+// Jednorazowe PIN-y do pobierania chronionych zasobów (np. RustDesk).
+// Generowane z panelu, dystrybuowane do klienta przez helpdesk.
+model DownloadPin {
+  id              String    @id @default(uuid())
+  workspaceId     String
+  pin             String    @unique
+  resource        String    // "rustdesk" — extensible later (asystent-mac, etc.)
+  note            String?   // optional label, np. "klient Janowski"
+  createdByUserId String
+  expiresAt       DateTime
+  usedAt          DateTime?
+  usedFromIp      String?
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
+
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+  @@index([expiresAt])
+}
+
+// ─────────────────────────── Partner IT Shares ────────────────────────
+// Czasowe udostępnianie zasobów (urządzenia / hasła / połączenia zdalne)
+// firmom-partnerom które wspierają nas przy konkretnych zleceniach.
+// Każdy share = jeden token URL, otwierany bez logowania (jak download PIN).
+
+model PartnerShare {
+  id               String       @id @default(uuid())
+  workspaceId      String       // owner workspace
+  resourceType     PartnerShareResource
+  resourceId       String       // device.id / credential.id (UUID, weryfikowany przy access)
+  shareToken       String       @unique  // 32B URL-safe — w linku
+  shareTokenHash   String       @unique  // SHA-256 hash dla lookup
+  partnerEmail     String?      // komu udostępniono (audit, opcjonalne)
+  partnerName      String?      // np. "AntyBugs Sp. z o.o."
+  note             String?      // np. "Klient Janowski — naprawa drukarki"
+  expiresAt        DateTime
+  usedAt           DateTime?    // pierwsza udana wizyta
+  usedFromIp       String?
+  accessCount      Int          @default(0)
+  revokedAt        DateTime?
+  createdByUserId  String
+  createdAt        DateTime     @default(now())
+
+  workspace        Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+  @@index([expiresAt])
+}
+
+enum PartnerShareResource {
+  DEVICE          // dane urządzenia (hostname, IP, RustDesk ID, lokalizacja)
+  CREDENTIAL      // jednorazowe odsłonięcie hasła z sejfu
+  RUSTDESK_LAUNCH // tylko link rustdesk://connection/new/<id>
 }
 
 // ─────────────────────────── OIDC Provider ────────────────────────────

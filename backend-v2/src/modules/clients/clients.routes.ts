@@ -8,6 +8,7 @@ import { requireWorkspace } from '../../middleware/requireWorkspace';
 import { requireAccess } from '../../middleware/requireAccess';
 import { HttpError } from '../../utils/httpError';
 import { MODULES } from '../../utils/canAccess';
+import { enforceCountLimit, countActiveMspClients } from '../../utils/planLimits';
 import { hashPassword, validatePasswordStrength } from '../../lib/password';
 import { randomToken } from '../../lib/crypto';
 import { config } from '../../config';
@@ -163,6 +164,9 @@ router.post('/', requireAccess(MODULES.CLIENTS, 'edit'), async (req: Request, re
     });
     if (provider?.type !== 'MSP') throw HttpError.forbidden('Tylko MSP może dodawać klientów');
 
+    const used = await countActiveMspClients(req.workspaceId!);
+    await enforceCountLimit(req.workspaceId!, 'mspClients', used);
+
     const result = await prisma.$transaction(async (tx) => {
       // 1. Create client workspace
       const clientWs = await tx.workspace.create({
@@ -170,7 +174,7 @@ router.post('/', requireAccess(MODULES.CLIENTS, 'edit'), async (req: Request, re
           slug,
           name: input.name,
           type: 'CLIENT',
-          plan: 'STARTER',
+          plan: 'START',
           taxId: input.taxId,
           regon: input.regon,
           addressLine1: input.addressLine1,

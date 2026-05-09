@@ -2,10 +2,11 @@ const PRIORITY_PL_LABEL: Record<string, string> = { LOW: 'Niski', MEDIUM: 'Śred
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Plus, Search, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Input, Select } from '@/components/ui/Input';
@@ -123,6 +124,8 @@ export function TicketsPage() {
   const device = sp.get('device') ?? '';
   const from = sp.get('from') ?? '';
   const to = sp.get('to') ?? '';
+  const sort = sp.get('sort') ?? 'createdAt';
+  const order = (sp.get('order') as 'asc' | 'desc') ?? 'desc';
 
   // Sync debounced search -> URL
   useEffect(() => {
@@ -172,11 +175,12 @@ export function TicketsPage() {
     else nav('/tickets/new');
   }
 
-  // Fetch tickets with backend filters from URL params
-  const { data, isLoading } = useQuery<{ items: TicketListItem[] }>({
-    queryKey: ['tickets', 'list', { q: debouncedSearch, priority, tech, client, device, from, to }],
+  // Fetch tickets with backend filters from URL params + cursor pagination (load-more)
+  const [pageLimit, setPageLimit] = useState<number>(100);
+  const { data, isLoading } = useQuery<{ items: TicketListItem[]; nextCursor?: string | null }>({
+    queryKey: ['tickets', 'list', { q: debouncedSearch, priority, tech, client, device, from, to, limit: pageLimit, sort, order }],
     queryFn: async () => {
-      const params: Record<string, string | number> = { limit: 200 };
+      const params: Record<string, string | number> = { limit: pageLimit, sort, order };
       if (debouncedSearch) params.search = debouncedSearch;
       if (priority) params.priority = priority;
       if (tech) params.assignedToUserId = tech;
@@ -186,8 +190,7 @@ export function TicketsPage() {
       if (to) params.to = to;
       return (await api.get('/tickets', { params })).data;
     },
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: 30_000,
   });
 
   // Reference data for filter dropdowns
@@ -298,6 +301,51 @@ export function TicketsPage() {
   function handleAssign(id: string, userId: string | null) { assignMut.mutate({ id, userId }); }
   function handleServiceMode(id: string, mode: 'REMOTE' | 'ONSITE') { serviceModeMut.mutate({ id, mode }); }
 
+  // F3.4: Bulk selection state + mutations
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const selectAll = () => setSelectedIds(new Set(filtered.map((t) => t.id)));
+  const clearSelected = () => setSelectedIds(new Set());
+
+  const bulkAssign = useMutation({
+    mutationFn: async (assignedToUserId: string | null) =>
+      (await api.post('/tickets/bulk-assign', { ids: Array.from(selectedIds), assignedToUserId })).data,
+    onSuccess: (data: { ok: number; failed: number; total: number }) => {
+      toast.success(`Przypisano ${data.ok}/${data.total} zgłoszeń`);
+      if (data.failed > 0) toast.error(`${data.failed} nieudanych`);
+      clearSelected();
+      qc.invalidateQueries({ queryKey: ['tickets'] });
+    },
+    onError: () => toast.error('Bulk assign failed'),
+  });
+  const bulkStatus = useMutation({
+    mutationFn: async (to: string) =>
+      (await api.post('/tickets/bulk-status', { ids: Array.from(selectedIds), to })).data,
+    onSuccess: (data: { ok: number; failed: number; total: number }, to) => {
+      toast.success(`Status ${to}: ${data.ok}/${data.total}`);
+      if (data.failed > 0) toast.error(`${data.failed} nieudanych (machine block)`);
+      clearSelected();
+      qc.invalidateQueries({ queryKey: ['tickets'] });
+    },
+    onError: () => toast.error('Bulk status failed'),
+  });
+  const bulkDelete = useMutation({
+    mutationFn: async () =>
+      (await api.post('/tickets/bulk-delete', { ids: Array.from(selectedIds) })).data,
+    onSuccess: (data: { ok: number }) => {
+      toast.success(`Usunięto ${data.ok} zgłoszeń`);
+      clearSelected();
+      qc.invalidateQueries({ queryKey: ['tickets'] });
+    },
+    onError: () => toast.error('Bulk delete failed'),
+  });
+
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-4">
@@ -307,10 +355,32 @@ export function TicketsPage() {
             Master-rekordy. Praca dzieje się w Zadaniach, Zamówieniach, CRM — tu widzisz nieprzydzielone i statusy.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Sort dropdown — F3.3 */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] text-tx3">Sortuj:</span>
+            <select
+              value={`${sort}:${order}`}
+              onChange={(e) => {
+                const [s, o] = e.target.value.split(':');
+                const next = new URLSearchParams(sp);
+                if (s) next.set('sort', s);
+                if (o) next.set('order', o);
+                setSp(next, { replace: true });
+              }}
+              className="text-[12px] py-1 px-2 rounded-[var(--r-s)] bg-bg border border-bd text-tx"
+            >
+              <option value="createdAt:desc">Najnowsze</option>
+              <option value="createdAt:asc">Najstarsze</option>
+              <option value="updatedAt:desc">Ostatnio zmienione</option>
+              <option value="priority:desc">Priorytet (od najwyższego)</option>
+              <option value="dueAt:asc">Termin (najbliższy)</option>
+              <option value="status:asc">Status</option>
+            </select>
+          </div>
           {view === 'table' && pickerButton}
           {view === 'visual' && cardPickerButton}
-          <ViewToggle value={view} onChange={setView} />
+          <ViewToggle value={view} onChange={setView} enableKanban />
           <Button onClick={handleAdd}><Plus className="h-4 w-4" /> Nowe zgłoszenie</Button>
         </div>
       </div>
@@ -451,11 +521,200 @@ export function TicketsPage() {
         </Card>
       ) : view === 'visual' ? (
         <TicketsVisualGrid items={filtered} members={members} onAssign={handleAssign} onServiceMode={handleServiceMode} visibleFields={visibleCardFields} density={cardPreset} />
+      ) : view === 'kanban' ? (
+        <TicketsKanban
+          items={filtered}
+          onStatusChange={(id, to) => {
+            // Per-ticket transition via single bulk-status (1 ticket)
+            (async () => {
+              try {
+                await api.post('/tickets/bulk-status', { ids: [id], to });
+                toast.success(`Status: ${to}`);
+                qc.invalidateQueries({ queryKey: ['tickets'] });
+              } catch (e) {
+                const ax = e as { response?: { data?: { message?: string } } };
+                toast.error(ax.response?.data?.message ?? 'Nie udało się zmienić statusu (machine block?)');
+              }
+            })();
+          }}
+        />
       ) : (
-        <TicketsTable items={filtered} columns={visibleColumns} members={members} onAssign={handleAssign} onServiceMode={handleServiceMode} />
+        <TicketsTable items={filtered} columns={visibleColumns} members={members} onAssign={handleAssign} onServiceMode={handleServiceMode} selectedIds={selectedIds} onToggleSelect={toggleSelected} onSelectAll={selectAll} onClearSelect={clearSelected} />
+      )}
+
+      {/* F3.4: Bulk action bar — sticky bottom gdy zaznaczone > 0 */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-bg border border-bd rounded-[var(--r-l)] shadow-2 p-3 flex items-center gap-2 anim-up">
+          <span className="text-[12px] font-semibold text-tx mr-2">Zaznaczone: {selectedIds.size}</span>
+          <select
+            onChange={(e) => { if (e.target.value) bulkAssign.mutate(e.target.value || null); e.target.value = ''; }}
+            disabled={bulkAssign.isPending}
+            className="text-[12px] py-1 px-2 rounded-[var(--r-s)] bg-sf border border-bd text-tx"
+            defaultValue=""
+          >
+            <option value="" disabled>Przypisz do...</option>
+            <option value="">— nikt (cofnij) —</option>
+            {members.map((m) => (
+              <option key={m.user.id} value={m.user.id}>{m.user.firstName} {m.user.lastName}</option>
+            ))}
+          </select>
+          <select
+            onChange={(e) => { if (e.target.value) bulkStatus.mutate(e.target.value); e.target.value = ''; }}
+            disabled={bulkStatus.isPending}
+            className="text-[12px] py-1 px-2 rounded-[var(--r-s)] bg-sf border border-bd text-tx"
+            defaultValue=""
+          >
+            <option value="" disabled>Status →</option>
+            <option value="OPEN">Otwarte</option>
+            <option value="ASSIGNED">Przypisane</option>
+            <option value="IN_PROGRESS">W toku</option>
+            <option value="WAITING">Oczekuje</option>
+            <option value="RESOLVED">Rozwiązane</option>
+            <option value="CLOSED">Zamknięte</option>
+            <option value="CANCELLED">Anulowane</option>
+          </select>
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-er border-er/30 hover:bg-er/10"
+            disabled={bulkDelete.isPending}
+            onClick={async () => {
+              const ok = await confirmDialog({
+                title: `Usunąć ${selectedIds.size} zgłoszeń?`,
+                message: 'Soft-delete. Akcja nieodwracalna z UI.',
+                confirmLabel: 'Usuń wszystkie',
+                danger: true,
+              });
+              if (ok) bulkDelete.mutate();
+            }}
+          >
+            Usuń
+          </Button>
+          <button onClick={clearSelected} className="text-[12px] text-tx3 hover:text-tx px-2 py-1">
+            Anuluj
+          </button>
+        </div>
+      )}
+
+      {/* Load more — F3.7. Backend zwraca nextCursor (=null gdy koniec).
+          Pierwsza strona = 100; klik → +100 do max 1000. */}
+      {items.length >= pageLimit && pageLimit < 1000 && (
+        <div className="flex justify-center mt-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPageLimit(Math.min(1000, pageLimit + 200))}
+            disabled={isLoading}
+          >
+            Wczytaj więcej (pokazane: {items.length})
+          </Button>
+        </div>
       )}
 
       {showNew && <NewTicketModal onClose={() => setShowNew(false)} />}
+    </div>
+  );
+}
+
+// F3.5+drag&drop: Kanban view tickets — drop ticket na kolumnę → transitionTicket
+function TicketsKanban({ items, onStatusChange }: { items: TicketListItem[]; onStatusChange?: (id: string, to: string) => void }) {
+  const [dragOverCol, setDragOverCol] = useState<string | null>(null);
+  const COLUMNS = [
+    { key: 'NEW',         label: 'Nowe',        accent: 'var(--tx3)' },
+    { key: 'OPEN',        label: 'Otwarte',     accent: 'var(--ts)' },
+    { key: 'ASSIGNED',    label: 'Przypisane',  accent: 'var(--accent, #4F8CFF)' },
+    { key: 'IN_PROGRESS', label: 'W toku',      accent: 'var(--wn, #f59e0b)' },
+    { key: 'WAITING',     label: 'Oczekuje',    accent: 'var(--wn-l, #fbbf24)' },
+    { key: 'RESOLVED',    label: 'Rozwiązane',  accent: 'var(--ok, #10b981)' },
+  ];
+  const grouped: Record<string, TicketListItem[]> = {};
+  for (const c of COLUMNS) grouped[c.key] = [];
+  for (const t of items) {
+    if (grouped[t.status]) grouped[t.status]!.push(t);
+  }
+  return (
+    <div
+      className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-3"
+      role="application"
+      aria-label="Tablica kanban zgłoszeń"
+    >
+      {COLUMNS.map((col) => (
+        <div
+          key={col.key}
+          onDragOver={(e) => { e.preventDefault(); setDragOverCol(col.key); }}
+          onDragLeave={() => setDragOverCol((c) => c === col.key ? null : c)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOverCol(null);
+            const id = e.dataTransfer.getData('text/ticket-id');
+            const fromStatus = e.dataTransfer.getData('text/ticket-status');
+            if (id && fromStatus !== col.key && onStatusChange) {
+              onStatusChange(id, col.key);
+            }
+          }}
+          role="region"
+          aria-label={`Kolumna ${col.label}`}
+          aria-dropeffect="move"
+          className={`rounded-[var(--r-s)] transition-colors ${dragOverCol === col.key ? 'bg-pri/5 ring-2 ring-pri/40' : ''}`}
+        >
+          <div className="flex items-center gap-2 mb-3 px-1 pt-1">
+            <div className="h-2 w-2 rounded-full" style={{ background: col.accent }} />
+            <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-tx2">{col.label}</h3>
+            <span className="text-[11px] text-tx3">({grouped[col.key]?.length ?? 0})</span>
+          </div>
+          <div className="space-y-2 px-1 pb-1 min-h-[100px]">
+            {(grouped[col.key] ?? []).map((t) => (
+              <div
+                key={t.id}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('text/ticket-id', t.id);
+                  e.dataTransfer.setData('text/ticket-status', t.status);
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                role="article"
+                aria-grabbed="false"
+                aria-label={`${t.ticketNumber} ${t.title}`}
+                onKeyDown={(e) => {
+                  // Keyboard accessibility: Alt+Arrow shifts ticket between columns.
+                  if (!onStatusChange) return;
+                  if (!e.altKey || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+                  e.preventDefault();
+                  const idx = COLUMNS.findIndex((c) => c.key === t.status);
+                  const nextIdx = e.key === 'ArrowRight' ? idx + 1 : idx - 1;
+                  const next = COLUMNS[nextIdx];
+                  if (next) onStatusChange(t.id, next.key);
+                }}
+                tabIndex={0}
+                className="cursor-move focus:outline-none focus:ring-2 focus:ring-pri/40 rounded-[var(--r-s)]"
+              >
+                <Link
+                  to={`/tickets/${t.id}`}
+                  className="block bg-bg border border-bd rounded-[var(--r-s)] p-2.5 hover:border-pri/50 transition-colors"
+                  draggable={false}
+                >
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span
+                      className="h-2 w-2 rounded-full shrink-0"
+                      style={{ background: PRIORITY_COLOR[t.priority] ?? '#6b7280' }}
+                    />
+                    <span className="text-[10px] font-mono text-tx3">{t.ticketNumber}</span>
+                  </div>
+                  <p className="text-[12px] text-tx font-medium line-clamp-2">{t.title}</p>
+                  {t.assignedTo && (
+                    <p className="text-[10px] text-tx3 mt-1">
+                      {t.assignedTo.firstName} {t.assignedTo.lastName}
+                    </p>
+                  )}
+                </Link>
+              </div>
+            ))}
+            {(grouped[col.key]?.length ?? 0) === 0 && (
+              <p className="text-[11px] text-tx3 text-center py-4">—</p>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

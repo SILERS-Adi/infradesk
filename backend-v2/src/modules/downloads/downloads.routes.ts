@@ -11,6 +11,7 @@ import { requireWorkspace } from '../../middleware/requireWorkspace';
 import { requireAccess } from '../../middleware/requireAccess';
 import { HttpError } from '../../utils/httpError';
 import { MODULES } from '../../utils/canAccess';
+import { enforceStorageLimit } from '../../utils/planLimits';
 import { logActivity, reqContext } from '../activity-logs/logActivity';
 
 // Downloads Center — MSP uploads installers/manuals/tools, serwisanci+clients DL.
@@ -237,29 +238,17 @@ router.post(
       const file = req.file;
       if (!file) throw HttpError.badRequest('Missing file (field name: "file")', 'no_file');
 
-      // Storage quota check (storageQuotaBytes null = unlimited)
-      const ownerWs = await prismaBg.workspace.findUnique({
-        where: { id: ownerId },
-        select: { storageQuotaBytes: true, name: true },
+      // Storage quota: plan-driven limit (Workspace.storageQuotaBytes nadpisuje jako manual override).
+      const used = await prismaBg.downloadFile.aggregate({
+        where: { workspaceId: ownerId, deletedAt: null },
+        _sum: { sizeBytes: true },
       });
-      if (ownerWs?.storageQuotaBytes && ownerWs.storageQuotaBytes > BigInt(0)) {
-        const used = await prismaBg.downloadFile.aggregate({
-          where: { workspaceId: ownerId, deletedAt: null },
-          _sum: { sizeBytes: true },
-        });
-        const backupUsed = await prismaBg.backupHistory.aggregate({
-          where: { config: { workspaceId: ownerId }, status: 'SUCCESS' },
-          _sum: { sizeBytes: true },
-        });
-        const usedBytes = (used._sum?.sizeBytes ?? BigInt(0)) + (backupUsed._sum?.sizeBytes ?? BigInt(0));
-        const newSize = BigInt(file.size);
-        if (usedBytes + newSize > ownerWs.storageQuotaBytes) {
-          const remainingMb = Number((ownerWs.storageQuotaBytes - usedBytes) / BigInt(1024 * 1024));
-          throw new HttpError(413,
-            'quota_exceeded',
-            `Limit miejsca przekroczony dla "${ownerWs.name}". Wolne: ${remainingMb} MB.`);
-        }
-      }
+      const backupUsed = await prismaBg.backupHistory.aggregate({
+        where: { config: { workspaceId: ownerId }, status: 'SUCCESS' },
+        _sum: { sizeBytes: true },
+      });
+      const usedBytes = (used._sum?.sizeBytes ?? BigInt(0)) + (backupUsed._sum?.sizeBytes ?? BigInt(0));
+      await enforceStorageLimit(ownerId, usedBytes, BigInt(file.size));
 
       const input = createSchema.parse({ ...req.body });
 

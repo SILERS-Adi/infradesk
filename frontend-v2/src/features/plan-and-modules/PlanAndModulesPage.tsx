@@ -1,10 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
   Zap, Check, Sparkles, Shield, Briefcase, CreditCard, Calendar,
   HardDrive, Archive, Bot, Ticket, Laptop, Clock, Users as UsersIcon,
   ShoppingCart, Plane, MapPin, Activity, Lock, TrendingUp, Wallet, FileText, Download,
+  FileSpreadsheet, EyeOff,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -12,9 +13,13 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { StatCard } from '@/components/ui/StatCard';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 
-type PlanKey = 'STARTER' | 'PRO' | 'ENTERPRISE';
+type PlanKey = 'START' | 'TEAM' | 'PRO' | 'ENTERPRISE';
+type BillingCycle = 'monthly' | 'yearly';
+
+const YEARLY_DISCOUNT = 0.2; // -20% przy rozliczeniu rocznym
 
 interface Workspace {
   id: string;
@@ -55,65 +60,123 @@ interface InvoiceRow {
   pdfUrl?: string | null;
 }
 
-const PLANS: Array<{
+interface PlanLimit {
+  label: string;
+  value: string;
+}
+
+interface PlanDef {
   key: PlanKey;
   label: string;
-  price: string;
-  priceSuffix: string;
+  tagline: string;
+  /** Cena miesięczna w zł. Roczna liczona jako monthly * 12 * (1 - YEARLY_DISCOUNT). null = enterprise. */
+  monthly: number | null;
   color: string;
-  features: string[];
   popular?: boolean;
-}> = [
+  features: string[];
+  limits: PlanLimit[];
+  trialDays?: number;
+}
+
+const PLANS: PlanDef[] = [
   {
-    key: 'STARTER',
-    label: 'Starter',
-    price: '0',
-    priceSuffix: 'zawsze darmowe',
+    key: 'START',
+    label: 'Start',
+    tagline: 'dla solo / małej firmy',
+    monthly: 49,
     color: 'var(--tx2)',
     features: [
-      'Do 3 użytkowników',
-      'Do 25 urządzeń',
-      'Tickety + Sesje',
+      'Tickety, Urządzenia, Sesje',
       'Sejf haseł',
+      'Dysk plików (5 GB)',
       'Email support',
+    ],
+    limits: [
+      { label: 'Użytkownicy', value: '3' },
+      { label: 'Urządzenia', value: '25' },
+      { label: 'Dysk plików', value: '5 GB' },
+      { label: 'AI calls / mc', value: '100' },
+    ],
+  },
+  {
+    key: 'TEAM',
+    label: 'Team',
+    tagline: 'dla rosnącej ekipy',
+    monthly: 149,
+    color: 'var(--ok)',
+    features: [
+      'Wszystko ze Start +',
+      'CRM, Zamówienia, Delegacje',
+      'Monitoring + Audit Score',
+      'Asystent Desktop',
+      'Multi-klient (MSP)',
+      'Integracje API',
+    ],
+    limits: [
+      { label: 'Użytkownicy', value: '10' },
+      { label: 'Urządzenia', value: '100' },
+      { label: 'Dysk plików', value: '25 GB' },
+      { label: 'Backupy', value: '10 GB' },
+      { label: 'AI calls / mc', value: '500' },
+      { label: 'Klienci (MSP)', value: '5' },
     ],
   },
   {
     key: 'PRO',
     label: 'Pro',
-    price: '299',
-    priceSuffix: 'zł / miesiąc',
+    tagline: 'dla MSP i średnich firm',
+    monthly: 399,
     color: 'var(--pri)',
     popular: true,
+    trialDays: 30,
     features: [
-      'Do 15 użytkowników',
-      'Nielimitowane urządzenia',
-      'Wszystko ze Starter +',
-      'Backupy + Monitoring',
-      'Desktop Asystent',
-      'AI Copilot Iris',
+      'Wszystko z Team +',
+      'Backupy z alertami',
+      'AI Copilot (Iris)',
       'Priority support',
+      'Shadow Mode AI',
+    ],
+    limits: [
+      { label: 'Użytkownicy', value: '30' },
+      { label: 'Urządzenia', value: '500' },
+      { label: 'Dysk plików', value: '100 GB' },
+      { label: 'Backupy', value: '50 GB' },
+      { label: 'AI calls / mc', value: '2 000' },
+      { label: 'Klienci (MSP)', value: '25' },
     ],
   },
   {
     key: 'ENTERPRISE',
     label: 'Enterprise',
-    price: 'Ustal',
-    priceSuffix: 'indywidualnie',
+    tagline: 'duże organizacje, on-prem',
+    monthly: null,
     color: 'var(--wn)',
     features: [
-      'Nielimitowani użytkownicy',
       'Wszystko z Pro +',
-      'SLA 99.9%',
+      'SLA 99,9%',
       'GPS Field Service',
       'Shadow AI Mode',
       'On-premise opcja',
       'Dedykowany CSM',
     ],
+    limits: [
+      { label: 'Użytkownicy', value: '∞' },
+      { label: 'Urządzenia', value: '∞' },
+      { label: 'Dysk plików', value: '500 GB+' },
+      { label: 'AI calls / mc', value: '∞' },
+      { label: 'Klienci (MSP)', value: '∞' },
+    ],
   },
 ];
 
-const TIER_ORDER: Record<PlanKey, number> = { STARTER: 0, PRO: 1, ENTERPRISE: 2 };
+const TIER_ORDER: Record<PlanKey, number> = { START: 0, TEAM: 1, PRO: 2, ENTERPRISE: 3 };
+
+function priceForCycle(p: PlanDef, cycle: BillingCycle): { display: string; suffix: string } {
+  if (p.monthly == null) return { display: 'Ustal', suffix: 'indywidualnie' };
+  if (cycle === 'monthly') return { display: String(p.monthly), suffix: 'zł / miesiąc' };
+  const yearlyMonthly = Math.round(p.monthly * (1 - YEARLY_DISCOUNT));
+  return { display: String(yearlyMonthly), suffix: `zł / mc · płatne rocznie` };
+}
 
 const MODULE_ICONS: Record<string, LucideIcon> = {
   tickets:     Ticket,
@@ -128,6 +191,9 @@ const MODULE_ICONS: Record<string, LucideIcon> = {
   'ai.copilot': Sparkles,
   downloads:   HardDrive,
   gps:         MapPin,
+  invoicing:   FileSpreadsheet,
+  asystent:    Bot,
+  'shadow.ai': EyeOff,
 };
 
 function moduleIcon(key: string): LucideIcon {
@@ -233,11 +299,33 @@ export function PlanAndModulesPage() {
   });
   const isSuperAdmin = meQ.data?.auth?.isSuperAdmin === true;
 
+  // Płatny upgrade — przez pay.infradesk.pl gateway. Otwiera Paynow checkout w nowej karcie.
+  const checkoutMut = useMutation({
+    mutationFn: async (vars: { plan: PlanKey; cycle: BillingCycle }) =>
+      (await api.post<{ checkoutUrl: string; paymentId: string; amountNet: number }>('/billing/checkout', vars)).data,
+    onSuccess: (data) => {
+      toast.success(`Otwieram bramkę płatności (${data.amountNet} zł netto)…`);
+      // Mały delay żeby toast był widoczny przed redirectem
+      setTimeout(() => { window.location.href = data.checkoutUrl; }, 600);
+    },
+    onError: (e: unknown) => {
+      const msg = (e as { response?: { data?: { error?: string; message?: string } } }).response?.data;
+      if (msg?.error === 'plan_negotiable') {
+        toast.error('Plan ENTERPRISE — skontaktuj się z nami żeby ustalić cenę.');
+      } else if (msg?.error === 'not_owner') {
+        toast.error('Tylko właściciel workspace może zmienić plan.');
+      } else {
+        toast.error(msg?.message ?? 'Nie udało się rozpocząć płatności');
+      }
+    },
+  });
+
+  // Pre-pay manual override — TYLKO super-admin (np. testowanie / bezpłatny gift).
   const planMut = useMutation({
     mutationFn: async (newPlan: PlanKey) =>
       (await api.put('/workspaces/current/plan', { plan: newPlan })).data,
     onSuccess: () => {
-      toast.success('Plan zmieniony');
+      toast.success('Plan zmieniony (super-admin)');
       qc.invalidateQueries({ queryKey: ['workspace', 'plan'] });
       qc.invalidateQueries({ queryKey: ['workspace', 'modules'] });
     },
@@ -260,9 +348,11 @@ export function PlanAndModulesPage() {
       ),
   });
 
-  const currentPlan: PlanKey = planQ.data?.plan.plan ?? 'STARTER';
+  const currentPlan: PlanKey = planQ.data?.plan.plan ?? 'START';
   const currentPlanMeta = useMemo(() => PLANS.find((p) => p.key === currentPlan)!, [currentPlan]);
   const currentTier = TIER_ORDER[currentPlan];
+
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
 
   if (planQ.isLoading) {
     return (
@@ -323,7 +413,9 @@ export function PlanAndModulesPage() {
                   {currentPlanMeta.label}
                 </span>
                 <span className="text-[15px] text-[var(--tx2)]">
-                  · {currentPlanMeta.price === '0' ? 'darmowy' : currentPlanMeta.price === 'Ustal' ? 'enterprise' : `${currentPlanMeta.price} zł/mc`}
+                  · {currentPlanMeta.monthly == null
+                    ? 'enterprise'
+                    : `${currentPlanMeta.monthly} zł/mc`}
                 </span>
               </div>
               <div className="flex items-center gap-[var(--sp-3)] mt-1.5 text-[12px] text-[var(--tx3)]">
@@ -356,20 +448,59 @@ export function PlanAndModulesPage() {
           Section 2 — Pricing Tiers
          ═══════════════════════════════════════════════════════════════ */}
       <section id="pricing-tiers">
-        <div className="mb-[var(--sp-3)]">
-          <h2 className="text-[16px] font-semibold">Dostępne plany</h2>
-          <p className="text-[12px] text-[var(--tx3)] mt-0.5">
-            Wybierz plan dopasowany do rozmiaru Twojego zespołu.
-          </p>
+        <div className="mb-[var(--sp-3)] flex items-end justify-between gap-[var(--sp-3)] flex-wrap">
+          <div>
+            <h2 className="text-[16px] font-semibold">Dostępne plany</h2>
+            <p className="text-[12px] text-[var(--tx3)] mt-0.5">
+              Wybierz plan dopasowany do rozmiaru Twojego zespołu.
+            </p>
+          </div>
+          <div
+            className="inline-flex items-center rounded-[var(--r-s)] border p-0.5"
+            style={{ borderColor: 'var(--bd)', background: 'var(--sf-h)' }}
+            role="tablist"
+            aria-label="Cykl rozliczeniowy"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={billingCycle === 'monthly'}
+              onClick={() => setBillingCycle('monthly')}
+              className="px-3 py-1.5 text-[12px] font-semibold rounded-[var(--r-xs)] transition-colors"
+              style={{
+                background: billingCycle === 'monthly' ? 'var(--sf)' : 'transparent',
+                color: billingCycle === 'monthly' ? 'var(--tx)' : 'var(--tx3)',
+                boxShadow: billingCycle === 'monthly' ? 'var(--sh1)' : 'none',
+              }}
+            >
+              Miesięcznie
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={billingCycle === 'yearly'}
+              onClick={() => setBillingCycle('yearly')}
+              className="px-3 py-1.5 text-[12px] font-semibold rounded-[var(--r-xs)] transition-colors flex items-center gap-1.5"
+              style={{
+                background: billingCycle === 'yearly' ? 'var(--sf)' : 'transparent',
+                color: billingCycle === 'yearly' ? 'var(--tx)' : 'var(--tx3)',
+                boxShadow: billingCycle === 'yearly' ? 'var(--sh1)' : 'none',
+              }}
+            >
+              Rocznie
+              <Badge variant="success">−20%</Badge>
+            </button>
+          </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-[var(--sp-3)]">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[var(--sp-3)]">
           {PLANS.map((p) => {
             const isActive = p.key === currentPlan;
             const isDowngrade = TIER_ORDER[p.key] < currentTier;
+            const price = priceForCycle(p, billingCycle);
             return (
               <Card
                 key={p.key}
-                className="p-[var(--sp-5)] relative transition-all"
+                className="p-[var(--sp-5)] relative transition-all flex flex-col"
                 style={isActive
                   ? { borderColor: p.color, borderWidth: 2, background: `color-mix(in srgb, ${p.color} 4%, var(--sf))` }
                   : p.popular
@@ -380,41 +511,106 @@ export function PlanAndModulesPage() {
                   <Badge variant="accent" className="absolute top-3 right-3">Polecany</Badge>
                 )}
                 {isActive && <Badge variant="success" className="absolute top-3 right-3">Aktualny</Badge>}
-                <div className="flex items-baseline gap-1 mb-1">
-                  <span className="text-[18px] font-semibold" style={{ color: p.color }}>{p.label}</span>
+                <div className="mb-1">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-[18px] font-semibold" style={{ color: p.color }}>{p.label}</span>
+                  </div>
+                  <p className="text-[11px] text-[var(--tx3)]">{p.tagline}</p>
                 </div>
-                <div className="flex items-baseline gap-1 mb-[var(--sp-4)]">
-                  <span className="text-[32px] font-bold tabular-nums">{p.price}</span>
-                  <span className="text-[12px] text-[var(--tx3)]">{p.priceSuffix}</span>
+                <div className="flex items-baseline gap-1 mb-[var(--sp-3)]">
+                  <span className="text-[30px] font-bold tabular-nums">{price.display}</span>
+                  <span className="text-[11px] text-[var(--tx3)]">{price.suffix}</span>
                 </div>
-                <ul className="space-y-2 mb-[var(--sp-4)]">
+                {p.trialDays && (
+                  <Badge variant="warning" className="self-start mb-[var(--sp-3)]">
+                    {p.trialDays} dni za darmo
+                  </Badge>
+                )}
+                <ul className="space-y-1.5 mb-[var(--sp-4)]">
                   {p.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-[13px]">
-                      <Check size={13} className="mt-0.5 shrink-0" style={{ color: p.color }} />
+                    <li key={f} className="flex items-start gap-2 text-[12px]">
+                      <Check size={12} className="mt-0.5 shrink-0" style={{ color: p.color }} />
                       <span className="text-[var(--tx)]">{f}</span>
                     </li>
                   ))}
                 </ul>
-                <Button
-                  variant={isActive ? 'outline' : p.popular ? 'primary' : 'outline'}
-                  className="w-full"
-                  disabled={isActive || (!isSuperAdmin) || planMut.isPending}
-                  onClick={() => {
-                    if (isActive || !isSuperAdmin) return;
-                    if (window.confirm(`Zmienić plan na ${p.label}?`)) {
-                      planMut.mutate(p.key);
-                    }
-                  }}
-                  title={
-                    isActive
-                      ? 'To Twój aktualny plan'
-                      : isSuperAdmin
-                        ? `Zmień plan na ${p.label}`
-                        : 'Tylko super-admin może zmienić plan'
-                  }
+                <div
+                  className="rounded-[var(--r-s)] p-2 mb-[var(--sp-4)] grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]"
+                  style={{ background: 'var(--sf-h)', border: '1px solid var(--bd)' }}
                 >
-                  {isActive ? 'Aktualny plan' : isDowngrade ? 'Downgrade' : 'Wybierz plan'}
-                </Button>
+                  {p.limits.map((l) => (
+                    <div key={l.label} className="flex items-baseline justify-between gap-1">
+                      <span className="text-[var(--tx3)]">{l.label}</span>
+                      <span className="font-semibold tabular-nums text-[var(--tx)]">{l.value}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-auto space-y-1.5">
+                  <Button
+                    variant={isActive ? 'outline' : p.popular ? 'primary' : 'outline'}
+                    className="w-full"
+                    disabled={isActive || checkoutMut.isPending || planMut.isPending}
+                    onClick={async () => {
+                      if (isActive) return;
+                      if (p.monthly == null) {
+                        window.location.href = '/kontakt';
+                        return;
+                      }
+                      if (isDowngrade) {
+                        if (!isSuperAdmin) {
+                          toast.error('Downgrade po wygaśnięciu opłaconego okresu — skontaktuj się z nami.');
+                          return;
+                        }
+                        const ok = await confirmDialog({
+                          title: `Downgrade na ${p.label}?`,
+                          message: 'Manual override super-admina (bez płatności). Workspace zejdzie na niższy plan natychmiast.',
+                          confirmLabel: `Zmień plan na ${p.label}`,
+                          danger: true,
+                        });
+                        if (ok) planMut.mutate(p.key);
+                        return;
+                      }
+                      // Upgrade: checkout przez pay.infradesk.pl
+                      checkoutMut.mutate({ plan: p.key, cycle: billingCycle });
+                    }}
+                    title={
+                      isActive
+                        ? 'To Twój aktualny plan'
+                        : p.monthly == null
+                          ? 'Skontaktuj się z nami'
+                          : isDowngrade
+                            ? 'Downgrade na koniec opłaconego okresu'
+                            : `Wybierz ${p.label} (${billingCycle === 'yearly' ? 'rocznie' : 'miesięcznie'})`
+                    }
+                  >
+                    {isActive
+                      ? 'Aktualny plan'
+                      : p.monthly == null
+                        ? 'Skontaktuj się'
+                        : isDowngrade
+                          ? 'Downgrade'
+                          : checkoutMut.isPending
+                            ? 'Otwieram bramkę…'
+                            : 'Wybierz plan'}
+                  </Button>
+                  {isSuperAdmin && !isActive && p.monthly != null && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const ok = await confirmDialog({
+                          title: `Manual override: ustaw plan ${p.label}?`,
+                          message: 'Aktywuje plan bez płatności (np. test/gift). Działanie super-admina — zostanie zalogowane.',
+                          confirmLabel: `Aktywuj ${p.label}`,
+                        });
+                        if (ok) planMut.mutate(p.key);
+                      }}
+                      className="w-full text-[10px] text-tx3 hover:text-pri press text-center"
+                      title="Super-admin only — bez płatności, np. test/gift"
+                    >
+                      manual override (super-admin)
+                    </button>
+                  )}
+                </div>
               </Card>
             );
           })}
@@ -599,7 +795,6 @@ export function PlanAndModulesPage() {
               <p className="text-[11px] text-[var(--tx3)] mt-1">
                 Faktury pojawią się tutaj po pierwszej płatności za plan Pro lub Enterprise.
               </p>
-              {/* TODO: wire to Stripe invoices API in Sprint 6 */}
             </div>
           ) : (
             <div className="overflow-x-auto">

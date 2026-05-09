@@ -6,8 +6,9 @@ import * as Dialog from '@radix-ui/react-dialog';
 import {
   Download, Upload, Search, Filter, File, FileText, FileSpreadsheet,
   FileImage, FileArchive, FileCode, Package, Eye, Lock, Globe, Users,
-  X, Pencil, Trash2, Loader2, ChevronLeft,
+  X, Pencil, Trash2, Loader2, ChevronLeft, KeyRound,
 } from 'lucide-react';
+import { DownloadPinsDialog } from './DownloadPinsDialog';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -89,6 +90,7 @@ export function DownloadsPage() {
   const [filterCategory, setFilterCategory] = useState('');
   const [filterVisibility, setFilterVisibility] = useState<'' | Visibility>('');
   const [showUpload, setShowUpload] = useState(false);
+  const [showPinsDialog, setShowPinsDialog] = useState(false);
   const [editFile, setEditFile] = useState<DownloadFile | null>(null);
   const [deleteFile, setDeleteFile] = useState<DownloadFile | null>(null);
 
@@ -197,6 +199,9 @@ export function DownloadsPage() {
         </div>
         <div className="flex items-center gap-3">
           <ViewToggle value={view} onChange={setView} />
+          <Button variant="outline" onClick={() => setShowPinsDialog(true)}>
+            <KeyRound className="h-4 w-4" /> PIN-y do RustDesk
+          </Button>
           {canEdit && !readOnly && (
             <Button onClick={handleAdd}>
               <Upload className="h-4 w-4" /> Dodaj plik do Dysku
@@ -204,6 +209,7 @@ export function DownloadsPage() {
           )}
         </div>
       </div>
+      <DownloadPinsDialog open={showPinsDialog} onClose={() => setShowPinsDialog(false)} />
 
       <Card className="p-3">
         <div className="flex items-center gap-2 flex-wrap">

@@ -113,11 +113,18 @@ router.post('/telemetry', async (req: Request, res: Response, next: NextFunction
       agentVersion: z.string().max(40).optional(),
     }).parse(req.body);
 
+    // Cap metrics JSON size — defends against an agent (possibly compromised)
+    // writing megabytes of garbage into agentRegistration.serverMetrics every 30s.
+    let metrics = input.metrics ?? null;
+    if (metrics && JSON.stringify(metrics).length > 32_768) {
+      metrics = { _truncated: true, note: 'metrics payload exceeded 32KB cap' };
+    }
+
     await prismaBg.agentRegistration.update({
       where: { id: reg.registrationId },
       data: {
         lastSeen: new Date(),
-        serverMetrics: (input.metrics ?? undefined) as never,
+        serverMetrics: (metrics ?? undefined) as never,
         currentUser: input.currentUser,
         diskFreeGb: input.diskFreeGb,
         diskTotalGb: input.diskTotalGb,
@@ -320,6 +327,8 @@ const pushCommandSchema = z.object({
   type: z.enum([
     'windows_update', 'restart_service', 'system_reboot',
     'install_software', 'schedule_task', 'backup_run', 'update', 'scan_databases', 'test_db_connection',
+    'run_security_audit', 'run_network_scan', 'run_full_inventory', 'run_server_metrics',
+    'run_security_fix',
   ]),
   payload: z.record(z.unknown()).optional(),
   timeoutMs: z.number().int().min(1000).max(120000).optional(),
@@ -361,6 +370,14 @@ adminRouter.post('/:id/push-command', requireAccess(MODULES.DEVICES, 'edit'), as
         // passthrough of scheduleTime if provided
         break;
       }
+      case 'run_security_fix': {
+        const checkId = body.payload?.checkId as string | undefined;
+        if (!checkId || typeof checkId !== 'string' || !/^[a-z_]{1,40}$/.test(checkId)) {
+          throw HttpError.badRequest('checkId required (a-z, _ only)');
+        }
+        payload.checkId = checkId;
+        break;
+      }
     }
 
     let ack: Record<string, unknown> | undefined;
@@ -382,19 +399,40 @@ adminRouter.post('/:id/push-command', requireAccess(MODULES.DEVICES, 'edit'), as
       return;
     }
 
+    // Extract ack.data if agent nested its result, else use ack body itself.
+    const ackData = (ack && (ack as Record<string, unknown>).data as Record<string, unknown>) ?? ack ?? {};
+
+    // Log activity — agent + device (jeśli istnieje) — żeby Historia zmian
+    // na karcie urządzenia widziała push-commands.
+    const fixOk = (ackData as { fixOk?: boolean } | undefined)?.fixOk;
+    const checkId = (body.payload as { checkId?: string } | undefined)?.checkId;
+    const niceDescription = body.type === 'run_security_fix' && checkId
+      ? `Auto-fix: ${checkId} → ${fixOk === true ? 'OK' : fixOk === false ? 'NIE NAPRAWIONO (sprawdź szczegóły)' : 'wysłane'}`
+      : `Push ${body.type} -> ${reg.hostname ?? ''}`;
+
     await logActivity({
       workspaceId: reg.workspaceId,
       entityType: 'agent',
       entityId: reg.id,
       actionType: `push_${body.type}`,
-      description: `Push ${body.type} -> ${reg.hostname ?? ''}`,
+      description: niceDescription,
       performedByUserId: req.auth!.sub,
       ...reqContext(req),
-      metadata: { type: body.type, payload: Object.keys(body.payload ?? {}) },
+      metadata: { type: body.type, payload: Object.keys(body.payload ?? {}), fixOk, checkId, ack: ackData },
     });
+    if (reg.deviceId) {
+      await logActivity({
+        workspaceId: reg.workspaceId,
+        entityType: 'device',
+        entityId: reg.deviceId,
+        actionType: `push_${body.type}`,
+        description: niceDescription,
+        performedByUserId: req.auth!.sub,
+        ...reqContext(req),
+        metadata: { type: body.type, payload: Object.keys(body.payload ?? {}), fixOk, checkId, ack: ackData },
+      });
+    }
 
-    // Extract ack.data if agent nested its result, else use ack body itself.
-    const ackData = (ack && (ack as Record<string, unknown>).data as Record<string, unknown>) ?? ack ?? {};
     res.json({ ok: true, ack: ackData });
   } catch (err) { next(err); }
 });
@@ -452,6 +490,50 @@ adminRouter.get('/:id/online', requireAccess(MODULES.DEVICES, 'view'), async (re
       status: reg.status,
       online: isAgentOnline(reg.id),
       lastSeen: reg.lastSeen,
+    });
+  } catch (err) { next(err); }
+});
+
+// R3+P5: monitoring agent versions — dashboard widget data
+adminRouter.get('/version-stats', requireAccess(MODULES.DEVICES, 'view'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const all = await prisma.agentRegistration.findMany({
+      where: { workspaceId: req.workspaceId!, status: 'ACTIVE' },
+      select: { id: true, agentVersion: true, lastSeen: true },
+    });
+    const now = Date.now();
+    const byVersion: Record<string, number> = {};
+    let online5m = 0;
+    let offline1d = 0;
+    let neverSeen = 0;
+    for (const a of all) {
+      const v = a.agentVersion || 'unknown';
+      byVersion[v] = (byVersion[v] || 0) + 1;
+      if (!a.lastSeen) { neverSeen++; continue; }
+      const ageMs = now - a.lastSeen.getTime();
+      if (ageMs < 5 * 60_000) online5m++;
+      if (ageMs > 24 * 60 * 60_000) offline1d++;
+    }
+    // Określ "latest" wersję = najwyższy semver z list (tylko liczbowe x.y.z)
+    const versions = Object.keys(byVersion).filter((v) => /^\d+\.\d+\.\d+/.test(v));
+    let latest = '';
+    for (const v of versions) {
+      if (!latest) { latest = v; continue; }
+      const [a, b, c] = v.split('.').map(Number);
+      const [la, lb, lc] = latest.split('.').map(Number);
+      if (a! > la! || (a === la && b! > lb!) || (a === la && b === lb && c! > lc!)) latest = v;
+    }
+    const outdated = Object.entries(byVersion)
+      .filter(([v]) => v !== latest && v !== 'unknown')
+      .reduce((s, [, n]) => s + n, 0);
+    res.json({
+      total: all.length,
+      online5m,
+      offline1d,
+      neverSeen,
+      latest,
+      outdated,
+      byVersion,
     });
   } catch (err) { next(err); }
 });

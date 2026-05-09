@@ -49,6 +49,8 @@ export function AlertsPage() {
   const resolve = useMutation({
     mutationFn: async (id: string) => (await api.post(`/monitoring/alerts/${id}/resolve`, { autoResolveReason: 'manual' })).data,
     onSuccess: () => { toast.success('Alert rozwiązany'); qc.invalidateQueries({ queryKey: ['alerts'] }); },
+    onError: (err: { response?: { data?: { message?: string } }; message?: string }) =>
+      toast.error(err?.response?.data?.message ?? err?.message ?? 'Nie udało się rozwiązać alertu'),
   });
 
   const alerts = data?.alerts ?? [];

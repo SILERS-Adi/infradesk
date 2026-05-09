@@ -114,7 +114,7 @@ export async function syncMailbox(accountId: string): Promise<SyncResult> {
         const fromAddr = parsed.from?.value?.[0]?.address ?? 'unknown@unknown';
         const fromName = parsed.from?.value?.[0]?.name ?? null;
 
-        await prisma.emailMessage.create({
+        const created = await prisma.emailMessage.create({
           data: {
             workspaceId: account.workspaceId,
             accountId: account.id,
@@ -131,9 +131,26 @@ export async function syncMailbox(accountId: string): Promise<SyncResult> {
             receivedAt: parsed.date ?? new Date(),
             addedManually: false,
           },
+          select: { id: true },
         });
         if (messageId) seen.add(messageId);
         newCount++;
+
+        // F1.6: Email→ticket auto-create. Jeśli from matches znanego klienta
+        // (Contact/User w workspace) AND subject nie wygląda na "Re:" odpowiedź AND
+        // nie jest auto-reply → utwórz Ticket source=EMAIL z linked emailMessage.
+        try {
+          await maybeCreateTicketFromEmail({
+            workspaceId: account.workspaceId,
+            emailMessageId: created.id,
+            fromAddress: fromAddr,
+            fromName,
+            subject: parsed.subject ?? null,
+            bodyText: parsed.text ?? '',
+          });
+        } catch (e) {
+          logger.warn({ err: e, accountId, fromAddr }, '[email-to-ticket] failed (non-fatal)');
+        }
       }
 
       await prisma.userEmailAccount.update({
@@ -207,4 +224,138 @@ export function stopImapScheduler(): void {
     schedulerHandle = null;
     logger.info('[imap-sync] scheduler stopped');
   }
+}
+
+// ── F1.6: Email → Ticket auto-create ────────────────────────────────────────
+// Jeśli przychodzący mail spełnia warunki:
+//   - from address pasuje do Contact (CRM) lub User w workspace
+//   - subject nie zaczyna się od Re: / Fwd: (pewnie odpowiedź na istniejący)
+//   - body > 10 znaków (nie auto-reply)
+// → utwórz Ticket source=EMAIL z requesterEmail/Name/Phone wypełnione,
+//   przypisany createdBy = system fallback OWNER.
+
+interface EmailToTicketOpts {
+  workspaceId: string;
+  emailMessageId: string;
+  fromAddress: string;
+  fromName: string | null;
+  subject: string | null;
+  bodyText: string;
+}
+
+async function maybeCreateTicketFromEmail(opts: EmailToTicketOpts): Promise<void> {
+  const subject = (opts.subject ?? '').trim();
+  if (!subject) return;
+  // Skip replies and forwards
+  if (/^(re|odp|fwd|fw|aw)\s*:/i.test(subject)) return;
+  // Skip auto-replies (DSN, Out-of-office, mailer-daemon)
+  if (/^(auto|automatyczna odpowiedź|out of office)/i.test(subject)) return;
+  if (/mailer-daemon|postmaster|noreply|no-reply/i.test(opts.fromAddress)) return;
+  if (opts.bodyText.trim().length < 10) return;
+
+  // Match contact in workspace (Contact lub User by email)
+  const fromLc = opts.fromAddress.toLowerCase();
+  const [contact, user] = await Promise.all([
+    prisma.contact.findFirst({
+      where: { workspaceId: opts.workspaceId, email: fromLc, deletedAt: null },
+      select: { id: true, firstName: true, lastName: true, phone: true },
+    }).catch(() => null),
+    prisma.user.findFirst({
+      where: { email: fromLc, memberships: { some: { workspaceId: opts.workspaceId, status: 'ACTIVE' } } },
+      select: { id: true, firstName: true, lastName: true, phone: true },
+    }).catch(() => null),
+  ]);
+  // Allow ticket creation only if from is a known contact or user
+  if (!contact && !user) {
+    logger.debug({ fromAddress: opts.fromAddress, workspaceId: opts.workspaceId }, '[email-to-ticket] from unknown — skipping');
+    return;
+  }
+  const requesterName = (
+    contact ? [contact.firstName, contact.lastName].filter(Boolean).join(' ') :
+    user ? `${user.firstName} ${user.lastName}` :
+    opts.fromName
+  ) || opts.fromName || opts.fromAddress;
+  const requesterPhone = contact?.phone ?? user?.phone ?? null;
+
+  // Resolve author (system user lub OWNER fallback)
+  let authorId: string | null = null;
+  const sys = await prisma.user.findUnique({ where: { email: 'agent@infradesk.system' }, select: { id: true } }).catch(() => null);
+  if (sys) authorId = sys.id;
+  if (!authorId) {
+    const owner = await prisma.membership.findFirst({
+      where: { workspaceId: opts.workspaceId, role: 'OWNER' },
+      select: { userId: true },
+    }).catch(() => null);
+    if (owner) authorId = owner.userId;
+  }
+  if (!authorId) {
+    logger.warn({ workspaceId: opts.workspaceId }, '[email-to-ticket] no author available — skipping');
+    return;
+  }
+
+  // Race-safe ticket number T-YYYY-NNNN
+  const year = new Date().getFullYear();
+  const numberPrefix = `T-${year}-`;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const last = await prisma.ticket.findFirst({
+      where: { workspaceId: opts.workspaceId, ticketNumber: { startsWith: numberPrefix } },
+      orderBy: { ticketNumber: 'desc' },
+      select: { ticketNumber: true },
+    });
+    let nextN = 1;
+    if (last) {
+      const m = last.ticketNumber.match(/-(\d+)$/);
+      if (m) nextN = parseInt(m[1]!, 10) + 1;
+    }
+    const candidate = `${numberPrefix}${String(nextN + attempt).padStart(4, '0')}`;
+    // R6: Apply SLA inline (bg context — bypass RLS, direct prismaBg call + DEFAULT_SLA fallback)
+    let sla: { slaResponseMinutes: number | null; slaResolveMinutes: number | null } = { slaResponseMinutes: null, slaResolveMinutes: null };
+    if (attempt === 0) {
+      const policy = await prisma.slaPolicy.findFirst({
+        where: { workspaceId: opts.workspaceId, priority: 'MEDIUM' },
+        select: { responseTimeMin: true, resolveTimeMin: true },
+      }).catch(() => null);
+      if (policy) {
+        sla = { slaResponseMinutes: policy.responseTimeMin, slaResolveMinutes: policy.resolveTimeMin };
+      } else {
+        const def = (await import('../tickets/tickets.service')).DEFAULT_SLA.MEDIUM;
+        if (def) sla = { slaResponseMinutes: def.responseMin, slaResolveMinutes: def.resolveMin };
+      }
+    }
+    try {
+      const ticket = await prisma.ticket.create({
+        data: {
+          workspaceId: opts.workspaceId,
+          ticketNumber: candidate,
+          title: subject.slice(0, 200),
+          description: opts.bodyText.slice(0, 5000),
+          status: 'NEW',
+          priority: 'MEDIUM',
+          type: 'INCIDENT',
+          source: 'EMAIL',
+          createdByUserId: authorId,
+          requesterName,
+          requesterEmail: fromLc,
+          requesterPhone,
+          slaResponseMinutes: sla.slaResponseMinutes,
+          slaResolveMinutes: sla.slaResolveMinutes,
+          events: { create: { userId: authorId, eventType: 'created', toValue: 'NEW', metadata: { source: 'email', emailMessageId: opts.emailMessageId } } },
+        },
+        select: { id: true, ticketNumber: true },
+      });
+      // Link email → ticket
+      await prisma.emailMessage.update({
+        where: { id: opts.emailMessageId },
+        data: { linkedTicketId: ticket.id },
+      });
+      logger.info({ ticketId: ticket.id, ticketNumber: ticket.ticketNumber, fromAddress: opts.fromAddress },
+        '[email-to-ticket] created');
+      return;
+    } catch (e: unknown) {
+      const code = (e as { code?: string } | null)?.code;
+      if (code === 'P2002') continue; // retry z wyższym numerem
+      throw e;
+    }
+  }
+  logger.warn({ workspaceId: opts.workspaceId }, '[email-to-ticket] could not allocate unique number after 5 tries');
 }

@@ -2,7 +2,7 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import { prisma } from '../../lib/prisma';
 import { z } from 'zod';
 import { config } from '../../config';
-import { loginLimiter, passwordResetLimiter } from '../../middleware/rateLimit';
+import { loginLimiter, passwordResetLimiter, registerLimiter, refreshLimiter, tokenConsumeLimiter } from '../../middleware/rateLimit';
 import { requireAuth } from '../../middleware/auth';
 import {
   registerSchema, loginSchema, requestResetSchema, confirmResetSchema,
@@ -28,7 +28,7 @@ function clearRefreshCookie(res: Response): void {
   res.clearCookie('refresh_token', { path: '/api/v2/auth' });
 }
 
-router.post('/register', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/register', registerLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const input = registerSchema.parse(req.body);
     const result = await service.register(input);
@@ -56,7 +56,7 @@ router.post('/login', loginLimiter, async (req: Request, res: Response, next: Ne
   } catch (err) { next(err); }
 });
 
-router.post('/refresh', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/refresh', refreshLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const raw = req.cookies?.refresh_token as string | undefined;
     if (!raw) throw HttpError.unauthorized('Missing refresh token');
@@ -170,7 +170,7 @@ router.post('/password-reset/request', passwordResetLimiter, async (req: Request
   } catch (err) { next(err); }
 });
 
-router.post('/password-reset/confirm', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/password-reset/confirm', tokenConsumeLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const input = confirmResetSchema.parse(req.body);
     await service.confirmPasswordReset(input.token, input.password);
@@ -178,11 +178,26 @@ router.post('/password-reset/confirm', async (req: Request, res: Response, next:
   } catch (err) { next(err); }
 });
 
-router.post('/verify-email', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/verify-email', tokenConsumeLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const input = verifyEmailSchema.parse(req.body);
     await service.verifyEmail(input.token);
     res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+router.post('/accept-invite', tokenConsumeLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const schema = z.object({ token: z.string().min(20).max(80), password: z.string().min(10).max(200) });
+    const input = schema.parse(req.body);
+    const result = await service.acceptInvite(input.token, input.password);
+    setRefreshCookie(res, result.tokens.refreshToken);
+    res.json({
+      user: result.user,
+      accessToken: result.tokens.accessToken,
+      expiresInSeconds: result.tokens.expiresInSeconds,
+      defaultWorkspaceId: result.defaultWorkspaceId,
+    });
   } catch (err) { next(err); }
 });
 

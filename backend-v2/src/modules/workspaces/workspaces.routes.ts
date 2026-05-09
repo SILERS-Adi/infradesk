@@ -8,6 +8,7 @@ import { prismaBg } from '../../lib/prisma-bg';
 import { requireAuth } from '../../middleware/auth';
 import { requireWorkspace } from '../../middleware/requireWorkspace';
 import { requireAccess } from '../../middleware/requireAccess';
+import { registerLimiter } from '../../middleware/rateLimit';
 import { HttpError } from '../../utils/httpError';
 import { MODULES } from '../../utils/canAccess';
 
@@ -31,8 +32,9 @@ const logoUpload = multer({
   storage: logoStorage,
   limits: { fileSize: 2 * 1024 * 1024 }, // 2MB max
   fileFilter: (_req, file, cb) => {
-    if (['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'].includes(file.mimetype)) cb(null, true);
-    else cb(new Error('Dozwolone tylko obrazy: JPG, PNG, WebP, SVG'));
+    // SVG removed: allows embedded <script>/onload — stored XSS on infradesk.pl cookie domain.
+    if (['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Dozwolone tylko obrazy: JPG, PNG, WebP'));
   },
 });
 
@@ -56,13 +58,20 @@ router.get('/', requireAuth, async (req: Request, res: Response, next: NextFunct
   } catch (err) { next(err); }
 });
 
-router.post('/', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requireAuth, registerLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const input = createSchema.parse(req.body);
+    // Cap OWNER workspaces per user — anti-spam DB.
+    const ownedCount = await prismaBg.membership.count({
+      where: { userId: req.auth!.sub, role: 'OWNER', status: 'ACTIVE' },
+    });
+    if (ownedCount >= 5) {
+      throw HttpError.tooMany('Limit workspace\'ów: 5 jako OWNER. Skontaktuj się z biurem żeby zwiększyć.');
+    }
     const dup = await prismaBg.workspace.findUnique({ where: { slug: input.slug }, select: { id: true } });
     if (dup) throw HttpError.conflict('Slug jest zajęty', 'slug_taken');
     const workspace = await prismaBg.$transaction(async (tx) => {
-      const ws = await tx.workspace.create({ data: { ...input, plan: 'STARTER' } });
+      const ws = await tx.workspace.create({ data: { ...input, plan: 'START' } });
       await tx.membership.create({
         data: {
           userId: req.auth!.sub, workspaceId: ws.id,
@@ -193,23 +202,26 @@ const MODULE_CATALOG: Array<{
   key: string;
   label: string;
   description: string;
-  plan: 'STARTER' | 'PRO' | 'ENTERPRISE';
+  plan: 'START' | 'TEAM' | 'PRO' | 'ENTERPRISE';
 }> = [
-  { key: 'tickets',     label: 'Tickety',              description: 'Zarządzanie zgłoszeniami od klientów i wewnętrznymi.',     plan: 'STARTER' },
-  { key: 'devices',     label: 'Urządzenia',           description: 'Inwentaryzacja sprzętu, konfiguracja, historia serwisu.', plan: 'STARTER' },
-  { key: 'sessions',    label: 'Sesje pracy',          description: 'Rejestrowanie czasu pracy i rozliczanie z klientami.',    plan: 'STARTER' },
-  { key: 'vault',       label: 'Sejf haseł',           description: 'Bezpieczne przechowywanie credentiali per urządzenie.',   plan: 'STARTER' },
-  { key: 'clients',     label: 'CRM (kontakty)',       description: 'Klienci, kontakty, umowy i warunki rozliczeń.',           plan: 'STARTER' },
-  { key: 'orders',      label: 'Zakupy',               description: 'Zamówienia sprzętu, magazyn, dostawy do klientów.',       plan: 'STARTER' },
-  { key: 'delegations', label: 'Delegacje',            description: 'Wyjazdy serwisowe, kalkulacja kosztów i diet.',           plan: 'STARTER' },
+  { key: 'tickets',     label: 'Tickety',              description: 'Zarządzanie zgłoszeniami od klientów i wewnętrznymi.',     plan: 'START' },
+  { key: 'devices',     label: 'Urządzenia',           description: 'Inwentaryzacja sprzętu, konfiguracja, historia serwisu.', plan: 'START' },
+  { key: 'sessions',    label: 'Sesje pracy',          description: 'Rejestrowanie czasu pracy i rozliczanie z klientami.',    plan: 'START' },
+  { key: 'vault',       label: 'Sejf haseł',           description: 'Bezpieczne przechowywanie credentiali per urządzenie.',   plan: 'START' },
+  { key: 'downloads',   label: 'Dysk',                 description: 'Pliki do pobrania: instalatory, instrukcje, narzędzia.',  plan: 'START' },
+  { key: 'clients',     label: 'CRM (kontakty)',       description: 'Klienci, kontakty, umowy i warunki rozliczeń.',           plan: 'TEAM' },
+  { key: 'orders',      label: 'Zakupy',               description: 'Zamówienia sprzętu, magazyn, dostawy do klientów.',       plan: 'TEAM' },
+  { key: 'delegations', label: 'Delegacje',            description: 'Wyjazdy serwisowe, kalkulacja kosztów i diet.',           plan: 'TEAM' },
+  { key: 'monitoring',  label: 'Monitoring',           description: 'Audit Score, uptime i health-check urządzeń.',            plan: 'TEAM' },
+  { key: 'invoicing',   label: 'Fakturowanie',         description: 'Faktury VAT, KSeF, rozliczenia abonamentowe.',            plan: 'TEAM' },
+  { key: 'asystent',    label: 'Asystent Desktop',     description: 'Klient desktopowy z AI komendami głosowymi.',             plan: 'TEAM' },
   { key: 'backups',     label: 'Backupy',              description: 'Monitoring zadań backupu i alerty w razie awarii.',       plan: 'PRO' },
-  { key: 'monitoring',  label: 'Monitoring',           description: 'Audit Score, uptime i health-check urządzeń.',            plan: 'PRO' },
   { key: 'ai.copilot',  label: 'AI Copilot (Iris)',    description: 'AI asystent do diagnostyki, pisania odpowiedzi, KB.',     plan: 'PRO' },
-  { key: 'downloads',   label: 'Dysk',                 description: 'Pliki do pobrania: instalatory, instrukcje, narzędzia.',  plan: 'STARTER' },
   { key: 'gps',         label: 'GPS Field Service',    description: 'Śledzenie techników w terenie, route optimization.',      plan: 'ENTERPRISE' },
+  { key: 'shadow.ai',   label: 'Shadow AI Mode',       description: 'AI auto-decyzje w tle z pełnym audit trailem.',           plan: 'ENTERPRISE' },
 ];
 
-const PLAN_ORDER = { STARTER: 0, PRO: 1, ENTERPRISE: 2 } as const;
+const PLAN_ORDER = { START: 0, TEAM: 1, PRO: 2, ENTERPRISE: 3 } as const;
 type PlanKey = keyof typeof PLAN_ORDER;
 
 // GET /workspaces/current/plan — plan details + billing dates
@@ -231,7 +243,7 @@ router.put('/current/plan', requireAuth, requireWorkspace, async (req: Request, 
       res.status(403).json({ error: 'forbidden', message: 'Plan zmienia super-admin' });
       return;
     }
-    const schema = z.object({ plan: z.enum(['STARTER', 'PRO', 'ENTERPRISE']) });
+    const schema = z.object({ plan: z.enum(['START', 'TEAM', 'PRO', 'ENTERPRISE']) });
     const input = schema.parse(req.body);
     const updated = await prisma.workspace.update({
       where: { id: req.workspaceId! },
@@ -393,6 +405,27 @@ router.get('/current/costs', requireAuth, requireWorkspace, async (req: Request,
       totalPln: Math.round(totalPln * 100) / 100,
       trend,
     });
+  } catch (err) { next(err); }
+});
+
+// GET /workspaces/current/onboarding — checklist for newly registered workspace
+router.get('/current/onboarding', requireAuth, requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const workspaceId = req.workspaceId!;
+    const [agentCount, deviceCount, memberCount, backupCount] = await Promise.all([
+      prisma.agentRegistration.count({ where: { workspaceId } }),
+      prisma.device.count({ where: { workspaceId, deletedAt: null } }),
+      prisma.membership.count({ where: { workspaceId, status: 'ACTIVE' } }),
+      prisma.backupConfig.count({ where: { workspaceId } }),
+    ]);
+    const steps = [
+      { key: 'asystent',  done: agentCount > 0,  label: 'Zainstaluj Asystenta',     description: 'Pobierz Asystenta Business i zaloguj go na pierwszej stacji robotniczej.', cta: { label: 'Pobierz', href: '/pobieranie' } },
+      { key: 'device',    done: deviceCount > 0, label: 'Dodaj urządzenie',         description: 'Dodaj pierwsze urządzenie ręcznie albo poczekaj aż Asystent samo się zarejestruje.', cta: { label: 'Urządzenia', href: '/devices' } },
+      { key: 'invite',    done: memberCount > 1, label: 'Zaproś kolegę',            description: 'Dodaj drugiego użytkownika do swojego workspace, żeby pracować zespołowo.', cta: { label: 'Zaproś', href: '/users' } },
+      { key: 'backup',    done: backupCount > 0, label: 'Skonfiguruj backup',       description: 'Dodaj harmonogram kopii (MySQL / PostgreSQL / MSSQL / folder) na Google Drive lub InfraDesk Cloud.', cta: { label: 'Backupy', href: '/backups' } },
+    ];
+    const completed = steps.filter((s) => s.done).length;
+    res.json({ steps, completed, total: steps.length });
   } catch (err) { next(err); }
 });
 

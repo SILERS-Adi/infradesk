@@ -152,6 +152,8 @@ function RejectButton({ id }: { id: string }) {
   const reject = useMutation({
     mutationFn: async () => (await api.post(`/agents/admin/${id}/reject`)).data,
     onSuccess: () => { toast.success('Odrzucone'); qc.invalidateQueries({ queryKey: ['agents'] }); },
+    onError: (err: { response?: { data?: { message?: string } }; message?: string }) =>
+      toast.error(err?.response?.data?.message ?? err?.message ?? 'Nie udało się odrzucić'),
   });
   return (
     <Button size="sm" variant="danger" onClick={() => reject.mutate()} disabled={reject.isPending} title="Odrzuć">

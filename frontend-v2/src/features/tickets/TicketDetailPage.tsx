@@ -1,19 +1,23 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import * as Dialog from '@radix-ui/react-dialog';
 import {
-  ArrowLeft, Clock, User, Server as ServerIcon, Send, Lock, MessageSquare,
+  ArrowLeft, Clock, Server as ServerIcon, Send, Lock, MessageSquare,
   CheckCircle2, Loader2, AlertCircle, RefreshCw, Globe, Mail, Phone, Bot,
-  Cpu, PenLine, Wallet, Building2, TrendingUp, Timer,
+  Cpu, PenLine, Wallet, Building2, TrendingUp, Timer, Trash2, Edit3, Star,
+  Play, X,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Textarea } from '@/components/ui/Input';
+import { Input, Textarea, Select } from '@/components/ui/Input';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { PriorityDot } from '@/components/ui/PriorityDot';
 import { Badge } from '@/components/ui/Badge';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
+import { SimpleMarkdown } from '@/components/ui/SimpleMarkdown';
 import { cn, formatDatePl, formatRelativePl } from '@/lib/utils';
 
 interface TicketDetail {
@@ -33,6 +37,13 @@ interface TicketDetail {
   resolvedAt: string | null;
   closedAt: string | null;
   resolutionSummary: string | null;
+  waitingType: 'CLIENT' | 'SUPPLIER' | 'INTERNAL' | null;
+  waitingFor: string | null;
+  parentTicketId: string | null;
+  parentTicket: { id: string; ticketNumber: string; title: string; status: string } | null;
+  slaResponseMinutes: number | null;
+  slaResolveMinutes: number | null;
+  slaBreached: boolean;
   rating: number | null;
   ratingComment: string | null;
   ratedAt: string | null;
@@ -100,8 +111,10 @@ interface TicketDetail {
   };
 }
 
-// State machine order — for the stepper UI.
+// State machine order — for the stepper UI. NEW = pre-step (przed OPEN),
+// CANCELLED + WAITING = side-states pokazane jako badge.
 const STATE_FLOW: Array<{ key: string; label: string }> = [
+  { key: 'NEW',         label: 'Nowe' },
   { key: 'OPEN',        label: 'Otwarte' },
   { key: 'ASSIGNED',    label: 'Przypisane' },
   { key: 'IN_PROGRESS', label: 'W toku' },
@@ -129,12 +142,34 @@ export function TicketDetailPage() {
   const [isInternal, setIsInternal] = useState(false);
   const [showResolveForm, setShowResolveForm] = useState(false);
   const [resolutionSummary, setResolutionSummary] = useState('');
+  const [editOpen, setEditOpen] = useState(false);
+  const [showAllEvents, setShowAllEvents] = useState(false);
 
   const { data, isLoading, error, refetch } = useQuery<{ ticket: TicketDetail }>({
     queryKey: ['tickets', id],
     queryFn: async () => (await api.get(`/tickets/${id}`)).data,
     enabled: !!id,
   });
+
+  // Lista techników workspace — do re-assign picker (R1: /memberships, nie /users które nie istnieje)
+  const { data: workspaceUsers } = useQuery<{ users: Array<{ id: string; firstName: string; lastName: string; email: string }> }>({
+    queryKey: ['memberships', 'as-users'],
+    queryFn: async () => {
+      const r = (await api.get('/memberships')).data as { memberships: Array<{ status: string; user: { id: string; firstName: string; lastName: string; email: string } }> };
+      const users = r.memberships
+        .filter((m) => m.status === 'ACTIVE')
+        .map((m) => m.user);
+      return { users };
+    },
+  });
+
+  // Aktualnie zalogowany user — dla guardów (np. RateTicketCard tylko dla createdBy)
+  const { data: meResp } = useQuery<{ user: { id: string } }>({
+    queryKey: ['me'],
+    queryFn: async () => (await api.get('/users/me')).data,
+    staleTime: 60_000,
+  });
+  const currentUserId = meResp?.user?.id ?? null;
 
   const transition = useMutation({
     mutationFn: async (payload: { to: string; resolutionSummary?: string }) =>
@@ -162,6 +197,59 @@ export function TicketDetailPage() {
     onError: () => toast.error('Błąd dodawania komentarza'),
   });
 
+  const updateTicket = useMutation({
+    mutationFn: async (patch: Record<string, unknown>) =>
+      (await api.patch(`/tickets/${id}`, patch)).data,
+    onSuccess: () => {
+      toast.success('Zaktualizowano');
+      qc.invalidateQueries({ queryKey: ['tickets', id] });
+      qc.invalidateQueries({ queryKey: ['tickets'] });
+      setEditOpen(false);
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } };
+      toast.error(ax.response?.data?.message ?? 'Błąd zapisu');
+    },
+  });
+
+  const deleteTicket = useMutation({
+    mutationFn: async () => (await api.delete(`/tickets/${id}`)).data,
+    onSuccess: () => {
+      toast.success('Zgłoszenie usunięte');
+      qc.invalidateQueries({ queryKey: ['tickets'] });
+      navigate('/tickets');
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } };
+      toast.error(ax.response?.data?.message ?? 'Błąd usuwania');
+    },
+  });
+
+  const rateTicket = useMutation({
+    mutationFn: async (payload: { rating: number; comment?: string }) =>
+      (await api.post(`/tickets/${id}/rate`, payload)).data,
+    onSuccess: () => {
+      toast.success('Dziękujemy za ocenę');
+      qc.invalidateQueries({ queryKey: ['tickets', id] });
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } };
+      toast.error(ax.response?.data?.message ?? 'Błąd zapisu oceny');
+    },
+  });
+
+  const startSession = useMutation({
+    mutationFn: async () => (await api.post('/sessions/start', { ticketId: id })).data,
+    onSuccess: () => {
+      toast.success('Sesja rozpoczęta');
+      qc.invalidateQueries({ queryKey: ['tickets', id] });
+    },
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { message?: string } } };
+      toast.error(ax.response?.data?.message ?? 'Nie udało się rozpocząć sesji');
+    },
+  });
+
   if (isLoading) return (
     <div className="flex items-center justify-center py-20">
       <Loader2 className="h-7 w-7 animate-spin" style={{ color: 'var(--pri)' }} />
@@ -178,14 +266,23 @@ export function TicketDetailPage() {
   );
 
   const t = data.ticket;
-  const currentStateIdx = STATE_FLOW.findIndex((s) => s.key === t.status);
+  // R4: Stepper logic dla side-states (WAITING, CANCELLED). Bez tego idx=-1 i pusty stepper.
+  // WAITING jest po IN_PROGRESS, CANCELLED jest terminalny "anyway".
+  const stepperState =
+    t.status === 'WAITING' ? 'IN_PROGRESS' :
+    t.status === 'CANCELLED' ? (
+      // Last reached state z events history
+      [...t.events].reverse().find((e) => e.eventType === 'status_changed' && e.fromValue && e.fromValue !== 'CANCELLED')?.fromValue ?? 'NEW'
+    ) :
+    t.status;
+  const currentStateIdx = STATE_FLOW.findIndex((s) => s.key === stepperState);
   const allowedNext = ALLOWED[t.status] ?? [];
 
   return (
     <div className="space-y-5 anim-up">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div className="flex items-start gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div className="flex items-start gap-3 min-w-0 flex-1">
           <Link to="/tickets" className="p-2 rounded-[var(--r-s)] text-tx3 hover:bg-sf-h press transition-colors">
             <ArrowLeft className="h-4 w-4" />
           </Link>
@@ -203,6 +300,32 @@ export function TicketDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setEditOpen(true)}
+            title="Edytuj zgłoszenie"
+          >
+            <Edit3 className="h-3.5 w-3.5" /> Edytuj
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={async () => {
+              const ok = await confirmDialog({
+                title: `Usunąć zgłoszenie ${t.ticketNumber}?`,
+                message: 'Soft-delete — ticket zniknie z list ale dane zostają. Akcja nieodwracalna z UI (admin musi przywrócić w bazie).',
+                confirmLabel: 'Usuń zgłoszenie',
+                danger: true,
+              });
+              if (ok) deleteTicket.mutate();
+            }}
+            disabled={deleteTicket.isPending}
+            title="Usuń zgłoszenie"
+            className="text-er border-er/30 hover:bg-er/10"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
           <button
             onClick={() => refetch()}
             className="p-2 rounded-[var(--r-s)] text-tx3 hover:bg-sf-h press"
@@ -212,6 +335,15 @@ export function TicketDetailPage() {
           </button>
         </div>
       </div>
+
+      {/* Edit modal */}
+      <EditTicketModal
+        open={editOpen}
+        ticket={t}
+        onClose={() => setEditOpen(false)}
+        onSave={(patch) => updateTicket.mutate(patch)}
+        isSaving={updateTicket.isPending}
+      />
 
       {/* Origin header — who/where ticket came from */}
       <OriginHeaderCard ticket={t} />
@@ -277,6 +409,26 @@ export function TicketDetailPage() {
           </div>
         )}
 
+        {/* Quick action: Start session — gdy ASSIGNED/IN_PROGRESS i ticket przypisany do mnie */}
+        {(t.status === 'ASSIGNED' || t.status === 'IN_PROGRESS') && (
+          <div className="mt-3 pt-3 border-t border-bd flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => startSession.mutate()}
+              disabled={startSession.isPending}
+              title="Zarejestruj czas pracy nad zgłoszeniem"
+            >
+              <Play className="h-3.5 w-3.5" /> Rozpocznij sesję pracy
+            </Button>
+            {t.billing && t.billing.sessionCount > 0 && (
+              <Link to={`/sessions?ticketId=${t.id}`} className="text-[12px] text-tx3 hover:underline">
+                Sesji: {t.billing.sessionCount} ({t.billing.billableHours.toFixed(1)} h)
+              </Link>
+            )}
+          </div>
+        )}
+
         {/* Resolve form (inline) */}
         {showResolveForm && (
           <div className="mt-4 pt-4 border-t border-bd anim-up">
@@ -304,13 +456,13 @@ export function TicketDetailPage() {
         )}
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Left — description + comments */}
-        <div className="lg:col-span-2 space-y-5">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {/* Left — description + comments. md:col-span-2 dla tabletów+, single col na mobile */}
+        <div className="md:col-span-2 space-y-5">
           <Card>
             <CardHeader><CardTitle>Opis</CardTitle></CardHeader>
             <CardContent>
-              <p className="text-[13px] text-tx leading-relaxed whitespace-pre-wrap">{t.description}</p>
+              <SimpleMarkdown text={t.description} className="text-[13px] text-tx leading-relaxed" />
             </CardContent>
           </Card>
 
@@ -348,7 +500,7 @@ export function TicketDetailPage() {
                             </Badge>
                           )}
                         </div>
-                        <p className="text-[13px] text-tx whitespace-pre-wrap">{c.comment}</p>
+                        <SimpleMarkdown text={c.comment} className="text-[13px] text-tx" />
                       </div>
                     </div>
                   ))}
@@ -357,10 +509,9 @@ export function TicketDetailPage() {
 
               {/* Add comment */}
               <div className="pt-4 border-t border-bd">
-                <Textarea
-                  rows={3}
+                <CommentEditor
                   value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
+                  onChange={setCommentText}
                   placeholder={isInternal ? 'Notatka wewnętrzna (klient nie zobaczy)…' : 'Odpowiedź do klienta…'}
                 />
                 <div className="flex items-center justify-between mt-3">
@@ -400,12 +551,24 @@ export function TicketDetailPage() {
                 </div>
               </MetaRow>
               <MetaRow label="Przypisany">
-                {t.assignedTo ? (
-                  <div className="flex items-center gap-2">
-                    <User className="h-3.5 w-3.5 text-tx3" />
-                    <span>{t.assignedTo.firstName} {t.assignedTo.lastName}</span>
-                  </div>
-                ) : <span className="text-tx3">—</span>}
+                <Select
+                  value={t.assignedTo?.id ?? ''}
+                  onChange={(e) => {
+                    const userId = e.target.value || null;
+                    if (userId !== (t.assignedTo?.id ?? null)) {
+                      updateTicket.mutate({ assignedToUserId: userId });
+                    }
+                  }}
+                  disabled={updateTicket.isPending}
+                  className="text-[12px] py-1 min-w-0"
+                >
+                  <option value="">— nikt —</option>
+                  {(workspaceUsers?.users ?? []).map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.firstName} {u.lastName}
+                    </option>
+                  ))}
+                </Select>
               </MetaRow>
               {t.device && (
                 <MetaRow label="Urządzenie">
@@ -435,8 +598,31 @@ export function TicketDetailPage() {
                   <span className="text-[11px] text-tx3">{formatRelativePl(t.resolvedAt)}</span>
                 </MetaRow>
               )}
+              {t.waitingType && (
+                <MetaRow label="Czeka na">
+                  <div>
+                    <Badge variant={t.waitingType === 'CLIENT' ? 'warning' : t.waitingType === 'SUPPLIER' ? 'accent' : 'neutral'}>
+                      {t.waitingType === 'CLIENT' ? 'Klienta' : t.waitingType === 'SUPPLIER' ? 'Dostawcę' : 'Wewnętrzne'}
+                    </Badge>
+                    {t.waitingFor && <p className="text-[11px] text-tx3 mt-0.5">{t.waitingFor}</p>}
+                  </div>
+                </MetaRow>
+              )}
+              {t.parentTicket && (
+                <MetaRow label="Duplikat">
+                  <Link to={`/tickets/${t.parentTicket.id}`} className="text-[12px] hover:underline" style={{ color: 'var(--pri)' }}>
+                    ↪ {t.parentTicket.ticketNumber}
+                  </Link>
+                </MetaRow>
+              )}
             </CardContent>
           </Card>
+
+          {(t.slaResponseMinutes || t.slaResolveMinutes) && (
+            <SlaCard ticket={t} />
+          )}
+
+          <AttachmentsCard ticketId={t.id} />
 
           {t.resolutionSummary && (
             <Card>
@@ -447,40 +633,58 @@ export function TicketDetailPage() {
             </Card>
           )}
 
-          {t.rating !== null && (
+          {t.rating != null ? (
             <Card>
               <CardHeader><CardTitle>Ocena klienta</CardTitle></CardHeader>
               <CardContent>
-                <div className="flex items-center gap-2 mb-1">
-                  {[1, 2, 3].map((n) => (
-                    <span
+                <div className="flex items-center gap-1 mb-1">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <Star
                       key={n}
-                      className="text-2xl"
-                      style={{ opacity: n === t.rating ? 1 : 0.2 }}
-                    >
-                      {n === 1 ? '☹️' : n === 2 ? '🙂' : '😊'}
-                    </span>
+                      className={cn(
+                        'h-5 w-5',
+                        n <= (t.rating ?? 0) ? 'text-warn fill-warn' : 'text-tx3',
+                      )}
+                    />
                   ))}
+                  <span className="text-[12px] text-tx3 ml-2">{t.rating}/5</span>
                 </div>
                 {t.ratingComment && (
-                  <p className="text-[12px] text-tx2 mt-2">{t.ratingComment}</p>
+                  <p className="text-[12px] text-tx2 mt-2 italic">"{t.ratingComment}"</p>
+                )}
+                {t.ratedAt && (
+                  <p className="text-[10px] text-tx3 mt-1">{formatRelativePl(t.ratedAt)}</p>
                 )}
               </CardContent>
             </Card>
+          ) : (t.status === 'RESOLVED' || t.status === 'CLOSED') && currentUserId && currentUserId === t.createdBy.id && (
+            // N8: pokazuj tylko gdy zalogowany user jest twórcą ticketu (klient zgłaszający)
+            // Technik własnego ticketu nie ocenia sam siebie.
+            <RateTicketCard onRate={(rating, comment) => rateTicket.mutate({ rating, comment })} isPending={rateTicket.isPending} />
           )}
 
           <Card>
-            <CardHeader><CardTitle>Aktywność</CardTitle></CardHeader>
+            <CardHeader className="flex items-center justify-between">
+              <CardTitle>Aktywność ({t.events.length})</CardTitle>
+              {t.events.length > 8 && (
+                <button
+                  onClick={() => setShowAllEvents((v) => !v)}
+                  className="text-[11px] text-tx3 hover:text-pri press"
+                >
+                  {showAllEvents ? 'Pokaż mniej' : 'Pokaż całą historię'}
+                </button>
+              )}
+            </CardHeader>
             <CardContent>
               <ol className="relative border-l border-bd ml-2 space-y-4">
-                {t.events.slice(-8).reverse().map((ev) => (
+                {(showAllEvents ? [...t.events].reverse() : [...t.events].slice(-8).reverse()).map((ev) => (
                   <li key={ev.id} className="pl-4 relative">
                     <span
                       className="absolute -left-1.5 top-1.5 w-3 h-3 rounded-full"
                       style={{ background: 'var(--pri)' }}
                     />
                     <p className="text-[11px] text-tx">
-                      <EventLabel event={ev} />
+                      <EventLabel event={ev} users={workspaceUsers?.users ?? []} />
                     </p>
                     <p className="text-[10px] text-tx3">{formatRelativePl(ev.createdAt)}</p>
                   </li>
@@ -503,16 +707,410 @@ function MetaRow({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-function EventLabel({ event }: { event: { eventType: string; fromValue: string | null; toValue: string | null } }) {
+interface UserMini { id: string; firstName: string; lastName: string }
+function userLabel(userId: string | null, users: UserMini[]): string {
+  if (!userId) return '—';
+  const u = users.find((x) => x.id === userId);
+  return u ? `${u.firstName} ${u.lastName}` : userId.slice(0, 8);
+}
+function EventLabel({ event, users }: {
+  event: { eventType: string; fromValue: string | null; toValue: string | null };
+  users: UserMini[];
+}) {
   switch (event.eventType) {
     case 'created': return <><MessageSquare className="inline h-3 w-3 mr-1" /> Utworzono zgłoszenie</>;
-    case 'status_changed': return <>Status: {event.fromValue ?? '—'} → <b>{event.toValue}</b></>;
-    case 'assigned': return <>Przypisano</>;
+    case 'status_changed': return <>Status: <span className="text-tx3">{event.fromValue ?? '—'}</span> → <b>{event.toValue}</b></>;
+    case 'assigned': return <>Przypisano: <span className="text-tx3">{userLabel(event.fromValue, users)}</span> → <b>{userLabel(event.toValue, users)}</b></>;
     case 'commented': return <><MessageSquare className="inline h-3 w-3 mr-1" /> Dodano komentarz</>;
-    case 'rated': return <>Klient ocenił: {event.toValue}/3</>;
+    case 'rated': return <>Klient ocenił: {event.toValue}/5</>;
     case 'updated': return <>Aktualizacja</>;
+    case 'auto_closed': return <>Auto-zamknięcie po terminie</>;
+    case 'deleted': return <><Trash2 className="inline h-3 w-3 mr-1" /> Usunięto</>;
     default: return <>{event.eventType}</>;
   }
+}
+
+function EditTicketModal({
+  open, ticket, onClose, onSave, isSaving,
+}: {
+  open: boolean;
+  ticket: TicketDetail;
+  onClose: () => void;
+  onSave: (patch: Record<string, unknown>) => void;
+  isSaving: boolean;
+}) {
+  const [form, setForm] = useState({
+    title: ticket.title,
+    description: ticket.description,
+    priority: ticket.priority,
+    category: ticket.category ?? '',
+    dueAt: ticket.dueAt ? ticket.dueAt.slice(0, 10) : '',
+    waitingType: ticket.waitingType ?? '',
+    waitingFor: ticket.waitingFor ?? '',
+    parentTicketId: ticket.parentTicketId ?? '',
+  });
+  // N9: reset state gdy zmienia się ticket id (nawigacja do innego ticketu z otwartym modalem)
+  useEffect(() => {
+    setForm({
+      title: ticket.title,
+      description: ticket.description,
+      priority: ticket.priority,
+      category: ticket.category ?? '',
+      dueAt: ticket.dueAt ? ticket.dueAt.slice(0, 10) : '',
+      waitingType: ticket.waitingType ?? '',
+      waitingFor: ticket.waitingFor ?? '',
+      parentTicketId: ticket.parentTicketId ?? '',
+    });
+  }, [ticket.id, ticket.title, ticket.description, ticket.priority, ticket.category, ticket.dueAt, ticket.waitingType, ticket.waitingFor, ticket.parentTicketId]);
+  return (
+    <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 bg-black/60 z-[100] anim-fade" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-[101] w-[92vw] max-w-xl -translate-x-1/2 -translate-y-1/2 rounded-[var(--r-l)] bg-bg border border-bd shadow-2 anim-scale flex flex-col max-h-[88vh]">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-bd">
+            <Dialog.Title className="text-[15px] font-semibold text-tx">Edytuj zgłoszenie</Dialog.Title>
+            <Dialog.Close asChild>
+              <button className="p-1.5 rounded-[var(--r-s)] text-tx3 hover:bg-sf-h press">
+                <X className="h-4 w-4" />
+                <span className="sr-only">Zamknij</span>
+              </button>
+            </Dialog.Close>
+          </div>
+          <div className="px-5 py-4 space-y-3 overflow-y-auto">
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-[0.12em] mb-1 text-tx2">Tytuł</label>
+              <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} maxLength={200} />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-[0.12em] mb-1 text-tx2">Opis</label>
+              <Textarea rows={5} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-[0.12em] mb-1 text-tx2">Priorytet</label>
+                <Select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
+                  <option value="LOW">Niski</option>
+                  <option value="MEDIUM">Średni</option>
+                  <option value="HIGH">Wysoki</option>
+                  <option value="CRITICAL">Krytyczny</option>
+                </Select>
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-[0.12em] mb-1 text-tx2">Termin</label>
+                <Input type="date" value={form.dueAt} onChange={(e) => setForm({ ...form, dueAt: e.target.value })} />
+              </div>
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-[0.12em] mb-1 text-tx2">Kategoria</label>
+              <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} maxLength={50} placeholder="np. Drukarka, Sieć" />
+            </div>
+            {/* F2.3: WAITING type + dla kogo czekamy */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-[0.12em] mb-1 text-tx2">Czeka na</label>
+                <Select value={form.waitingType} onChange={(e) => setForm({ ...form, waitingType: e.target.value as typeof form.waitingType })}>
+                  <option value="">— nie czeka —</option>
+                  <option value="CLIENT">Klienta</option>
+                  <option value="SUPPLIER">Dostawcę</option>
+                  <option value="INTERNAL">Decyzję wewnętrzną</option>
+                </Select>
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-[0.12em] mb-1 text-tx2">Opis (opc.)</label>
+                <Input value={form.waitingFor} onChange={(e) => setForm({ ...form, waitingFor: e.target.value })} maxLength={200} placeholder="np. potwierdzenie zamówienia" />
+              </div>
+            </div>
+            {/* F8.2: parent ticket — duplicate */}
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-[0.12em] mb-1 text-tx2">Duplikat zgłoszenia (UUID)</label>
+              <Input
+                value={form.parentTicketId}
+                onChange={(e) => setForm({ ...form, parentTicketId: e.target.value })}
+                placeholder="np. abc12345-67de-..."
+              />
+              <p className="text-[10px] text-tx3 mt-1">UUID zgłoszenia macierzystego — to zgłoszenie zostanie oznaczone jako duplikat.</p>
+            </div>
+          </div>
+          <div className="px-5 py-3 border-t border-bd flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={onClose}>Anuluj</Button>
+            <Button
+              size="sm"
+              disabled={isSaving || form.title.trim().length < 3}
+              onClick={() => onSave({
+                title: form.title.trim(),
+                description: form.description,
+                priority: form.priority,
+                category: form.category.trim() || null,
+                dueAt: form.dueAt ? new Date(form.dueAt).toISOString() : null,
+                waitingType: form.waitingType || null,
+                waitingFor: form.waitingFor.trim() || null,
+                parentTicketId: form.parentTicketId.trim() || null,
+              })}
+            >
+              {isSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Zapisz
+            </Button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+// Markdown preview toggle dla komentarza/opisu — F4.8 enhancement
+function CommentEditor({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
+  const [showPreview, setShowPreview] = useState(false);
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[10px] text-tx3">
+          <code>**bold**</code> · <code>*kursywa*</code> · <code>[tekst](url)</code>
+        </span>
+        <button
+          type="button"
+          onClick={() => setShowPreview((v) => !v)}
+          className="text-[11px] text-pri hover:underline press"
+        >
+          {showPreview ? 'Edytuj' : 'Podgląd'}
+        </button>
+      </div>
+      {showPreview ? (
+        <div className="min-h-[80px] p-3 rounded-[var(--r-s)] border border-bd bg-sf-h text-[13px] text-tx">
+          {value.trim() ? <SimpleMarkdown text={value} /> : <span className="text-tx3 italic">Pusty</span>}
+        </div>
+      ) : (
+        <Textarea
+          rows={3}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+        />
+      )}
+    </div>
+  );
+}
+
+// F4.9: Załączniki ticketu — upload + lista + delete
+function AttachmentsCard({ ticketId }: { ticketId: string }) {
+  const qc = useQueryClient();
+  const [uploading, setUploading] = useState(false);
+  const { data } = useQuery<{ attachments: Array<{ id: string; fileName: string; fileSize: number; mimeType: string; createdAt: string }> }>({
+    queryKey: ['tickets', ticketId, 'attachments'],
+    queryFn: async () => (await api.get(`/tickets/${ticketId}/attachments`)).data,
+  });
+  const del = useMutation({
+    mutationFn: async (aid: string) => (await api.delete(`/tickets/${ticketId}/attachments/${aid}`)).data,
+    onSuccess: () => {
+      toast.success('Usunięto załącznik');
+      qc.invalidateQueries({ queryKey: ['tickets', ticketId, 'attachments'] });
+    },
+    onError: () => toast.error('Błąd usuwania załącznika'),
+  });
+  async function handleUpload(file: File) {
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      await api.post(`/tickets/${ticketId}/attachments`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      toast.success('Plik wgrany');
+      qc.invalidateQueries({ queryKey: ['tickets', ticketId, 'attachments'] });
+    } catch (err) {
+      const ax = err as { response?: { data?: { message?: string } } };
+      toast.error(ax.response?.data?.message ?? 'Błąd uploadu');
+    } finally {
+      setUploading(false);
+    }
+  }
+  const attachments = data?.attachments ?? [];
+  function fmtSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
+  return (
+    <Card>
+      <CardHeader className="flex items-center justify-between">
+        <CardTitle>Załączniki ({attachments.length})</CardTitle>
+        <label className="cursor-pointer text-[11px] px-2 py-1 rounded-[var(--r-s)] border border-bd hover:bg-sf-h press">
+          {uploading ? <Loader2 className="h-3 w-3 animate-spin inline mr-1" /> : null}
+          {uploading ? 'Wgrywam...' : 'Dodaj plik'}
+          <input
+            type="file"
+            className="hidden"
+            disabled={uploading}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleUpload(f);
+              e.target.value = '';
+            }}
+          />
+        </label>
+      </CardHeader>
+      <CardContent>
+        {attachments.length === 0 ? (
+          <p className="text-[12px] text-tx3 text-center py-3">Brak załączników. Max 25 MB.</p>
+        ) : (
+          <div className="space-y-1.5">
+            {attachments.map((a) => (
+              <div key={a.id} className="flex items-center gap-2 p-2 rounded-[var(--r-s)] bg-sf-h text-[12px]">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const resp = await api.get(`/tickets/${ticketId}/attachments/${a.id}/file`, { responseType: 'blob' });
+                      const url = window.URL.createObjectURL(resp.data as Blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = a.fileName;
+                      document.body.appendChild(link);
+                      link.click();
+                      link.remove();
+                      // Defer revoke — Safari/older Firefox can abort the download otherwise.
+                      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+                    } catch {
+                      toast.error('Nie udało się pobrać pliku');
+                    }
+                  }}
+                  className="flex-1 min-w-0 hover:underline text-tx truncate text-left"
+                  title={a.fileName}
+                >
+                  {a.fileName}
+                </button>
+                <span className="text-tx3 text-[10px] shrink-0">{fmtSize(a.fileSize)}</span>
+                <button
+                  onClick={async () => {
+                    const ok = await confirmDialog({
+                      title: 'Usunąć załącznik?',
+                      message: a.fileName,
+                      confirmLabel: 'Usuń',
+                      danger: true,
+                    });
+                    if (ok) del.mutate(a.id);
+                  }}
+                  className="text-tx3 hover:text-er press p-1"
+                  title="Usuń"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function SlaCard({ ticket }: { ticket: TicketDetail }) {
+  const now = Date.now();
+  const created = new Date(ticket.createdAt).getTime();
+  const responseDeadline = ticket.slaResponseMinutes ? created + ticket.slaResponseMinutes * 60_000 : null;
+  const resolveDeadline = ticket.slaResolveMinutes ? created + ticket.slaResolveMinutes * 60_000 : null;
+  const responseDone = !!ticket.firstResponseAt;
+  const resolveDone = !!ticket.resolvedAt;
+  const responseBreached = responseDeadline && !responseDone && now > responseDeadline;
+  const resolveBreached = resolveDeadline && !resolveDone && now > resolveDeadline;
+  const fmtRemaining = (deadline: number) => {
+    const diff = deadline - now;
+    if (diff < 0) {
+      const overdue = Math.abs(diff);
+      const h = Math.floor(overdue / 3_600_000);
+      const m = Math.floor((overdue % 3_600_000) / 60_000);
+      return `przekroczono o ${h > 0 ? `${h}h ` : ''}${m}min`;
+    }
+    const h = Math.floor(diff / 3_600_000);
+    const m = Math.floor((diff % 3_600_000) / 60_000);
+    return h > 0 ? `${h}h ${m}min` : `${m}min`;
+  };
+  return (
+    <Card>
+      <CardHeader className="flex items-center justify-between">
+        <CardTitle>SLA</CardTitle>
+        {(responseBreached || resolveBreached || ticket.slaBreached) && (
+          <Badge variant="danger">Przekroczone</Badge>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-2 text-[12px]">
+        {responseDeadline && (
+          <div className="flex items-center justify-between">
+            <span className="text-tx3">Czas reakcji ({ticket.slaResponseMinutes}min)</span>
+            <span className={cn(
+              'font-medium',
+              responseDone ? 'text-ok' : responseBreached ? 'text-er' : 'text-tx',
+            )}>
+              {responseDone ? '✓ ' + formatRelativePl(ticket.firstResponseAt!) :
+               responseBreached ? `⚠ ${fmtRemaining(responseDeadline)}` :
+               fmtRemaining(responseDeadline)}
+            </span>
+          </div>
+        )}
+        {resolveDeadline && (
+          <div className="flex items-center justify-between">
+            <span className="text-tx3">Czas rozwiązania ({ticket.slaResolveMinutes}min)</span>
+            <span className={cn(
+              'font-medium',
+              resolveDone ? 'text-ok' : resolveBreached ? 'text-er' : 'text-tx',
+            )}>
+              {resolveDone ? '✓ ' + formatRelativePl(ticket.resolvedAt!) :
+               resolveBreached ? `⚠ ${fmtRemaining(resolveDeadline)}` :
+               fmtRemaining(resolveDeadline)}
+            </span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function RateTicketCard({ onRate, isPending }: { onRate: (rating: number, comment?: string) => void; isPending: boolean }) {
+  const [hoverN, setHoverN] = useState(0);
+  const [selected, setSelected] = useState(0);
+  const [comment, setComment] = useState('');
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Oceń obsługę</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-[12px] text-tx3 mb-3">Jak szybko/dobrze rozwiązano twój problem?</p>
+        <div className="flex items-center gap-1 mb-3">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              type="button"
+              onMouseEnter={() => setHoverN(n)}
+              onMouseLeave={() => setHoverN(0)}
+              onClick={() => setSelected(n)}
+              className="p-1 press"
+              title={`${n}/5`}
+            >
+              <Star
+                className={cn(
+                  'h-7 w-7 transition-colors',
+                  n <= (hoverN || selected) ? 'text-warn fill-warn' : 'text-tx3',
+                )}
+              />
+            </button>
+          ))}
+          {selected > 0 && <span className="text-[12px] text-tx3 ml-2">{selected}/5</span>}
+        </div>
+        <Textarea
+          rows={2}
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          placeholder="Komentarz (opcjonalny) — co poszło dobrze, co można poprawić?"
+          maxLength={1000}
+        />
+        <Button
+          className="mt-3"
+          size="sm"
+          disabled={selected === 0 || isPending}
+          onClick={() => onRate(selected, comment.trim() || undefined)}
+        >
+          {isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Wyślij ocenę
+        </Button>
+      </CardContent>
+    </Card>
+  );
 }
 
 function labelForState(key: string): string {
@@ -577,7 +1175,7 @@ function GeneratedArtifactsCard({ ticket }: { ticket: TicketDetail }) {
               {tasks.map((t) => {
                 const s = TASK_STATUS_LABEL[t.status] ?? TASK_STATUS_LABEL.NEW!;
                 return (
-                  <Link key={t.id} to={`/tasks`} className="block p-2.5 rounded-[var(--r-s)] border border-bd hover:bg-sf-h transition-colors">
+                  <Link key={t.id} to={`/tasks/${t.id}`} className="block p-2.5 rounded-[var(--r-s)] border border-bd hover:bg-sf-h transition-colors">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
@@ -608,7 +1206,7 @@ function GeneratedArtifactsCard({ ticket }: { ticket: TicketDetail }) {
               {orders.map((o) => {
                 const s = ORDER_STATUS_LABEL[o.status] ?? ORDER_STATUS_LABEL.DRAFT!;
                 return (
-                  <Link key={o.id} to={`/orders`} className="block p-2.5 rounded-[var(--r-s)] border border-bd hover:bg-sf-h transition-colors">
+                  <Link key={o.id} to={`/orders/${o.id}`} className="block p-2.5 rounded-[var(--r-s)] border border-bd hover:bg-sf-h transition-colors">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">

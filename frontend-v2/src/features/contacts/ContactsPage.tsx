@@ -138,6 +138,8 @@ function ContactsGrid({ contacts, clients }: { contacts: Contact[]; clients: Cli
   const del = useMutation({
     mutationFn: async (id: string) => (await api.delete(`/contacts/${id}`)).data,
     onSuccess: () => { toast.success('Usunięty'); qc.invalidateQueries({ queryKey: ['contacts'] }); },
+    onError: (err: { response?: { data?: { message?: string } }; message?: string }) =>
+      toast.error(err?.response?.data?.message ?? err?.message ?? 'Nie udało się usunąć kontaktu'),
   });
   const clientName = (id: string | null) => id ? clients.find((c) => c.client.id === id)?.client.name ?? '—' : '—';
   return (

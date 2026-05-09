@@ -23,10 +23,14 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--bd); border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--tx3); }
 
-/* ── Animations ── */
-@keyframes fadeUp { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: translateY(0) } }
-@keyframes scaleIn { from { opacity: 0; transform: scale(.96) } to { opacity: 1; transform: scale(1) } }
-@keyframes slideR { from { opacity: 0; transform: translateX(8px) } to { opacity: 1; transform: translateX(0) } }
+/* ── Animations ──
+   Używamy individual transform properties (translate, scale) zamiast transform:...,
+   żeby nie konfliktować z Tailwindowymi `-translate-x-1/2` które używają `transform`.
+   Bez tego dialogi z `top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2` lądują
+   w prawym dolnym kwartale (animation override'uje translate). */
+@keyframes fadeUp  { from { opacity: 0; translate: 0 8px } to { opacity: 1; translate: 0 0 } }
+@keyframes scaleIn { from { opacity: 0; scale: .96 }       to { opacity: 1; scale: 1 } }
+@keyframes slideR  { from { opacity: 0; translate: 8px 0 } to { opacity: 1; translate: 0 0 } }
 @keyframes shimmer { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
 @keyframes glow { 0%, 100% { box-shadow: 0 0 8px var(--pri-glow) } 50% { box-shadow: 0 0 24px var(--pri-glow2) } }
 @keyframes spin { to { transform: rotate(360deg) } }

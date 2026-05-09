@@ -206,7 +206,7 @@ async function migrateWorkspaces(v1: PgClient, v2: PrismaClient): Promise<void> 
         slug: w.slug,
         name: w.name,
         type: typeRemap[w.orgType ?? 'MSP'] ?? 'MSP',
-        plan: 'STARTER',
+        plan: 'START',
         taxId: w.taxId,
         regon: w.regon,
         logoUrl: w.logoUrl,

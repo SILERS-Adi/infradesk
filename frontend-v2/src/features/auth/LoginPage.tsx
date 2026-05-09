@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -42,14 +42,22 @@ export function LoginPage() {
     api.get<WorkspaceHint>('/public/workspace').then((r) => setHint(r.data.workspace)).catch(() => {});
   }, []);
 
-  if (user) { if (nextUrl && nextUrl.startsWith("/")) { window.location.href = nextUrl; return null; } return <Navigate to="/" replace />; }
+  const safeNext = (raw: string | null) => {
+    if (!raw) return null;
+    if (!raw.startsWith('/')) return null;
+    if (raw.startsWith('//') || raw.startsWith('/\\') || raw.startsWith('\\')) return null;
+    return raw;
+  };
+  const target = safeNext(nextUrl);
+
+  if (user) { if (target) { window.location.href = target; return null; } return <Navigate to="/dashboard" replace />; }
 
   const onSubmit = async (data: LoginForm) => {
     try {
       const res = await api.post('/auth/login', data);
       setSession(res.data.user, res.data.accessToken, res.data.defaultWorkspaceId);
       toast.success('Zalogowano');
-      if (nextUrl && nextUrl.startsWith("/")) { window.location.href = nextUrl; } else { navigate("/"); };
+      if (target) { window.location.href = target; } else { navigate("/dashboard"); };
     } catch (err: unknown) {
       const axiosErr = err as { response?: { status?: number; data?: { error?: string; message?: string } } };
       const code = axiosErr.response?.data?.error;
@@ -135,7 +143,20 @@ export function LoginPage() {
                 {isSubmitting ? <Loader2 className="w-5 h-5" style={{ animation: 'spin .6s linear infinite' }} /> : <>Zaloguj <ArrowRight className="w-4 h-4" /></>}
               </Button>
             </div>
+
+            <p className="text-center text-[12px] anim-up" style={{ animationDelay: '300ms' }}>
+              <Link to="/forgot-password" className="text-tx3 hover:text-pri press">
+                Zapomniałem hasła
+              </Link>
+            </p>
           </form>
+
+          <p className="text-center text-[12px] text-tx3 mt-6 anim-up" style={{ animationDelay: '320ms' }}>
+            Nie masz jeszcze konta?{' '}
+            <Link to="/register" className="text-pri font-semibold hover:underline">
+              Załóż za darmo
+            </Link>
+          </p>
         </div>
         <p className="text-center text-[10px] mt-5 font-medium text-tx3 anim-up" style={{ animationDelay: '320ms' }}>
           InfraDesk v2.0.0 · alpha · Powered by Silers

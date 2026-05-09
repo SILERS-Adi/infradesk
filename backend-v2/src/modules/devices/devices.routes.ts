@@ -7,6 +7,7 @@ import { requireWorkspace } from '../../middleware/requireWorkspace';
 import { requireAccess } from '../../middleware/requireAccess';
 import { HttpError } from '../../utils/httpError';
 import { MODULES } from '../../utils/canAccess';
+import { enforceCountLimit, countActiveDevices } from '../../utils/planLimits';
 
 const router = Router();
 router.use(requireAuth, requireWorkspace);
@@ -99,8 +100,22 @@ router.get('/', requireAccess(MODULES.DEVICES, 'view'), async (req: Request, res
         ipAddress: true, macAddress: true, operatingSystem: true, osVersion: true,
         qrCodeValue: true,
         workspaceId: true,
+        assetTag: true, serialNumber: true, manufacturer: true, model: true,
+        rustdeskId: true, rdpAddress: true, sshAddress: true,
+        anydeskId: true, teamviewerId: true, customRemoteLink: true,
+        purchaseDate: true, installationDate: true, warrantyUntil: true,
+        createdAt: true, updatedAt: true,
         workspace: { select: { id: true, name: true, type: true } },
         location: { select: { id: true, name: true, city: true } },
+        agent: {
+          select: {
+            id: true, status: true, lastSeen: true, agentVersion: true,
+            currentUser: true, cpuModel: true, ramMb: true,
+            diskFreeGb: true, diskTotalGb: true,
+            allowMonitoring: true, allowRustdesk: true, allowRemoteCommands: true,
+          },
+        },
+        _count: { select: { tickets: true, alerts: true } },
       },
     });
     res.json({ devices });
@@ -123,6 +138,9 @@ router.post('/', requireAccess(MODULES.DEVICES, 'edit'), async (req: Request, re
       select: { id: true },
     });
     if (dup) throw HttpError.conflict('Device o takiej nazwie już istnieje', 'device_name_taken');
+
+    const used = await countActiveDevices(targetWs);
+    await enforceCountLimit(targetWs, 'devices', used);
 
     const d = await prisma.device.create({
       data: {
@@ -149,12 +167,58 @@ router.get('/:id', requireAccess(MODULES.DEVICES, 'view'), async (req: Request, 
       where: { id: String(req.params.id), workspaceId: { in: visibleWsIds }, deletedAt: null },
       include: {
         location: { select: { id: true, name: true, city: true } },
-        agent: { select: { id: true, status: true, lastSeen: true } },
+        workspace: { select: { id: true, name: true, type: true } },
+        agent: {
+          select: {
+            id: true, status: true, lastSeen: true,
+            agentVersion: true, hostname: true, currentUser: true,
+            cpuModel: true, ramMb: true, diskFreeGb: true, diskTotalGb: true,
+            osName: true, osVersion: true,
+            allowMonitoring: true, allowRustdesk: true, allowRemoteCommands: true,
+            serverMetrics: true,
+            contactFirstName: true, contactLastName: true,
+            contactEmail: true, contactPhone: true, companyName: true,
+          },
+        },
         _count: { select: { tickets: true, alerts: true } },
       },
     });
     if (!d) throw HttpError.notFound();
     res.json({ device: d });
+  } catch (err) { next(err); }
+});
+
+const capabilitiesSchema = z.object({
+  allowMonitoring: z.boolean().optional(),
+  allowRustdesk: z.boolean().optional(),
+  allowRemoteCommands: z.boolean().optional(),
+});
+
+router.patch('/:id/agent-capabilities', requireAccess(MODULES.DEVICES, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const input = capabilitiesSchema.parse(req.body);
+    if (Object.keys(input).length === 0) throw HttpError.badRequest('Brak pól do aktualizacji');
+
+    const relations = await prisma.workspaceRelation.findMany({
+      where: { providerWorkspaceId: req.workspaceId!, canViewDevices: true, status: 'ACTIVE' },
+      select: { clientWorkspaceId: true },
+    });
+    const visibleWsIds = [req.workspaceId!, ...relations.map((r) => r.clientWorkspaceId)];
+    const device = await prisma.device.findFirst({
+      where: { id: String(req.params.id), workspaceId: { in: visibleWsIds }, deletedAt: null },
+      select: { id: true, agent: { select: { id: true } } },
+    });
+    if (!device) throw HttpError.notFound();
+    if (!device.agent) throw HttpError.conflict('Urządzenie nie ma podpiętego agenta', 'no_agent');
+
+    const updated = await prisma.agentRegistration.update({
+      where: { id: device.agent.id },
+      data: input,
+      select: {
+        id: true, allowMonitoring: true, allowRustdesk: true, allowRemoteCommands: true,
+      },
+    });
+    res.json({ agent: updated });
   } catch (err) { next(err); }
 });
 

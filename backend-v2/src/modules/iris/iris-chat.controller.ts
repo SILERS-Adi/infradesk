@@ -40,6 +40,7 @@ import { verifyAccessToken } from '../../lib/jwt';
 import { verifyIrisEmbedToken } from './iris-embed.controller';
 import { assertTransition, type TicketStatus } from '../../utils/ticketStateMachine';
 import { nextTicketNumber } from '../tickets/tickets.service';
+import { enforceAiCallLimit } from '../../utils/planLimits';
 
 // ─── LLM client + pricing ───────────────────────────────────────────────────
 let anthropicClient: Anthropic | null = null;
@@ -367,6 +368,9 @@ async function handleUtworzZgloszenie(tc: ToolContext, rawInput: unknown): Promi
 
   const title = input.tytul ?? input.opis.slice(0, 80);
   const ticketNumber = await nextTicketNumber(tc.providerWorkspaceId);
+  // R6: SLA apply
+  const { resolveSlaForTicket } = await import('../tickets/tickets.service');
+  const sla = await resolveSlaForTicket(tc.providerWorkspaceId, input.priorytet);
   const ticket = await prisma.ticket.create({
     data: {
       workspaceId: tc.providerWorkspaceId,
@@ -381,6 +385,8 @@ async function handleUtworzZgloszenie(tc: ToolContext, rawInput: unknown): Promi
       deviceId,
       createdByUserId: tc.userId,
       hasService: true,
+      slaResponseMinutes: sla.slaResponseMinutes,
+      slaResolveMinutes: sla.slaResolveMinutes,
       events: { create: { userId: tc.userId, eventType: 'created', toValue: 'OPEN' } },
     },
     select: { id: true, ticketNumber: true },
@@ -594,10 +600,13 @@ async function handleAnulujZgloszenie(tc: ToolContext, rawInput: unknown): Promi
     return { error: 'illegal_transition', message: `Przejście ${t.status} -> CANCELLED jest niedozwolone.` };
   }
 
+  // FX.3: NIE ustawiać closedAt dla CANCELLED. CANCELLED to terminalny stan
+  // ale semantycznie różny od CLOSED (nigdy nie ukończony). closedAt = "kiedy
+  // ticket został RZECZYWIŚCIE zakończony" (jak w service.transitionTicket).
   await prisma.$transaction([
     prisma.ticket.update({
       where: { id: t.id },
-      data: { status: 'CANCELLED', resolutionSummary: input.powod, closedAt: new Date() },
+      data: { status: 'CANCELLED', resolutionSummary: input.powod },
     }),
     prisma.ticketEvent.create({
       data: {
@@ -685,6 +694,10 @@ async function chatHandler(req: Request, res: Response, next: NextFunction): Pro
     const auth = await resolveIrisAuth(req);
     if (!auth) throw HttpError.unauthorized('Brak uwierzytelnienia');
 
+    // Cost guard: enforce per-plan miesięczny limit Iris AI calls przed wywołaniem
+    // Anthropic. Bez tego START user (49 zł/mc) może wygenerować 260k zł kosztu.
+    await enforceAiCallLimit(auth.workspaceId);
+
     // Lookup isSuperAdmin via bg client (User has no RLS) — needed for ALS context
     const _userMeta = await prismaBg.user.findUnique({
       where: { id: auth.userId },
@@ -737,6 +750,19 @@ async function chatHandler(req: Request, res: Response, next: NextFunction): Pro
 
       const toolResults: ContentBlockParam[] = [];
       for (const use of toolUses) {
+        // Per-chat mutation cap: LLM hallucination loops or prompt injection could
+        // mass-create/cancel tickets. 8 mutations/chat is generous for legitimate
+        // multi-step flows (e.g. utworz + dodaj_komentarz + sprawdz_status).
+        const MUTATING_TOOLS = new Set(['utworz_zgloszenie', 'dodaj_komentarz_do_zgloszenia', 'anuluj_zgloszenie', 'ocen_zakonczone', 'popros_o_oddzwonienie']);
+        if (MUTATING_TOOLS.has(use.name)) {
+          const mutationsSoFar = toolCallsLog.filter((c) => MUTATING_TOOLS.has(c.tool)).length;
+          if (mutationsSoFar >= 8) {
+            const result = { error: 'mutation_cap', message: 'Przekroczony limit mutacji w jednej rozmowie (8). Otwórz nowy czat.' };
+            toolCallsLog.push({ tool: use.name, input: use.input, result });
+            toolResults.push({ type: 'tool_result', tool_use_id: use.id, content: JSON.stringify(result), is_error: true });
+            continue;
+          }
+        }
         const result = await dispatchTool(use.name, use.input, tc);
         toolCallsLog.push({ tool: use.name, input: use.input, result });
         toolResults.push({

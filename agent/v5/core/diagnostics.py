@@ -211,11 +211,76 @@ def run_security_fix(check_id: str) -> dict:
         return {"ok": False, "error": str(e), "checkId": check_id}
 
 
+def _detect_domain_join() -> bool:
+    """Sprawdz czy maszyna jest przylaczona do AD domain — wtedy GPO nadpisuje
+    lokalne ustawienia (lockout_policy/password_policy/ps_policy są zarządzane
+    przez Default Domain Policy na DC, nie lokalnie)."""
+    try:
+        r = subprocess.run(
+            ["powershell", "-ExecutionPolicy", "Bypass", "-Command",
+             "(Get-CimInstance -Class Win32_ComputerSystem).PartOfDomain"],
+            capture_output=True, text=True, timeout=10, creationflags=NO_WINDOW,
+        )
+        return (r.stdout or "").strip().lower() == "true"
+    except Exception:
+        return False
+
+
+# Checki ktorych fix lokalny i tak zostanie nadpisany przez GPO domeny.
+# Static lista — używana jako fallback. Per-check detection przez _detect_gpo_overrides()
+# jest dynamicznym uzupełnieniem (czyta HKLM:\SOFTWARE\Policies\* dla rzeczywistego stanu).
+GPO_MANAGED_CHECKS = {"lockout_policy", "password_policy", "ps_policy"}
+
+
+# Mapa check_id → registry path w HKLM\Software\Policies (gdzie GPO odkłada wartość)
+# Jeśli klucz/wartość istnieje → check jest faktycznie zarządzany przez GPO.
+GPO_REGISTRY_HINTS: dict[str, list[str]] = {
+    "firewall":         ["HKLM:\\SOFTWARE\\Policies\\Microsoft\\WindowsFirewall"],
+    "defender":         ["HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender"],
+    "defender_defs":    ["HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Signature Updates"],
+    "smb1":             ["HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\LanmanServer"],
+    "rdp_nla":          ["HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\Terminal Services"],
+    "lockout_policy":   ["HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\Network Provider"],
+    "password_policy":  ["HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System"],
+    "ps_policy":        ["HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\PowerShell"],
+    "autorun":          ["HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\Explorer"],
+    "bitlocker":        ["HKLM:\\SOFTWARE\\Policies\\Microsoft\\FVE"],
+    "updates":          ["HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate"],
+}
+
+
+def _detect_gpo_overrides(is_domain_joined: bool) -> set[str]:
+    """Per-check detection: sprawdza czy registry path GPO istnieje.
+    Tylko dla maszyn w domenie — bo na standalone GPO Local Policy ma niski impact
+    i lokalny fix zwykle pomaga.
+
+    Zwraca set check_id które są zarządzane przez GPO domeny."""
+    if not is_domain_joined:
+        return set(GPO_MANAGED_CHECKS)  # baseline na domain-joined nawet bez sprawdzania
+    detected: set[str] = set(GPO_MANAGED_CHECKS)
+    for check_id, paths in GPO_REGISTRY_HINTS.items():
+        for path in paths:
+            try:
+                r = subprocess.run(
+                    ["powershell", "-ExecutionPolicy", "Bypass", "-Command",
+                     f"if (Test-Path '{path}') {{ 'true' }} else {{ 'false' }}"],
+                    capture_output=True, text=True, timeout=8, creationflags=NO_WINDOW,
+                )
+                if (r.stdout or "").strip().lower() == "true":
+                    detected.add(check_id)
+                    break
+            except Exception:
+                continue
+    return detected
+
+
 def security_audit() -> dict:
     """Run 20 security checks; return score 0-100 + per-check detail."""
     WEIGHTS = {"critical": 15, "high": 10, "medium": 5, "low": 2, "info": 0}
     checks = []
     total_weight = 0
+    is_domain_joined = _detect_domain_join()
+    gpo_managed = _detect_gpo_overrides(is_domain_joined)
 
     def _ck(cid, name, sev, cmd, pass_fn, detail_fn=None):
         nonlocal total_weight
@@ -229,15 +294,29 @@ def security_audit() -> dict:
             ok = pass_fn(o)
             detail = detail_fn(o) if detail_fn else (o[:150] if o else "")
             info = SECURITY_CHECK_INFO.get(cid, {})
+            domain_managed = is_domain_joined and cid in gpo_managed
+            fixable = (not ok
+                       and cid in SECURITY_FIX_WHITELIST
+                       and SECURITY_FIX_WHITELIST[cid] is not None
+                       and not domain_managed)  # GPO nadpisze, nie ma sensu
+            fix_info = info.get("fix_info", "")
+            if domain_managed and not ok:
+                fix_info = (
+                    "MASZYNA W DOMENIE: ten check jest zarządzany przez GPO na "
+                    "kontrolerze domeny. Lokalna naprawa (net accounts/registry) "
+                    "zostanie nadpisana przez Default Domain Policy. Aby trwale "
+                    "zmienić — edytuj zasady domenowe w 'Group Policy Management' "
+                    "na DC i odpal 'gpupdate /force' na komputerze."
+                )
             checks.append({
                 "id": cid, "name": name,
                 "status": "pass" if ok else "fail",
                 "severity": sev, "detail": detail,
-                "fixable": not ok and cid in SECURITY_FIX_WHITELIST
-                           and SECURITY_FIX_WHITELIST[cid] is not None,
+                "fixable": fixable,
+                "domainManaged": domain_managed,
                 "description": info.get("desc", ""),
                 "why": info.get("why", ""),
-                "fixInfo": info.get("fix_info", ""),
+                "fixInfo": fix_info,
             })
         except Exception as e:
             info = SECURITY_CHECK_INFO.get(cid, {})
@@ -355,7 +434,12 @@ def security_audit() -> dict:
 
     fail_w = sum(WEIGHTS.get(c["severity"], 0) for c in checks if c["status"] == "fail")
     score = max(0, min(100, round(100 - (fail_w / max(total_weight, 1)) * 100)))
-    return {"score": score, "checks": checks, "timestamp": datetime.now().isoformat()[:19]}
+    return {
+        "score": score,
+        "checks": checks,
+        "domainJoined": is_domain_joined,
+        "timestamp": datetime.now().isoformat()[:19],
+    }
 
 
 # ── System score (1-10) ─────────────────────────────────────────────────────
@@ -759,13 +843,13 @@ def full_diagnosis() -> dict:
         except Exception:
             pass
 
-        # Disk speed test
+        # Disk speed test — clean up the 50MB blob after each audit so it doesn't
+        # accumulate in %TEMP%. Cost: regenerate ~50MB once per audit run.
+        tmp = os.path.join(os.environ.get('TEMP', tempfile.gettempdir()), 'infradesk_diskspeed.bin')
         try:
-            tmp = os.path.join(os.environ.get('TEMP', tempfile.gettempdir()), 'infradesk_diskspeed.bin')
             size_mb = 50
-            if not os.path.exists(tmp) or os.path.getsize(tmp) < size_mb * 1024 * 1024:
-                with open(tmp, 'wb') as f:
-                    f.write(os.urandom(size_mb * 1024 * 1024))
+            with open(tmp, 'wb') as f:
+                f.write(os.urandom(size_mb * 1024 * 1024))
             t0 = time.perf_counter()
             with open(tmp, 'rb') as f:
                 while f.read(1024 * 1024):
@@ -778,6 +862,12 @@ def full_diagnosis() -> dict:
                 f'{mb_s} MB/s (test sekwencyjny 50 MB)', sev)
         except Exception:
             pass
+        finally:
+            try:
+                if os.path.exists(tmp):
+                    os.remove(tmp)
+            except Exception:
+                pass
 
         # BIOS
         try:

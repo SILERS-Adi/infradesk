@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/auth';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
 import { SectionCard, Field } from '../SectionCard';
 
 interface MeAuthResponse {
@@ -567,9 +568,13 @@ function SessionsCard() {
   });
 
   async function logoutEverywhere() {
-    if (!window.confirm('Wylogować ze wszystkich urządzeń? Zostaniesz wylogowany również tutaj.')) {
-      return;
-    }
+    const ok = await confirmDialog({
+      title: 'Wylogować ze wszystkich urządzeń?',
+      message: 'Wszystkie aktywne sesje zostaną zakończone — w tym ta. Trzeba będzie zalogować się ponownie.',
+      confirmLabel: 'Wyloguj wszędzie',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await api.post('/auth/logout-everywhere');
       toast.success('Wylogowano ze wszystkich sesji');

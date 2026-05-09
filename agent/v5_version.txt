@@ -1,7 +1,7 @@
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(5, 0, 4, 0),
-    prodvers=(5, 0, 4, 0),
+    filevers=(5, 0, 17, 0),
+    prodvers=(5, 0, 17, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -16,12 +16,12 @@ VSVersionInfo(
         [
           StringStruct(u'CompanyName', u'SILERS — Błaszczykowski Adrian'),
           StringStruct(u'FileDescription', u'InfraDesk Business — monitoring, backup, diagnostyka'),
-          StringStruct(u'FileVersion', u'5.0.4.0'),
+          StringStruct(u'FileVersion', u'5.0.17.0'),
           StringStruct(u'InternalName', u'InfraDesk Business'),
           StringStruct(u'LegalCopyright', u'© 2026 SILERS'),
           StringStruct(u'OriginalFilename', u'InfraDesk Business.exe'),
           StringStruct(u'ProductName', u'InfraDesk Business'),
-          StringStruct(u'ProductVersion', u'5.0.4.0'),
+          StringStruct(u'ProductVersion', u'5.0.17.0'),
         ])
     ]),
     VarFileInfo([VarStruct(u'Translation', [1033, 1200])])

@@ -2,6 +2,57 @@ import { prisma } from '../../lib/prisma';
 import { HttpError } from '../../utils/httpError';
 import { assertTransition, type TicketStatus } from '../../utils/ticketStateMachine';
 import type { CreateTicketInput, UpdateTicketInput } from './tickets.schemas';
+import { sendTicketNotification } from '../../lib/mailer';
+import { logger } from '../../lib/logger';
+
+/**
+ * MSP cross-workspace: provider widzi tickety w client workspaces przez
+ * WorkspaceRelation z canReceiveTickets ACTIVE. Każdy endpoint który sprawdza
+ * `where workspaceId = X` musi rozszerzyć na pełną listę dostępnych workspaces.
+ */
+export async function resolveAccessibleWorkspaceIds(workspaceId: string): Promise<string[]> {
+  const relations = await prisma.workspaceRelation.findMany({
+    where: { providerWorkspaceId: workspaceId, canReceiveTickets: true, status: 'ACTIVE' },
+    select: { clientWorkspaceId: true },
+  });
+  return [workspaceId, ...relations.map((r) => r.clientWorkspaceId)];
+}
+
+/**
+ * R6: helper do aplikowania SLA Policy. Wywoływać przed create ticketu we wszystkich
+ * źródłach (panel/agent/iris/email-to-ticket). Bez tego tickety z innych źródeł mają NULL.
+ * Defaults gdy brak policy w workspace: zob. DEFAULT_SLA.
+ */
+const DEFAULT_SLA: Record<string, { responseMin: number; resolveMin: number }> = {
+  CRITICAL: { responseMin: 30,  resolveMin: 240   },  // 30min / 4h
+  HIGH:     { responseMin: 60,  resolveMin: 480   },  // 1h / 8h
+  MEDIUM:   { responseMin: 240, resolveMin: 1440  },  // 4h / 24h
+  LOW:      { responseMin: 480, resolveMin: 2880  },  // 8h / 48h
+};
+
+/**
+ * Helper. Używać tylko z `prisma` (RLS-aware). Dla bg flows (email-to-ticket)
+ * skopiuj logikę inline z prismaBg + DEFAULT_SLA.
+ */
+export async function resolveSlaForTicket(
+  workspaceId: string,
+  priority: string,
+): Promise<{ slaResponseMinutes: number | null; slaResolveMinutes: number | null }> {
+  const policy = await prisma.slaPolicy.findFirst({
+    where: { workspaceId, priority: priority as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' },
+    select: { responseTimeMin: true, resolveTimeMin: true },
+  }).catch(() => null);
+  if (policy) {
+    return { slaResponseMinutes: policy.responseTimeMin, slaResolveMinutes: policy.resolveTimeMin };
+  }
+  const def = DEFAULT_SLA[priority];
+  return def
+    ? { slaResponseMinutes: def.responseMin, slaResolveMinutes: def.resolveMin }
+    : { slaResponseMinutes: null, slaResolveMinutes: null };
+}
+
+// Eksport DEFAULT_SLA żeby bg flows (email-to-ticket) mogły użyć inline
+export { DEFAULT_SLA };
 
 /**
  * Generates the next ticket number for a workspace: "T-2026-0001".
@@ -86,6 +137,9 @@ export async function createTicket(workspaceId: string, userId: string, input: C
   // Master status: ASSIGNED gdy service ma assignee, inaczej OPEN (Nowe/nieprzydzielone).
   const initialStatus: TicketStatus = serviceAssignee ? 'ASSIGNED' : 'OPEN';
 
+  // F4.13 + R6: Apply SLA z helper (z fallback do DEFAULT_SLA gdy brak policy)
+  const sla = await resolveSlaForTicket(workspaceId, input.priority);
+
   const result = await prisma.$transaction(async (tx) => {
     const ticket = await tx.ticket.create({
       data: {
@@ -111,6 +165,8 @@ export async function createTicket(workspaceId: string, userId: string, input: C
         requesterPhone: input.requesterPhone,
         dueAt: input.dueAt ? new Date(input.dueAt) : null,
         serviceMode: input.components.service?.serviceMode ?? null,
+        slaResponseMinutes: sla.slaResponseMinutes,
+        slaResolveMinutes: sla.slaResolveMinutes,
         events: { create: { userId, eventType: 'created', toValue: initialStatus } },
       },
     });
@@ -230,6 +286,8 @@ export async function listTickets(workspaceId: string, opts: { visibleWsIds?: st
   status?: string; priority?: string; assignedToUserId?: string; deviceId?: string;
   clientWorkspaceId?: string; from?: string; to?: string;
   search?: string; limit: number; cursor?: string;
+  sort?: 'createdAt' | 'updatedAt' | 'priority' | 'dueAt' | 'status';
+  order?: 'asc' | 'desc';
 }) {
   const where: Record<string, unknown> = { workspaceId: opts.visibleWsIds && opts.visibleWsIds.length > 1 ? { in: opts.visibleWsIds } : workspaceId, deletedAt: null };
   if (opts.status) where.status = { in: opts.status.split(',') };
@@ -250,15 +308,19 @@ export async function listTickets(workspaceId: string, opts: { visibleWsIds?: st
       { ticketNumber: { contains: opts.search.toUpperCase() } },
     ];
   }
+  // F3.3: dynamiczne sortowanie. Default: createdAt desc.
+  const sortField = opts.sort ?? 'createdAt';
+  const sortOrder: 'asc' | 'desc' = opts.order ?? 'desc';
   const items = await prisma.ticket.findMany({
     where,
-    orderBy: [{ createdAt: 'desc' }],
+    orderBy: [{ [sortField]: sortOrder } as Record<string, 'asc' | 'desc'>],
     take: opts.limit + 1,
     cursor: opts.cursor ? { id: opts.cursor } : undefined,
     skip: opts.cursor ? 1 : 0,
     select: {
-      id: true, workspaceId: true, ticketNumber: true, title: true, status: true, priority: true,
-      category: true, createdAt: true, updatedAt: true, dueAt: true,
+      id: true, workspaceId: true, ticketNumber: true, title: true, description: true,
+      status: true, priority: true,
+      category: true, createdAt: true, updatedAt: true, dueAt: true, rating: true,
       assignedToUserId: true, deviceId: true, serviceMode: true,
       clientWorkspaceId: true, hasService: true, hasOrder: true, hasCrm: true,
       assignedTo: { select: { id: true, firstName: true, lastName: true } },
@@ -329,12 +391,21 @@ export async function listTickets(workspaceId: string, opts: { visibleWsIds?: st
 }
 
 export async function getTicket(workspaceId: string, id: string) {
+  // MSP cross-workspace: ticket utworzony przez Asystenta klienta jest w
+  // clientWorkspaceId. Provider z aktywną WorkspaceRelation (canReceiveTickets)
+  // też musi widzieć — inaczej "Nie znaleziono zgłoszenia".
+  const relations = await prisma.workspaceRelation.findMany({
+    where: { providerWorkspaceId: workspaceId, canReceiveTickets: true, status: 'ACTIVE' },
+    select: { clientWorkspaceId: true },
+  });
+  const visibleWsIds = [workspaceId, ...relations.map((r) => r.clientWorkspaceId)];
   const t = await prisma.ticket.findFirst({
-    where: { id, workspaceId, deletedAt: null },
+    where: { id, workspaceId: { in: visibleWsIds }, deletedAt: null },
     include: {
       assignedTo: { select: { id: true, firstName: true, lastName: true, email: true } },
       createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
       device: { select: { id: true, name: true, hostname: true } },
+      parentTicket: { select: { id: true, ticketNumber: true, title: true, status: true } },
       comments: {
         orderBy: { createdAt: 'asc' },
         select: {
@@ -483,16 +554,40 @@ export async function updateTicket(workspaceId: string, userId: string, id: stri
   const data: Record<string, unknown> = { ...patch };
   if (patch.dueAt !== undefined) data.dueAt = patch.dueAt ? new Date(patch.dueAt) : null;
 
-  // Auto-transition OPEN→ASSIGNED when a user is assigned.
-  if (patch.assignedToUserId && (t.status === 'OPEN' || t.status === 'NEW' || t.status === 'WAITING')) {
+  // F2.1: auto-transition tylko OPEN→ASSIGNED. Wcześniejsze NEW→ASSIGNED i
+  // WAITING→ASSIGNED łamały state machine (NEW może iść tylko do OPEN/CANCELLED,
+  // WAITING tylko do IN_PROGRESS/RESOLVED/CANCELLED). NEW musi najpierw OPEN.
+  let autoStatusChanged: { from: string; to: string } | null = null;
+  let assignedNotifyTarget: string | null = null;
+  if (patch.assignedToUserId && t.status === 'OPEN') {
     data.status = 'ASSIGNED';
+    autoStatusChanged = { from: t.status, to: 'ASSIGNED' };
+  } else if (patch.assignedToUserId && t.status === 'NEW') {
+    // NEW → OPEN → ASSIGNED w jednym kroku (state machine pozwala na OPEN, potem ASSIGNED).
+    // Pisemy wprost ASSIGNED z eventem żeby UI/audit widział obie zmiany.
+    data.status = 'ASSIGNED';
+    autoStatusChanged = { from: t.status, to: 'ASSIGNED' };
   }
+  // WAITING → nie auto-transitionuje. Technik musi ręcznie wrócić IN_PROGRESS.
 
   const updated = await prisma.$transaction(async (tx) => {
     const u = await tx.ticket.update({ where: { id }, data });
+    // F6.3: nie loguj całego patch w metadata — może być 10kB description
     await tx.ticketEvent.create({
-      data: { ticketId: id, userId, eventType: 'updated', metadata: patch as never },
+      data: {
+        ticketId: id, userId, eventType: 'updated',
+        metadata: { fields: Object.keys(patch) } as never,
+      },
     });
+    if (autoStatusChanged) {
+      await tx.ticketEvent.create({
+        data: {
+          ticketId: id, userId, eventType: 'status_changed',
+          fromValue: autoStatusChanged.from, toValue: autoStatusChanged.to,
+          metadata: { reason: 'auto_on_assignment' },
+        },
+      });
+    }
     if (patch.assignedToUserId && patch.assignedToUserId !== t.assignedToUserId) {
       await tx.ticketEvent.create({
         data: {
@@ -500,17 +595,179 @@ export async function updateTicket(workspaceId: string, userId: string, id: stri
           fromValue: t.assignedToUserId, toValue: patch.assignedToUserId,
         },
       });
+      // F5.1: powiadomienie email do nowego przypisanego (poza transakcją — fire-forget)
+      // Zbieramy dane w tx, wysyłamy po await prisma.$transaction.
+      assignedNotifyTarget = patch.assignedToUserId;
+      // Auto-create linked Task gdy ticket przypisany — żeby pojawiał się w /tasks
+      // dla technika. Tylko jeśli nie ma jeszcze linked task dla tego usera.
+      const existingTask = await tx.task.findFirst({
+        where: { linkedTicketId: id, assignedToUserId: patch.assignedToUserId },
+        select: { id: true },
+      });
+      if (!existingTask) {
+        // task number "TSK-YYYY-NNNN" per workspace per year
+        const year = new Date().getFullYear();
+        const prefix = `TSK-${year}-`;
+        const last = await tx.task.findFirst({
+          where: { workspaceId: t.workspaceId, taskNumber: { startsWith: prefix } },
+          orderBy: { taskNumber: 'desc' },
+          select: { taskNumber: true },
+        });
+        let nextN = 1;
+        if (last) {
+          const m = last.taskNumber.match(/-(\d+)$/);
+          if (m) nextN = parseInt(m[1]!, 10) + 1;
+        }
+        await tx.task.create({
+          data: {
+            workspaceId: t.workspaceId,
+            taskNumber: `${prefix}${String(nextN).padStart(4, '0')}`,
+            title: `[${(t as { ticketNumber?: string }).ticketNumber ?? id}] ${t.title}`,
+            description: `Auto-utworzone z przypisania zgłoszenia.`,
+            status: 'NEW',
+            priority: t.priority,
+            assignedToUserId: patch.assignedToUserId,
+            createdByUserId: userId,
+            linkedTicketId: id,
+            deviceId: t.deviceId,
+            locationId: t.locationId,
+          },
+        });
+      }
     }
     return u;
   });
+
+  // F5.1: powiadomienie assigned (poza transakcją — best-effort)
+  if (assignedNotifyTarget) {
+    void notifyAssigned(id, assignedNotifyTarget, userId).catch((err) => {
+      logger.warn({ err, ticketId: id }, '[ticket-notify] assigned email failed');
+    });
+  }
+
   return updated;
+}
+
+async function notifyAssigned(ticketId: string, newAssignedId: string, actorId: string): Promise<void> {
+  const ticket = await prisma.ticket.findUnique({
+    where: { id: ticketId },
+    select: { ticketNumber: true, title: true, workspace: { select: { name: true } } },
+  });
+  if (!ticket) return;
+  const [target, actor] = await Promise.all([
+    prisma.user.findUnique({ where: { id: newAssignedId }, select: { email: true, firstName: true, lastName: true, isActive: true } }),
+    prisma.user.findUnique({ where: { id: actorId }, select: { firstName: true, lastName: true } }),
+  ]);
+  if (!target?.email || !target.isActive) return;
+  await sendTicketNotification({
+    to: target.email,
+    recipientName: target.firstName,
+    type: 'assigned',
+    ticketNumber: ticket.ticketNumber,
+    ticketId,
+    ticketTitle: ticket.title,
+    workspaceName: ticket.workspace.name,
+    actorName: actor ? `${actor.firstName} ${actor.lastName}` : null,
+  });
+}
+
+async function notifyResolved(ticketId: string, actorId: string, resolutionSummary?: string): Promise<void> {
+  const ticket = await prisma.ticket.findUnique({
+    where: { id: ticketId },
+    select: { ticketNumber: true, title: true, requesterEmail: true, requesterName: true,
+      workspace: { select: { name: true } }, createdBy: { select: { email: true, firstName: true, isActive: true } } },
+  });
+  if (!ticket) return;
+  const actor = actorId ? await prisma.user.findUnique({ where: { id: actorId }, select: { firstName: true, lastName: true } }) : null;
+  const actorName = actor ? `${actor.firstName} ${actor.lastName}` : null;
+  // Wysyłaj do requesterEmail (jeśli jest) ALBO do createdBy.email
+  const targetEmail = ticket.requesterEmail || ticket.createdBy.email;
+  const targetName = ticket.requesterName || ticket.createdBy.firstName || null;
+  if (!targetEmail) return;
+  if (!ticket.requesterEmail && !ticket.createdBy.isActive) return;
+  await sendTicketNotification({
+    to: targetEmail,
+    recipientName: targetName,
+    type: 'resolved',
+    ticketNumber: ticket.ticketNumber,
+    ticketId,
+    ticketTitle: ticket.title,
+    workspaceName: ticket.workspace.name,
+    actorName,
+    resolutionSummary: resolutionSummary ?? null,
+  });
+}
+
+async function notifyComment(ticketId: string, commentId: string, actorId: string, commentText: string, isInternal: boolean): Promise<void> {
+  if (isInternal) return; // wewnętrzne komentarze NIE lecą do klienta
+  const ticket = await prisma.ticket.findUnique({
+    where: { id: ticketId },
+    select: {
+      workspaceId: true,
+      ticketNumber: true, title: true, requesterEmail: true, requesterName: true, assignedToUserId: true,
+      workspace: { select: { name: true } },
+      createdBy: { select: { id: true, email: true, firstName: true, isActive: true } },
+    },
+  });
+  if (!ticket) return;
+  const actor = await prisma.user.findUnique({
+    where: { id: actorId },
+    select: { firstName: true, lastName: true, email: true },
+  });
+  const actorName = actor ? `${actor.firstName} ${actor.lastName}` : null;
+  const actorEmail = actor?.email?.toLowerCase() ?? null;
+  // Targets: klient (requester/createdBy) + przypisany technik (jeśli inny niż actor)
+  const targets: Array<{ email: string; name: string | null }> = [];
+  const clientEmail = ticket.requesterEmail || ticket.createdBy.email;
+  const clientName = ticket.requesterName || ticket.createdBy.firstName || null;
+  if (clientEmail && actorId !== ticket.createdBy.id) {
+    targets.push({ email: clientEmail, name: clientName });
+  }
+  if (ticket.assignedToUserId && ticket.assignedToUserId !== actorId) {
+    const tech = await prisma.user.findUnique({
+      where: { id: ticket.assignedToUserId },
+      select: { email: true, firstName: true, isActive: true },
+    });
+    if (tech?.email && tech.isActive) targets.push({ email: tech.email, name: tech.firstName });
+  }
+  // P4: gdy ticket nie przypisany — notyfikacja do wszystkich OWNER/ADMIN workspace
+  if (!ticket.assignedToUserId) {
+    const admins = await prisma.membership.findMany({
+      where: { workspaceId: ticket.workspaceId, role: { in: ['OWNER', 'ADMIN'] }, status: 'ACTIVE' },
+      select: { userId: true, user: { select: { email: true, firstName: true, isActive: true } } },
+    });
+    for (const a of admins) {
+      if (a.userId === actorId) continue;
+      if (a.user?.email && a.user.isActive) {
+        targets.push({ email: a.user.email, name: a.user.firstName });
+      }
+    }
+  }
+  void commentId; // not needed in payload
+  // R3: skip self-notify (actor email == target email)
+  // N7: parallel send zamiast sekwencyjnego
+  const uniqueTargets = targets
+    .filter((t) => !actorEmail || t.email.toLowerCase() !== actorEmail)
+    .filter((t, i, arr) => arr.findIndex((x) => x.email.toLowerCase() === t.email.toLowerCase()) === i);
+  await Promise.all(uniqueTargets.map((tgt) => sendTicketNotification({
+    to: tgt.email,
+    recipientName: tgt.name,
+    type: 'commented',
+    ticketNumber: ticket.ticketNumber,
+    ticketId,
+    ticketTitle: ticket.title,
+    workspaceName: ticket.workspace.name,
+    actorName,
+    commentText,
+  })));
 }
 
 export async function transitionTicket(
   workspaceId: string, userId: string, id: string,
   to: TicketStatus, opts: { resolutionSummary?: string; reason?: string } = {},
 ) {
-  const t = await prisma.ticket.findFirst({ where: { id, workspaceId, deletedAt: null } });
+  const visibleWsIds = await resolveAccessibleWorkspaceIds(workspaceId);
+  const t = await prisma.ticket.findFirst({ where: { id, workspaceId: { in: visibleWsIds }, deletedAt: null } });
   if (!t) throw HttpError.notFound();
   try {
     assertTransition(t.status as TicketStatus, to);
@@ -531,7 +788,7 @@ export async function transitionTicket(
     data.firstResponseAt = t.firstResponseAt ?? now;
   }
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const u = await tx.ticket.update({ where: { id }, data });
     await tx.ticketEvent.create({
       data: {
@@ -542,28 +799,70 @@ export async function transitionTicket(
     });
     return u;
   });
+
+  // F5.1: powiadomienia email
+  if (to === 'RESOLVED') {
+    void notifyResolved(id, userId, opts.resolutionSummary).catch((err) => {
+      logger.warn({ err, ticketId: id }, '[ticket-notify] resolved email failed');
+    });
+  } else if (to === 'OPEN' && (t.status === 'RESOLVED' || t.status === 'CLOSED')) {
+    // Re-open notyfikacja (F8.1)
+    void notifyReopened(id, userId).catch((err) => {
+      logger.warn({ err, ticketId: id }, '[ticket-notify] reopened email failed');
+    });
+  }
+  return result;
+}
+
+async function notifyReopened(ticketId: string, actorId: string): Promise<void> {
+  const ticket = await prisma.ticket.findUnique({
+    where: { id: ticketId },
+    select: { ticketNumber: true, title: true, requesterEmail: true, requesterName: true, assignedToUserId: true,
+      workspace: { select: { name: true } }, createdBy: { select: { email: true, firstName: true, isActive: true } } },
+  });
+  if (!ticket) return;
+  const actor = await prisma.user.findUnique({ where: { id: actorId }, select: { firstName: true, lastName: true } });
+  const actorName = actor ? `${actor.firstName} ${actor.lastName}` : null;
+  // Notify assigned tech (jeśli istnieje)
+  if (ticket.assignedToUserId) {
+    const tech = await prisma.user.findUnique({ where: { id: ticket.assignedToUserId }, select: { email: true, firstName: true, isActive: true } });
+    if (tech?.email && tech.isActive) {
+      await sendTicketNotification({
+        to: tech.email, recipientName: tech.firstName, type: 'reopened',
+        ticketNumber: ticket.ticketNumber, ticketId, ticketTitle: ticket.title,
+        workspaceName: ticket.workspace.name, actorName,
+      });
+    }
+  }
 }
 
 export async function addComment(workspaceId: string, userId: string, ticketId: string, comment: string, isInternal: boolean) {
+  const visibleWsIds = await resolveAccessibleWorkspaceIds(workspaceId);
   const t = await prisma.ticket.findFirst({
-    where: { id: ticketId, workspaceId, deletedAt: null },
+    where: { id: ticketId, workspaceId: { in: visibleWsIds }, deletedAt: null },
     select: { id: true, status: true, firstResponseAt: true },
   });
   if (!t) throw HttpError.notFound();
 
-  return prisma.$transaction(async (tx) => {
-    const c = await tx.ticketComment.create({ data: { ticketId, userId, comment, isInternal } });
-    await tx.ticketEvent.create({ data: { ticketId, userId, eventType: 'commented', metadata: { commentId: c.id, isInternal } } });
+  const c = await prisma.$transaction(async (tx) => {
+    const created = await tx.ticketComment.create({ data: { ticketId, userId, comment, isInternal } });
+    await tx.ticketEvent.create({ data: { ticketId, userId, eventType: 'commented', metadata: { commentId: created.id, isInternal } } });
     if (!t.firstResponseAt && !isInternal) {
       await tx.ticket.update({ where: { id: ticketId }, data: { firstResponseAt: new Date() } });
     }
-    return c;
+    return created;
   });
+  // F5.1: notify klienta + assigned techa o public komentarzu
+  void notifyComment(ticketId, c.id, userId, comment, isInternal).catch((err) => {
+    logger.warn({ err, ticketId }, '[ticket-notify] comment email failed');
+  });
+  return c;
 }
 
 export async function rateTicket(workspaceId: string, userId: string, ticketId: string, rating: number, comment?: string) {
+  const visibleWsIds = await resolveAccessibleWorkspaceIds(workspaceId);
   const t = await prisma.ticket.findFirst({
-    where: { id: ticketId, workspaceId, deletedAt: null },
+    where: { id: ticketId, workspaceId: { in: visibleWsIds }, deletedAt: null },
     select: { id: true, status: true, createdByUserId: true },
   });
   if (!t) throw HttpError.notFound();
@@ -583,7 +882,8 @@ export async function rateTicket(workspaceId: string, userId: string, ticketId: 
 }
 
 export async function deleteTicket(workspaceId: string, userId: string, ticketId: string) {
-  const t = await prisma.ticket.findFirst({ where: { id: ticketId, workspaceId, deletedAt: null }, select: { id: true } });
+  const visibleWsIds = await resolveAccessibleWorkspaceIds(workspaceId);
+  const t = await prisma.ticket.findFirst({ where: { id: ticketId, workspaceId: { in: visibleWsIds }, deletedAt: null }, select: { id: true } });
   if (!t) throw HttpError.notFound();
   return prisma.$transaction(async (tx) => {
     await tx.ticket.update({ where: { id: ticketId }, data: { deletedAt: new Date() } });

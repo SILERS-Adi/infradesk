@@ -35,7 +35,12 @@ import crypto from 'crypto';
 import { prismaBg as prisma } from "../../lib/prisma-bg";
 import { agentRegisterLimiter } from '../../middleware/rateLimit';
 import { HttpError } from '../../utils/httpError';
-import { hashToken } from '../../lib/crypto';
+import { hashToken, decrypt, randomToken } from '../../lib/crypto';
+import { verifyPassword, hashPassword, validatePasswordStrength } from '../../lib/password';
+import { sendVerificationEmail } from '../../lib/mailer';
+import { assertTransition, type TicketStatus } from '../../utils/ticketStateMachine';
+import { resolveSlaForTicket } from '../tickets/tickets.service';
+import { logger } from '../../lib/logger';
 
 // ──────────────────────────────────────────────────────────────────
 // Uploads
@@ -177,6 +182,187 @@ router.post('/register', agentRegisterLimiter, async (req: Request, res: Respons
       if (ws?.isActive) workspaceId = ws.id;
     }
 
+    // Login/signup flow — agent v5.0.5 webview wysyła:
+    //   companyName, nip, contactFirstName, contactLastName, contactPhone,
+    //   contactEmail, email, password, registrationNotes, allowRustdesk/Monitoring
+    // Starsze wersje (Tk) wysyłają: email, password, name, company
+    if (!workspaceId && typeof body.email === 'string' && typeof body.password === 'string') {
+      const emailLc = body.email.toLowerCase().trim();
+      const fname =
+        (typeof body.contactFirstName === 'string' && body.contactFirstName.trim()) ||
+        (typeof body.name === 'string' ? body.name.trim().split(/\s+/)[0] : '') ||
+        '';
+      const lname =
+        (typeof body.contactLastName === 'string' && body.contactLastName.trim()) ||
+        (typeof body.name === 'string' ? body.name.trim().split(/\s+/).slice(1).join(' ') : '') ||
+        fname;
+      const companyName =
+        (typeof body.companyName === 'string' && body.companyName.trim()) ||
+        (typeof body.company === 'string' ? body.company.trim() : '') ||
+        '';
+      const nipDigits = typeof body.nip === 'string' ? body.nip.replace(/[-\s]/g, '') : '';
+
+      const user = await prisma.user.findUnique({
+        where: { email: emailLc },
+        select: { id: true, passwordHash: true, isActive: true, lockedUntil: true },
+      });
+
+      // 1. Jeśli podano NIP, spróbuj znaleźć istniejący workspace po taxId
+      let nipWorkspaceId: string | null = null;
+      if (nipDigits.length >= 10) {
+        const ws = await prisma.workspace.findFirst({
+          where: { taxId: nipDigits, isActive: true },
+          select: { id: true },
+        });
+        if (ws) nipWorkspaceId = ws.id;
+      }
+
+      if (user) {
+        // LOGIN flow — istniejący user
+        if (!user.isActive) {
+          throw HttpError.unauthorized('Konto nieaktywne — sprawdź email weryfikacyjny', 'user_inactive');
+        }
+        if (user.lockedUntil && user.lockedUntil > new Date()) {
+          throw HttpError.unauthorized('Konto zablokowane — odczekaj kilka minut', 'user_locked');
+        }
+        const ok = await verifyPassword(user.passwordHash, body.password);
+        if (!ok) {
+          throw HttpError.unauthorized('Nieprawidłowe hasło', 'invalid_password');
+        }
+        // Jeśli podano NIP istniejącego workspace i user jest jego członkiem — użyj go.
+        // Dla rejestracji agenta wystarczy ACTIVE lub INVITED (sam dostęp do danych
+        // dalej wymaga ACTIVE — pilnowane gdzie indziej). AgentRegistration goes
+        // PENDING anyway and admin approves separately.
+        if (nipWorkspaceId) {
+          const m = await prisma.membership.findFirst({
+            where: { userId: user.id, workspaceId: nipWorkspaceId, status: { in: ['ACTIVE', 'INVITED'] } },
+            select: { workspaceId: true },
+          });
+          if (m) {
+            workspaceId = m.workspaceId;
+          } else {
+            throw HttpError.forbidden(
+              `Twoje konto nie jest członkiem workspace dla NIP ${nipDigits}. Poproś admina o zaproszenie.`,
+              'not_workspace_member',
+            );
+          }
+        } else {
+          const m = await prisma.membership.findFirst({
+            where: { userId: user.id, status: 'ACTIVE' },
+            orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+            select: { workspaceId: true, workspace: { select: { isActive: true } } },
+          });
+          if (!m || !m.workspace.isActive) {
+            throw HttpError.forbidden('Brak aktywnego workspace dla tego użytkownika', 'no_workspace');
+          }
+          workspaceId = m.workspaceId;
+        }
+      } else {
+        // SIGNUP flow — nowy user
+        if (!fname || !lname || !companyName) {
+          throw HttpError.badRequest(
+            'Brak danych do rejestracji — wypełnij imię, nazwisko i nazwę firmy',
+            'signup_fields_missing',
+          );
+        }
+        const pwCheck = validatePasswordStrength(body.password);
+        if (!pwCheck.ok) {
+          throw HttpError.badRequest(pwCheck.reason ?? 'Hasło zbyt słabe', 'weak_password');
+        }
+        if (nipWorkspaceId) {
+          // NIP wskazuje na istniejący workspace — utwórz usera + PENDING membership.
+          // Admin musi zaakceptować zarówno membership jak i AgentRegistration.
+          const passwordHash = await hashPassword(body.password);
+          const verifyTokenPlain = randomToken(24);
+          await prisma.$transaction(async (tx) => {
+            const u = await tx.user.create({
+              data: {
+                email: emailLc,
+                firstName: fname,
+                lastName: lname,
+                phone: typeof body.contactPhone === 'string' ? body.contactPhone : null,
+                passwordHash,
+                emailVerified: false,
+                emailVerifyToken: hashToken(verifyTokenPlain),
+                emailVerifySentAt: new Date(),
+              },
+              select: { id: true },
+            });
+            await tx.membership.create({
+              data: {
+                userId: u.id,
+                workspaceId: nipWorkspaceId!,
+                role: 'MEMBER',
+                scope: 'FULL',
+                isDefault: true,
+                status: 'INVITED',
+              },
+            });
+          });
+          // Wyślij email weryfikacyjny — best effort. NIE blokuje rejestracji asystenta.
+          void sendVerificationEmail(emailLc, verifyTokenPlain, fname);
+          workspaceId = nipWorkspaceId;
+        } else {
+          // Brak istniejącego workspace o tym NIP — pełny signup nowej firmy
+          const baseSlug = companyName
+            .toLowerCase()
+            .normalize('NFKD')
+            .replace(/[̀-ͯ]/g, '')
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/(^-|-$)/g, '')
+            .slice(0, 40) || 'workspace';
+          let slug = baseSlug;
+          for (let i = 2; i < 100; i++) {
+            const exists = await prisma.workspace.findUnique({ where: { slug }, select: { id: true } });
+            if (!exists) break;
+            slug = `${baseSlug}-${i}`;
+          }
+          const passwordHash = await hashPassword(body.password);
+          const verifyTokenPlain = randomToken(24);
+          const created = await prisma.$transaction(async (tx) => {
+            const u = await tx.user.create({
+              data: {
+                email: emailLc,
+                firstName: fname,
+                lastName: lname,
+                phone: typeof body.contactPhone === 'string' ? body.contactPhone : null,
+                passwordHash,
+                emailVerified: false,
+                emailVerifyToken: hashToken(verifyTokenPlain),
+                emailVerifySentAt: new Date(),
+              },
+              select: { id: true },
+            });
+            const ws = await tx.workspace.create({
+              data: {
+                name: companyName,
+                slug,
+                type: 'MSP',
+                plan: 'PRO',
+                trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                taxId: nipDigits || null,
+              },
+              select: { id: true },
+            });
+            await tx.membership.create({
+              data: {
+                userId: u.id,
+                workspaceId: ws.id,
+                role: 'OWNER',
+                scope: 'FULL',
+                isDefault: true,
+                status: 'ACTIVE',
+              },
+            });
+            return { workspaceId: ws.id };
+          });
+          // Wyślij email weryfikacyjny — best effort. NIE blokuje rejestracji asystenta.
+          void sendVerificationEmail(emailLc, verifyTokenPlain, fname);
+          workspaceId = created.workspaceId;
+        }
+      }
+    }
+
     // If there's already a registration for this (workspace?, hostname, serial) reuse it
     const existing = workspaceId
       ? await prisma.agentRegistration.findFirst({
@@ -190,10 +376,33 @@ router.post('/register', agentRegisterLimiter, async (req: Request, res: Respons
       : null;
 
     if (existing) {
-      // Refresh lastSeen so admin console can tell the agent is alive.
+      // Refresh lastSeen + uzupelnij/aktualizuj dane kontaktowe ze swiezego payloadu.
+      const reuseEmail =
+        (typeof body.contactEmail === 'string' && body.contactEmail.trim()) ||
+        (typeof body.email === 'string' ? body.email.trim() : '') || undefined;
+      const reuseFirst =
+        (typeof body.contactFirstName === 'string' && body.contactFirstName.trim()) ||
+        (typeof body.name === 'string' ? body.name.trim().split(/\s+/)[0] : '') || undefined;
+      const reuseLast =
+        (typeof body.contactLastName === 'string' && body.contactLastName.trim()) ||
+        (typeof body.name === 'string' ? body.name.trim().split(/\s+/).slice(1).join(' ') : '') || undefined;
+      const reusePhone = typeof body.contactPhone === 'string' ? body.contactPhone : undefined;
+      const reuseCompany =
+        (typeof body.companyName === 'string' && body.companyName.trim()) ||
+        (typeof body.company === 'string' ? body.company.trim() : '') || undefined;
+      const reuseNip = typeof body.nip === 'string' ? body.nip.replace(/[-\s]/g, '') : undefined;
       await prisma.agentRegistration.update({
         where: { id: existing.id },
-        data: { lastSeen: new Date() },
+        data: {
+          lastSeen: new Date(),
+          ...(reuseEmail ? { contactEmail: reuseEmail.toLowerCase() } : {}),
+          ...(reuseFirst ? { contactFirstName: reuseFirst } : {}),
+          ...(reuseLast ? { contactLastName: reuseLast } : {}),
+          ...(reusePhone ? { contactPhone: reusePhone } : {}),
+          ...(reuseCompany ? { companyName: reuseCompany } : {}),
+          ...(reuseNip ? { nip: reuseNip } : {}),
+          ...(typeof body.currentUser === 'string' ? { currentUser: body.currentUser } : {}),
+        },
       });
       res.status(201).json({
         token: existing.agentToken,
@@ -214,27 +423,50 @@ router.post('/register', agentRegisterLimiter, async (req: Request, res: Respons
       );
     }
 
+    // Login-flow fallback: agent v5 wysyla "email" zamiast "contactEmail".
+    // Jezeli email pasuje do uzytkownika w workspace, dociagnij imie/nazwisko/telefon.
+    const loginEmail =
+      typeof body.contactEmail === 'string' ? body.contactEmail :
+      typeof body.email === 'string' ? body.email : undefined;
+    let userFirstName = body.contactFirstName as string | undefined;
+    let userLastName = body.contactLastName as string | undefined;
+    let userPhone = body.contactPhone as string | undefined;
+    if (loginEmail && (!userFirstName || !userLastName)) {
+      const u = await prisma.user.findUnique({
+        where: { email: loginEmail.toLowerCase() },
+        select: { firstName: true, lastName: true, phone: true },
+      }).catch(() => null);
+      if (u) {
+        userFirstName = userFirstName ?? u.firstName ?? undefined;
+        userLastName = userLastName ?? u.lastName ?? undefined;
+        userPhone = userPhone ?? u.phone ?? undefined;
+      }
+    }
+
     const token = crypto.randomBytes(48).toString('hex');
+    // Walidacja długości pól żeby agent z aktywnym tokenem nie mógł wstawić MB tekstu
+    const safeStr = (v: unknown, max: number): string | undefined =>
+      typeof v === 'string' ? v.slice(0, max) : undefined;
     const reg = await prisma.agentRegistration.create({
       data: {
         workspaceId,
         agentToken: token,
         agentTokenHash: hashToken(token),
-        agentVersion: body.appVersion ?? 'unknown',
+        agentVersion: safeStr(body.appVersion, 40) ?? 'unknown',
         status: 'PENDING',
         hostname,
         serialNumber: serial,
         osName: osInfo,
-        osVersion: body.windowsVersion ?? undefined,
-        cpuModel: body.cpuModel ?? undefined,
+        osVersion: safeStr(body.windowsVersion, 60),
+        cpuModel: safeStr(body.cpuModel, 120),
         ramMb: typeof body.ramTotalGb === 'number' ? Math.round(body.ramTotalGb * 1024) : undefined,
-        currentUser: body.currentUser ?? undefined,
-        companyName: body.companyName ?? undefined,
-        nip: typeof body.nip === 'string' ? body.nip.replace(/[-\s]/g, '') : undefined,
-        contactFirstName: body.contactFirstName ?? undefined,
-        contactLastName: body.contactLastName ?? undefined,
-        contactEmail: body.contactEmail ?? undefined,
-        contactPhone: body.contactPhone ?? undefined,
+        currentUser: safeStr(body.currentUser, 120),
+        companyName: safeStr(body.companyName, 200),
+        nip: typeof body.nip === 'string' ? body.nip.replace(/[-\s]/g, '').slice(0, 20) : undefined,
+        contactFirstName: userFirstName,
+        contactLastName: userLastName,
+        contactEmail: loginEmail,
+        contactPhone: userPhone,
         allowRustdesk: body.allowRustdesk ?? true,
         allowMonitoring: body.allowMonitoring ?? true,
       },
@@ -294,21 +526,42 @@ router.post('/metrics', async (req: Request, res: Response, next: NextFunction) 
       domain: rest.domain,
     };
 
+    // Walidacja długości — agent z aktywnym tokenem nie może wstawić MB tekstu
+    const safeStr2 = (v: unknown, max: number): string | undefined =>
+      typeof v === 'string' && v.length > 0 ? v.slice(0, max) : undefined;
     await prisma.agentRegistration.update({
       where: { id: reg.id },
       data: {
         lastSeen: new Date(),
         serverMetrics: merged as never,
-        currentUser: typeof rest.currentUser === 'string' ? rest.currentUser : undefined,
+        currentUser: safeStr2(rest.currentUser, 120),
         diskFreeGb: typeof rest.diskFree === 'number' ? rest.diskFree : undefined,
         diskTotalGb: typeof rest.diskTotal === 'number' ? rest.diskTotal : undefined,
-        agentVersion: typeof rest.appVersion === 'string' ? rest.appVersion : undefined,
-        cpuModel: typeof rest.cpuModel === 'string' ? rest.cpuModel : undefined,
+        agentVersion: safeStr2(rest.appVersion, 40),
+        cpuModel: safeStr2(rest.cpuModel, 120),
         ramMb: typeof rest.ramTotalGb === 'number' ? Math.round(rest.ramTotalGb * 1024) : undefined,
-        osVersion: typeof rest.windowsVersion === 'string' ? rest.windowsVersion : undefined,
-        hostname: typeof rest.hostname === 'string' && rest.hostname.length > 0 ? rest.hostname : undefined,
+        osVersion: safeStr2(rest.windowsVersion, 60),
+        hostname: safeStr2(rest.hostname, 120),
       },
     });
+
+    // Sync wykryte IDs zdalnego dostępu do Device — agent skanuje system
+    // i wysyła rustdeskId/anydeskId/teamviewerId, ale były zapisywane tylko
+    // do AgentRegistration.serverMetrics. Panel czyta z Device.* — sync poniżej.
+    if (reg.deviceId) {
+      const deviceUpdate: Record<string, string> = {};
+      if (typeof rest.rustdeskId === 'string'   && rest.rustdeskId.trim())   deviceUpdate.rustdeskId   = rest.rustdeskId.trim();
+      if (typeof rest.anydeskId === 'string'    && rest.anydeskId.trim())    deviceUpdate.anydeskId    = rest.anydeskId.trim();
+      if (typeof rest.teamviewerId === 'string' && rest.teamviewerId.trim()) deviceUpdate.teamviewerId = rest.teamviewerId.trim();
+      if (typeof rest.ipAddress === 'string'    && rest.ipAddress.trim())    deviceUpdate.ipAddress    = rest.ipAddress.trim();
+      if (Object.keys(deviceUpdate).length > 0) {
+        try {
+          await prisma.device.update({ where: { id: reg.deviceId }, data: deviceUpdate });
+        } catch {
+          // Device może być soft-deleted lub inny race — nie blokuj heartbeatu.
+        }
+      }
+    }
 
     res.json({ ok: true });
   } catch (err) { next(err); }
@@ -335,6 +588,7 @@ router.post('/ticket', async (req: Request, res: Response, next: NextFunction) =
     if (!ws?.isActive) throw HttpError.conflict('Workspace inactive — admin must re-approve agent');
 
     // Dedup: if an open ticket with same title exists for this device, just bump updatedAt
+    // F1.2: deletedAt: null — żeby nie wskrzeszać soft-deleted
     const existing = await prisma.ticket.findFirst({
       where: {
         workspaceId: reg.workspaceId,
@@ -342,6 +596,7 @@ router.post('/ticket', async (req: Request, res: Response, next: NextFunction) =
         source: 'AGENT',
         title: input.title,
         status: { in: ['NEW', 'OPEN', 'ASSIGNED', 'IN_PROGRESS', 'WAITING'] },
+        deletedAt: null,
       },
       select: { id: true, ticketNumber: true },
     });
@@ -384,33 +639,73 @@ router.post('/ticket', async (req: Request, res: Response, next: NextFunction) =
     }
     if (!authorId) throw HttpError.internal('No author available for agent ticket');
 
-    const count = await prisma.ticket.count({ where: { workspaceId: reg.workspaceId } });
-    const ticketNumber = `T-${String(count + 1).padStart(4, '0')}`;
-
     const reporterName =
       [reg.contactFirstName, reg.contactLastName].filter(Boolean).join(' ') ||
       reg.hostname || 'Agent';
 
-    const ticket = await prisma.ticket.create({
-      data: {
-        workspaceId: reg.workspaceId,
-        ticketNumber,
-        title: input.title,
-        description: input.description ?? '',
-        status: 'NEW',
-        priority: (input.priority ?? 'MEDIUM') as never,
-        type: 'INCIDENT',
-        source: 'AGENT',
-        deviceId: reg.deviceId ?? undefined,
-        locationId: locationId ?? undefined,
-        createdByUserId: authorId,
-        requesterName: reporterName,
-        requesterPhone: reg.contactPhone ?? undefined,
-        requesterEmail: reg.contactEmail ?? undefined,
-        dueAt: input.dueAt ? new Date(input.dueAt) : undefined,
-      },
-      select: { id: true, ticketNumber: true, title: true, description: true, status: true },
-    });
+    // F1.1: ujednolicony format `T-YYYY-NNNN` — taki sam jak nextTicketNumber()
+    // używany w tickets.service.ts. Wcześniej agent dawał `T-NNNN` co rozjeżdżało
+    // numerację w workspace.
+    // Race-safe: retry on P2002 z incrementem (do 10 prób).
+    const year = new Date().getFullYear();
+    const numberPrefix = `T-${year}-`;
+    let ticket: { id: string; ticketNumber: string; title: string; description: string; status: string } | null = null;
+    let lastErr: unknown = null;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const last = await prisma.ticket.findFirst({
+        where: { workspaceId: reg.workspaceId, ticketNumber: { startsWith: numberPrefix } },
+        orderBy: { ticketNumber: 'desc' },
+        select: { ticketNumber: true },
+      });
+      let nextN = 1;
+      if (last) {
+        const m = last.ticketNumber.match(/-(\d+)$/);
+        if (m) nextN = parseInt(m[1]!, 10) + 1;
+      }
+      const candidate = `${numberPrefix}${String(nextN + attempt).padStart(4, '0')}`;
+      // R6: Apply SLA z helper (przy pierwszej próbie tylko)
+      const slaPriority = (input.priority ?? 'MEDIUM') as string;
+      const sla = attempt === 0 ? await resolveSlaForTicket(reg.workspaceId, slaPriority) : { slaResponseMinutes: null, slaResolveMinutes: null };
+      try {
+        ticket = await prisma.ticket.create({
+          data: {
+            workspaceId: reg.workspaceId,
+            ticketNumber: candidate,
+            title: input.title,
+            description: input.description ?? '',
+            status: 'NEW',
+            priority: (input.priority ?? 'MEDIUM') as never,
+            type: 'INCIDENT',
+            source: 'AGENT',
+            deviceId: reg.deviceId ?? undefined,
+            locationId: locationId ?? undefined,
+            createdByUserId: authorId,
+            requesterName: reporterName,
+            requesterPhone: reg.contactPhone ?? undefined,
+            requesterEmail: reg.contactEmail ?? undefined,
+            dueAt: input.dueAt ? new Date(input.dueAt) : undefined,
+            slaResponseMinutes: sla.slaResponseMinutes,
+            slaResolveMinutes: sla.slaResolveMinutes,
+            // F1.3: TicketEvent('created') — pełen audyt także dla agent submissions
+            events: { create: { userId: authorId, eventType: 'created', toValue: 'NEW', metadata: { source: 'agent' } } },
+          },
+          select: { id: true, ticketNumber: true, title: true, description: true, status: true },
+        });
+        break;
+      } catch (e: unknown) {
+        const code = (e as { code?: string } | null)?.code;
+        if (code === 'P2002') {
+          lastErr = e;
+          continue; // retry z wyższym numerem
+        }
+        throw e;
+      }
+    }
+    if (!ticket) {
+      throw lastErr instanceof Error
+        ? lastErr
+        : HttpError.conflict('Nie udało się wygenerować unikalnego numeru ticketu po 10 próbach', 'ticket_number_collision');
+    }
 
     res.status(201).json({
       id: ticket.id,
@@ -433,7 +728,7 @@ router.get('/tickets', async (req: Request, res: Response, next: NextFunction) =
     }
 
     const tickets = await prisma.ticket.findMany({
-      where: { workspaceId: reg.workspaceId, deviceId: reg.deviceId },
+      where: { workspaceId: reg.workspaceId, deviceId: reg.deviceId, deletedAt: null },
       orderBy: { createdAt: 'desc' },
       take: 50,
       select: {
@@ -462,7 +757,7 @@ router.get('/tickets/:id', async (req: Request, res: Response, next: NextFunctio
     if (!reg.deviceId) throw HttpError.notFound('Agent has no device linked');
 
     const t = await prisma.ticket.findFirst({
-      where: { id: String(req.params.id), deviceId: reg.deviceId, workspaceId: reg.workspaceId },
+      where: { id: String(req.params.id), deviceId: reg.deviceId, workspaceId: reg.workspaceId, deletedAt: null },
       select: {
         id: true, ticketNumber: true, title: true, description: true,
         status: true, priority: true, source: true, serviceMode: true,
@@ -517,23 +812,37 @@ router.post('/tickets/:id/comments', async (req: Request, res: Response, next: N
     if (!authorId) throw HttpError.internal('No comment author available');
 
     const prefix = reg.hostname ? `[z komputera ${reg.hostname}] ` : '';
-    const created = await prisma.ticketComment.create({
-      data: {
-        ticketId: t.id,
-        userId: authorId,
-        comment: `${prefix}${comment.trim()}`,
-        isInternal: false,
-      },
-      select: {
-        id: true, comment: true, createdAt: true,
-        user: { select: { id: true, firstName: true, lastName: true, email: true } },
-      },
+    // F1.5: dodatkowy TicketEvent('commented') żeby historia była pełna
+    const created = await prisma.$transaction(async (tx) => {
+      const c = await tx.ticketComment.create({
+        data: {
+          ticketId: t.id,
+          userId: authorId,
+          comment: `${prefix}${comment.trim()}`,
+          isInternal: false,
+        },
+        select: {
+          id: true, comment: true, createdAt: true,
+          user: { select: { id: true, firstName: true, lastName: true, email: true } },
+        },
+      });
+      await tx.ticketEvent.create({
+        data: {
+          ticketId: t.id,
+          userId: authorId,
+          eventType: 'commented',
+          metadata: { commentId: c.id, isInternal: false, source: 'agent' },
+        },
+      });
+      return c;
     });
     res.status(201).json(created);
   } catch (err) { next(err); }
 });
 
 // POST /api/agent/tickets/:id/cancel
+// F1.4: użyj state machine + TicketEvent('status_changed'). Wcześniej ustawiało
+// resolvedAt (CANCELLED ≠ RESOLVED) i nie pisało eventu — historia kłamała.
 router.post('/tickets/:id/cancel', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const reg = await agentAuth(req);
@@ -541,20 +850,54 @@ router.post('/tickets/:id/cancel', async (req: Request, res: Response, next: Nex
     if (!reg.deviceId) throw HttpError.notFound('Agent has no device linked');
 
     const t = await prisma.ticket.findFirst({
-      where: { id: String(req.params.id), deviceId: reg.deviceId, workspaceId: reg.workspaceId },
-      select: { id: true, status: true },
+      where: { id: String(req.params.id), deviceId: reg.deviceId, workspaceId: reg.workspaceId, deletedAt: null },
+      select: { id: true, status: true, ticketNumber: true },
     });
     if (!t) throw HttpError.notFound('Ticket not found');
 
-    const cancellable = new Set(['NEW', 'OPEN', 'ASSIGNED']);
-    if (!cancellable.has(t.status as string)) {
-      throw HttpError.conflict('Zgłoszenie już w realizacji — nie można anulować. Napisz wiadomość do technika.');
+    // Resolve canceller (contactEmail user lub system fallback)
+    let cancellerId: string | null = null;
+    if (reg.contactEmail) {
+      const u = await prisma.user.findUnique({ where: { email: reg.contactEmail }, select: { id: true } });
+      if (u) cancellerId = u.id;
+    }
+    if (!cancellerId) {
+      const sys = await prisma.user.findUnique({ where: { email: 'agent@infradesk.system' }, select: { id: true } }).catch(() => null);
+      if (sys) cancellerId = sys.id;
     }
 
-    const updated = await prisma.ticket.update({
-      where: { id: t.id },
-      data: { status: 'CANCELLED', resolvedAt: new Date(), resolutionSummary: 'Anulowane przez klienta' },
-      select: { id: true, status: true, ticketNumber: true },
+    try {
+      assertTransition(t.status as TicketStatus, 'CANCELLED');
+    } catch (err) {
+      throw HttpError.conflict(
+        'Zgłoszenie już w realizacji — nie można anulować. Napisz wiadomość do technika.',
+        'illegal_transition',
+      );
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const u = await tx.ticket.update({
+        where: { id: t.id },
+        data: {
+          status: 'CANCELLED',
+          // FX.3: NIE ustawiać closedAt ani resolvedAt dla CANCELLED.
+          // closedAt/resolvedAt to "rzeczywiste ukończenie" — anulowanie to nie
+          // ukończenie. Konsystencja z service.transitionTicket.
+          resolutionSummary: 'Anulowane przez klienta',
+        },
+        select: { id: true, status: true, ticketNumber: true },
+      });
+      await tx.ticketEvent.create({
+        data: {
+          ticketId: t.id,
+          userId: cancellerId,
+          eventType: 'status_changed',
+          fromValue: t.status,
+          toValue: 'CANCELLED',
+          metadata: { reason: 'cancelled_by_client', source: 'agent' },
+        },
+      });
+      return u;
     });
     res.json(updated);
   } catch (err) { next(err); }
@@ -593,16 +936,38 @@ router.patch('/tickets/:id', async (req: Request, res: Response, next: NextFunct
   } catch (err) { next(err); }
 });
 
-// POST /api/agent/upload — image attachment
+// POST /api/agent/upload — image attachment from agent (only ACTIVE agents).
 router.post(
   '/upload',
-  async (req, _res, next) => {
-    try { await agentAuth(req); next(); } catch (err) { next(err); }
+  async (req: Request, _res, next) => {
+    try {
+      const reg = await agentAuth(req);
+      if (reg.status !== 'ACTIVE') throw HttpError.forbidden('Agent musi być zatwierdzony', 'agent_not_active');
+      (req as Request & { _agentReg?: typeof reg })._agentReg = reg;
+      next();
+    } catch (err) { next(err); }
   },
   upload.single('file'),
-  (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.file) { res.status(400).json({ error: 'Brak pliku' }); return; }
+      const reg = (req as Request & { _agentReg?: { workspaceId: string; id: string } })._agentReg;
+      // Audit trail for cleanup — Attachment requires uploadedByUserId, agents have no
+      // User row, so we log to ActivityLog instead. Cron-cleanup może później wymieść
+      // pliki bez referencji w ActivityLog/Ticket.
+      if (reg) {
+        void prisma.activityLog.create({
+          data: {
+            workspaceId: reg.workspaceId,
+            entityType: 'agent_upload',
+            entityId: reg.id,
+            actionType: 'file_uploaded',
+            description: `Agent ${reg.id.slice(0, 8)} uploaded ${req.file.originalname.slice(0, 80)}`,
+            performedByUserId: null,
+            metadata: { storageKey: req.file.filename, fileSize: req.file.size, mimeType: req.file.mimetype },
+          },
+        }).catch((e) => logger.warn({ err: e, file: req.file?.filename }, '[agent-upload] activity log failed'));
+      }
       res.json({ url: `/uploads/${req.file.filename}` });
     } catch (err) { next(err); }
   },
@@ -620,19 +985,52 @@ router.post(
 router.get('/backup-configs', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const reg = await agentAuth(req);
-    // Only return configs bound to THIS agent registration (V2 schema: agentRegistrationId)
+    // Configs bound to THIS agent registration. Schema field names (sqlDatabase,
+    // sqlUsername) różnią się od tego czego oczekuje agent v5 (sqlDatabases,
+    // sqlUser, sqlPassword). Mapowanie poniżej + dekodowanie hasła.
     const configs = await prisma.backupConfig.findMany({
       where: { workspaceId: reg.workspaceId, agentRegistrationId: reg.id },
       select: {
         id: true, name: true, type: true,
         sqlHost: true, sqlPort: true, sqlDatabase: true, sqlUsername: true,
+        sqlPasswordEnc: true, sqlPasswordIv: true, sqlPasswordAuthTag: true,
         folderPath: true, localBackupPath: true, useInfradeskCloud: true,
         googleDriveFolder: true,
         cronSchedule: true, retentionDays: true, encryptBackups: true,
         lastRunAt: true,
       },
     });
-    res.json(configs);
+    const mapped = configs.map((c) => {
+      let sqlPassword: string | undefined;
+      if (c.sqlPasswordEnc && c.sqlPasswordIv && c.sqlPasswordAuthTag) {
+        try {
+          sqlPassword = decrypt({
+            ciphertext: c.sqlPasswordEnc,
+            iv: c.sqlPasswordIv,
+            authTag: c.sqlPasswordAuthTag,
+          });
+        } catch (e) {
+          // jeśli decrypt failuje, pomijamy — agent użyje Windows Auth (-E)
+        }
+      }
+      return {
+        id: c.id, name: c.name, type: c.type,
+        sqlHost: c.sqlHost, sqlPort: c.sqlPort,
+        // alias names that agent v5 expects
+        sqlDatabases: c.sqlDatabase ?? '',
+        sqlDatabase: c.sqlDatabase, // kept for forward compat
+        sqlUser: c.sqlUsername ?? '',
+        sqlUsername: c.sqlUsername, // kept for forward compat
+        sqlPassword: sqlPassword,
+        folderPath: c.folderPath, localBackupPath: c.localBackupPath,
+        useInfradeskCloud: c.useInfradeskCloud,
+        googleDriveFolder: c.googleDriveFolder,
+        cronSchedule: c.cronSchedule, retentionDays: c.retentionDays,
+        encryptBackups: c.encryptBackups,
+        lastRunAt: c.lastRunAt,
+      };
+    });
+    res.json(mapped);
   } catch (err) { next(err); }
 });
 

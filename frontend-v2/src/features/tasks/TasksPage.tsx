@@ -54,6 +54,8 @@ export function TasksPage() {
     mutationFn: async ({ id, status }: { id: string; status: string }) =>
       (await api.post(`/tasks/${id}/status`, { status })).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks'] }),
+    onError: (err: { response?: { data?: { message?: string } }; message?: string }) =>
+      toast.error(err?.response?.data?.message ?? err?.message ?? 'Nie udało się zmienić statusu'),
   });
 
   const items = data?.items ?? [];

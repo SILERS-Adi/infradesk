@@ -52,6 +52,86 @@ from ..core.utils import NO_WINDOW, kill_other_instances, send_wol
 from ..core.ws import WS
 
 
+# ── Security guards: restart_service blocklist + reboot cooldown ─────────────
+
+# Usługi security-krytyczne — NIGDY nie pozwalamy ich zatrzymać przez WS.
+# Match po nazwie usługi (case-insensitive). Atakujący nie może przez panel
+# wyłączyć Defendera/Firewalla/Crypto/Audytu Windows itd.
+_BLOCKED_SERVICES = frozenset(s.lower() for s in {
+    "WinDefend",            # Windows Defender Antivirus
+    "WdNisSvc",             # Defender Network Inspection
+    "Sense",                # Defender Advanced Threat Protection
+    "MpsSvc",               # Windows Firewall
+    "BFE",                  # Base Filtering Engine (FW dependency)
+    "CryptSvc",             # Cryptographic Services
+    "Wuauserv",             # Windows Update — recovery wymaga ręcznej decyzji
+    "EventLog",             # System event log
+    "RpcSs", "RpcEptMapper", # RPC — restart kładzie cały system
+    "LanmanServer",         # zatrzymanie wybija RDP/file sharing
+    "NlaSvc", "Dnscache",   # network identification — kładzie sieć
+    "AppXSvc",              # Windows Store app management
+    "BITS",                 # Background Intelligent Transfer (Win Update dep)
+    "EFS",                  # Encrypting File System
+    "TermService",          # Terminal Services (RDP — kładzie zdalny dostęp)
+})
+
+def _is_safe_service_name(svc: str) -> bool:
+    """Czy nazwa usługi jest bezpieczna do restartu przez panel."""
+    if not isinstance(svc, str) or not svc.strip():
+        return False
+    # Walidacja zestawu znaków (Windows service names: alfanumeryczne + _ . -)
+    if not all(c.isalnum() or c in "._- " for c in svc):
+        return False
+    if len(svc) > 80:
+        return False
+    return svc.lower().strip() not in _BLOCKED_SERVICES
+
+
+_REBOOT_STATE_FILE = os.path.join(INSTALL_DIR, "last_reboot.txt")
+_REBOOT_COOLDOWN_SEC = 60 * 60  # 1h między rebootami z panelu
+
+def _check_reboot_cooldown() -> tuple[bool, str]:
+    """Czy minął cooldown od ostatniego reboot-z-panelu. (allow, reason)."""
+    try:
+        if not os.path.exists(_REBOOT_STATE_FILE):
+            return True, ""
+        with open(_REBOOT_STATE_FILE, "r", encoding="utf-8") as f:
+            ts = float(f.read().strip() or "0")
+        elapsed = time.time() - ts
+        if elapsed < _REBOOT_COOLDOWN_SEC:
+            mins_left = int((_REBOOT_COOLDOWN_SEC - elapsed) / 60)
+            return False, f"Reboot z panelu już w cooldownie — pozostało {mins_left} min."
+        return True, ""
+    except Exception:
+        # Fail-open jest bezpieczniejszy niż całkowite zablokowanie reboot przy IO error
+        return True, ""
+
+def _record_reboot_attempt() -> None:
+    """Zapisz timestamp reboot-z-panelu (do cooldownu)."""
+    try:
+        os.makedirs(INSTALL_DIR, exist_ok=True)
+        with open(_REBOOT_STATE_FILE, "w", encoding="utf-8") as f:
+            f.write(str(time.time()))
+    except Exception as e:
+        log.warning("[system_reboot] cannot persist last_reboot timestamp: %s", e)
+
+
+# Forensic audit trail — write critical commands to Windows Event Log so an
+# investigator can reconstruct "kto restartował serwer? kto zainstalował X?"
+# even when the agent log is gone or backend is unreachable.
+def _audit_event(action: str, detail: str) -> None:
+    try:
+        msg = f"InfraDesk: {action} :: {detail}"[:1024]
+        subprocess.run(
+            ["eventcreate", "/T", "INFORMATION", "/ID", "1000",
+             "/L", "APPLICATION", "/SO", "InfraDeskBusiness",
+             "/D", msg],
+            capture_output=True, timeout=10, creationflags=NO_WINDOW,
+        )
+    except Exception:
+        pass
+
+
 # ── BusinessAPI (pywebview JS bridge) ────────────────────────────────────────
 
 class BusinessAPI:
@@ -93,6 +173,11 @@ class BusinessAPI:
         except Exception as e:
             return {"error": str(e)}
 
+    def get_app_version(self):
+        # Lekki endpoint dla About page — bez wywołań WMIC / inventarii.
+        # Wcześniej About wołał get_system_info które ładowało się sekundy.
+        return {"version": APP_VERSION, "appName": APP_NAME}
+
     def get_metrics(self):
         try:
             disk = psutil.disk_usage("C:\\")
@@ -107,6 +192,16 @@ class BusinessAPI:
 
     def capture_screenshot(self, slot):
         try:
+            # Cap per-instance — without it a runaway page can fill TEMP with N×MB images.
+            if len(self._screenshots) >= 10 and slot not in self._screenshots:
+                return {"ok": False, "error": "Limit zrzutów ekranu (10)"}
+            try:
+                slot_int = int(slot)
+                if slot_int < 0 or slot_int > 99:
+                    return {"ok": False, "error": "Niepoprawny slot"}
+                slot = slot_int
+            except (ValueError, TypeError):
+                return {"ok": False, "error": "Slot musi być liczbą"}
             img = ImageGrab.grab()
             path = os.path.join(tempfile.gettempdir(), f"infradesk_screen_{slot}.png")
             img.save(path, "PNG")
@@ -292,9 +387,17 @@ class BusinessAPI:
             return {"ok": False, "error": str(e)}
 
     def copy_to_clipboard(self, text):
+        # SECURITY: tekst MUSI iść przez stdin, nie przez interpolację stringa do
+        # PowerShell -Command. Wcześniejsza wersja (f"Set-Clipboard -Value '{text}'")
+        # pozwalała na PowerShell injection przez apostrof w treści (XSS w iris-embed
+        # → SYSTEM-level RCE).
         try:
-            subprocess.run(["powershell", "-Command", f"Set-Clipboard -Value '{text}'"],
-                           creationflags=NO_WINDOW, timeout=5)
+            subprocess.run(
+                ["powershell", "-NoProfile", "-Command",
+                 "$input | Set-Clipboard"],
+                input=str(text), text=True,
+                creationflags=NO_WINDOW, timeout=5,
+            )
             return {"ok": True}
         except Exception:
             return {"ok": False}
@@ -488,8 +591,25 @@ class BusinessAPI:
             return {"ok": False, "error": str(e)}
 
     def open_url(self, url):
+        # Whitelist — JS bridge pozwala wszystkim webview-renderowanym stronom
+        # wywołać open_url. Bez walidacji `file:///`/`javascript:`/`vbscript:`
+        # albo dowolny zewnętrzny URL może otworzyć się z agent context.
         import webbrowser
-        webbrowser.open(url)
+        if not isinstance(url, str):
+            return {"ok": False, "error": "invalid url"}
+        u = url.strip()
+        allowed_prefixes = (
+            "https://infradesk.pl/",
+            "https://www.infradesk.pl/",
+            "https://silers.pl/",
+            "https://www.silers.pl/",
+            "https://faktura.infradesk.pl/",
+        )
+        if not u.startswith(allowed_prefixes):
+            log.warning("open_url blocked: %s", u[:120])
+            return {"ok": False, "error": "url niedozwolony"}
+        webbrowser.open(u)
+        return {"ok": True}
 
     def get_dysk_files(self):
         try:
@@ -798,7 +918,16 @@ class BackgroundServices:
             self._ws_ack(msg, ok=True, message="Windows Update started")
         elif mtype == "restart_service":
             svc = msg.get("serviceName", "")
-            if svc:
+            # SECURITY: blokujemy restart usług security-krytycznych. Atakujący
+            # z dostępem do panelu (lub spreparowaną wiadomością) NIE może wyłączyć
+            # Defendera/Firewalla/Crypto przez ten endpoint.
+            if not svc or not isinstance(svc, str) or not svc.strip():
+                self._ws_ack(msg, ok=False, message="serviceName required")
+            elif not _is_safe_service_name(svc):
+                self._ws_ack(msg, ok=False,
+                    message=f"Usługa '{svc}' jest na czarnej liście security-krytycznych — restart zablokowany.")
+                log.warning("[restart_service] BLOCKED unsafe service: %s", svc)
+            else:
                 def _rs():
                     try:
                         subprocess.run(["net", "stop", svc], capture_output=True,
@@ -811,20 +940,30 @@ class BackgroundServices:
                         log.error("Service restart error: %s", e)
 
                 threading.Thread(target=_rs, daemon=True).start()
+                _audit_event("restart_service", svc)
                 self._ws_ack(msg, ok=True, message=f"Restarting {svc}")
-            else:
-                self._ws_ack(msg, ok=False, message="serviceName required")
         elif mtype == "system_reboot":
-            delay = msg.get("delay", 60)
-            threading.Thread(target=lambda: subprocess.run(
-                ["shutdown", "/r", "/t", str(delay), "/c",
-                 f"{APP_NAME}: restart serwera"],
-                capture_output=True, creationflags=NO_WINDOW), daemon=True).start()
-            self._ws_ack(msg, ok=True, message=f"Reboot scheduled in {delay}s")
+            try:
+                delay = max(30, min(3600, int(msg.get("delay", 60))))
+            except (TypeError, ValueError):
+                delay = 60
+            allow, reason = _check_reboot_cooldown()
+            if not allow:
+                self._ws_ack(msg, ok=False, message=reason)
+                log.warning("[system_reboot] BLOCKED: %s", reason)
+            else:
+                _record_reboot_attempt()
+                _audit_event("system_reboot", f"delay={delay}s")
+                threading.Thread(target=lambda: subprocess.run(
+                    ["shutdown", "/r", "/t", str(delay), "/c",
+                     f"{APP_NAME}: restart serwera"],
+                    capture_output=True, creationflags=NO_WINDOW), daemon=True).start()
+                self._ws_ack(msg, ok=True, message=f"Reboot scheduled in {delay}s")
         elif mtype == "schedule_task":
             threading.Thread(target=self._schedule_task, args=(msg,), daemon=True).start()
             self._ws_ack(msg, ok=True, message="Task scheduled")
         elif mtype == "install_software":
+            _audit_event("install_software", str(msg.get("package", "?"))[:120])
             threading.Thread(target=self._install_software, args=(msg,), daemon=True).start()
             self._ws_ack(msg, ok=True,
                          message=f"Installing {msg.get('package', '?')}")
@@ -878,18 +1017,122 @@ class BackgroundServices:
                     self._ws_ack(msg, ok=False, message=str(e)[:300])
 
             threading.Thread(target=_test, daemon=True).start()
+        elif mtype == "run_security_audit":
+            def _audit():
+                try:
+                    audit = security_audit()
+                    _save_audit_cache(audit)
+                    do_metrics(self.token, {**metrics(), "serverMetrics": {"securityAudit": audit}})
+                    self._ws_ack(msg, ok=True, data={"score": audit.get("score"), "checksCount": len(audit.get("checks", []))})
+                except Exception as e:
+                    log.error("run_security_audit failed: %s", e)
+                    self._ws_ack(msg, ok=False, message=str(e)[:300])
+
+            threading.Thread(target=_audit, daemon=True).start()
+        elif mtype == "run_security_fix":
+            def _fix():
+                try:
+                    check_id = (msg.get("payload") or {}).get("checkId") or msg.get("checkId")
+                    if not check_id:
+                        self._ws_ack(msg, ok=False, message="brak checkId")
+                        return
+                    res = run_security_fix(check_id)
+                    # Re-audyt — to JEST źródło prawdy. Subprocess rc=0 nie wystarczy
+                    # bo polityki domenowe mogą "udawać OK".
+                    audit = security_audit()
+                    _save_audit_cache(audit)
+                    do_metrics(self.token, {**metrics(), "serverMetrics": {"securityAudit": audit}})
+                    check = next((c for c in audit.get("checks", []) if c.get("id") == check_id), None)
+                    check_status = (check or {}).get("status")
+                    actually_passed = check_status == "pass"
+                    is_gpo = bool(res.get("partial"))
+                    if actually_passed:
+                        warning = res.get("warning")
+                        fix_error = None
+                    elif is_gpo:
+                        warning = res.get("warning") or (
+                            "Ustawiono lokalnie, ale GPO domenowe nadpisuje. "
+                            "Trwała zmiana wymaga edycji zasad na kontrolerze domeny."
+                        )
+                        fix_error = None
+                    else:
+                        warning = None
+                        fix_error = (
+                            f"Komenda wykonana (rc={res.get('rc', '?')}) ale check nadal "
+                            f"'{check_status or 'nieznany'}'. Najczęściej: polityka domenowa, "
+                            f"wymagany restart, lub brak uprawnień. Wynik subprocessa: "
+                            f"{(res.get('output') or '')[:160]}"
+                        )
+                    # ok=True ZAWSZE jeśli komenda się wykonała bez wyjątku — bo
+                    # ws-server traktuje ok=False jako reject promise i zjada `data`.
+                    # To czy fix faktycznie zadziałał idzie w `data.fixOk`.
+                    self._ws_ack(msg, ok=True, data={
+                        "checkId": check_id,
+                        "fixOk": actually_passed,
+                        "fixError": fix_error,
+                        "partial": is_gpo and not actually_passed,
+                        "warning": warning,
+                        "output": res.get("output"),
+                        "newScore": audit.get("score"),
+                        "checkStatus": check_status,
+                    })
+                except Exception as e:
+                    log.error("run_security_fix failed: %s", e)
+                    self._ws_ack(msg, ok=False, message=str(e)[:300])
+
+            threading.Thread(target=_fix, daemon=True).start()
+        elif mtype == "run_network_scan":
+            def _scan():
+                try:
+                    scan = lan_scan_diff()
+                    do_metrics(self.token, {**metrics(), "serverMetrics": {"networkScan": scan}})
+                    self._ws_ack(msg, ok=True, data={"subnet": scan.get("subnet"), "devicesCount": len(scan.get("devices", []))})
+                except Exception as e:
+                    log.error("run_network_scan failed: %s", e)
+                    self._ws_ack(msg, ok=False, message=str(e)[:300])
+
+            threading.Thread(target=_scan, daemon=True).start()
+        elif mtype == "run_full_inventory":
+            def _inv():
+                try:
+                    inv = full_inventory()
+                    do_metrics(self.token, inv)
+                    keys = [k for k in inv.keys() if k not in ("cpuUsage", "ramUsage", "diskFree", "diskTotal")]
+                    self._ws_ack(msg, ok=True, data={"keys": keys, "softwareCount": len(inv.get("installedSoftware") or [])})
+                except Exception as e:
+                    log.error("run_full_inventory failed: %s", e)
+                    self._ws_ack(msg, ok=False, message=str(e)[:300])
+
+            threading.Thread(target=_inv, daemon=True).start()
+        elif mtype == "run_server_metrics":
+            def _srv():
+                try:
+                    srv = server_metrics()
+                    do_metrics(self.token, {**metrics(), "serverMetrics": srv or {}})
+                    self._ws_ack(msg, ok=True, data={"keys": list((srv or {}).keys())})
+                except Exception as e:
+                    log.error("run_server_metrics failed: %s", e)
+                    self._ws_ack(msg, ok=False, message=str(e)[:300])
+
+            threading.Thread(target=_srv, daemon=True).start()
 
     def _run_windows_update(self, schedule_time=None):
         try:
+            if schedule_time and not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", str(schedule_time)):
+                return {"ok": False, "error": "schedule_time format: HH:MM"}
             log.info("Windows Update: starting%s",
                      f" (restart at {schedule_time})" if schedule_time else "")
+            # SECURITY: pin PSWindowsUpdate na konkretną wersję (supply chain protection
+            # — wcześniej -Force ściągał najnowszą z PSGallery bez weryfikacji).
+            # 2.2.1.5 to LTS-stabilna wersja Michała Gajdy (oficjalny autor).
+            # Allowed AuthorizedPublishers wymusza signed module (PSGallery requires).
             ps_cmd = (
                 '$ErrorActionPreference="SilentlyContinue"; '
-                'if (-not (Get-Module -ListAvailable -Name PSWindowsUpdate)) { '
+                'if (-not (Get-Module -ListAvailable -Name PSWindowsUpdate | Where-Object { $_.Version -ge "2.2.0.0" })) { '
                 '  Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Confirm:$false | Out-Null; '
-                '  Install-Module PSWindowsUpdate -Force -Confirm:$false | Out-Null '
+                '  Install-Module PSWindowsUpdate -RequiredVersion 2.2.1.5 -Force -Confirm:$false -AllowClobber | Out-Null '
                 '}; '
-                'Import-Module PSWindowsUpdate; '
+                'Import-Module PSWindowsUpdate -RequiredVersion 2.2.1.5 -ErrorAction Stop; '
                 'Get-WindowsUpdate -Install -AcceptAll -AutoReboot:$false -Confirm:$false 2>&1 | Out-String'
             )
             result = subprocess.run(
@@ -907,33 +1150,43 @@ class BackgroundServices:
 
     def _schedule_task(self, msg: dict):
         try:
-            action = msg.get("action") or "shell"
+            action = (msg.get("action") or "").strip()
             params = msg.get("params") or {}
             st = msg.get("scheduleTime") or ""
             freq = msg.get("frequency") or "once"
             name = msg.get("taskName") or f"InfraDeskBusiness_{action}_{int(time.time())}"
+            # Walidacja taskName — schtasks akceptuje tylko alfanum, _ i -
+            if not re.match(r'^[A-Za-z0-9_\-]{1,80}$', name):
+                log.error("schedule_task: niepoprawna nazwa taska: %r", name[:80])
+                return
 
             if action == "restart_service":
                 svc = params.get("service", "")
-                if not svc:
-                    log.error("schedule_task: brak service")
+                # SECURITY: ta sama blocklist'a co dla restart_service
+                if not _is_safe_service_name(svc):
+                    log.warning("schedule_task: BLOCKED unsafe service: %r", svc)
                     return
                 tr = f'cmd /c net stop "{svc}" && net start "{svc}"'
             elif action == "windows_update":
                 tr = 'powershell -ExecutionPolicy Bypass -Command "Get-WindowsUpdate -Install -AcceptAll -AutoReboot:$false -Confirm:$false"'
             elif action == "defrag":
                 drive = params.get("drive", "C:")
+                if not re.match(r'^[A-Za-z]:$', drive):
+                    log.error("schedule_task defrag: nieprawidłowy drive: %r", drive)
+                    return
                 tr = f'defrag {drive} /O /H'
             elif action == "reboot":
-                delay = int(params.get("delay", 60))
+                try:
+                    delay = max(30, min(3600, int(params.get("delay", 60))))
+                except (TypeError, ValueError):
+                    delay = 60
                 tr = f'shutdown /r /t {delay} /c "{APP_NAME}: zaplanowany restart"'
-            elif action == "shell":
-                tr = params.get("command", "")
-                if not tr:
-                    log.error("schedule_task shell: brak command")
-                    return
             else:
-                log.error("schedule_task: nieznana akcja %s", action)
+                # SECURITY: usunięto akcję 'shell' — pozwalała na RCE przez params.command
+                # bez walidacji. Każdy malicious WS msg z action=shell mógł zainstalować
+                # persistent backdoor (schtasks /rl HIGHEST = SYSTEM). Tylko whitelisted
+                # akcje są dozwolone.
+                log.error("schedule_task: akcja '%s' nie jest dozwolona (whitelist: restart_service, windows_update, defrag, reboot)", action)
                 return
 
             date_arg = []
@@ -963,12 +1216,22 @@ class BackgroundServices:
         try:
             pkg = (msg.get("package") or "").strip()
             mgr = (msg.get("manager") or "auto").lower()
-            source = msg.get("source") or "winget"
+            source = (msg.get("source") or "winget").strip().lower()
             if not pkg:
                 log.error("install_software: brak package")
                 return
-            if re.search(r'[;&|`$<>\n]', pkg):
-                log.error("install_software: odrzucono package z metaznakami powłoki")
+            # SECURITY: walidacja package name — tylko bezpieczne znaki, max 128
+            if not re.match(r'^[A-Za-z0-9._\-+]{1,128}$', pkg):
+                log.error("install_software: pakiet '%s' nie pasuje do safe regex (A-Za-z0-9._-+)", pkg[:128])
+                return
+            # SECURITY: source whitelist — wcześniej akceptowało dowolny string,
+            # winget akceptuje ścieżki lokalne jako --source = atak przez podstawienie manifestu
+            if source not in ("winget", "msstore"):
+                log.error("install_software: source '%s' poza whitelistą (dozwolone: winget, msstore)", source)
+                return
+            # mgr whitelist
+            if mgr not in ("winget", "choco", "auto"):
+                log.error("install_software: manager '%s' poza whitelistą", mgr)
                 return
 
             def _try_winget() -> tuple[bool, str]:
@@ -1120,7 +1383,13 @@ class ServerServiceLoop:
             self._ws_ack(msg, ok=bool(mac), message=None if mac else "missing mac")
         elif mtype == "restart_service":
             svc = msg.get("serviceName", "")
-            if svc:
+            if not svc or not isinstance(svc, str) or not svc.strip():
+                self._ws_ack(msg, ok=False, message="serviceName required")
+            elif not _is_safe_service_name(svc):
+                self._ws_ack(msg, ok=False,
+                    message=f"Usługa '{svc}' jest na czarnej liście security-krytycznych — restart zablokowany.")
+                log.warning("[restart_service-headless] BLOCKED unsafe service: %s", svc)
+            else:
                 def _rs():
                     try:
                         subprocess.run(["net", "stop", svc], capture_output=True,
@@ -1132,16 +1401,25 @@ class ServerServiceLoop:
                         log.error("Service restart (headless): %s", e)
 
                 threading.Thread(target=_rs, daemon=True).start()
+                _audit_event("restart_service", svc)
                 self._ws_ack(msg, ok=True, message=f"Restarting {svc}")
-            else:
-                self._ws_ack(msg, ok=False, message="serviceName required")
         elif mtype == "system_reboot":
-            delay = msg.get("delay", 60)
-            threading.Thread(target=lambda: subprocess.run(
-                ["shutdown", "/r", "/t", str(delay), "/c",
-                 f"{APP_NAME}: restart serwera"],
-                capture_output=True, creationflags=NO_WINDOW), daemon=True).start()
-            self._ws_ack(msg, ok=True, message=f"Reboot scheduled in {delay}s")
+            try:
+                delay = max(30, min(3600, int(msg.get("delay", 60))))
+            except (TypeError, ValueError):
+                delay = 60
+            allow, reason = _check_reboot_cooldown()
+            if not allow:
+                self._ws_ack(msg, ok=False, message=reason)
+                log.warning("[system_reboot-headless] BLOCKED: %s", reason)
+            else:
+                _record_reboot_attempt()
+                _audit_event("system_reboot", f"delay={delay}s")
+                threading.Thread(target=lambda: subprocess.run(
+                    ["shutdown", "/r", "/t", str(delay), "/c",
+                     f"{APP_NAME}: restart serwera"],
+                    capture_output=True, creationflags=NO_WINDOW), daemon=True).start()
+                self._ws_ack(msg, ok=True, message=f"Reboot scheduled in {delay}s")
         elif mtype == "speedtest":
             def _st():
                 try:
@@ -1189,6 +1467,88 @@ class ServerServiceLoop:
                     self._ws_ack(msg, ok=False, message=str(e)[:300])
 
             threading.Thread(target=_test, daemon=True).start()
+        elif mtype == "run_security_audit":
+            def _audit():
+                try:
+                    audit = security_audit()
+                    _save_audit_cache(audit)
+                    do_metrics(self.token, {**metrics(), "serverMetrics": {"securityAudit": audit}})
+                    self._ws_ack(msg, ok=True, data={"score": audit.get("score"),
+                                                     "checksCount": len(audit.get("checks", []))})
+                except Exception as e:
+                    log.error("run_security_audit (headless) failed: %s", e)
+                    self._ws_ack(msg, ok=False, message=str(e)[:300])
+
+            threading.Thread(target=_audit, daemon=True).start()
+        elif mtype == "run_security_fix":
+            def _fix():
+                try:
+                    check_id = (msg.get("payload") or {}).get("checkId") or msg.get("checkId")
+                    if not check_id:
+                        self._ws_ack(msg, ok=False, message="brak checkId")
+                        return
+                    res = run_security_fix(check_id)
+                    audit = security_audit()
+                    _save_audit_cache(audit)
+                    do_metrics(self.token, {**metrics(), "serverMetrics": {"securityAudit": audit}})
+                    check = next((c for c in audit.get("checks", []) if c.get("id") == check_id), None)
+                    actually_passed = (check or {}).get("status") == "pass"
+                    self._ws_ack(msg, ok=True, data={
+                        "checkId": check_id,
+                        "fixOk": actually_passed,
+                        "fixError": None if actually_passed else f"Komenda wykonana (rc={res.get('rc', '?')}) ale check nadal '{(check or {}).get('status', 'nieznany')}'.",
+                        "output": res.get("output"),
+                        "newScore": audit.get("score"),
+                    })
+                except Exception as e:
+                    log.error("run_security_fix (headless) failed: %s", e)
+                    self._ws_ack(msg, ok=False, message=str(e)[:300])
+
+            threading.Thread(target=_fix, daemon=True).start()
+        elif mtype == "run_network_scan":
+            def _scan_lan():
+                try:
+                    scan = lan_scan_diff()
+                    do_metrics(self.token, {**metrics(), "serverMetrics": {"networkScan": scan}})
+                    self._ws_ack(msg, ok=True, data={"subnet": scan.get("subnet"),
+                                                     "devicesCount": len(scan.get("devices", []))})
+                except Exception as e:
+                    log.error("run_network_scan (headless) failed: %s", e)
+                    self._ws_ack(msg, ok=False, message=str(e)[:300])
+
+            threading.Thread(target=_scan_lan, daemon=True).start()
+        elif mtype == "run_full_inventory":
+            def _inv():
+                try:
+                    inv = full_inventory()
+                    do_metrics(self.token, inv)
+                    self._ws_ack(msg, ok=True, data={
+                        "softwareCount": len(inv.get("installedSoftware") or []),
+                    })
+                except Exception as e:
+                    log.error("run_full_inventory (headless) failed: %s", e)
+                    self._ws_ack(msg, ok=False, message=str(e)[:300])
+
+            threading.Thread(target=_inv, daemon=True).start()
+        elif mtype == "run_server_metrics":
+            def _srv():
+                try:
+                    srv = server_metrics()
+                    do_metrics(self.token, {**metrics(), "serverMetrics": srv or {}})
+                    self._ws_ack(msg, ok=True, data={"keys": list((srv or {}).keys())})
+                except Exception as e:
+                    log.error("run_server_metrics (headless) failed: %s", e)
+                    self._ws_ack(msg, ok=False, message=str(e)[:300])
+
+            threading.Thread(target=_srv, daemon=True).start()
+        else:
+            # Komenda nieobsługiwana w trybie service (np. submit_ticket wymaga
+            # webview, schedule_task/install_software/windows_update wymagają
+            # methods z BackgroundServices). Zwracamy ok=False natychmiast zamiast
+            # zostawiać backend w timeoucie.
+            log.warning("ServerServiceLoop: unsupported command type: %r", mtype)
+            self._ws_ack(msg, ok=False,
+                         message=f"Komenda '{mtype}' nie jest obsługiwana w trybie service")
 
     def start(self):
         log.info("ServerServiceLoop starting (token=%s...)", self.token[:8])

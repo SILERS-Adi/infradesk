@@ -72,6 +72,8 @@ export function BackupsPage() {
   const runNow = useMutation({
     mutationFn: async (id: string) => (await api.post(`/backups/${id}/run-now`)).data,
     onSuccess: () => { toast.success('Backup zakolejkowany'); qc.invalidateQueries({ queryKey: ['backups'] }); },
+    onError: (err: { response?: { data?: { message?: string } }; message?: string }) =>
+      toast.error(err?.response?.data?.message ?? err?.message ?? 'Nie udało się uruchomić backupu'),
   });
 
   const configs = data?.configs ?? [];

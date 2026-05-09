@@ -303,17 +303,36 @@ function RevealModal({
     onError: (e: unknown) => toast.error((e as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Błąd'),
   });
 
-  function copy(text: string, what: string) {
-    navigator.clipboard.writeText(text);
-    toast.success(`${what} skopiowane`);
+  async function copy(text: string, what: string) {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        // Fallback for HTTP / iframe contexts where Clipboard API is blocked.
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+      toast.success(`${what} skopiowane`);
+    } catch {
+      toast.error('Nie udało się skopiować — skopiuj ręcznie');
+    }
   }
 
   return (
     <Dialog.Root open={!!credential} onOpenChange={(o) => !o && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40" />
-        <Dialog.Content className="fixed left-1/2 top-[2vh] -translate-x-1/2 z-50 w-[92vw] max-w-[480px] bg-[var(--sf)] border border-[var(--bd)] rounded-[var(--r-m)] shadow-xl">
-          <div className="flex items-center justify-between p-[var(--sp-4)] border-b border-[var(--bd)]">
+        <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 anim-up" />
+        <Dialog.Content
+          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[92vw] max-w-[480px] max-h-[92vh] rounded-[var(--r-xl)] anim-scale overflow-hidden flex flex-col"
+          style={{ background: 'var(--sf)', boxShadow: 'var(--sh4)', border: '1px solid var(--bd)' }}
+        >
+          <div className="flex items-center justify-between p-[var(--sp-4)] border-b border-[var(--bd)] shrink-0">
             <Dialog.Title className="text-[15px] font-semibold flex items-center gap-2">
               <Eye size={15} />
               Odsłoń hasło
@@ -409,9 +428,12 @@ function AuditModal({ credential, onClose }: { credential: Credential | null; on
   return (
     <Dialog.Root open={!!credential} onOpenChange={(o) => !o && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40" />
-        <Dialog.Content className="fixed left-1/2 top-[2vh] -translate-x-1/2 z-50 w-[92vw] max-w-[560px] max-h-[80vh] bg-[var(--sf)] border border-[var(--bd)] rounded-[var(--r-m)] shadow-xl overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between p-[var(--sp-4)] border-b border-[var(--bd)]">
+        <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 anim-up" />
+        <Dialog.Content
+          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[92vw] max-w-[560px] max-h-[92vh] rounded-[var(--r-xl)] anim-scale overflow-hidden flex flex-col"
+          style={{ background: 'var(--sf)', boxShadow: 'var(--sh4)', border: '1px solid var(--bd)' }}
+        >
+          <div className="flex items-center justify-between p-[var(--sp-4)] border-b border-[var(--bd)] shrink-0">
             <Dialog.Title className="text-[15px] font-semibold flex items-center gap-2">
               <History size={15} />
               Historia dostępów — {credential?.name}
@@ -562,8 +584,11 @@ function CredentialFormModal({
   return (
     <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40" />
-        <Dialog.Content className="fixed left-1/2 top-[2vh] -translate-x-1/2 z-50 w-[92vw] max-w-[560px] max-h-[85vh] bg-[var(--sf)] border border-[var(--bd)] rounded-[var(--r-m)] shadow-xl overflow-hidden flex flex-col">
+        <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 anim-up" />
+        <Dialog.Content
+          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[92vw] max-w-[560px] max-h-[92vh] rounded-[var(--r-xl)] anim-scale overflow-hidden flex flex-col"
+          style={{ background: 'var(--sf)', boxShadow: 'var(--sh4)', border: '1px solid var(--bd)' }}
+        >
           <form onSubmit={handleSubmit((v) => saveMut.mutate(v))} className="flex flex-col flex-1 min-h-0">
             <div className="flex items-center justify-between p-[var(--sp-4)] border-b border-[var(--bd)]">
               <Dialog.Title className="text-[15px] font-semibold flex items-center gap-2">
@@ -602,7 +627,15 @@ function CredentialFormModal({
                 <label className="text-[12px] text-[var(--tx2)] block mb-1">
                   Hasło {isEdit ? <span className="text-[var(--tx3)]">(zostaw puste aby nie zmieniać)</span> : '*'}
                 </label>
-                <Input type="password" {...register('password')} placeholder="••••••••" />
+                <Input
+                  type="password"
+                  autoComplete="off"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
+                  data-bwignore="true"
+                  {...register('password')}
+                  placeholder="••••••••"
+                />
               </div>
               <div>
                 <label className="text-[12px] text-[var(--tx2)] block mb-1">URL / host</label>

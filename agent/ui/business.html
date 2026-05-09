@@ -13,7 +13,10 @@
     /* Ticket modal — matches premium theme */
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity .25s}
     .modal-overlay.active{opacity:1;pointer-events:all}
-    .modal-card{background:linear-gradient(180deg,rgba(12,20,42,.97),rgba(8,14,30,.98));border:1px solid rgba(120,160,255,.1);border-radius:18px;width:90%;max-width:480px;max-height:90vh;overflow-y:auto;padding:24px;backdrop-filter:blur(20px);box-shadow:0 24px 60px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.04)}
+    .modal-card{background:linear-gradient(180deg,rgba(12,20,42,.97),rgba(8,14,30,.98));border:1px solid rgba(120,160,255,.1);border-radius:18px;width:90%;max-width:480px;max-height:90vh;display:flex;flex-direction:column;backdrop-filter:blur(20px);box-shadow:0 24px 60px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.04)}
+    .modal-card > #ticketFormView,.modal-card > #ticketSuccessView{display:flex;flex-direction:column;min-height:0;flex:1}
+    .modal-scroll{flex:1;overflow-y:auto;padding:24px 24px 12px;min-height:0}
+    .modal-footer{padding:14px 24px 18px;border-top:1px solid rgba(120,160,255,.08);background:linear-gradient(180deg,rgba(12,20,42,0),rgba(8,14,30,.6) 40%);position:sticky;bottom:0;z-index:1}
     .modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
     .modal-header h2{font-size:15px;font-weight:700;color:var(--t,#EEF2FA)}
     .close-btn{background:none;border:none;color:var(--tm,#576380);font-size:22px;cursor:pointer;padding:4px 8px;border-radius:8px;transition:all .2s}
@@ -47,10 +50,13 @@
     .submit-btn::before{content:'';position:absolute;inset:0;border-radius:11px;background:linear-gradient(180deg,rgba(255,255,255,.08),transparent 50%);pointer-events:none}
     .submit-btn:hover{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 4px 12px rgba(79,140,255,.3),0 12px 32px rgba(79,140,255,.2)}
     .submit-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;filter:none}
-    .success-msg{text-align:center;padding:40px 20px}
-    .success-msg .check{font-size:48px;margin-bottom:12px}
-    .success-msg h3{font-size:15px;margin-bottom:6px;color:var(--t,#EEF2FA)}
-    .success-msg p{font-size:11px;color:var(--tm,#576380)}
+    .success-msg{text-align:center;padding:48px 24px;display:flex;flex-direction:column;align-items:center;gap:8px}
+    .success-msg .check{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#22D3A0 0%,#10B981 100%);display:flex;align-items:center;justify-content:center;margin-bottom:12px;box-shadow:0 8px 24px rgba(16,185,129,.3),inset 0 1px 0 rgba(255,255,255,.2);animation:successPop .4s cubic-bezier(.34,1.56,.64,1)}
+    .success-msg .check svg{width:36px;height:36px;color:#fff;stroke-width:3}
+    .success-msg h3{font-size:16px;font-weight:600;margin:0;color:var(--t,#EEF2FA)}
+    .success-msg p{font-size:12px;color:var(--tm,#9CA3AF);margin:4px 0 0;line-height:1.5;max-width:320px}
+    .success-msg .ticket-num{font-family:monospace;background:rgba(79,140,255,.1);color:#7DA9FF;padding:4px 10px;border-radius:6px;font-size:12px;margin-top:8px;display:inline-block}
+    @keyframes successPop{0%{transform:scale(.3);opacity:0}50%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
     .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;margin-right:6px;vertical-align:middle}
     @keyframes spin{to{transform:rotate(360deg)}}
   </style>
@@ -197,37 +203,42 @@
 <div class="modal-overlay" id="ticketModal">
   <div class="modal-card">
     <div id="ticketFormView">
-      <div class="modal-header">
-        <h2>Zglos problem</h2>
-        <button class="close-btn" onclick="closeTicketForm()">&times;</button>
+      <div class="modal-scroll">
+        <div class="modal-header">
+          <h2>Zgłoś problem</h2>
+          <button class="close-btn" onclick="closeTicketForm()">&times;</button>
+        </div>
+        <div class="cat-pills" id="catPills">
+          <button class="pill active" data-cat="Komputer">Komputer</button>
+          <button class="pill" data-cat="Internet / siec">Internet / sieć</button>
+          <button class="pill" data-cat="Drukarka">Drukarka</button>
+          <button class="pill" data-cat="Program">Program</button>
+          <button class="pill urgent" data-cat="Awaria pilna">Awaria pilna</button>
+          <button class="pill" data-cat="Inne">Inne</button>
+        </div>
+        <input type="text" class="form-input" id="ticketTitle" placeholder="Tytuł zgłoszenia..." maxlength="200">
+        <textarea class="form-input" id="ticketDesc" placeholder="Opisz problem..." rows="4"></textarea>
+        <div class="toggle-row">
+          <span>Pilne</span>
+          <label class="toggle-switch"><input type="checkbox" id="ticketUrgent"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="ss-label">Zrzuty ekranu (opcjonalne)</div>
+        <div class="screenshot-row">
+          <div class="ss-slot" id="ss0" onclick="captureScreenshot(0)"><span class="ss-plus">+</span></div>
+          <div class="ss-slot" id="ss1" onclick="captureScreenshot(1)"><span class="ss-plus">+</span></div>
+          <div class="ss-slot" id="ss2" onclick="captureScreenshot(2)"><span class="ss-plus">+</span></div>
+        </div>
       </div>
-      <div class="cat-pills" id="catPills">
-        <button class="pill active" data-cat="Komputer">Komputer</button>
-        <button class="pill" data-cat="Internet / siec">Internet / siec</button>
-        <button class="pill" data-cat="Drukarka">Drukarka</button>
-        <button class="pill" data-cat="Program">Program</button>
-        <button class="pill urgent" data-cat="Awaria pilna">Awaria pilna</button>
-        <button class="pill" data-cat="Inne">Inne</button>
+      <div class="modal-footer">
+        <button class="submit-btn" id="submitBtn" onclick="submitTicket()">Wyślij zgłoszenie</button>
       </div>
-      <input type="text" class="form-input" id="ticketTitle" placeholder="Tytul zgloszenia..." maxlength="200">
-      <textarea class="form-input" id="ticketDesc" placeholder="Opisz problem..." rows="4"></textarea>
-      <div class="toggle-row">
-        <span>Pilne</span>
-        <label class="toggle-switch"><input type="checkbox" id="ticketUrgent"><span class="toggle-slider"></span></label>
-      </div>
-      <div class="ss-label">Zrzuty ekranu (opcjonalne)</div>
-      <div class="screenshot-row">
-        <div class="ss-slot" id="ss0" onclick="captureScreenshot(0)"><span class="ss-plus">+</span></div>
-        <div class="ss-slot" id="ss1" onclick="captureScreenshot(1)"><span class="ss-plus">+</span></div>
-        <div class="ss-slot" id="ss2" onclick="captureScreenshot(2)"><span class="ss-plus">+</span></div>
-      </div>
-      <button class="submit-btn" id="submitBtn" onclick="submitTicket()">Wyslij zgloszenie</button>
     </div>
     <div id="ticketSuccessView" style="display:none">
       <div class="success-msg">
-        <div class="check">&#x2705;</div>
-        <h3>Zgloszenie wyslane!</h3>
-        <p>Nasz zespol zajmie sie Twoim problemem.</p>
+        <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+        <h3>Zgłoszenie wysłane!</h3>
+        <p>Nasz zespół zajmie się Twoim problemem.</p>
+        <span class="ticket-num" id="successTicketNum"></span>
       </div>
     </div>
   </div>
@@ -311,20 +322,31 @@ async function submitTicket() {
   }
   const btn = document.getElementById('submitBtn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>Wysylanie...';
+  btn.innerHTML = '<span class="spinner"></span>Wysyłanie...';
   const r = await py('submit_ticket', selectedCategory, title, desc, urgent);
   if (r && r.ok) {
+    // Wyświetl success view z numerem zgłoszenia
+    const numEl = document.getElementById('successTicketNum');
+    if (numEl) {
+      const num = r.ticketNumber || (r.ticketId ? '#' + r.ticketId : '');
+      numEl.textContent = num || '';
+      numEl.style.display = num ? 'inline-block' : 'none';
+    }
     document.getElementById('ticketFormView').style.display = 'none';
     document.getElementById('ticketSuccessView').style.display = '';
-    setTimeout(closeTicketForm, 2500);
+    // Po 2s zamknij modal i przejdź do listy zgłoszeń (auto-refresh listy)
+    setTimeout(() => {
+      closeTicketForm();
+      try { window.navigateTo('ticket'); } catch (e) { /* navigate może nie istnieć w niektórych ścieżkach */ }
+    }, 2000);
   } else {
-    btn.textContent = r?.error || 'Blad — sprobuj ponownie';
+    btn.textContent = r?.error || 'Błąd — spróbuj ponownie';
     btn.style.background = '#EF4444';
-    setTimeout(() => { btn.textContent = 'Wyslij zgloszenie'; btn.style.background = ''; btn.disabled = false }, 3000);
+    setTimeout(() => { btn.textContent = 'Wyślij zgłoszenie'; btn.style.background = ''; btn.disabled = false }, 3000);
     return;
   }
   btn.disabled = false;
-  btn.innerHTML = 'Wyslij zgloszenie';
+  btn.innerHTML = 'Wyślij zgłoszenie';
 }
 
 </script>
@@ -909,9 +931,14 @@ function renderTicketPage(root) {
       const sourceBadge = isAuto
         ? '<span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:8px;background:rgba(139,92,246,.1);color:#A78BFA;border:1px solid rgba(139,92,246,.2);margin-right:6px">AUTO</span>'
         : '<span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:8px;background:rgba(96,165,250,.1);color:#60A5FA;border:1px solid rgba(96,165,250,.2);margin-right:6px">Reczne</span>';
-      html += '<div class="card fade-up" style="animation-delay:'+(Math.min(i,10)*0.04)+'s;cursor:pointer;margin-bottom:6px;padding:10px 12px" onclick="window.openTicketDetail(\''+(t.id||'')+'\')"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px"><div style="min-width:0;flex:1"><div style="font-size:12px;font-weight:600;color:var(--t);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(t.title||'Bez tytulu')+'</div><div style="font-size:10px;color:var(--tm);margin-top:2px">'+sourceBadge+'#'+(t.number||t.id||'').toString().slice(-8)+' &middot; '+date+'</div></div><span style="font-size:9px;font-weight:600;padding:3px 10px;border-radius:10px;background:'+col+'18;color:'+col+';border:1px solid '+col+'30;white-space:nowrap">'+lab+'</span></div></div>';
+      const safeId = (t.id||'').toString().replace(/[^A-Za-z0-9_-]/g, '');
+      const num = (t.number||t.id||'').toString().replace(/[^A-Za-z0-9_-]/g, '').slice(-8);
+      html += '<div class="card fade-up" data-tid="'+safeId+'" style="animation-delay:'+(Math.min(i,10)*0.04)+'s;cursor:pointer;margin-bottom:6px;padding:10px 12px"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px"><div style="min-width:0;flex:1"><div style="font-size:12px;font-weight:600;color:var(--t);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_escapeHtml(t.title||'Bez tytulu')+'</div><div style="font-size:10px;color:var(--tm);margin-top:2px">'+sourceBadge+'#'+num+' &middot; '+_escapeHtml(date)+'</div></div><span style="font-size:9px;font-weight:600;padding:3px 10px;border-radius:10px;background:'+col+'18;color:'+col+';border:1px solid '+col+'30;white-space:nowrap">'+_escapeHtml(lab)+'</span></div></div>';
     });
     list.innerHTML = html;
+    list.querySelectorAll('.card[data-tid]').forEach(el => {
+      el.addEventListener('click', () => window.openTicketDetail(el.dataset.tid));
+    });
   };
   document.querySelectorAll('.tk-filter').forEach(b => {
     b.addEventListener('click', () => {
@@ -968,11 +995,20 @@ function renderTicketPage(root) {
     btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Wysylanie...';
     const r = await py('submit_ticket', inlineCat, title, desc, urgent);
     if (r && r.ok) {
-      document.getElementById('inlineResult').innerHTML = '<div class="success-msg" style="padding:16px"><div class="check" style="font-size:32px">&#x2705;</div><h3>Zgloszenie wyslane!</h3><p>Numer: #'+(r.ticketId||'')+'</p></div>';
+      const num = r.ticketNumber || (r.ticketId ? '#' + r.ticketId.slice(0, 8) : '');
+      document.getElementById('inlineResult').innerHTML =
+        '<div class="success-msg">' +
+          '<div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>' +
+          '<h3>Zgłoszenie wysłane!</h3>' +
+          '<p>Nasz zespół zajmie się Twoim problemem.</p>' +
+          (num ? '<span class="ticket-num">' + _escapeHtml(num) + '</span>' : '') +
+        '</div>';
       btn.style.display = 'none';
+      // Auto-przejście do historii po 2s — żeby user widział że ticket jest na liście
+      setTimeout(() => { try { window.navigateTo('history'); } catch(e){} }, 2000);
     } else {
-      btn.textContent = r?.error || 'Blad — sprobuj ponownie'; btn.style.background = '#EF4444';
-      setTimeout(() => { btn.textContent='Wyslij zgloszenie'; btn.style.background=''; btn.disabled=false }, 3000);
+      btn.textContent = r?.error || 'Błąd — spróbuj ponownie'; btn.style.background = '#EF4444';
+      setTimeout(() => { btn.textContent='Wyślij zgłoszenie'; btn.style.background=''; btn.disabled=false }, 3000);
     }
   };
 }
@@ -1596,7 +1632,12 @@ async function renderContactPage(root) {
 async function renderAboutPage(root) {
   root.innerHTML = '<div class="content-header"><div class="content-title"><span class="title-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>O programie</div><div class="content-subtitle">Informacje o Asystent Business</div></div><div id="aboutContent" class="fade-up"></div>';
 
-  const info = await py('get_system_info');
+  // Lekki endpoint — fallback do pełnego get_system_info gdy starszy agent
+  let info = null;
+  try { info = await py('get_app_version'); } catch(e){}
+  if (!info || !info.version) {
+    try { info = await py('get_system_info'); } catch(e){}
+  }
   const ver = (info && info.version) || '1.0.0';
   const el = document.getElementById('aboutContent');
   if (!el) return;

@@ -143,6 +143,21 @@ def scan_databases() -> dict:
     return {"databases": results, "services": services, "hostname": socket.gethostname()}
 
 
+def _is_local_host(host: str) -> bool:
+    """Allow only loopback / link-local / RFC1918 / docker bridge etc.
+    Blocks public/Internet addresses to prevent SSRF and external DB recon."""
+    import ipaddress
+    h = (host or "").strip().lower()
+    if h in ("localhost", "127.0.0.1", "::1", ""):
+        return True
+    try:
+        ip = ipaddress.ip_address(h)
+        return ip.is_loopback or ip.is_private or ip.is_link_local
+    except ValueError:
+        # hostname (not raw IP) — allow only well-known local-only labels
+        return h.endswith(".local") or h.endswith(".lan") or h.endswith(".internal")
+
+
 def test_db_connection(p: dict) -> dict:
     db_type = (p.get("type") or "").upper().replace("SQL_", "")
     host = p.get("host", "127.0.0.1")
@@ -153,13 +168,25 @@ def test_db_connection(p: dict) -> dict:
     auth_mode = p.get("authMode", "sql")
     if auth_mode != "windows" and not user:
         raise ValueError("user is required")
+    # SECURITY: agent działa jako SYSTEM. test_db_connection do dowolnego hosta
+    # = SSRF + (dla MSSQL Windows-auth) NTLM relay na DC. Whitelist tylko local.
+    if not _is_local_host(host):
+        return {"success": False, "error": "host poza zakresem lokalnym (whitelist)"}
+    # Windows-auth (NTLM) tylko na localhost — nigdy zdalnie.
+    if auth_mode == "windows" and host not in ("127.0.0.1", "localhost", "::1"):
+        return {"success": False, "error": "Windows-auth dozwolone tylko dla localhost"}
     if "MYSQL" in db_type:
         cmd = ["mysql", f"--host={host}", f"--port={port or 3306}", f"--user={user}"]
         if pw:
             cmd.append(f"--password={pw}")
         cmd.extend(["-e", "SHOW DATABASES"])
+        env = None
     elif "POSTGRES" in db_type:
-        os.environ["PGPASSWORD"] = pw
+        # Lokalny env dict zamiast mutacji globalnego os.environ — żeby
+        # następne subprocess.Popen w tym procesie nie dziedziczyło PGPASSWORD.
+        env = os.environ.copy()
+        if pw:
+            env["PGPASSWORD"] = pw
         cmd = ["psql", f"-h{host}", f"-p{port or 5432}", f"-U{user}", "-c",
                "SELECT datname FROM pg_database WHERE datistemplate = false", "postgres"]
     elif "MSSQL" in db_type:
@@ -176,10 +203,11 @@ def test_db_connection(p: dict) -> dict:
             if pw:
                 cmd.append(f"-P{pw}")
         cmd.extend(["-Q", "SELECT name FROM sys.databases WHERE name NOT IN ('master','tempdb','model','msdb')"])
+        env = None
     else:
         raise ValueError(f"Unsupported: {db_type}")
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=10, creationflags=NO_WINDOW)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=10, creationflags=NO_WINDOW, env=env)
         if r.returncode != 0:
             return {"success": False, "error": r.stderr.strip()[:200]}
         dbs = [l.strip() for l in r.stdout.strip().split("\n")[1:]

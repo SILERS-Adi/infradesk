@@ -13,7 +13,7 @@ import sys
 
 # ── Branding / versioning ────────────────────────────────────────────────────
 
-__version__ = "5.0.4"
+__version__ = "5.0.17"
 
 APP_NAME     = "InfraDesk Business"
 APP_VERSION  = __version__

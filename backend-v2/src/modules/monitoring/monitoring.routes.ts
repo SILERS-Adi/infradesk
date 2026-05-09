@@ -6,11 +6,51 @@ import { requireWorkspace } from '../../middleware/requireWorkspace';
 import { requireAccess } from '../../middleware/requireAccess';
 import { HttpError } from '../../utils/httpError';
 import { MODULES } from '../../utils/canAccess';
+import { sendAlertEmail } from '../../lib/mailer';
+import { logger } from '../../lib/logger';
+import { prismaBg } from '../../lib/prisma-bg';
 
 const router = Router();
 router.use(requireAuth, requireWorkspace);
 
 const DEDUPE_WINDOW_MINUTES = 60;
+
+/**
+ * Powiadom adminów workspace'a o krytycznym alercie (HIGH / CRITICAL).
+ * Background — nie blokuje response. Używa prismaBg żeby ominąć RLS przy lookup'ie ownera.
+ * Każdy admin dostaje osobnego maila (nie BCC — żeby Reply-To działało indywidualnie).
+ */
+async function notifyAdminsOfAlert(workspaceId: string, ticketId: string | null, ticketNumber: string | null, deviceName: string, severity: 'HIGH' | 'CRITICAL', type: string, message: string): Promise<void> {
+  try {
+    const [ws, admins] = await Promise.all([
+      prismaBg.workspace.findUnique({ where: { id: workspaceId }, select: { name: true } }),
+      prismaBg.membership.findMany({
+        where: { workspaceId, status: 'ACTIVE', role: { in: ['OWNER', 'ADMIN'] } },
+        select: { user: { select: { email: true, firstName: true, isActive: true } } },
+      }),
+    ]);
+    if (!ws) return;
+    const recipients = admins
+      .map((m) => m.user)
+      .filter((u): u is { email: string; firstName: string; isActive: boolean } => !!u && u.isActive && !!u.email);
+    if (recipients.length === 0) return;
+    await Promise.all(recipients.map((u) =>
+      sendAlertEmail({
+        to: u.email,
+        recipientFirstName: u.firstName,
+        workspaceName: ws.name,
+        deviceName,
+        severity,
+        type,
+        message,
+        ticketId,
+        ticketNumber,
+      })
+    ));
+  } catch (err) {
+    logger.warn({ err, workspaceId }, '[monitoring] alert email notification failed');
+  }
+}
 
 const createAlertSchema = z.object({
   deviceId: z.string().uuid(),
@@ -91,52 +131,75 @@ router.post('/alerts', requireAccess(MODULES.MONITORING, 'edit'), async (req: Re
       return;
     }
 
-    const created = await prisma.$transaction(async (tx) => {
-      const alert = await tx.monitoringAlert.create({
-        data: {
-          workspaceId: req.workspaceId!,
-          deviceId: input.deviceId,
-          type: input.type,
-          severity: input.severity,
-          message: input.message,
-          rawData: (input.rawData ?? undefined) as never,
-        },
-      });
-      // Auto-create ticket for HIGH/CRITICAL.
-      if (input.severity === 'HIGH' || input.severity === 'CRITICAL') {
-        const year = new Date().getFullYear();
-        const prefix = `T-${year}-`;
-        const lastTicket = await tx.ticket.findFirst({
-          where: { workspaceId: req.workspaceId!, ticketNumber: { startsWith: prefix } },
-          orderBy: { ticketNumber: 'desc' },
-          select: { ticketNumber: true },
+    // P2002 race: parallel HIGH/CRITICAL alerts in one workspace can read the same
+    // `lastTicket` and collide on (workspaceId, ticketNumber). Retry with attempt offset.
+    const MAX_TRIES = 5;
+    let created: { id: string; ticketId?: string | null; ticketNumber?: string } | null = null;
+    let lastErr: unknown = null;
+    for (let attempt = 0; attempt < MAX_TRIES; attempt++) {
+      try {
+        created = await prisma.$transaction(async (tx) => {
+          const alert = await tx.monitoringAlert.create({
+            data: {
+              workspaceId: req.workspaceId!,
+              deviceId: input.deviceId,
+              type: input.type,
+              severity: input.severity,
+              message: input.message,
+              rawData: (input.rawData ?? undefined) as never,
+            },
+          });
+          if (input.severity === 'HIGH' || input.severity === 'CRITICAL') {
+            const year = new Date().getFullYear();
+            const prefix = `T-${year}-`;
+            const lastTicket = await tx.ticket.findFirst({
+              where: { workspaceId: req.workspaceId!, ticketNumber: { startsWith: prefix } },
+              orderBy: { ticketNumber: 'desc' },
+              select: { ticketNumber: true },
+            });
+            let n = 1;
+            if (lastTicket) {
+              const m = lastTicket.ticketNumber.match(/-(\d+)$/);
+              if (m) n = parseInt(m[1]!, 10) + 1;
+            }
+            n += attempt;
+            const ticket = await tx.ticket.create({
+              data: {
+                workspaceId: req.workspaceId!,
+                ticketNumber: `${prefix}${String(n).padStart(4, '0')}`,
+                title: `[${input.severity}] ${input.type} — ${device.name}`,
+                description: input.message,
+                status: 'OPEN',
+                priority: input.severity === 'CRITICAL' ? 'CRITICAL' : 'HIGH',
+                source: 'AGENT',
+                deviceId: input.deviceId,
+                createdByUserId: req.auth!.sub,
+              },
+            });
+            await tx.monitoringAlert.update({ where: { id: alert.id }, data: { ticketId: ticket.id } });
+            await tx.ticketEvent.create({
+              data: { ticketId: ticket.id, userId: req.auth!.sub, eventType: 'created', toValue: 'OPEN', metadata: { alertId: alert.id } },
+            });
+            return { ...alert, ticketId: ticket.id, ticketNumber: ticket.ticketNumber };
+          }
+          return alert;
         });
-        let n = 1;
-        if (lastTicket) {
-          const m = lastTicket.ticketNumber.match(/-(\d+)$/);
-          if (m) n = parseInt(m[1]!, 10) + 1;
-        }
-        const ticket = await tx.ticket.create({
-          data: {
-            workspaceId: req.workspaceId!,
-            ticketNumber: `${prefix}${String(n).padStart(4, '0')}`,
-            title: `[${input.severity}] ${input.type} — ${device.name}`,
-            description: input.message,
-            status: 'OPEN',
-            priority: input.severity === 'CRITICAL' ? 'CRITICAL' : 'HIGH',
-            source: 'AGENT',
-            deviceId: input.deviceId,
-            createdByUserId: req.auth!.sub,
-          },
-        });
-        await tx.monitoringAlert.update({ where: { id: alert.id }, data: { ticketId: ticket.id } });
-        await tx.ticketEvent.create({
-          data: { ticketId: ticket.id, userId: req.auth!.sub, eventType: 'created', toValue: 'OPEN', metadata: { alertId: alert.id } },
-        });
-        return { ...alert, ticketId: ticket.id };
+        break;
+      } catch (e) {
+        lastErr = e;
+        const code = (e as { code?: string }).code;
+        if (code !== 'P2002') throw e;
+        if (attempt === MAX_TRIES - 1) throw e;
+        await new Promise((r) => setTimeout(r, 30 + Math.floor(Math.random() * 50)));
       }
-      return alert;
-    });
+    }
+    if (!created) throw lastErr ?? new Error('Failed to create monitoring alert');
+    if (input.severity === 'HIGH' || input.severity === 'CRITICAL') {
+      const ticketId = (created.ticketId as string | undefined) ?? null;
+      const ticketNumber = (created.ticketNumber as string | undefined) ?? null;
+      void notifyAdminsOfAlert(req.workspaceId!, ticketId, ticketNumber, device.name, input.severity, input.type, input.message);
+    }
+
     res.status(201).json({ alert: created, deduped: false });
   } catch (err) { next(err); }
 });

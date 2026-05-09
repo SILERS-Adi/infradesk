@@ -76,6 +76,17 @@ export const updateTicketSchema = z.object({
   assignedToUserId: z.string().uuid().optional().nullable(),
   serviceMode: z.enum(['ONSITE', 'REMOTE']).optional().nullable(),
   dueAt: z.string().datetime().optional().nullable(),
+  // F6.1: brakujące pola — zmiana zgłaszającego (np. korekta po imporcie z agenta) + typ + clientWorkspaceId
+  clientWorkspaceId: z.string().uuid().optional().nullable(),
+  requesterEmail: z.string().email().max(200).optional().nullable(),
+  requesterName: z.string().max(200).optional().nullable(),
+  requesterPhone: z.string().max(40).optional().nullable(),
+  type: z.enum(['INCIDENT', 'REQUEST', 'PROBLEM', 'CHANGE']).optional(),
+  // F2.3: WAITING typ + opis czego/kogo czekamy
+  waitingType: z.enum(['CLIENT', 'SUPPLIER', 'INTERNAL']).optional().nullable(),
+  waitingFor: z.string().max(500).optional().nullable(),
+  // F8.2: duplicate-link
+  parentTicketId: z.string().uuid().optional().nullable(),
 });
 export type UpdateTicketInput = z.infer<typeof updateTicketSchema>;
 
@@ -101,9 +112,13 @@ export const listQuerySchema = z.object({
   to: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
   limit: z.coerce.number().int().min(1).max(500).default(100),
   cursor: z.string().uuid().optional(),
+  // F3.3: sortowanie
+  sort: z.enum(['createdAt', 'updatedAt', 'priority', 'dueAt', 'status']).optional().default('createdAt'),
+  order: z.enum(['asc', 'desc']).optional().default('desc'),
 });
 
 export const rateTicketSchema = z.object({
-  rating: z.number().int().min(1).max(3),
+  // Unified 1-5 (NPS-style). Wcześniej max(3) niespójne z iris (1-5) i grid /5.
+  rating: z.number().int().min(1).max(5),
   comment: z.string().max(1000).optional(),
 });

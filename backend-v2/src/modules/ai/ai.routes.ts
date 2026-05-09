@@ -7,6 +7,7 @@ import { requireAccess } from '../../middleware/requireAccess';
 import { MODULES } from '../../utils/canAccess';
 import { complete } from '../../lib/llm';
 import { HttpError } from '../../utils/httpError';
+import { enforceAiCallLimit } from '../../utils/planLimits';
 
 const router = Router();
 router.use(requireAuth, requireWorkspace);
@@ -27,6 +28,8 @@ const chatSchema = z.object({
 router.post('/chat', requireAccess(MODULES.AI_COPILOT, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const input = chatSchema.parse(req.body);
+    // Cost guard: enforce per-plan miesięczny limit Iris AI calls
+    await enforceAiCallLimit(req.workspaceId!);
     const result = await complete({
       workspaceId: req.workspaceId!,
       userId: req.auth!.sub,

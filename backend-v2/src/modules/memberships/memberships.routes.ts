@@ -6,6 +6,7 @@ import { requireWorkspace } from '../../middleware/requireWorkspace';
 import { requireAccess } from '../../middleware/requireAccess';
 import { HttpError } from '../../utils/httpError';
 import { MODULES } from '../../utils/canAccess';
+import { enforceCountLimit, countActiveMembers } from '../../utils/planLimits';
 
 const router = Router();
 
@@ -65,15 +66,30 @@ router.post(
     try {
       const input = inviteSchema.parse(req.body);
       const targetWs = await resolveTargetWs(req, input.workspaceId);
-      let user = await prisma.user.findUnique({ where: { email: input.email }, select: { id: true } });
+      const { randomToken, hashToken } = await import('../../lib/crypto');
+      const { sendClientInviteEmail } = await import('../../lib/mailer');
+
+      let user = await prisma.user.findUnique({ where: { email: input.email }, select: { id: true, isActive: true } });
+      let inviteToken: string | null = null;
+      const wantsInvite = !user || !user.isActive;
       if (!user) {
+        inviteToken = randomToken(24);
         user = await prisma.user.create({
           data: {
             email: input.email, firstName: input.firstName, lastName: input.lastName,
             passwordHash: 'PENDING_INVITE',
             isActive: false,
+            emailVerifyToken: hashToken(inviteToken),
+            emailVerifySentAt: new Date(),
           },
-          select: { id: true },
+          select: { id: true, isActive: true },
+        });
+      } else if (!user.isActive) {
+        // user istnieje ale nie aktywny — przegeneruj token (poprzedni mógł wygasnąć)
+        inviteToken = randomToken(24);
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { emailVerifyToken: hashToken(inviteToken), emailVerifySentAt: new Date() },
         });
       }
       const existing = await prisma.membership.findFirst({
@@ -81,13 +97,24 @@ router.post(
         select: { id: true },
       });
       if (existing) throw HttpError.conflict('Użytkownik jest już członkiem', 'already_member');
+
+      const used = await countActiveMembers(targetWs);
+      await enforceCountLimit(targetWs, 'users', used);
+
       const m = await prisma.membership.create({
         data: {
           userId: user.id, workspaceId: targetWs,
           role: input.role, scope: input.scope, status: 'INVITED',
         },
       });
-      res.status(201).json({ membership: m });
+
+      if (wantsInvite && inviteToken) {
+        const ws = await prisma.workspace.findUnique({ where: { id: targetWs }, select: { name: true } });
+        const inviter = await prisma.user.findUnique({ where: { id: req.auth!.sub }, select: { firstName: true, lastName: true } });
+        const inviterName = inviter ? `${inviter.firstName} ${inviter.lastName}`.trim() : null;
+        void sendClientInviteEmail(input.email, inviteToken, ws?.name ?? '', inviterName).catch(() => {});
+      }
+      res.status(201).json({ membership: m, invited: wantsInvite });
     } catch (err) { next(err); }
   },
 );

@@ -6,6 +6,7 @@ import { requireWorkspace } from '../../middleware/requireWorkspace';
 import { requireAccess } from '../../middleware/requireAccess';
 import { HttpError } from '../../utils/httpError';
 import { MODULES } from '../../utils/canAccess';
+import { resolveAccessibleWorkspaceIds } from '../tickets/tickets.service';
 
 const router = Router();
 router.use(requireAuth, requireWorkspace);
@@ -47,6 +48,46 @@ async function nextTaskNumber(workspaceId: string): Promise<string> {
     }
     return `${prefix}${String(n).padStart(4, '0')}`;
   });
+}
+
+// Validate FK fields against caller's workspace + accessible client workspaces.
+// Prevents cross-workspace FK injection (e.g. assignedToUserId pointing at user in another tenant).
+type FKInput = {
+  assignedToUserId?: string | null;
+  clientWorkspaceId?: string | null;
+  locationId?: string | null;
+  deviceId?: string | null;
+};
+async function validateTaskFKs(workspaceId: string, input: FKInput): Promise<void> {
+  const scopeWs = input.clientWorkspaceId ? [workspaceId, input.clientWorkspaceId] : [workspaceId];
+  const checks: Array<Promise<{ ok: boolean; code: string; msg: string }>> = [];
+  if (input.assignedToUserId) {
+    checks.push(prisma.membership.findFirst({
+      where: { userId: input.assignedToUserId, workspaceId, status: 'ACTIVE' },
+      select: { id: true },
+    }).then((m) => ({ ok: !!m, code: 'invalid_assignee', msg: 'assignedToUserId nie należy do tego workspace' })));
+  }
+  if (input.clientWorkspaceId) {
+    checks.push(prisma.workspaceRelation.findFirst({
+      where: { providerWorkspaceId: workspaceId, clientWorkspaceId: input.clientWorkspaceId, status: 'ACTIVE' },
+      select: { id: true },
+    }).then((r) => ({ ok: !!r, code: 'invalid_client_ws', msg: 'clientWorkspaceId nie jest klientem tego workspace' })));
+  }
+  if (input.locationId) {
+    checks.push(prisma.location.findFirst({
+      where: { id: input.locationId, workspaceId: { in: scopeWs } },
+      select: { id: true },
+    }).then((l) => ({ ok: !!l, code: 'invalid_location', msg: 'locationId nie należy do dostępnego workspace' })));
+  }
+  if (input.deviceId) {
+    checks.push(prisma.device.findFirst({
+      where: { id: input.deviceId, workspaceId: { in: scopeWs } },
+      select: { id: true },
+    }).then((d) => ({ ok: !!d, code: 'invalid_device', msg: 'deviceId nie należy do dostępnego workspace' })));
+  }
+  const results = await Promise.all(checks);
+  const fail = results.find((r) => !r.ok);
+  if (fail) throw HttpError.badRequest(fail.msg, fail.code);
 }
 
 // GET /tasks — list with filters
@@ -104,13 +145,16 @@ router.get('/', requireAccess(MODULES.TICKETS, 'view'), async (req: Request, res
 router.post('/', requireAccess(MODULES.TICKETS, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const input = createSchema.parse(req.body);
+    // MSP may link a task to a client-workspace ticket via WorkspaceRelation.
+    const visibleWs = await resolveAccessibleWorkspaceIds(req.workspaceId!);
     if (input.linkedTicketId) {
       const t = await prisma.ticket.findFirst({
-        where: { id: input.linkedTicketId, workspaceId: req.workspaceId!, deletedAt: null },
-        select: { id: true },
+        where: { id: input.linkedTicketId, workspaceId: { in: visibleWs }, deletedAt: null },
+        select: { id: true, workspaceId: true },
       });
-      if (!t) throw HttpError.badRequest('Ticket nie należy do workspace', 'invalid_ticket');
+      if (!t) throw HttpError.badRequest('Ticket nie należy do dostępnych workspace', 'invalid_ticket');
     }
+    await validateTaskFKs(req.workspaceId!, input);
     const taskNumber = await nextTaskNumber(req.workspaceId!);
     const task = await prisma.task.create({
       data: {
@@ -138,8 +182,9 @@ router.post('/', requireAccess(MODULES.TICKETS, 'edit'), async (req: Request, re
 // GET /tasks/:id
 router.get('/:id', requireAccess(MODULES.TICKETS, 'view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const visibleWs = await resolveAccessibleWorkspaceIds(req.workspaceId!);
     const t = await prisma.task.findFirst({
-      where: { id: String(req.params.id), workspaceId: req.workspaceId! },
+      where: { id: String(req.params.id), workspaceId: { in: visibleWs } },
       include: {
         assignedTo: { select: { id: true, firstName: true, lastName: true, email: true } },
         createdBy: { select: { id: true, firstName: true, lastName: true } },
@@ -151,15 +196,17 @@ router.get('/:id', requireAccess(MODULES.TICKETS, 'view'), async (req: Request, 
   } catch (err) { next(err); }
 });
 
-// PATCH /tasks/:id
+
 router.patch('/:id', requireAccess(MODULES.TICKETS, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const input = updateSchema.parse(req.body);
+    const visibleWs = await resolveAccessibleWorkspaceIds(req.workspaceId!);
     const existing = await prisma.task.findFirst({
-      where: { id: String(req.params.id), workspaceId: req.workspaceId! },
+      where: { id: String(req.params.id), workspaceId: { in: visibleWs } },
       select: { id: true },
     });
     if (!existing) throw HttpError.notFound();
+    await validateTaskFKs(req.workspaceId!, input);
     const data: Record<string, unknown> = { ...input };
     if (input.dueAt !== undefined) data.dueAt = input.dueAt ? new Date(input.dueAt) : null;
     if (input.scheduledAt !== undefined) data.scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : null;
@@ -172,8 +219,9 @@ router.patch('/:id', requireAccess(MODULES.TICKETS, 'edit'), async (req: Request
 router.post('/:id/status', requireAccess(MODULES.TICKETS, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const input = statusSchema.parse(req.body);
+    const visibleWs = await resolveAccessibleWorkspaceIds(req.workspaceId!);
     const existing = await prisma.task.findFirst({
-      where: { id: String(req.params.id), workspaceId: req.workspaceId! },
+      where: { id: String(req.params.id), workspaceId: { in: visibleWs } },
       select: { id: true },
     });
     if (!existing) throw HttpError.notFound();
@@ -187,8 +235,9 @@ router.post('/:id/status', requireAccess(MODULES.TICKETS, 'edit'), async (req: R
 // DELETE /tasks/:id
 router.delete('/:id', requireAccess(MODULES.TICKETS, 'delete'), async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const visibleWs = await resolveAccessibleWorkspaceIds(req.workspaceId!);
     const existing = await prisma.task.findFirst({
-      where: { id: String(req.params.id), workspaceId: req.workspaceId! },
+      where: { id: String(req.params.id), workspaceId: { in: visibleWs } },
       select: { id: true },
     });
     if (!existing) throw HttpError.notFound();

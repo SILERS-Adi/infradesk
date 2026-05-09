@@ -197,8 +197,19 @@ router.post('/start', requireAccess(MODULES.SESSIONS, 'edit'), async (req: Reque
         },
       });
       if (input.ticketIds?.length) {
+        // Pre-validate that all ticket IDs belong to this workspace BEFORE inserting
+        // links — otherwise rows referencing foreign-workspace tickets persist
+        // (RLS hides them from reads but the link rows remain).
+        const valid = await tx.ticket.findMany({
+          where: { id: { in: input.ticketIds }, workspaceId: req.workspaceId! },
+          select: { id: true },
+        });
+        const validIds = valid.map((t) => t.id);
+        if (validIds.length !== input.ticketIds.length) {
+          throw HttpError.badRequest('Niektóre tickety nie należą do tego workspace', 'invalid_tickets');
+        }
         await tx.ticketSessionLink.createMany({
-          data: input.ticketIds.map((ticketId) => ({ ticketId, workSessionId: s.id })),
+          data: validIds.map((ticketId) => ({ ticketId, workSessionId: s.id })),
         });
         // Auto-transition linked tickets toward IN_PROGRESS.
         // Chain OPEN → ASSIGNED → IN_PROGRESS if needed (state machine does not allow OPEN → IN_PROGRESS directly).

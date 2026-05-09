@@ -2,8 +2,14 @@
 /**
  * Re-sync WorkSessions from RustDesk audit logs.
  * Idempotent via `notes: rustdesk:<guid>` marker.
+ *
+ * Zapisuje stan ostatniego runu do /tmp/rustdesk-state.json — używane przez
+ * scheduler watchdog (src/jobs/rustdesk-health.ts) do wykrywania awarii.
  */
+import fs from 'node:fs';
 import { PrismaClient } from '@prisma/client';
+
+const STATE_FILE = process.env.RUSTDESK_STATE_FILE || '/tmp/rustdesk-state.json';
 
 const prisma = new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL_BG ?? process.env.DATABASE_URL } } });
 
@@ -73,10 +79,34 @@ async function main(): Promise<void> {
 
   const devices = await prisma.device.findMany({
     where: { rustdeskId: { not: null }, deletedAt: null },
-    select: { id: true, rustdeskId: true, workspaceId: true, locationId: true },
+    select: {
+      id: true, rustdeskId: true, workspaceId: true, locationId: true,
+      workspace: { select: { id: true, type: true } },
+    },
   });
   const deviceByRustId = new Map(devices.map((d) => [d.rustdeskId!, d]));
   console.log(`  V2 devices with rustdeskId: ${devices.length}`);
+
+  // Map clientWorkspaceId → providerWorkspaceId (MSP) dla relacji ACTIVE.
+  // Pozwala wyliczyć poprawny workspaceId+clientWorkspaceId per sesja:
+  // - urządzenie w workspace CLIENT → sesja w workspace MSP (provider) z clientWorkspaceId=client
+  // - urządzenie w MSP/INTERNAL_IT → sesja w tym samym workspace, clientWorkspaceId=null
+  const relations = await prisma.workspaceRelation.findMany({
+    where: { status: 'ACTIVE' },
+    select: { clientWorkspaceId: true, providerWorkspaceId: true },
+  });
+  const providerByClient = new Map(relations.map((r) => [r.clientWorkspaceId, r.providerWorkspaceId]));
+
+  function resolveSessionContext(deviceWorkspace: { id: string; type: string }): { workspaceId: string; clientWorkspaceId: string | null } {
+    if (deviceWorkspace.type === 'CLIENT') {
+      const provider = providerByClient.get(deviceWorkspace.id);
+      if (provider) return { workspaceId: provider, clientWorkspaceId: deviceWorkspace.id };
+      // CLIENT bez aktywnego MSP — sesja w jego workspace, brak billing context
+      return { workspaceId: deviceWorkspace.id, clientWorkspaceId: null };
+    }
+    // MSP / INTERNAL_IT — sesja w tym workspace, brak client context
+    return { workspaceId: deviceWorkspace.id, clientWorkspaceId: null };
+  }
 
   // Only users who are members of an MSP/INTERNAL_IT workspace can be technicians.
   // CLIENT workspace users (e.g. Izabela @ PKS) must NEVER be assigned as technician
@@ -128,11 +158,12 @@ async function main(): Promise<void> {
   const syncedGuids = new Set(existing.map((s) => (s.notes ?? '').replace('rustdesk:', '')));
 
   let created = 0, skippedSynced = 0, skippedNoDevice = 0;
+  const unmatchedIds = new Set<string>();
   for (const conn of completed) {
     if (syncedGuids.has(conn.guid)) { skippedSynced++; continue; }
     const remote = parseRemote(conn.remote);
     const device = deviceByRustId.get(remote.id);
-    if (!device) { skippedNoDevice++; continue; }
+    if (!device) { skippedNoDevice++; unmatchedIds.add(remote.id); continue; }
 
     const local = (conn.local_user ?? '').toLowerCase();
     const technicianId = techByKey.get(local) ?? fallbackTech.id;
@@ -142,9 +173,11 @@ async function main(): Promise<void> {
     const rawMin = Math.max(1, Math.floor((conn.end_time! - conn.created_at) / 60));
     const billableMin = roundUpTo15(rawMin);
 
+    const ctx = resolveSessionContext(device.workspace);
     const session = await prisma.workSession.create({
       data: {
-        workspaceId: device.workspaceId,
+        workspaceId: ctx.workspaceId,
+        clientWorkspaceId: ctx.clientWorkspaceId,
         technicianId,
         deviceId: device.id,
         locationId: device.locationId,
@@ -156,6 +189,8 @@ async function main(): Promise<void> {
         billableMinutes: billableMin,
         billable: true,
         notes: `rustdesk:${conn.guid}`,
+        externalSourceType: 'rustdesk',
+        externalSessionId: conn.guid,
       },
     });
     await prisma.sessionTimeEntry.create({
@@ -168,8 +203,37 @@ async function main(): Promise<void> {
   console.log(`  utworzonych:       ${created}`);
   console.log(`  pominiętych (dupl): ${skippedSynced}`);
   console.log(`  pominiętych (no device match): ${skippedNoDevice}`);
+  if (unmatchedIds.size > 0) {
+    const sample = Array.from(unmatchedIds).slice(0, 5).join(', ');
+    console.log(`  unique unmatched RustDesk IDs: ${unmatchedIds.size} (sample: ${sample}${unmatchedIds.size > 5 ? '…' : ''})`);
+  }
+
+  // Zapis stanu dla watchdog'a
+  try {
+    fs.writeFileSync(STATE_FILE, JSON.stringify({
+      lastSyncAt: new Date().toISOString(),
+      created,
+      skippedSynced,
+      skippedNoDevice,
+      unmatchedCount: unmatchedIds.size,
+      unmatchedSample: Array.from(unmatchedIds).slice(0, 20),
+    }, null, 2));
+  } catch (err) {
+    console.warn('  state write failed:', (err as Error).message);
+  }
 
   await prisma.$disconnect();
 }
 
-main().catch((err) => { console.error(err); process.exit(1); });
+main().catch((err) => {
+  console.error(err);
+  // Zapisz error state — watchdog go odczyta i zaalertuje
+  try {
+    fs.writeFileSync(STATE_FILE, JSON.stringify({
+      lastSyncAt: null,
+      lastError: (err as Error).message,
+      lastErrorAt: new Date().toISOString(),
+    }, null, 2));
+  } catch { /* ignore */ }
+  process.exit(1);
+});

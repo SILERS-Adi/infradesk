@@ -91,7 +91,15 @@ export async function register(input: RegisterInput): Promise<AuthResult> {
           name: input.workspaceName,
           slug,
           type: 'MSP',
-          plan: 'STARTER',
+          // Nowy workspace startuje na 30-dniowym trialu PRO; po wygaśnięciu auto-downgrade do START.
+          plan: 'PRO',
+          trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          // Dane firmy z MF/CEIDG (opcjonalnie pobrane podczas rejestracji)
+          taxId: input.taxId ?? null,
+          regon: input.regon ?? null,
+          addressLine1: input.addressLine1 ?? null,
+          postalCode: input.postalCode ?? null,
+          city: input.city ?? null,
         },
       });
       workspaceId = ws.id;
@@ -460,4 +468,63 @@ export async function verifyEmail(token: string): Promise<void> {
     where: { id: user.id },
     data: { emailVerified: true, emailVerifyToken: null, emailVerifySentAt: null },
   });
+}
+
+// Accept-invite: invitee clicks link from email, sets password, gets logged in.
+// Reuses User.emailVerifyToken (set by /memberships/invite). Activates ALL pending
+// INVITED memberships of this user — typically one, but could be many in MSP setups.
+export async function acceptInvite(token: string, password: string): Promise<AuthResult> {
+  const hashed = hashToken(token);
+  const user = await prisma.user.findFirst({
+    where: { emailVerifyToken: hashed },
+    select: {
+      id: true, email: true, firstName: true, lastName: true,
+      isActive: true, emailVerifySentAt: true, twoFactorEnabled: true, isSuperAdmin: true,
+      tokenVersion: true,
+    },
+  });
+  if (!user) throw HttpError.badRequest('Invalid invite token', 'invite_invalid');
+  const expired = user.emailVerifySentAt && (Date.now() - user.emailVerifySentAt.getTime()) > 7 * 24 * 60 * 60 * 1000;
+  if (expired) throw HttpError.badRequest('Invite token expired', 'invite_expired');
+  validatePasswordStrength(password);
+
+  const passwordHash = await hashPassword(password);
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        isActive: true,
+        emailVerified: true,
+        emailVerifyToken: null,
+        emailVerifySentAt: null,
+        tokenVersion: { increment: 1 },
+      },
+    }),
+    prisma.membership.updateMany({
+      where: { userId: user.id, status: 'INVITED' },
+      data: { status: 'ACTIVE' },
+    }),
+  ]);
+  const fresh = await prisma.user.findUniqueOrThrow({
+    where: { id: user.id },
+    select: { id: true, email: true, firstName: true, lastName: true, twoFactorEnabled: true, isSuperAdmin: true, tokenVersion: true, emailVerified: true },
+  });
+  const defaultWs = await prisma.membership.findFirst({
+    where: { userId: user.id, status: 'ACTIVE' },
+    orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+    select: { id: true, workspaceId: true },
+  });
+  if (defaultWs) {
+    await prisma.membership.update({ where: { id: defaultWs.id }, data: { isDefault: true } });
+  }
+  const tokens = await issueTokens(fresh, defaultWs?.workspaceId, defaultWs?.id);
+  return {
+    user: {
+      id: fresh.id, email: fresh.email, firstName: fresh.firstName, lastName: fresh.lastName,
+      twoFactorEnabled: fresh.twoFactorEnabled, emailVerified: fresh.emailVerified,
+    },
+    tokens,
+    defaultWorkspaceId: defaultWs?.workspaceId,
+  };
 }

@@ -7,7 +7,7 @@
 //   WAITING → IN_PROGRESS | RESOLVED | CANCELLED
 //   RESOLVED → CLOSED | OPEN (reopen)
 //   CLOSED → OPEN (reopen)
-//   CANCELLED → (terminal)
+//   CANCELLED → OPEN (klient się rozmyślił)
 
 export type TicketStatus =
   | 'NEW'
@@ -27,7 +27,7 @@ const TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
   WAITING: ['IN_PROGRESS', 'RESOLVED', 'CANCELLED'],
   RESOLVED: ['CLOSED', 'OPEN'],
   CLOSED: ['OPEN'],
-  CANCELLED: [],
+  CANCELLED: ['OPEN'], // F2.5: re-open gdy klient się rozmyślił
 };
 
 export function canTransition(from: TicketStatus, to: TicketStatus): boolean {
@@ -44,6 +44,8 @@ export function allowedNextStates(from: TicketStatus): TicketStatus[] {
   return [...(TRANSITIONS[from] ?? [])];
 }
 
+// CLOSED nadal terminalny semantycznie (statystyki) ale można re-open.
+// CANCELLED też (klient anulował) ale można re-open.
 export const TERMINAL_STATES: TicketStatus[] = ['CLOSED', 'CANCELLED'];
 export function isTerminal(status: TicketStatus): boolean {
   return TERMINAL_STATES.includes(status);

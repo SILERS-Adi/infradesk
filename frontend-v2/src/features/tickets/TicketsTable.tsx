@@ -13,15 +13,33 @@ interface Props {
   members?: QuickActionMember[];
   onAssign?: (ticketId: string, userId: string | null) => void;
   onServiceMode?: (ticketId: string, mode: 'REMOTE' | 'ONSITE') => void;
+  // F3.4: bulk selection
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string) => void;
+  onSelectAll?: () => void;
+  onClearSelect?: () => void;
 }
 
-export function TicketsTable({ items, columns, members, onAssign, onServiceMode }: Props) {
+export function TicketsTable({ items, columns, members, onAssign, onServiceMode, selectedIds, onToggleSelect, onSelectAll, onClearSelect }: Props) {
+  const hasBulk = !!(selectedIds && onToggleSelect);
+  const allSelected = hasBulk && items.length > 0 && items.every((t) => selectedIds!.has(t.id));
   return (
     <Card className="overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-sf2/50 border-b border-bd">
             <tr className="text-left text-xs uppercase tracking-wide text-tx3">
+              {hasBulk && (
+                <th className="px-3 py-2.5 w-8">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={() => allSelected ? onClearSelect?.() : onSelectAll?.()}
+                    className="accent-[color:var(--pri)] cursor-pointer"
+                    title={allSelected ? 'Odznacz wszystkie' : 'Zaznacz wszystkie'}
+                  />
+                </th>
+              )}
               {columns.map((c) => (
                 <th
                   key={c.id}
@@ -35,7 +53,17 @@ export function TicketsTable({ items, columns, members, onAssign, onServiceMode 
           </thead>
           <tbody className="divide-y divide-bd">
             {items.map((t) => (
-              <tr key={t.id} className="hover:bg-sf2/40 transition-colors">
+              <tr key={t.id} className={`hover:bg-sf2/40 transition-colors ${hasBulk && selectedIds!.has(t.id) ? 'bg-pri/5' : ''}`}>
+                {hasBulk && (
+                  <td className="px-3 py-3 align-middle w-8" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds!.has(t.id)}
+                      onChange={() => onToggleSelect!(t.id)}
+                      className="accent-[color:var(--pri)] cursor-pointer"
+                    />
+                  </td>
+                )}
                 {columns.map((c) => (
                   <td key={c.id} className="px-4 py-3 align-middle">
                     {c.id === 'quickActions' && members && onAssign && onServiceMode

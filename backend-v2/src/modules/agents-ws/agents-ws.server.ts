@@ -80,14 +80,19 @@ async function lookupAgentByToken(token: string): Promise<{
   return reg;
 }
 
-function extractToken(req: IncomingMessage): string | null {
+function extractToken(req: IncomingMessage): { token: string; source: 'header' | 'query' } | null {
+  // Prefer Authorization header — query string ends up in nginx access logs and
+  // agent token leak there = persistent agent impersonation. v5 always uses header;
+  // v4 may still use ?token=. Log query usage so we can phase it out.
+  const auth = req.headers['authorization'];
+  if (typeof auth === 'string' && auth.startsWith('Bearer ')) {
+    return { token: auth.slice(7).trim(), source: 'header' };
+  }
   try {
     const url = new URL(req.url ?? '', 'http://localhost');
     const q = url.searchParams.get('token');
-    if (q) return q.trim();
+    if (q) return { token: q.trim(), source: 'query' };
   } catch { /* ignore */ }
-  const auth = req.headers['authorization'];
-  if (typeof auth === 'string' && auth.startsWith('Bearer ')) return auth.slice(7).trim();
   return null;
 }
 
@@ -318,11 +323,16 @@ export function initAgentWsServer(server: HttpServer): void {
       return;
     }
 
-    const token = extractToken(req);
-    if (!token) {
+    const extracted = extractToken(req);
+    if (!extracted) {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
       socket.destroy();
       return;
+    }
+    const { token, source } = extracted;
+    if (source === 'query') {
+      // Query-token logged so we can track v4 stragglers and phase out URL auth.
+      logger.warn({ ip: req.socket.remoteAddress, ua: req.headers['user-agent'] }, 'agent-ws DEPRECATED query-token auth — agent should upgrade to Authorization header');
     }
 
     let reg;

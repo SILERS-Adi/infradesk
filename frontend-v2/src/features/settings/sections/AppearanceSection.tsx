@@ -137,7 +137,7 @@ export function AppearanceSection() {
           >
             <option value="pl-PL">Polski</option>
             <option value="en-US" disabled>
-              English (TODO)
+              English (wkrótce)
             </option>
           </Select>
         </Field>

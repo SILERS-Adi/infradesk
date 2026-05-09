@@ -48,8 +48,29 @@ function publicShape(b: { sqlPasswordEnc: string | null; ftpPasswordEnc: string 
 // GET /backups
 router.get('/', requireAccess(MODULES.BACKUPS, 'view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const agentRegistrationId = typeof req.query.agentRegistrationId === 'string' ? req.query.agentRegistrationId : undefined;
+    const deviceId = typeof req.query.deviceId === 'string' ? req.query.deviceId : undefined;
+
+    // Cross-workspace read for MSP providers — config może leżeć w client workspace
+    // ALBO w provider workspace (jeśli agent zarejestrował się tam). Aby panel
+    // providera widział wszystkie kopie urządzeń klienta, dolinkuję tu workspace
+    // klientów + provider sam.
+    const relations = await prisma.workspaceRelation.findMany({
+      where: { providerWorkspaceId: req.workspaceId!, status: 'ACTIVE' },
+      select: { clientWorkspaceId: true },
+    });
+    const visibleWsIds = [req.workspaceId!, ...relations.map((r) => r.clientWorkspaceId)];
+
+    const where: Record<string, unknown> = { workspaceId: { in: visibleWsIds } };
+    // OR — config może mieć tylko deviceId, tylko agentRegistrationId, lub oba.
+    // AND wykluczy te z NULL po jednej stronie.
+    const orConditions: Record<string, unknown>[] = [];
+    if (deviceId) orConditions.push({ deviceId });
+    if (agentRegistrationId) orConditions.push({ agentRegistrationId });
+    if (orConditions.length > 0) where.OR = orConditions;
+
     const items = await prisma.backupConfig.findMany({
-      where: { workspaceId: req.workspaceId! },
+      where,
       orderBy: { createdAt: 'desc' },
       include: {
         history: { orderBy: { startedAt: 'desc' }, take: 1 },

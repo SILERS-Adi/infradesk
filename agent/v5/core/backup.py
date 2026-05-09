@@ -7,8 +7,16 @@ from __future__ import annotations
 import base64
 import glob
 import os
+import re
 import shutil
 import subprocess
+
+# Reject any SQL identifier with characters outside [A-Za-z0-9_-]. Compiled once
+# (was inside the per-backup loop) — prevents SQL injection in `BACKUP DATABASE [{db}]`
+# and path traversal in `f"{db}_{timestamp}.sql"` filenames.
+_DB_NAME_RX = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+_SQL_HOST_RX = re.compile(r"^[A-Za-z0-9_.\-]{1,253}$")
+_SQL_USER_RX = re.compile(r"^[A-Za-z0-9_.\-]{1,128}$")
 import tempfile
 import threading
 import time
@@ -195,11 +203,18 @@ class BackupScheduler:
             out_dir = os.path.join(os.environ.get("ProgramData", "C:\\ProgramData"), "InfraDesk", "backups")
         os.makedirs(out_dir, exist_ok=True)
 
+        if not _SQL_HOST_RX.match(host or ""):
+            raise RuntimeError(f"Invalid SQL host: {host!r}")
+        if user and not _SQL_USER_RX.match(user):
+            raise RuntimeError(f"Invalid SQL user: {user!r}")
+
         results = []
         for db in dbs:
             db = db.strip()
             if not db:
                 continue
+            if not _DB_NAME_RX.match(db):
+                raise RuntimeError(f"Invalid database name: {db!r}")
 
             if btype == "SQL_MYSQL":
                 output = os.path.join(out_dir, f"{db}_{timestamp}.sql")

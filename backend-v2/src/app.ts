@@ -37,6 +37,9 @@ import monitoringOverviewRouter from './modules/monitoring/monitoring-overview.r
 import aiRouter from './modules/ai/ai.routes';
 import crmEmailRouter from './modules/crm-email/crm-email.routes';
 import downloadsRouter from './modules/downloads/downloads.routes';
+import downloadPinsRouter from './modules/download-pins/download-pins.routes';
+import partnerSharesRouter from './modules/partner-shares/partner-shares.routes';
+import paymentBillingRouter from './modules/billing/billing.routes';
 import storageRouter from './modules/storage/storage.routes';
 import { irisEmbedRouter } from './modules/iris/iris-embed.controller';
 import { irisChatRouter } from './modules/iris/iris-chat.controller';
@@ -50,21 +53,50 @@ export function buildApp(): Express {
   app.set('trust proxy', 1);
   app.use(requestId);
   app.use(helmet({ contentSecurityPolicy: false }));
-  // CORS: allow explicit origins + wildcard *.infradesk.pl (production subdomains)
-  const WILDCARD_PATTERN = /^https:\/\/([a-z0-9-]{3,40}\.)?infradesk\.pl$/;
+  // CORS allowlist — explicit production hosts. Workspace subdomain origins
+  // (`<slug>.infradesk.pl`) są resolwowane dynamicznie z DB, żeby żaden dangling
+  // CNAME nie mógł zostać przejęty pod credentials cookies.
+  const STATIC_ORIGINS = new Set<string>([
+    ...config.corsOrigins,
+    'https://infradesk.pl',
+    'https://www.infradesk.pl',
+    'https://faktura.infradesk.pl',
+    'https://pay.infradesk.pl',
+    'https://app.infradesk.pl',
+  ]);
+  const SUBDOMAIN_PATTERN = /^https:\/\/([a-z0-9-]{3,40})\.infradesk\.pl$/;
   app.use(
     cors({
       origin: (origin, cb) => {
         if (!origin) return cb(null, true);
-        if (config.corsOrigins.includes(origin)) return cb(null, true);
-        if (WILDCARD_PATTERN.test(origin)) return cb(null, true);
+        if (STATIC_ORIGINS.has(origin)) return cb(null, true);
+        const match = SUBDOMAIN_PATTERN.exec(origin);
+        if (match && match[1]) {
+          // Verify slug is a known active workspace before approving with credentials.
+          import('./lib/prisma-bg').then(({ prismaBg }) => {
+            prismaBg.workspace
+              .findUnique({ where: { slug: match[1]! }, select: { id: true, isActive: true, deletedAt: true } })
+              .then((ws) => {
+                if (ws && ws.isActive && !ws.deletedAt) cb(null, true);
+                else cb(new Error('CORS: unknown workspace subdomain'));
+              })
+              .catch(() => cb(new Error('CORS: workspace lookup failed')));
+          });
+          return;
+        }
         return cb(new Error('CORS: origin not allowed'));
       },
       credentials: true,
     }),
   );
   app.use(compression());
-  app.use(express.json({ limit: '1mb' }));
+  app.use(express.json({
+    limit: '1mb',
+    verify: (req: express.Request & { rawBody?: Buffer }, _res, buf) => {
+      // Raw body needed for HMAC webhook verification (billing /webhooks/payment).
+      req.rawBody = buf;
+    },
+  }));
   app.use(express.urlencoded({ extended: true, limit: '1mb' }));
   app.use(cookieParser());
 
@@ -109,11 +141,17 @@ export function buildApp(): Express {
   app.use('/api/v2/clients/risk', riskRouter);
   app.use('/api/v2/activity-logs', activityLogsRouter);
   app.use('/api/v2/downloads', downloadsRouter);
+  app.use('/api/v2/download-pins', downloadPinsRouter);
+  app.use('/api/v2/partner-shares', partnerSharesRouter);
+  // paymentBillingRouter has paths /billing/checkout + /webhooks/payment, both mounted under /api/v2.
+  app.use('/api/v2', paymentBillingRouter);
   app.use('/api/v2/storage', storageRouter);
   app.use('/api/v2/iris', irisChatRouter());
   app.use('/api/v2/iris', irisEmbedRouter(requireAuth));
   app.use("/api/v2/settings", settingsRouter);
   // Static uploads (logos, etc.) served under /uploads/* for the backend origin.
+  // Block /uploads/tickets/* — ticket attachments must go through auth-gated route.
+  app.use("/uploads/tickets", (_req, res) => res.status(404).end());
   app.use("/uploads", express.static(path.resolve(process.env.UPLOADS_DIR || "/home/adrian/infradesk/backend-v2/uploads"), { maxAge: "7d", fallthrough: true }));
   app.use('/api/v2/oauth', oauthRouter);
   app.use('/', oauthDiscoveryRouter);

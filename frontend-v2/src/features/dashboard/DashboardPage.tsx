@@ -1,16 +1,18 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { Ticket, Server, AlertTriangle, Clock, RefreshCw, Loader2, Send } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { StatCard } from '@/components/ui/StatCard';
 import { Gauge } from '@/components/ui/Gauge';
 import { PriorityDot } from '@/components/ui/PriorityDot';
 import { StatusPill } from '@/components/ui/StatusPill';
-import { IrisCore } from '@/components/iris/IrisCore';
+import { IDCore, type IDCoreState } from '@/components/iris/IDCore';
 import { useAuthStore } from '@/store/auth';
 import { formatRelativePl } from '@/lib/utils';
+import { OnboardingChecklist } from './OnboardingChecklist';
 
 interface TicketRow {
   id: string;
@@ -42,7 +44,18 @@ const IRIS_SUGGESTIONS = [
 export function DashboardPage() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [irisQ, setIrisQ] = useState('');
+
+  // Pay.infradesk.pl redirectuje tu po sukcesie z ?paid=ok — pokaż potwierdzenie i wyczyść param.
+  useEffect(() => {
+    if (searchParams.get('paid') === 'ok') {
+      toast.success('🎉 Płatność przyjęta — plan zostanie aktywowany w ciągu kilku minut.');
+      const next = new URLSearchParams(searchParams);
+      next.delete('paid');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const { data, isFetching, refetch } = useQuery<{ items: TicketRow[] }>({
     queryKey: ['dashboard', 'recent-tickets'],
@@ -79,8 +92,15 @@ export function DashboardPage() {
   const h = new Date().getHours();
   const greeting = h < 12 ? 'Dzień dobry' : h < 18 ? 'Cześć' : 'Dobry wieczór';
 
-  // Placeholder SLA — w realu wyliczana po stronie backendu z SlaPolicy + actual response times
-  const slaPct = 94;
+  // SLA % — backend liczy w `/dashboard/summary` (tickets-with-policy / breached).
+  // Gdy brakuje policy lub danych = null. Nie rysujemy gauge'a z fałszywą liczbą.
+  const slaPct: number | null = (sum as { slaCompliancePct?: number | null } | undefined)?.slaCompliancePct ?? null;
+
+  function mapIrisStateToIDCore(s: 'ok' | 'warning' | 'critical' | 'offline'): IDCoreState {
+    if (s === 'critical') return 'critical';
+    if (s === 'warning') return 'warning';
+    return 'idle';
+  }
 
   function askIris(q: string) {
     const trimmed = q.trim();
@@ -93,6 +113,7 @@ export function DashboardPage() {
 
   return (
     <div className="anim-up space-y-5">
+      <OnboardingChecklist />
       <div className="flex items-start justify-between mb-5">
         <div>
           <h1 className="text-[22px] font-bold text-tx">
@@ -114,20 +135,26 @@ export function DashboardPage() {
       {/* Iris hero panel — visual identity + entry point */}
       <Card className="rounded-[var(--r-l)] p-6 anim-scale iris-hero">
         <div className="flex items-center gap-6 flex-wrap md:flex-nowrap">
-          <div
-            className="flex items-center justify-center shrink-0"
+          <button
+            type="button"
+            onClick={() => navigate('/ai')}
+            aria-label="Otwórz Iris — asystent AI"
+            className="flex items-center justify-center shrink-0 bg-transparent border-none p-0 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-pri/60 rounded-full"
             style={{ width: 220, height: 220 }}
           >
-            <IrisCore
-              size="hero"
-              score={irisScore}
-              status={irisStatus}
-              alerts={irisAlerts}
-              aiActive
-              onClick={() => navigate('/ai')}
-              ariaLabel="Otwórz Iris — asystent AI"
+            <IDCore
+              size={220}
+              state={mapIrisStateToIDCore(irisStatus)}
+              healthScore={irisScore ?? 0}
+              metrics={{
+                sla: slaPct ?? 0,
+                alerts: irisAlerts,
+                devices: typeof devicesOnlineLabel === 'number' ? devicesOnlineLabel : sum?.totalDevices ?? 0,
+                sessions: inProgress,
+              }}
+              showOrbits={false}
             />
-          </div>
+          </button>
           <div className="flex-1 min-w-[260px]">
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] mb-2" style={{ color: 'var(--pri)' }}>
               Iris
@@ -178,7 +205,9 @@ export function DashboardPage() {
       {/* Hero — SLA gauge + summary */}
       <Card className="rounded-[var(--r-l)] p-6 anim-scale">
         <div className="flex items-center gap-7 flex-wrap">
-          <Gauge pct={slaPct} size={160} label="SLA zgodność" />
+          {slaPct != null
+            ? <Gauge pct={slaPct} size={160} label="SLA zgodność" />
+            : <div className="w-[160px] h-[160px] flex items-center justify-center rounded-full border border-dashed border-bd text-tx3 text-[11px] text-center px-3">SLA<br/>brak danych</div>}
           <div className="flex-1 min-w-[240px]">
             <p className="text-[10px] font-bold uppercase tracking-[0.12em] mb-4 text-tx3">
               Dzisiaj w liczbach
@@ -200,6 +229,8 @@ export function DashboardPage() {
         <StatCard icon={Server} label="Urządzenia" value={sum ? sum.totalDevices : '—'} accent="neutral" />
         <StatCard icon={Clock} label="Aktywne sesje" value="—" accent="warning" />
       </div>
+
+      <AgentVersionWidget />
 
       {/* Recent tickets */}
       <Card>
@@ -256,5 +287,43 @@ function InlineStat({ icon: Icon, n, l, color }: { icon: typeof Ticket; n: numbe
         <p className="text-[10px] font-medium text-tx3">{l}</p>
       </div>
     </div>
+  );
+}
+
+// R3+P5: monitoring agent versions — pokazuje rozkład wersji + ostrzeżenie dla outdated
+function AgentVersionWidget() {
+  const { data, isLoading } = useQuery<{
+    total: number; online5m: number; offline1d: number; neverSeen: number;
+    latest: string; outdated: number; byVersion: Record<string, number>;
+  }>({
+    queryKey: ['agent-version-stats'],
+    queryFn: async () => (await api.get('/agents/admin/version-stats')).data,
+    staleTime: 60_000,
+  });
+  if (isLoading || !data) return null;
+  if (data.total === 0) return null;
+  const versions = Object.entries(data.byVersion).sort((a, b) => b[1] - a[1]);
+  return (
+    <Card className="p-5">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-[14px] font-semibold text-tx">Asystenci — wersje</h3>
+        <span className="text-[11px] text-tx3">
+          Online: <span className="text-ok font-semibold">{data.online5m}</span> · Offline ({'>'}24h): {data.offline1d} · Never: {data.neverSeen} · Total: {data.total}
+        </span>
+      </div>
+      {data.outdated > 0 && (
+        <div className="mb-3 p-2.5 rounded-[var(--r-s)] bg-warn/10 border border-warn/30 text-[12px] text-warn">
+          ⚠ {data.outdated} asystentów ma starszą wersję niż najnowszy <strong>v{data.latest}</strong>. Auto-update w ciągu 2h.
+        </div>
+      )}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+        {versions.map(([v, n]) => (
+          <div key={v} className={`p-2 rounded-[var(--r-s)] text-center ${v === data.latest ? 'bg-ok/10 border border-ok/30' : v === 'unknown' ? 'bg-er/10 border border-er/30' : 'bg-sf-h border border-bd'}`}>
+            <p className="text-[11px] text-tx font-semibold">v{v}</p>
+            <p className="text-[18px] font-bold text-tx">{n}</p>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
