@@ -43,6 +43,9 @@ tmp/
 dw-work/
 *.sql
 *.dump
+# Prisma migrations są SQL ale MUSZĄ być w repo (deploy uses them)
+!backend-v2/prisma/migrations/**/*.sql
+!**/prisma/migrations/**
 *.bak
 *.bak.*
 *.bak-*
