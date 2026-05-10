@@ -12,11 +12,17 @@ import os
 import sys
 
 
+# Sentry DSN dla agenta — DSN to publiczny klucz (jak frontend), bezpieczny
+# do bundlowania w EXE. ENV override pozwala dev-em wyłączyć (`SENTRY_DSN_AGENT=`)
+# albo wskazać własny projekt testowy. Sentry events pomagają znaleźć cichych
+# crashy u klientów — bez tego nie wiemy że coś się sypie.
+_SENTRY_DSN_DEFAULT = "https://5744e66abf6753182e1de952f12a1127@o4511364994105344.ingest.de.sentry.io/4511366982664272"
+
+
 def _init_sentry() -> None:
-    """Init Sentry SDK if available + configured. Pusty DSN = no-op (lokalny dev).
-    DSN przychodzi przez ENV (`SENTRY_DSN_AGENT`) — wpisany w build w version.json
-    lub instalator. NIE hardcodować w kodzie."""
-    dsn = os.environ.get("SENTRY_DSN_AGENT")
+    """Init Sentry SDK. Default DSN bundled, override przez ENV `SENTRY_DSN_AGENT`
+    (pusty string = wyłącz na konkretnej maszynie, np. dev test bez Sentry)."""
+    dsn = os.environ.get("SENTRY_DSN_AGENT", _SENTRY_DSN_DEFAULT)
     if not dsn:
         return
     try:
