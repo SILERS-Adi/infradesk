@@ -310,6 +310,23 @@ Każdy security-sensitive commit:
 - `pip-audit` na agencie — manual co miesiąc
 - `trivy` na obrazach Docker (gdy będą)
 
+### Known accepted vulnerabilities (post-audit 2026-05-10)
+
+Backend ma 5 transitive vulns które `npm audit fix` nie naprawia (wymagają
+`--force` z major upgrades). Wszystkie są **install-time / dev tools**, nie
+runtime exposed:
+
+| Pakiet | Sev | Path | Runtime impact |
+|--------|-----|------|----------------|
+| `tar` ≤7.5.10 | High | `bcrypt → @mapbox/node-pre-gyp → tar` | Tylko przy `npm install` (extract bcrypt prebuilt). Brak path traversal w runtime |
+| `ip-address` ≤10.1.0 | Mod | Transitive | XSS w `Address6.toRFC5952String()` — internie używane, nie eksponowane do user |
+| `uuid` 11.0.0-11.1.0 | Mod | `bullmq → uuid` | Buffer bounds check — wymaga `buf` arg, my nie wzywamy |
+
+**Plan:** review przy następnym major bump bullmq/bcrypt, lub `npm audit fix --force`
+gdy testy E2E będą gotowe (P2).
+
+Frontend: **0 vulnerabilities** (po fix axios 1.16.0, 2026-05-10).
+
 ### Secret rotation triggers
 
 - Pracownik odchodzi z dostępem → rotuj wszystko czego dotykał

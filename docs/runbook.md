@@ -17,8 +17,40 @@ Pierwsza pomoc gdy coś się sypie. Każdy playbook: **Symptoms → Diagnose →
 | AI Iris ratelimit / koszt | 🟡 P2 | [§9](#9-ai-iris-cost--ratelimit) |
 
 **Server:** `ssh -p 2222 adrian@188.68.236.166`
-**Logi:** `pm2 logs infradesk-api`
+**Logi:** `pm2 logs infradesk-v2-backend`
 **DB:** `sudo -u postgres psql infradesk_v2_dev`
+**PM2 process name:** `infradesk-v2-backend` (id 51, port 4250)
+**Repo:** `/home/adrian/infradesk` (branch `main`)
+**Frontend dist:** `/var/www/infradesk-v2/`
+**Backupy DB:** `/home/adrian/backups/`
+
+## Stan referencyjny (post-deploy 2026-05-10)
+
+```
+DB rozmiar: 16 MB · 60 tabel
+Top tabele: WorkSession 494 · MonitoringAlert 395 · ActivityLog 281 · TicketEvent 263 · Ticket 240 · Device 59
+PM2 RAM: ~170 MB · CPU: 0% idle · uptime stable
+Health response time: ~55-60ms
+```
+
+## Recovery: OWNER zablokowany przez 2FA enforce
+
+Jeśli OWNER (np. `biuro@silers.pl`) został zablokowany modal'em `ForceTwoFactorSetup`
+i nie ma dostępu do TOTP:
+
+```bash
+ssh -p 2222 adrian@188.68.236.166
+sudo -u postgres psql infradesk_v2_dev -c "UPDATE \"User\" SET \"twoFactorEnabled\" = false, \"twoFactorSecret\" = NULL WHERE email = 'biuro@silers.pl';"
+# Zaloguj się normalnie. Modal pojawi się ponownie — masz drugą szansę
+# z dostępem do TOTP (Google Authenticator / Authy / 1Password).
+# WAŻNE: zapisz kody zapasowe!
+```
+
+## Quick health check (1 polecenie)
+
+```bash
+ssh -p 2222 adrian@188.68.236.166 'curl -s https://infradesk.pl/health; echo; pm2 list | grep infradesk-v2; df -h / | tail -1; free -h | head -2'
+```
 
 ---
 
@@ -322,10 +354,10 @@ ORDER BY n_dead_tup DESC LIMIT 10;
 **Fix:**
 
 **A. Kill pojedynczego long-running query:**
-```sql
-SELECT pg_cancel_backend(<pid>);
--- Jeśli ignoruje:
-SELECT pg_terminate_backend(<pid>);
+```bash
+sudo -u postgres psql infradesk_v2_dev -c "SELECT pg_cancel_backend(<pid>);"
+# Jeśli ignoruje:
+sudo -u postgres psql infradesk_v2_dev -c "SELECT pg_terminate_backend(<pid>);"
 ```
 
 **B. VACUUM dużej tabeli:**
