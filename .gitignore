@@ -28,6 +28,7 @@ backend-v2/uploads/
 frontend-v2/node_modules/
 frontend-v2/dist/
 frontend-v2/tsconfig.tsbuildinfo
+backend-v2/tsconfig.tsbuildinfo
 
 # Tmp scripts from session work
 tmp-*.py

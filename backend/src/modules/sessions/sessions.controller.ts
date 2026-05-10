@@ -15,8 +15,8 @@ export async function postStart(req: Request, res: Response, next: NextFunction)
 export async function patchEnd(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const techId = req.user!.userId;
-    const { notes } = req.body as { notes?: string };
-    const session = await endSession(req.params.id, techId, notes);
+    const { notes, closedTicketIds } = req.body as { notes?: string; closedTicketIds?: string[] };
+    const session = await endSession(req.params.id, techId, notes, closedTicketIds);
     res.json(session);
   } catch (err) { next(err); }
 }

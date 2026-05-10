@@ -10,12 +10,32 @@ import prisma from '../../lib/prisma';
 const IDCORE_URL   = process.env.IDCORE_URL   || 'http://172.18.0.1:4300';
 const IDCORE_TOKEN = process.env.IDCORE_TOKEN || 'idcore-adrian-2026-secure';
 
+const OPEN_STATUSES = ['PENDING', 'ASSIGNED'] as const;
+
 async function buildWorkspaceContext(userId: string, workspaceId: string): Promise<string> {
-  const [user, ws, tickets, devices, alerts] = await Promise.all([
-    prisma.user.findUnique({ where: { id: userId }, select: { firstName: true, lastName: true, email: true } }),
-    prisma.workspace.findUnique({ where: { id: workspaceId }, select: { name: true, taxId: true } }),
+  const [
+    user,
+    ws,
+    openTicketsCount,
+    allTicketsCount,
+    recentOpenTickets,
+    devicesCount,
+    alertsCount,
+  ] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { firstName: true, lastName: true, email: true },
+    }),
+    prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { name: true, taxId: true },
+    }),
+    prisma.ticket.count({
+      where: { workspaceId, status: { in: [...OPEN_STATUSES] } as any },
+    }),
+    prisma.ticket.count({ where: { workspaceId } }),
     prisma.ticket.findMany({
-      where: { workspaceId, status: { in: ['PENDING', 'ASSIGNED'] as any } },
+      where: { workspaceId, status: { in: [...OPEN_STATUSES] } as any },
       select: { ticketNumber: true, title: true, status: true, priority: true },
       take: 10,
       orderBy: { createdAt: 'desc' },
@@ -27,19 +47,30 @@ async function buildWorkspaceContext(userId: string, workspaceId: string): Promi
   const lines: string[] = [];
   lines.push(`[KONTEKST USERA] Rozmawiam z: ${user?.firstName ?? ''} ${user?.lastName ?? ''} (${user?.email ?? '—'})`);
   lines.push(`[FIRMA KLIENTA] ${ws?.name ?? '—'}${ws?.taxId ? ` · NIP ${ws.taxId}` : ''}`);
-  lines.push(`[STATUS] Urządzeń: ${devices}, aktywnych alertów: ${alerts}, otwartych zgłoszeń: ${tickets.length}`);
-  if (tickets.length > 0) {
-    lines.push(`[OSTATNIE ZGŁOSZENIA]`);
-    for (const t of tickets.slice(0, 5)) {
+  lines.push('');
+  lines.push('[LICZBY — TYLKO TE WARTOŚCI SĄ PRAWDZIWE]');
+  lines.push(`- Urządzenia łącznie: ${devicesCount}`);
+  lines.push(`- Aktywne alerty bezpieczeństwa: ${alertsCount}`);
+  lines.push(`- Otwarte zgłoszenia (PENDING + ASSIGNED): ${openTicketsCount}`);
+  lines.push(`- Wszystkie zgłoszenia w historii: ${allTicketsCount}`);
+  lines.push('');
+
+  if (recentOpenTickets.length > 0) {
+    lines.push('[LISTA OSTATNICH OTWARTYCH ZGŁOSZEŃ — max 10 pokazanych, prawdziwa liczba otwartych wyżej]');
+    for (const t of recentOpenTickets) {
       lines.push(`  #${t.ticketNumber ?? '—'} [${t.status}/${t.priority}] ${t.title}`);
     }
+  } else {
+    lines.push('[LISTA OTWARTYCH ZGŁOSZEŃ] — brak otwartych zgłoszeń');
   }
-  lines.push(``);
-  lines.push(`[WAŻNE ZASADY]`);
-  lines.push(`- Widzisz TYLKO dane tego klienta. Nie wspominaj innych firm.`);
-  lines.push(`- Jeżeli user pyta o coś czego nie umiesz — powiedz wprost i zaproponuj utworzenie zgłoszenia.`);
-  lines.push(`- Odpowiadaj krótko i po polsku. Bez emoji w biznesowym kontekście.`);
-  lines.push(``);
+
+  lines.push('');
+  lines.push('[TWARDE ZASADY — NIE ŁAM ICH]');
+  lines.push('1. LICZB NIE WYMYŚLAJ. Jeśli user pyta "ile mam zgłoszeń" — podaj DOKŁADNIE tę liczbę z sekcji [LICZBY] wyżej (otwarte albo wszystkie, zależnie od kontekstu pytania).');
+  lines.push('2. Widzisz dane TYLKO tej firmy. Nie wspominaj innych klientów, ani liczb z innych firm.');
+  lines.push('3. Jeśli nie masz czegoś w kontekście — powiedz wprost "nie mam tego w danych, mogę założyć zgłoszenie". NIE zgaduj.');
+  lines.push('4. Odpowiadaj krótko, po polsku, bez emoji.');
+  lines.push('');
   return lines.join('\n');
 }
 

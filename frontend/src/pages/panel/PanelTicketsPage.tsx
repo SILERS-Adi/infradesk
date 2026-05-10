@@ -13,14 +13,16 @@ import { Card, SectionHeader, Badge, Button, EmptyState, ListRow } from '../../u
 
 const STATUS_LABEL: Record<string, string> = {
   NEW: 'Nowe', PENDING: 'Oczekuje', ASSIGNED: 'Przypisane', IN_PROGRESS: 'W trakcie',
-  RESOLVED: 'Rozwiązane', CLOSED: 'Zamknięte', CANCELLED: 'Anulowane',
+  WAITING_FOR_CLIENT: 'Czeka na klienta',
+  RESOLVED: 'Zakończone', COMPLETED: 'Zakończone', CLOSED: 'Zamknięte', CANCELLED: 'Anulowane',
 };
 const STATUS_TONE: Record<string, 'ok' | 'warn' | 'bad' | 'blue' | 'gray'> = {
   NEW: 'blue', PENDING: 'warn', ASSIGNED: 'blue', IN_PROGRESS: 'blue',
-  RESOLVED: 'ok', CLOSED: 'gray', CANCELLED: 'gray',
+  WAITING_FOR_CLIENT: 'warn',
+  RESOLVED: 'ok', COMPLETED: 'ok', CLOSED: 'gray', CANCELLED: 'gray',
 };
-const PRIORITY_LABEL: Record<string, string> = { LOW: 'Niski', MEDIUM: 'Średni', HIGH: 'Wysoki', URGENT: 'Pilny' };
-const PRIORITY_TONE: Record<string, 'gray' | 'blue' | 'warn' | 'bad'> = { LOW: 'gray', MEDIUM: 'blue', HIGH: 'warn', URGENT: 'bad' };
+const PRIORITY_LABEL: Record<string, string> = { LOW: 'Niski', MEDIUM: 'Średni', HIGH: 'Wysoki', CRITICAL: 'Pilny' };
+const PRIORITY_TONE: Record<string, 'gray' | 'blue' | 'warn' | 'bad'> = { LOW: 'gray', MEDIUM: 'blue', HIGH: 'warn', CRITICAL: 'bad' };
 
 function formatRel(iso: string): string {
   const d = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
@@ -46,7 +48,7 @@ export default function PanelTicketsPage() {
   React.useEffect(() => { setShowNew(params.has('new')); }, [params]);
 
   const filtered = React.useMemo(() => {
-    if (filter === 'open') return tickets.filter(t => !['CLOSED', 'CANCELLED', 'RESOLVED'].includes(t.status));
+    if (filter === 'open') return tickets.filter(t => !['CLOSED', 'CANCELLED', 'RESOLVED', 'COMPLETED'].includes(t.status));
     return tickets;
   }, [tickets, filter]);
 
@@ -115,7 +117,7 @@ export default function PanelTicketsPage() {
 function NewTicketDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [title, setTitle] = React.useState('');
   const [description, setDescription] = React.useState('');
-  const [priority, setPriority] = React.useState<'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'>('MEDIUM');
+  const [priority, setPriority] = React.useState<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('MEDIUM');
   const [saving, setSaving] = React.useState(false);
 
   const submit = async () => {
@@ -170,7 +172,7 @@ function NewTicketDrawer({ onClose, onCreated }: { onClose: () => void; onCreate
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ip-text-3)', fontFamily: 'var(--ip-font-mono)', marginBottom: 6 }}>PRIORYTET</div>
             <div style={{ display: 'flex', gap: 6 }}>
-              {(['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const).map(p => (
+              {(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const).map(p => (
                 <button key={p} onClick={() => setPriority(p)}
                   style={{
                     flex: 1, padding: '10px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600,

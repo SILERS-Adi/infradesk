@@ -144,21 +144,21 @@ export const SYSTEM_ITEMS: SystemMenuItem[] = [
   { id: 'dashboard',       to: '/dashboard',            label: 'Dashboard',            icon: LayoutDashboard, groupId: 'main',         defaultOrder: 0 },
 
   // ── MSP: OPERACJE ──
-  { id: 'tickets',         to: '/tickets',              label: 'Zgłoszenia',           icon: Ticket,          groupId: 'operations',   defaultOrder: 0,  badgeKey: 'ticketQueue', end: true },
-  { id: 'tasks',           to: '/tasks',                label: 'Zadania',              icon: ClipboardList,   groupId: 'operations',   defaultOrder: 1,  badgeKey: 'activeTasks' },
+  { id: 'tickets',         to: '/tickets',              label: 'Zgłoszenia',           icon: Ticket,          groupId: 'operations',   defaultOrder: 0,  badgeKey: 'ticketQueue', end: true, module: 'service-desk.tickets' },
+  { id: 'tasks',           to: '/tasks',                label: 'Zadania',              icon: ClipboardList,   groupId: 'operations',   defaultOrder: 1,  badgeKey: 'activeTasks', module: 'service-desk.tasks' },
   { id: 'calendar',        to: '/calendar',             label: 'Kalendarz',            icon: CalendarDays,    groupId: 'operations',   defaultOrder: 2 },
-  { id: 'sessions',        to: '/sessions',             label: 'Sesje pracy',          icon: Timer,           groupId: 'operations',   defaultOrder: 3 },
-  { id: 'billing',         to: '/billing',              label: 'Rozliczenia',          icon: Receipt,         groupId: 'operations',   defaultOrder: 4 },
+  { id: 'sessions',        to: '/sessions',             label: 'Sesje pracy',          icon: Timer,           groupId: 'operations',   defaultOrder: 3, module: 'service-desk.sessions' },
+  { id: 'billing',         to: '/billing',              label: 'Rozliczenia',          icon: Receipt,         groupId: 'operations',   defaultOrder: 4, module: 'service-desk.billing' },
   { id: 'alerts',          to: '/operator/alerts',      label: 'Alerty i asystenci',   icon: Bell,            groupId: 'operations',   defaultOrder: 5 },
-  { id: 'msp-orders',      to: '/orders',               label: 'Zamówienia klientów',  icon: ShoppingCart,    groupId: 'operations',   defaultOrder: 6 },
-  { id: 'delegations',     to: '/delegations',          label: 'Delegacje',            icon: Plane,           groupId: 'operations',   defaultOrder: 7 },
+  { id: 'msp-orders',      to: '/orders',               label: 'Zamówienia klientów',  icon: ShoppingCart,    groupId: 'operations',   defaultOrder: 6, module: 'service-desk.orders' },
+  { id: 'delegations',     to: '/delegations',          label: 'Delegacje',            icon: Plane,           groupId: 'operations',   defaultOrder: 7, module: 'service-desk.delegations' },
   { id: 'portal-settings', to: '/portal-settings',      label: 'Portal i obsługa',     icon: Settings,        groupId: 'operations',   defaultOrder: 8, adminOnly: true },
 
   // ── INTERNAL_IT: HELPDESK ──
-  { id: 'int-tickets',     to: '/tickets',              label: 'Zgłoszenia',           icon: Ticket,          groupId: 'helpdesk',     defaultOrder: 0,  badgeKey: 'ticketQueue', end: true },
-  { id: 'int-tasks',       to: '/tasks',                label: 'Zadania',              icon: ClipboardList,   groupId: 'helpdesk',     defaultOrder: 1,  badgeKey: 'activeTasks' },
-  { id: 'int-calendar',    to: '/calendar',             label: 'Kalendarz',            icon: CalendarDays,    groupId: 'helpdesk',     defaultOrder: 2 },
-  { id: 'int-alerts',      to: '/operator/alerts',      label: 'Alerty i asystenci',   icon: Bell,            groupId: 'helpdesk',     defaultOrder: 3 },
+  { id: 'int-tickets',     to: '/tickets',              label: 'Zgłoszenia',           icon: Ticket,          groupId: 'helpdesk',     defaultOrder: 0,  badgeKey: 'ticketQueue', end: true, module: 'service-desk.tickets' },
+  { id: 'int-tasks',       to: '/tasks',                label: 'Zadania',              icon: ClipboardList,   groupId: 'helpdesk',     defaultOrder: 1,  badgeKey: 'activeTasks', module: 'service-desk.tasks' },
+  { id: 'int-calendar',    to: '/calendar',             label: 'Kalendarz',            icon: CalendarDays,    groupId: 'helpdesk',     defaultOrder: 2, module: 'service-desk' },
+  { id: 'int-alerts',      to: '/operator/alerts',      label: 'Alerty i asystenci',   icon: Bell,            groupId: 'helpdesk',     defaultOrder: 3, module: 'infrastructure' },
   { id: 'int-portal',      to: '/portal-settings',      label: 'Portal i obsługa',     icon: Settings,        groupId: 'helpdesk',     defaultOrder: 4, adminOnly: true },
 
   // ── CLIENT: ZGŁOSZENIA ──
@@ -182,11 +182,11 @@ export const SYSTEM_ITEMS: SystemMenuItem[] = [
   { id: 'cli-portal',      to: '/portal-settings',      label: 'Portal i obsługa',     icon: Settings,        groupId: 'client-orders', defaultOrder: 1, adminOnly: true },
 
   // ── INFRASTRUKTURA IT ──
-  { id: 'devices',         to: '/devices',              label: 'Urządzenia',           icon: Monitor,         groupId: 'infrastructure', defaultOrder: 0 },
-  { id: 'agents',          to: '/agents',               label: 'Asystenci',            icon: Bot,             groupId: 'infrastructure', defaultOrder: 1 },
-  { id: 'audit-network',   to: '/monitoring',           label: 'Audyt i sieć',         icon: Shield,          groupId: 'infrastructure', defaultOrder: 2 },
-  { id: 'backups',         to: '/backups',              label: 'Kopie zapasowe',       icon: HardDrive,       groupId: 'infrastructure', defaultOrder: 3 },
-  { id: 'activity-logs',   to: '/activity-logs',        label: 'Logi aktywności',      icon: Activity,        groupId: 'infrastructure', defaultOrder: 4 },
+  { id: 'devices',         to: '/devices',              label: 'Urządzenia',           icon: Monitor,         groupId: 'infrastructure', defaultOrder: 0, module: 'infrastructure.devices' },
+  { id: 'agents',          to: '/agents',               label: 'Asystenci',            icon: Bot,             groupId: 'infrastructure', defaultOrder: 1, module: 'infrastructure.agents' },
+  { id: 'audit-network',   to: '/monitoring',           label: 'Audyt i sieć',         icon: Shield,          groupId: 'infrastructure', defaultOrder: 2, module: 'infrastructure.monitoring' },
+  { id: 'backups',         to: '/backups',              label: 'Kopie zapasowe',       icon: HardDrive,       groupId: 'infrastructure', defaultOrder: 3, module: 'infrastructure.backups' },
+  { id: 'activity-logs',   to: '/activity-logs',        label: 'Logi aktywności',      icon: Activity,        groupId: 'infrastructure', defaultOrder: 4, module: 'infrastructure.activity-logs' },
 
   // ── FINANSE ──
   { id: 'inv-dashboard',   to: '/invoicing',            label: 'Dashboard',            icon: LayoutDashboard, groupId: 'invoicing',    defaultOrder: 0, module: 'invoicing' },
@@ -217,19 +217,19 @@ export const SYSTEM_ITEMS: SystemMenuItem[] = [
   { id: 'skp-vehicles',    to: '/skp/vehicles',         label: 'Pojazdy',              icon: Car,             groupId: 'skp',          defaultOrder: 2, module: 'skp' },
 
   // ── SEJF HASEŁ ──
-  { id: 'vault',           to: '/vault',                label: 'Wszystkie wpisy',      icon: Lock,            groupId: 'vault',        defaultOrder: 0 },
-  { id: 'vault-mine',      to: '/vault/mine',           label: 'Moje wpisy',           icon: KeyRound,        groupId: 'vault',        defaultOrder: 1 },
-  { id: 'vault-shared',    to: '/vault/shared',         label: 'Współdzielone',        icon: Share2,          groupId: 'vault',        defaultOrder: 2 },
+  { id: 'vault',           to: '/vault',                label: 'Wszystkie wpisy',      icon: Lock,            groupId: 'vault',        defaultOrder: 0, module: 'vault' },
+  { id: 'vault-mine',      to: '/vault/mine',           label: 'Moje wpisy',           icon: KeyRound,        groupId: 'vault',        defaultOrder: 1, module: 'vault.mine' },
+  { id: 'vault-shared',    to: '/vault/shared',         label: 'Współdzielone',        icon: Share2,          groupId: 'vault',        defaultOrder: 2, module: 'vault.shared' },
 
   // ── ASYSTENT AI ──
   { id: 'ai',              to: '/ai',                   label: 'Czat i komendy',       icon: Sparkles,        groupId: 'ai',           defaultOrder: 0 },
 
   // ── MOJA FIRMA ──
-  { id: 'company-data',    to: '/my-company',           label: 'Moje dane',            icon: Building2,       groupId: 'company',      defaultOrder: 0 },
-  { id: 'plan-modules',    to: '/plan-and-modules',     label: 'Plan i moduły',  icon: Layers,          groupId: 'company',      defaultOrder: 1, adminOnly: true },
-  { id: 'locations',       to: '/locations',            label: 'Lokalizacje',          icon: MapPin,          groupId: 'company',      defaultOrder: 2 },
-  { id: 'company-users',   to: '/users',               label: 'Użytkownicy',          icon: Users,           groupId: 'company',      defaultOrder: 3, adminOnly: true },
-  { id: 'company-settings',to: '/settings',             label: 'Ustawienia',           icon: Settings,        groupId: 'company',      defaultOrder: 4, adminOnly: true },
+  { id: 'company-data',    to: '/my-company',           label: 'Moje dane',            icon: Building2,       groupId: 'company',      defaultOrder: 0, module: 'company.data' },
+  { id: 'plan-modules',    to: '/plan-and-modules',     label: 'Plan i moduły',  icon: Layers,          groupId: 'company',      defaultOrder: 1, adminOnly: true, module: 'company.settings' },
+  { id: 'locations',       to: '/locations',            label: 'Lokalizacje',          icon: MapPin,          groupId: 'company',      defaultOrder: 2, module: 'company.locations' },
+  { id: 'company-users',   to: '/users',               label: 'Użytkownicy',          icon: Users,           groupId: 'company',      defaultOrder: 3, adminOnly: true, module: 'company.users' },
+  { id: 'company-settings',to: '/settings',             label: 'Ustawienia',           icon: Settings,        groupId: 'company',      defaultOrder: 4, adminOnly: true, module: 'company.settings' },
 
   // ── PLATFORMA (superadmin) ──
   { id: 'sa-dashboard',    to: '/superadmin',           label: 'Dashboard SA',         icon: Activity,        groupId: 'platform',     defaultOrder: 0, end: true },

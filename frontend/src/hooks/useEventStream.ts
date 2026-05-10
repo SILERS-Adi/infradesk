@@ -38,6 +38,14 @@ export function useEventStream() {
         } catch { /* malformed data */ }
       });
 
+      // Permissions updated by admin — invalidate my-permissions cache so menu refreshes
+      es.addEventListener('permissions-updated', () => {
+        try {
+          const qc = (window as any).__INFRADESK_QC__;
+          if (qc) qc.invalidateQueries({ queryKey: ['my-permissions'] });
+        } catch { /* no-op */ }
+      });
+
       es.onerror = () => {
         setConnected(false);
         es.close();

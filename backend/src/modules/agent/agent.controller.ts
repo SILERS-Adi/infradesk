@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import prisma from '../../lib/prisma';
 import {
-  registerAgent, updateMetrics, createAgentTicket,
+  registerAgent, updateMetrics, createAgentTicket, listMyAgentTickets, getMyAgentTicketDetail, addAgentTicketComment, cancelAgentTicket, editAgentTicket,
   getAllRegistrations, approveRegistration, approveRegistrationWithNewClient, deleteRegistration,
 } from './agent.service';
 
@@ -303,6 +303,49 @@ export async function postRustdeskSyncSessions(req: Request, res: Response, next
   try {
     const { syncCompletedRustDeskSessions } = await import('../../utils/rustdesk');
     const result = await syncCompletedRustDeskSessions(prisma, req.workspaceId);
+    res.json(result);
+  } catch (err) { next(err); }
+}
+
+
+export async function getMyAgentTickets(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const token = (req as any).agentToken as string;
+    const result = await listMyAgentTickets(token);
+    res.json(result);
+  } catch (err) { next(err); }
+}
+
+
+export async function getAgentTicketDetail(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const token = (req as any).agentToken as string;
+    const ticket = await getMyAgentTicketDetail(token, req.params.id);
+    res.json(ticket);
+  } catch (err) { next(err); }
+}
+
+export async function postAgentTicketComment(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const token = (req as any).agentToken as string;
+    const { comment } = req.body as { comment?: string };
+    const created = await addAgentTicketComment(token, req.params.id, comment || '');
+    res.status(201).json(created);
+  } catch (err) { next(err); }
+}
+
+export async function postAgentTicketCancel(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const token = (req as any).agentToken as string;
+    const result = await cancelAgentTicket(token, req.params.id);
+    res.json(result);
+  } catch (err) { next(err); }
+}
+
+export async function patchAgentTicket(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const token = (req as any).agentToken as string;
+    const result = await editAgentTicket(token, req.params.id, req.body);
     res.json(result);
   } catch (err) { next(err); }
 }

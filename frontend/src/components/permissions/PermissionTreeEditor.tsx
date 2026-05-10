@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight, Lock, Info } from 'lucide-react';
 import { apiClient } from '../../api/client';
@@ -195,7 +195,7 @@ function ModuleNode({
         {/* Label */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {hasChildren ? (
-            <button onClick={() => toggleExpand(node.nodeId)}
+            <button type="button" onClick={() => toggleExpand(node.nodeId)}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--tm)', padding: 0, display: 'flex' }}>
               {isExpanded ? <ChevronDown style={{ width: 14, height: 14 }} /> : <ChevronRight style={{ width: 14, height: 14 }} />}
             </button>
@@ -229,21 +229,13 @@ function ModuleNode({
           ) : readOnly ? (
             <span style={{ fontSize: 11, color: levelConfig.color, fontWeight: 600 }}>{levelConfig.label}</span>
           ) : (
-            <select
+            <LevelPicker
               value={inherited ? '__inherit__' : effectiveLevel}
-              onChange={e => setLevel(node.nodeId, e.target.value)}
-              style={{
-                width: '100%', padding: '4px 6px', borderRadius: 6, fontSize: 11, fontWeight: 500,
-                background: 'var(--bg)', border: `1px solid ${inherited ? 'var(--border)' : levelConfig.color + '40'}`,
-                color: inherited ? 'var(--tm)' : levelConfig.color,
-                cursor: 'pointer',
-              }}
-            >
-              {depth > 0 && <option value="__inherit__">↳ Dziedzicz z modułu</option>}
-              <option value="FULL">Pełny dostęp</option>
-              <option value="VIEW">Tylko podgląd</option>
-              <option value="NONE">Brak dostępu</option>
-            </select>
+              onChange={(v) => setLevel(node.nodeId, v)}
+              canInherit={depth > 0}
+              color={inherited ? undefined : levelConfig.color}
+              inherited={inherited}
+            />
           )}
         </div>
 
@@ -289,6 +281,83 @@ function ModuleNode({
           isLast={i === node.children!.length - 1 && isLast}
         />
       ))}
+    </div>
+  );
+}
+
+function LevelPicker({ value, onChange, canInherit, color, inherited }: {
+  value: string;
+  onChange: (v: string) => void;
+  canInherit: boolean;
+  color?: string;
+  inherited?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (ev: MouseEvent) => { if (ref.current && !ref.current.contains(ev.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+
+  const labels: Record<string, string> = {
+    __inherit__: '↳ Dziedzicz z modułu',
+    FULL: 'Pełny dostęp',
+    VIEW: 'Tylko podgląd',
+    NONE: 'Brak dostępu',
+  };
+  const options = canInherit
+    ? ['__inherit__', 'FULL', 'VIEW', 'NONE']
+    : ['FULL', 'VIEW', 'NONE'];
+
+  return (
+    <div ref={ref} style={{ position: 'relative', width: '100%' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: '100%', padding: '4px 6px', borderRadius: 6,
+          fontSize: 11, fontWeight: 500, textAlign: 'left',
+          background: 'var(--bg)',
+          border: '1px solid ' + (inherited ? 'var(--border)' : (color || 'var(--border)') + '40'),
+          color: inherited ? 'var(--tm)' : (color || 'var(--t)'),
+          cursor: 'pointer', fontFamily: 'inherit',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {labels[value] ?? value}
+        </span>
+        <span style={{ fontSize: 9, opacity: 0.6, marginLeft: 4 }}>▾</span>
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1000,
+          marginTop: 2, padding: 4, borderRadius: 6,
+          background: 'var(--bg-card)', border: '1px solid var(--border)',
+          boxShadow: '0 8px 20px rgba(0,0,0,0.2)',
+        }}>
+          {options.map(opt => (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => { onChange(opt); setOpen(false); }}
+              style={{
+                display: 'block', width: '100%', padding: '5px 8px',
+                textAlign: 'left', background: 'transparent', border: 'none',
+                fontSize: 11, color: value === opt ? (color || 'var(--t)') : 'var(--t)',
+                fontWeight: value === opt ? 600 : 500,
+                cursor: 'pointer', borderRadius: 4, fontFamily: 'inherit',
+              }}
+              onMouseEnter={ev => (ev.currentTarget as HTMLButtonElement).style.background = 'var(--hover-bg)'}
+              onMouseLeave={ev => (ev.currentTarget as HTMLButtonElement).style.background = 'transparent'}
+            >
+              {labels[opt]}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

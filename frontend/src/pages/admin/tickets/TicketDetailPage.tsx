@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Send, Lock, Pencil, X, Check, Trash2, Star } from 'lucide-react';
+import { Send, Lock, Pencil, X, Check, Trash2, Star, Play, Monitor, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
+import { sessionsApi } from '../../../api/sessions';
 import { AttachmentGallery } from '../../../components/ui/AttachmentGallery';
 import toast from 'react-hot-toast';
 import { ticketsApi } from '../../../api/tickets';
@@ -123,6 +124,34 @@ export function TicketDetailPage() {
   const { user } = useAuth();
   const { isAdmin: wsAdmin, isTechnician: wsTech, isMember, isViewer } = useWorkspaceContext();
   const qc = useQueryClient();
+  const navigate = useNavigate();
+
+  // Neighbour tickets for prev/next navigation (same workspace, by createdAt desc — matches list default)
+  const { data: neighbours } = useQuery({
+    queryKey: ['tickets-neighbours'],
+    queryFn: () => ticketsApi.getAll({ limit: 500 } as any),
+    staleTime: 60_000,
+  });
+  const currentIdx = Array.isArray(neighbours)
+    ? (neighbours as any[]).findIndex((t: any) => t.id === id)
+    : -1;
+  const prevTicket = currentIdx > 0 ? (neighbours as any[])[currentIdx - 1] : null;
+  const nextTicket = currentIdx >= 0 && Array.isArray(neighbours) && currentIdx < (neighbours as any[]).length - 1
+    ? (neighbours as any[])[currentIdx + 1]
+    : null;
+  const goPrev = () => prevTicket && navigate(`/tickets/${prevTicket.id}`);
+  const goNext = () => nextTicket && navigate(`/tickets/${nextTicket.id}`);
+
+  // Keyboard shortcuts: Alt+Left / Alt+Right
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.altKey) return;
+      if (e.key === 'ArrowLeft' && prevTicket) { e.preventDefault(); goPrev(); }
+      if (e.key === 'ArrowRight' && nextTicket) { e.preventDefault(); goNext(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [prevTicket?.id, nextTicket?.id]);
   const [comment, setComment] = useState('');
   const [isInternal, setIsInternal] = useState(false);
   const [assignUserId, setAssignUserId] = useState('');
@@ -178,6 +207,26 @@ export function TicketDetailPage() {
     onError: (e) => toast.error(getErrorMessage(e)),
   });
 
+  const startSessionMut = useMutation({
+    mutationFn: async (mode: 'REMOTE' | 'ONSITE') => {
+      // Set serviceMode on ticket if not already set, then start session
+      if (ticket && (ticket as any).serviceMode !== mode) {
+        await ticketsApi.assign(id!, ticket.assignedToUserId ?? user!.id, mode as any);
+      }
+      return sessionsApi.startMobile({
+        clientId: ticket!.workspaceId,
+        ticketId: id!,
+        deviceId: ticket?.deviceId ?? undefined,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['active-session'] });
+      inv();
+      toast.success('Sesja pracy rozpoczęta');
+    },
+    onError: (e) => toast.error(getErrorMessage(e)),
+  });
+
   if (isLoading) return <LoadingSpinner />;
   if (!ticket) return <div className="text-sm" style={{ color: 'var(--tm)' }}>Nie znaleziono zgłoszenia</div>;
 
@@ -192,7 +241,53 @@ export function TicketDetailPage() {
   return (
     <div>
       <PageHeader title={ticket.title} helpKey="ticketDetail" back="/tickets" subtitle={ticket.ticketNumber}
-        actions={<div className="flex items-center gap-2"><PriorityBadge priority={ticket.priority} /><TicketStatusBadge status={ticket.status} /></div>} />
+        actions={
+          <div className="flex items-center gap-2 flex-wrap">
+            <PriorityBadge priority={ticket.priority} />
+            <TicketStatusBadge status={ticket.status} />
+            {/* chevron-prev-next-injected */}
+            <div className="flex items-center gap-1 ml-1">
+              <button
+                onClick={goPrev}
+                disabled={!prevTicket}
+                title={prevTicket ? `Poprzednie: ${prevTicket.ticketNumber}` : 'Brak poprzedniego'}
+                className="p-1.5 rounded-md disabled:opacity-40 hover:bg-[var(--hover-bg)]"
+                style={{ border: '1px solid var(--border)' }}
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                onClick={goNext}
+                disabled={!nextTicket}
+                title={nextTicket ? `Następne: ${nextTicket.ticketNumber}` : 'Brak następnego'}
+                className="p-1.5 rounded-md disabled:opacity-40 hover:bg-[var(--hover-bg)]"
+                style={{ border: '1px solid var(--border)' }}
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+            {canEdit && isAdminOrTech && ticket.status !== 'RESOLVED' && (
+              <>
+                <button
+                  onClick={() => startSessionMut.mutate('REMOTE')}
+                  disabled={startSessionMut.isPending}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50"
+                  title="Rozpocznij pracę zdalną i uruchom pomiar czasu"
+                >
+                  <Play size={14} /><Monitor size={14} /> Zdalnie
+                </button>
+                <button
+                  onClick={() => startSessionMut.mutate('ONSITE')}
+                  disabled={startSessionMut.isPending}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50"
+                  title="Rozpocznij pracę lokalną i uruchom pomiar czasu"
+                >
+                  <Play size={14} /><MapPin size={14} /> Lokalnie
+                </button>
+              </>
+            )}
+          </div>
+        } />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 

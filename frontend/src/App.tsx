@@ -39,6 +39,7 @@ const PublicTicketForm = React.lazy(() => import('./pages/public/PublicTicketFor
 
 // Layouts
 import { OperationsLayout } from './components/layout/OperationsLayout';
+import { RequireModule } from './components/auth/RequireModule';
 import { PortalLayout } from './components/layout/PortalLayout';
 
 // Auth
@@ -174,6 +175,8 @@ const queryClient = new QueryClient({
   },
 });
 
+if (typeof window !== "undefined") (window as any).__INFRADESK_QC__ = queryClient;
+
 function AdminRoutes() {
   return (
     <OperationsLayout>
@@ -194,7 +197,7 @@ function AdminRoutes() {
         <Route path="credentials" element={<Navigate to="/vault" replace />} />
         <Route path="users" element={<WorkspaceMembersPage />} />
         <Route path="workspace-members" element={<Navigate to="/users" replace />} />
-        <Route path="activity-logs" element={<ActivityLogsPage />} />
+        <Route path="activity-logs" element={<RequireModule moduleKey="infrastructure.activity-logs"><ActivityLogsPage /></RequireModule>} />
         <Route path="tasks" element={<TasksPage />} />
         <Route path="orders" element={<OrdersPage />} />
         <Route path="delegations" element={<DelegationsPage />} />
@@ -214,7 +217,7 @@ function AdminRoutes() {
         <Route path="ai" element={<AiCommandsPage />} />
         {/* ids-preview moved to public routes */}
         {/* Invoicing module */}
-        <Route path="invoicing" element={<InvoicingDashboardPage />} />
+        <Route path="invoicing" element={<RequireModule moduleKey="invoicing"><InvoicingDashboardPage /></RequireModule>} />
         <Route path="invoicing/documents" element={<DocumentsListPage />} />
         <Route path="invoicing/documents/new" element={<DocumentNewPage />} />
         <Route path="invoicing/documents/:id/edit" element={<DocumentEditPage />} />
@@ -232,7 +235,7 @@ function AdminRoutes() {
         <Route path="invoicing/settings" element={<InvoicingSettingsPage />} />
         <Route path="invoicing/jpk" element={<JpkExportPage />} />
         {/* Packaging module */}
-        <Route path="packaging" element={<PackagingDashboardPage />} />
+        <Route path="packaging" element={<RequireModule moduleKey="packaging"><PackagingDashboardPage /></RequireModule>} />
         <Route path="packaging/shipments" element={<ShipmentsListPage />} />
         <Route path="packaging/shipments/new" element={<ShipmentNewPage />} />
         <Route path="packaging/shipments/:id/edit" element={<ShipmentEditPage />} />
@@ -246,7 +249,7 @@ function AdminRoutes() {
         <Route path="packaging/waves" element={<WavesPage />} />
         <Route path="packaging/reports" element={<PackagingReportsPage />} />
         {/* SKP module (new paths) */}
-        <Route path="skp" element={<ServiceDashboardPage />} />
+        <Route path="skp" element={<RequireModule moduleKey="skp"><ServiceDashboardPage /></RequireModule>} />
         <Route path="skp/inspections" element={<InspectionsListPage />} />
         <Route path="skp/inspections/new" element={<InspectionFormPage />} />
         <Route path="skp/inspections/:id/edit" element={<InspectionFormPage />} />

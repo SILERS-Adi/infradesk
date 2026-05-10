@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { Monitor, X, Check } from 'lucide-react';
+import { Monitor, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { sessionsApi, WorkSession } from '../../api/sessions';
+import { EndSessionModal } from './EndSessionModal';
 
 interface Props {
   session: WorkSession;
@@ -11,8 +12,7 @@ interface Props {
 
 export function FloatingSessionTimer({ session, hostname, onEnded }: Props) {
   const [elapsed, setElapsed] = useState(0);
-  const [showNotes, setShowNotes] = useState(false);
-  const [notes, setNotes] = useState('');
+  const [showModal, setShowModal] = useState(false);
   const [ending, setEnding] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -25,20 +25,22 @@ export function FloatingSessionTimer({ session, hostname, onEnded }: Props) {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [session.startedAt]);
 
-  const fmt = (s: number) => {
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const sec = s % 60;
+  const fmt = (sec: number) => {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
     return h > 0
-      ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
-      : `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+      ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+      : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
-  const handleEnd = async () => {
+  const handleEnd = async (notes: string, closedTicketIds: string[]) => {
     setEnding(true);
     try {
-      await sessionsApi.end(session.id, notes || undefined);
-      toast.success('Sesja zakończona');
+      await sessionsApi.end(session.id, notes || undefined, closedTicketIds);
+      const n = closedTicketIds.length;
+      toast.success(n > 1 ? `Sesja zakończona — zamknięto ${n} zgłoszeń` : 'Sesja zakończona');
+      setShowModal(false);
       onEnded();
     } catch {
       toast.error('Błąd zakończenia sesji');
@@ -48,67 +50,47 @@ export function FloatingSessionTimer({ session, hostname, onEnded }: Props) {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
-      <div className="rounded-2xl shadow-2xl overflow-hidden w-72" style={{ background: 'var(--bg-card)', color: 'var(--t)', border: '1px solid var(--border)' }}>
-        {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-3 bg-indigo-600">
-          <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-          <Monitor className="h-4 w-4" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold truncate">{hostname}</p>
-            {session.client && (
-              <p className="text-[10px] text-indigo-200 truncate">{session.client.name}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Timer */}
-        <div className="px-4 pt-3 pb-2 text-center">
-          <p className="text-3xl font-mono font-bold tracking-wider">{fmt(elapsed)}</p>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--tm)' }}>czas połączenia</p>
-        </div>
-
-        {/* Notes section */}
-        {showNotes ? (
-          <div className="px-4 pb-3 space-y-2">
-            <textarea
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              placeholder="Co zrobiłeś w tej sesji?"
-              rows={3}
-              className="w-full text-xs rounded-xl px-3 py-2 resize-none focus:outline-none"
-              style={{ background: 'var(--hover-bg)', border: '1px solid var(--border)', color: 'var(--t)' }}
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowNotes(false)}
-                className="flex-1 text-xs py-2 rounded-xl transition-colors"
-                style={{ background: 'var(--hover-bg)', color: 'var(--ts)' }}
-              >
-                Anuluj
-              </button>
-              <button
-                onClick={handleEnd}
-                disabled={ending}
-                className="flex-1 text-xs py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 transition-colors font-medium flex items-center justify-center gap-1.5 disabled:opacity-50"
-              >
-                <Check className="h-3.5 w-3.5" />
-                {ending ? 'Zapisuję...' : 'Zakończ'}
-              </button>
+    <>
+      <div className="fixed bottom-6 right-6 z-50">
+        <div className="rounded-2xl shadow-2xl overflow-hidden w-72" style={{ background: 'var(--bg-card)', color: 'var(--t)', border: '1px solid var(--border)' }}>
+          <div className="flex items-center gap-3 px-4 py-3 bg-indigo-600">
+            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+            <Monitor className="h-4 w-4" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold truncate">{hostname}</p>
+              {session.client && (
+                <p className="text-[10px] text-indigo-200 truncate">{session.client.name}</p>
+              )}
             </div>
           </div>
-        ) : (
+
+          <div className="px-4 pt-3 pb-2 text-center">
+            <p className="text-3xl font-mono font-bold tracking-wider">{fmt(elapsed)}</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--tm)' }}>czas połączenia</p>
+          </div>
+
           <div className="px-4 pb-3">
             <button
-              onClick={() => setShowNotes(true)}
+              onClick={() => setShowModal(true)}
               className="w-full text-sm py-2.5 rounded-xl bg-red-600 hover:bg-red-500 transition-colors font-medium flex items-center justify-center gap-2"
             >
               <X className="h-4 w-4" />
               Zakończ sesję
             </button>
           </div>
-        )}
+        </div>
       </div>
-    </div>
+
+      {showModal && (
+        <EndSessionModal
+          session={session}
+          hostname={hostname}
+          elapsedSec={elapsed}
+          ending={ending}
+          onClose={() => setShowModal(false)}
+          onConfirm={handleEnd}
+        />
+      )}
+    </>
   );
 }

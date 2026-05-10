@@ -71,6 +71,12 @@ export async function startJobScheduler() {
       removeOnFail: 10,
     });
 
+    await queue.add('auto-resolve', {}, {
+      repeat: { every: 15 * 60 * 1000 }, // every 15 minutes
+      removeOnComplete: 5,
+      removeOnFail: 20,
+    });
+
     // Worker processes jobs
     const worker = new Worker('infradesk-jobs', async (job) => {
       switch (job.name) {
@@ -102,6 +108,11 @@ export async function startJobScheduler() {
         case 'trial-check': {
           const { checkTrialExpiry } = await import('../utils/trialChecker');
           return await checkTrialExpiry();
+        }
+
+        case 'auto-resolve': {
+          const { runAutoResolve } = await import('../utils/autoResolve');
+          return await runAutoResolve();
         }
 
         default:
@@ -163,6 +174,14 @@ function startLegacyJobs() {
       await checkSlaBreaches();
     } catch { /* silent */ }
   }, 5 * 60 * 1000);
+
+  // Auto-resolve agent tickets + alerts every 15 minutes
+  setInterval(async () => {
+    try {
+      const { runAutoResolve } = await import('../utils/autoResolve');
+      await runAutoResolve();
+    } catch { /* silent */ }
+  }, 15 * 60 * 1000);
 
   // Trial expiry check every hour
   setInterval(async () => {
