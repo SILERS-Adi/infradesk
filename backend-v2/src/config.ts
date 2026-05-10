@@ -52,6 +52,11 @@ const schema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.string().optional(),
+
+  // Sentry — pusty DSN = wyłączony (no-op). Sample rate domyślnie 10% w produkcji.
+  SENTRY_DSN: z.string().optional(),
+  SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.1),
+  SENTRY_RELEASE: z.string().optional(),
 });
 
 const parsed = schema.safeParse(process.env);

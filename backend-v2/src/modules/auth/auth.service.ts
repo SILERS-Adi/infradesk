@@ -23,6 +23,8 @@ export interface AuthResult {
     lastName: string;
     twoFactorEnabled: boolean;
     emailVerified: boolean;
+    /** OWNER role wymaga 2FA. Set gdy user jest OWNER ≥1 workspace ale 2FA wyłączone. */
+    mustEnable2FA?: boolean;
   };
   tokens: AuthTokens;
   defaultWorkspaceId?: string;
@@ -226,6 +228,16 @@ export async function login(input: LoginInput, ipAddress?: string, userAgent?: s
     data: { ipAddress: ipAddress ?? null, userAgent: userAgent?.slice(0, 400) ?? null },
   });
 
+  // OWNER musi mieć 2FA — wykrywamy gdy zalogowany OWNER bez 2FA i informujemy frontend.
+  let mustEnable2FA = false;
+  if (!user.twoFactorEnabled) {
+    const ownerMembership = await prisma.membership.findFirst({
+      where: { userId: user.id, status: 'ACTIVE', role: 'OWNER' },
+      select: { id: true },
+    });
+    if (ownerMembership) mustEnable2FA = true;
+  }
+
   return {
     user: {
       id: user.id,
@@ -234,6 +246,7 @@ export async function login(input: LoginInput, ipAddress?: string, userAgent?: s
       lastName: user.lastName,
       twoFactorEnabled: user.twoFactorEnabled,
       emailVerified: user.emailVerified,
+      mustEnable2FA,
     },
     tokens,
     defaultWorkspaceId: defaultMembership?.workspaceId,

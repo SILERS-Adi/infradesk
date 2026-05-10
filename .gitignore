@@ -57,3 +57,6 @@ agent/*.spec.bak*
 new_*.tsx
 new_*.css
 screenshot*.png
+
+# Design extracts (lokalne, nie commit)
+_idcore_extract/

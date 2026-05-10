@@ -5,6 +5,8 @@ import { Toaster } from 'react-hot-toast';
 import { Loader2 } from 'lucide-react';
 import { RequireAuth } from '@/features/auth/RequireAuth';
 import { RequireRole, type Role } from '@/features/auth/RequireRole';
+import { CookieBanner } from '@/components/ui/CookieBanner';
+import { ForceTwoFactorSetup } from '@/features/auth/ForceTwoFactorSetup';
 
 const ADMIN_ONLY: readonly Role[] = ['OWNER', 'ADMIN'];
 const SUPER_ADMIN_ONLY: readonly Role[] = []; // empty = require isSuperAdmin shortcut in RequireRole
@@ -41,6 +43,7 @@ const PobieraniePage  = lazyNamed(() => import('@/features/public/PobieraniePage
 const KontaktPage     = lazyNamed(() => import('@/features/public/KontaktPage'),     'KontaktPage');
 const ChangelogPage   = lazyNamed(() => import('@/features/public/ChangelogPage'),   'ChangelogPage');
 const LegalPage       = lazyNamed(() => import('@/features/public/LegalPage'),       'LegalPage');
+const PressPage       = lazyNamed(() => import('@/features/public/PressPage'),       'PressPage');
 
 // ─── Iris embed (standalone, used in iframes) ──────────────────────────────
 const IrisEmbedPage      = lazy(() => import('./features/iris/IrisEmbedPage'));
@@ -140,6 +143,7 @@ export default function App() {
               <Route path="/regulamin" element={<LegalPage />} />
               <Route path="/prywatnosc" element={<LegalPage />} />
               <Route path="/rodo" element={<LegalPage />} />
+              <Route path="/press" element={<PressPage />} />
             </Route>
 
             <Route
@@ -233,6 +237,8 @@ export default function App() {
           },
         }}
       />
+      <CookieBanner />
+      <ForceTwoFactorSetup />
     </QueryClientProvider>
   );
 }

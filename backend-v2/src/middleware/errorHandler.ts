@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
 import { HttpError } from '../utils/httpError';
 import { logger } from '../lib/logger';
+import { Sentry } from '../lib/sentry';
 
 export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction): void {
   if (err instanceof HttpError) {
@@ -18,6 +19,10 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
   }
 
   logger.error({ err, path: req.path, method: req.method, requestId: req.requestId }, 'unhandled error');
+  // Sentry capture — tylko 5xx (4xx są handle'owane wyżej i nie ma sensu zalewać).
+  Sentry.captureException(err, {
+    tags: { path: req.path, method: req.method, requestId: req.requestId },
+  });
   res.status(500).json({ error: 'internal', message: 'Internal server error' });
 }
 

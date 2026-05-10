@@ -1,3 +1,7 @@
+// Sentry MUSI być first import — przechwytuje crashes podczas init.
+import { initSentry } from './lib/sentry';
+initSentry();
+
 import { buildApp } from './app';
 import { config } from './config';
 import { logger } from './lib/logger';

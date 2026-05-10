@@ -8,6 +8,7 @@ export interface AuthUser {
   lastName: string;
   twoFactorEnabled: boolean;
   emailVerified: boolean;
+  mustEnable2FA?: boolean;
 }
 
 interface AuthState {

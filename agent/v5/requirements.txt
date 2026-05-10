@@ -10,3 +10,6 @@ pywin32>=306
 # Optional — Google Drive backup uploads
 google-api-python-client>=2.0
 google-auth>=2.0
+
+# Optional — Sentry error tracking (init only when SENTRY_DSN_AGENT env set)
+sentry-sdk>=2.0

@@ -1,0 +1,56 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/backend-v2"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - backend
+    groups:
+      prisma:
+        patterns:
+          - "@prisma/*"
+          - "prisma"
+      sentry:
+        patterns:
+          - "@sentry/*"
+
+  - package-ecosystem: npm
+    directory: "/frontend-v2"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - frontend
+    groups:
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@tanstack/*"
+      sentry:
+        patterns:
+          - "@sentry/*"
+
+  - package-ecosystem: pip
+    directory: "/agent/v5"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - agent
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    labels:
+      - dependencies
+      - ci

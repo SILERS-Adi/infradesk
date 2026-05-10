@@ -8,7 +8,39 @@ chosen variant.
 """
 from __future__ import annotations
 
+import os
 import sys
+
+
+def _init_sentry() -> None:
+    """Init Sentry SDK if available + configured. Pusty DSN = no-op (lokalny dev).
+    DSN przychodzi przez ENV (`SENTRY_DSN_AGENT`) — wpisany w build w version.json
+    lub instalator. NIE hardcodować w kodzie."""
+    dsn = os.environ.get("SENTRY_DSN_AGENT")
+    if not dsn:
+        return
+    try:
+        import sentry_sdk  # type: ignore
+        from .core.config import APP_VERSION
+        sentry_sdk.init(
+            dsn=dsn,
+            release=f"agent-v5@{APP_VERSION}",
+            environment=os.environ.get("SENTRY_ENV", "production"),
+            traces_sample_rate=0.05,
+            send_default_pii=False,
+            before_send=_filter_sentry_event,
+        )
+    except ImportError:
+        return
+    except Exception:
+        return
+
+
+def _filter_sentry_event(event, hint):
+    # Pomijamy znane czasowe błędy WS które same się rozwiązują.
+    if event.get("logger") == "websocket":
+        return None
+    return event
 
 
 def _acquire_single_instance_mutex() -> object | None:
@@ -35,6 +67,7 @@ _mutex_handle: object | None = None
 
 def main() -> None:
     global _mutex_handle
+    _init_sentry()
     # Hold mutex for process lifetime — gc'ing it would release on second start.
     _mutex_handle = _acquire_single_instance_mutex()
     # Phase 1: only business variant is shipped.
