@@ -1,207 +1,146 @@
 # InfraDesk
 
-**InfraDesk by SILERS** — Nowoczesna platforma operacyjna dla firm IT.
+**SaaS B2B dla firm IT typu MSP** — zarządzanie klientami, infrastrukturą,
+zgłoszeniami, monitoringiem i AI-asystentem w jednym panelu.
 
-## O projekcie
+🌐 [infradesk.pl](https://infradesk.pl) · ✉️ biuro@silers.pl · 📞 +48 575 662 664
 
-InfraDesk to produkcyjny system do zarządzania klientami, lokalizacjami, infrastrukturą IT, danymi dostępowymi i zgłoszeniami serwisowymi.
+## Funkcje
 
-**Moduły:**
-- Zarządzanie klientami i lokalizacjami
-- Inwentaryzacja urządzeń (CMDB)
-- Serwis / Helpdesk (zgłoszenia, komentarze, przypisania)
-- Vault danych dostępowych (szyfrowanie AES-256)
-- Identyfikacja urządzeń przez QR
-- Portal klienta
-- Logi aktywności / audit trail
-- Role: Administrator, Technik, Klient
+- **Helpdesk / Tickety** — pełen workflow (NEW → ASSIGNED → IN_PROGRESS → RESOLVED → CLOSED), SLA, kanban, email→ticket
+- **Klienci & Lokalizacje** — multi-workspace MSP (provider ↔ client)
+- **Urządzenia (CMDB)** — inventory, zdalny dostęp (RustDesk), monitoring metryk
+- **Asystent IT na Windows** — auto-update, audyty bezpieczeństwa, backupy SQL, restart usług, GPO checks
+- **Vault haseł** — AES-256-GCM, audit log, rotacja
+- **Sejf zamówień / faktury** — InvoiceItem, KSeF (planowane)
+- **AI Iris** — Claude API, tworzy/anuluje tickety, sprawdza status, dodaje komentarze
+- **Portal klienta** — okrojony widok dla pracowników klienta
+- **Backupy** — MySQL/Postgres/MSSQL z agenta, Fernet encryption, retention
+
+## Quick start (lokalny dev)
+
+### Wymagania
+- Node.js 20+
+- PostgreSQL 16
+- Python 3.11+ (tylko jeśli budujesz agenta)
+
+### Backend
+
+```bash
+cd backend-v2
+cp .env.example .env   # uzupełnij DATABASE_URL, JWT_SECRET, etc.
+npm ci
+npx prisma migrate dev
+npx prisma db seed     # opcjonalnie — testowe dane
+npm run dev            # http://localhost:3000
+```
+
+### Frontend
+
+```bash
+cd frontend-v2
+npm ci
+npm run dev            # http://localhost:5173
+```
+
+### Asystent (Windows tylko)
+
+```powershell
+cd agent
+pip install -r v5/requirements.txt
+python -m v5.main
+# Build EXE: pyinstaller "InfraDesk Business v5.spec"
+```
+
+## Struktura monorepo
+
+```
+infradesk/
+├── backend-v2/         Node + Express + Prisma (REST + WS)
+│   ├── prisma/         schema.prisma + migrations
+│   ├── src/
+│   │   ├── modules/    routery per-feature (auth, tickets, vault, ...)
+│   │   ├── jobs/       background schedulers
+│   │   ├── lib/        prisma, mailer, logger, jwt, crypto
+│   │   ├── middleware/ auth, requireWorkspace, rateLimit, ...
+│   │   └── utils/      stałe, helpery, ticket state machine
+│   └── scripts/        deploy, backfill, sync skrypty
+│
+├── frontend-v2/        React 18 + Vite + Tailwind + RQ
+│   └── src/
+│       ├── features/   strony per-feature (auth, tickets, dashboard, ...)
+│       ├── components/ ui/, layout/ (Sidebar, AppShell, Topbar)
+│       ├── lib/        api (axios), utils
+│       └── store/      Zustand (auth, ui state)
+│
+├── agent/              Python + PyInstaller
+│   ├── v5/             aktualny kod (modułowy)
+│   │   ├── core/       backup, update, ws, diagnostics, metrics
+│   │   ├── variants/   business, home, server
+│   │   └── main.py
+│   ├── ui/             HTML dla pywebview (business.html)
+│   └── InfraDesk Business v5.spec
+│
+├── id-faktura/         Osobne mini-app: faktury (Express + Vite)
+├── docs/               Dokumentacja techniczna
+│   ├── architecture.md
+│   ├── runbook.md
+│   ├── deploy.md
+│   └── security.md
+├── CLAUDE.md           Kontekst dla AI agentów (Claude Code etc.)
+├── CHANGELOG.md        Release notes
+└── CONTRIBUTING.md     Konwencje i PR flow
+```
 
 ## Stack
 
 | Warstwa | Technologia |
 |---------|-------------|
-| Backend | Node.js, Express.js, TypeScript |
-| Frontend | React 18, Vite, TypeScript, Tailwind CSS |
-| Baza danych | PostgreSQL 16 |
-| ORM | Prisma |
-| Auth | JWT (access 15min + refresh 7d) |
-| Deployment | Docker, docker-compose |
-
-## Struktura projektu
-
-```
-infradesk/
-├── backend/
-│   ├── prisma/
-│   │   ├── schema.prisma
-│   │   └── seed.ts
-│   └── src/
-│       ├── app.ts
-│       ├── config/
-│       ├── lib/
-│       ├── middleware/
-│       ├── modules/
-│       │   ├── auth/
-│       │   ├── users/
-│       │   ├── clients/
-│       │   ├── locations/
-│       │   ├── devices/
-│       │   ├── credentials/
-│       │   ├── tickets/
-│       │   ├── activityLogs/
-│       │   └── dashboard/
-│       └── utils/
-├── frontend/
-│   └── src/
-│       ├── api/
-│       ├── components/
-│       │   ├── ui/
-│       │   ├── layout/
-│       │   └── forms/
-│       ├── pages/
-│       │   ├── auth/
-│       │   ├── admin/
-│       │   ├── portal/
-│       │   └── qr/
-│       ├── store/
-│       └── types/
-├── docker-compose.yml
-├── docker-compose.dev.yml
-└── README.md
-```
-
-## Konta demo
-
-| Rola | Email | Hasło |
-|------|-------|-------|
-| Administrator | admin@infradesk.pl | Admin123! |
-| Technik | jan.kowalski@infradesk.pl | Tech123! |
-| Technik | anna.nowak@infradesk.pl | Tech123! |
-| Klient | portal@techcorp.pl | Client123! |
-| Klient | portal@retailchain.pl | Client123! |
-| Klient | portal@hospital.pl | Client123! |
-
-## Uruchomienie z Dockerem (produkcja)
-
-```bash
-git clone <repo>
-cd infradesk
-
-# Uruchom kontenery
-docker-compose up -d --build
-
-# Uruchom migracje i seed
-docker exec infradesk-backend npx prisma migrate deploy
-docker exec infradesk-backend npm run db:seed
-
-# Otwórz aplikację
-http://localhost        # Frontend
-http://localhost:3000   # Backend API
-```
-
-## Uruchomienie lokalne (development)
-
-```bash
-# 1. Uruchom bazę danych
-docker-compose -f docker-compose.dev.yml up -d
-
-# 2. Backend
-cd backend
-npm install
-cp .env.example .env    # uzupełnij zmienne
-npx prisma generate
-npx prisma migrate dev
-npm run db:seed
-npm run dev             # http://localhost:3000
-
-# 3. Frontend (nowy terminal)
-cd frontend
-npm install
-cp .env.example .env
-npm run dev             # http://localhost:5173
-```
-
-## Zmienne środowiskowe
-
-### backend/.env
-
-| Zmienna | Opis | Przykład |
-|---------|------|---------|
-| DATABASE_URL | Connection string do PostgreSQL | postgresql://infradesk:infradesk@localhost:5432/infradesk |
-| JWT_SECRET | Klucz JWT (min 32 znaki) | losowy string |
-| JWT_REFRESH_SECRET | Klucz refresh token (min 32 znaki) | losowy string |
-| ENCRYPTION_KEY | Klucz AES-256 (dokładnie 32 znaki) | losowy 32-znakowy string |
-| PORT | Port backendu | 3000 |
-| NODE_ENV | Środowisko | development / production |
-
-### frontend/.env
-
-| Zmienna | Opis |
-|---------|------|
-| VITE_API_URL | URL backendu | http://localhost:3000/api |
-
-## API — główne endpointy
-
-```
-POST   /api/auth/login
-POST   /api/auth/refresh
-GET    /api/auth/me
-
-GET    /api/clients
-GET    /api/clients/:id
-POST   /api/clients
-PATCH  /api/clients/:id
-
-GET    /api/locations
-GET    /api/locations/:id
-POST   /api/locations
-
-GET    /api/devices
-GET    /api/devices/:id
-GET    /api/devices/:id/qr      → base64 PNG
-GET    /api/qr/:qrCodeValue     → publiczny endpoint QR
-POST   /api/devices
-
-GET    /api/credentials
-POST   /api/credentials
-POST   /api/credentials/:id/reveal   → odszyfruj hasło (logowane)
-
-GET    /api/tickets
-POST   /api/tickets
-GET    /api/tickets/:id
-POST   /api/tickets/:id/comments
-POST   /api/tickets/:id/assign
-POST   /api/tickets/:id/status
-
-GET    /api/activity-logs
-GET    /api/dashboard
-GET    /api/dashboard/client
-```
+| Backend | Node.js 20, TypeScript, Express, Prisma, Pino |
+| Frontend | React 18, Vite, TypeScript, Tailwind, Radix UI, React Query, Zustand |
+| DB | PostgreSQL 16 + Row Level Security |
+| Auth | JWT (15min access + 7d refresh httpOnly), 2FA TOTP |
+| AI | Anthropic Claude API |
+| Agent | Python 3.11, PyInstaller, pywebview, websockets |
+| Płatności | Paynow (przez `pay.infradesk.pl`) |
+| Mail | SMTP (Postfix lokalny) |
 
 ## Bezpieczeństwo
 
-- Hasła użytkowników: bcrypt
-- Hasła w vault: szyfrowanie AES-256-CBC
-- Hasła nigdy nie są zwracane w listach ani szczegółach
-- Odsłonięcie hasła tylko przez `/reveal` z logowaniem audytowym
-- JWT access token: 15 minut
-- JWT refresh token: 7 dni
-- Izolacja danych klientów na poziomie backendu
+- **Workspace isolation** — dwie linie obrony (aplikacja + Postgres RLS FORCE)
+- **TLS** — Let's Encrypt, A+ rating
+- **Tokens** — access in-memory, refresh httpOnly cookie
+- **Audit** — pełen ActivityLog per akcja, `audit-logs.routes.ts`
+- **Secrets** — DATABASE_URL/JWT_SECRET/API keys przez env, nigdy w repo
+- **Backupy** — codzienne pg_dump, retention 14d, integrity verify
 
-## Deploy na VPS
+Pełen security model: [`docs/security.md`](docs/security.md).
 
-```bash
-# Na serwerze Ubuntu/Debian
-sudo apt install docker.io docker-compose -y
+## Deployment
 
-git clone <repo> /var/www/infradesk
-cd /var/www/infradesk
+Pojedynczy serwer (DigitalOcean droplet, 188.68.236.166:2222).
+Frontend serwowany przez nginx z `frontend-v2/dist/`. Backend pm2 (`infradesk-api`).
 
-# Uzupełnij sekrety w docker-compose.yml
-# ...
+Procedure: [`docs/deploy.md`](docs/deploy.md). Incident playbook: [`docs/runbook.md`](docs/runbook.md).
 
-docker-compose up -d --build
-docker exec infradesk-backend npm run db:seed
+## Roadmap (najbliższe)
 
-# Domena: infradesk.pl → port 80
-```
+- [ ] Sentry + UptimeRobot + status.infradesk.pl
+- [ ] CI/CD (GitHub Actions) + staging env
+- [ ] Off-site backup (Backblaze B2)
+- [ ] PgBouncer + Redis
+- [ ] Mobile drawer + Kanban a11y improvements
+- [ ] DPA template + KSeF integration
+- [ ] Multi-region (DE/NL) — gdy >10 klientów
+
+Pełen [CHANGELOG.md](CHANGELOG.md).
+
+## Wsparcie
+
+- **Dokumentacja techniczna:** `docs/`
+- **Wsparcie klienta:** biuro@silers.pl, +48 575 662 664
+- **Issue / bug raport:** wewnętrznie do Silers (na razie nie ma publicznego repo)
+
+## Licencja
+
+Proprietary © 2026 Silers Adrian Błaszczykowski. Wszelkie prawa zastrzeżone.
