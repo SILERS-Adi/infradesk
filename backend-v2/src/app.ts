@@ -45,6 +45,7 @@ import { irisEmbedRouter } from './modules/iris/iris-embed.controller';
 import { irisChatRouter } from './modules/iris/iris-chat.controller';
 import oauthRouter, { discoveryRouter as oauthDiscoveryRouter } from './modules/auth-oidc/auth-oidc.routes';
 import settingsRouter from './modules/settings/settings.routes';
+import notificationsRouter from './modules/notifications/notifications.routes';
 import path from 'path';
 
 export function buildApp(): Express {
@@ -155,6 +156,7 @@ export function buildApp(): Express {
   app.use('/api/v2/iris', irisChatRouter());
   app.use('/api/v2/iris', irisEmbedRouter(requireAuth));
   app.use("/api/v2/settings", settingsRouter);
+  app.use('/api/v2/notifications', notificationsRouter);
   // Static uploads (logos, etc.) served under /uploads/* for the backend origin.
   // Block /uploads/tickets/* — ticket attachments must go through auth-gated route.
   app.use("/uploads/tickets", (_req, res) => res.status(404).end());
