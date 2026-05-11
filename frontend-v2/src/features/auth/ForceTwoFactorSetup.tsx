@@ -45,12 +45,13 @@ export function ForceTwoFactorSetup() {
       toast.error(err?.response?.data?.message ?? 'Nieprawidłowy kod'),
   });
 
-  // Auto-start setup gdy modal się pokazuje (tylko jeśli OWNER faktycznie musi włączyć 2FA).
-  // Bez tej straży komponent woła /auth/2fa/setup na publicznych stronach → 401 w konsoli.
+  // Auto-start setup tylko gdy: (a) OWNER faktycznie musi włączyć 2FA, (b) mamy ważny accessToken.
+  // user.mustEnable2FA siedzi w localStorage i może być true mimo wygasłej sesji — bez guard
+  // na accessToken komponent wali POST /auth/2fa/setup → 401 zaraz przy restore sesji.
   useEffect(() => {
-    if (user?.mustEnable2FA && step === 'init') setupMut.mutate();
+    if (user?.mustEnable2FA && accessToken && step === 'init') setupMut.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.mustEnable2FA]);
+  }, [user?.mustEnable2FA, accessToken]);
 
   if (!user?.mustEnable2FA) return null;
 
