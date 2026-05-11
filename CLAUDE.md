@@ -118,18 +118,30 @@ Pełen standard: `~/.claude/projects/C--Users-adria-infradesk/memory/security_st
 ## Deploy
 
 Production: pojedynczy serwer `188.68.236.166:2222`, ssh user `adrian`.
-- `/home/adrian/infradesk-v2/` — kod, deploy z gita
-- pm2 process `infradesk-api` (backend), nginx serwuje frontend z `frontend-v2/dist/`
+- `/home/adrian/infradesk/` — kod, deploy z gita (repo clone, NIE `infradesk-v2`)
+- pm2 process `infradesk-v2-backend` (port wewnętrzny 7690), nginx proxy + static frontend
+- Frontend serwowany z `/var/www/infradesk-v2/` (nie z `frontend-v2/dist/` — to musi być **skopiowane** po buildzie)
 - DB Postgres lokalna, port 5432
 - Backup: `~/db-backups/` retention 14d, integrity verify (`gunzip -t`)
 
 **Procedure (skrót):**
 ```bash
 ssh -p 2222 adrian@188.68.236.166
-cd /home/adrian/infradesk-v2 && git pull
-cd backend-v2 && npm ci --omit=dev && npx prisma migrate deploy && pm2 restart infradesk-api
-cd ../frontend-v2 && npm ci && npm run build && sudo nginx -s reload
+cd /home/adrian/infradesk && git pull
+
+# Backend — pełny npm ci (tsc jest devDep, potrzebny do builda)
+cd backend-v2 && npm ci && npx prisma migrate deploy && npm run build && pm2 restart infradesk-v2-backend --update-env
+
+# Frontend — build + RSYNC do /var/www (krok często pomijany!)
+cd ../frontend-v2 && npm ci && npm run build \
+  && sudo rsync -a --delete --exclude=downloads/ dist/ /var/www/infradesk-v2/ \
+  && sudo nginx -s reload
 ```
+
+**Pułapki:**
+- `npm ci --omit=dev` w backend wywali tsc (TypeScript = devDep) → `npm run build` zawiedzie. Zostaw dev deps na serwerze.
+- Pominięcie `rsync` po `npm run build` w frontend = nginx serwuje stare bundle w nieskończoność.
+- `--exclude=downloads/` w rsync chroni instalatory asystenta (~60 MB) przed wycięciem.
 
 Pełen procedure: `docs/deploy.md`. Smoke testy + rollback: `docs/runbook.md`.
 

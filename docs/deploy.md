@@ -17,18 +17,21 @@ Pełny procedure deployu na produkcję. Aktualnie ręczny — w P1 do CI/CD.
 └────────────────┬────────────────────────────────────────┘
                  │ git pull
                  ▼
-┌─────────────────────────────────────────────────────────┐
-│  Server 188.68.236.166                                  │
-│  /home/adrian/infradesk-v2/                             │
-│  ├── backend-v2/    pm2 process "infradesk-api" :3000   │
-│  ├── frontend-v2/   build → /var/www/.../dist (nginx)   │
-│  └── id-faktura/    pm2 process "id-faktura"           │
-│                                                         │
-│  /var/www/infradesk-v2/downloads/                       │
-│  └── InfraDeskBusiness.exe + version.json (asystent)    │
-│                                                         │
-│  /home/adrian/db-backups/  (cron 03:00, retention 14d)  │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│  Server 188.68.236.166                                           │
+│  /home/adrian/infradesk/                                         │
+│  ├── backend-v2/    pm2 "infradesk-v2-backend" :7690 (internal)  │
+│  └── frontend-v2/   build → rsync → /var/www/infradesk-v2/       │
+│                                                                  │
+│  /var/www/infradesk-v2/        ← nginx root (NIE symlink!)       │
+│  ├── index.html, assets/       ← rsync target po npm run build   │
+│  └── downloads/                ← installery asystenta (~60 MB,   │
+│                                  exclude w rsync, NIE wycinaj)   │
+│                                                                  │
+│  /home/adrian/idfaktura/       pm2 "idfaktura-backend"           │
+│                                                                  │
+│  /home/adrian/db-backups/  (cron 03:00, retention 14d)           │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ## Pełny deploy procedure
@@ -58,14 +61,14 @@ sudo -u postgres pg_dump infradesk_v2_dev | gzip > ~/db-backups/pre-deploy-$(dat
 ls -lh ~/db-backups/pre-deploy-*.sql.gz | tail -1
 # >10MB ✓
 
-# Backup current frontend dist (rollback bez rebuild)
-cp -r /home/adrian/infradesk-v2/frontend-v2/dist /home/adrian/dist-backups/$(date +%F-%H%M)
+# Backup current frontend (rollback bez rebuild)
+sudo cp -r /var/www/infradesk-v2 /home/adrian/dist-backups/$(date +%F-%H%M)
 ```
 
 ### 3. Pull kodu
 
 ```bash
-cd /home/adrian/infradesk-v2
+cd /home/adrian/infradesk
 git fetch origin
 git log HEAD..origin/main --oneline   # zobacz co przyjdzie
 git pull origin main
@@ -76,8 +79,9 @@ git pull origin main
 ```bash
 cd backend-v2
 
-# Dependencies (--omit=dev = production)
-npm ci --omit=dev
+# Dependencies — PEŁNE (NIE --omit=dev). TypeScript/tsc to devDependency
+# i jest potrzebny do `npm run build`. Bez tego krok build wywali "tsc: not found".
+npm ci
 
 # Prisma
 npx prisma generate
@@ -85,12 +89,15 @@ npx prisma migrate deploy   # idempotentne, każda migracja w transakcji
 # Sprawdź:
 sudo -u postgres psql infradesk_v2_dev -c "SELECT migration_name FROM _prisma_migrations ORDER BY started_at DESC LIMIT 5;"
 
+# Build TypeScript → dist/ (pm2 startuje z dist/index.js)
+npm run build
+
 # Restart backendu
-pm2 restart infradesk-api
+pm2 restart infradesk-v2-backend --update-env
 
 # Verify
 sleep 3
-pm2 logs infradesk-api --lines 50 --nostream | grep -iE 'error|listen|started'
+pm2 logs infradesk-v2-backend --lines 50 --nostream | grep -iE 'error|listen|started'
 # ❗ STOP gdy widzisz "Cannot find module" / "Environment variable not found"
 curl -I https://infradesk.pl/health
 # 200 OK ✓
@@ -103,9 +110,16 @@ cd ../frontend-v2
 
 npm ci
 npm run build
-# Build powinien dać `dist/` w ~30s
+# Build daje `dist/` w ~30s
 
-# Reload nginx (frontend serwowany jest z dist/ — nginx ma do tego symlink)
+# KRYTYCZNE: nginx NIE serwuje z dist/ — root to /var/www/infradesk-v2/.
+# Trzeba skopiować dist → /var/www. Bez tego nginx serwuje stary bundle do skończoności świata.
+# --exclude=downloads/  → zachowuje installery asystenta (~60 MB) w /var/www/infradesk-v2/downloads/
+sudo rsync -a --delete --exclude=downloads/ dist/ /var/www/infradesk-v2/
+
+# Verify nowy bundle jest live
+grep -oE 'index-[A-Za-z0-9_-]+\.js' /var/www/infradesk-v2/index.html
+
 sudo nginx -t && sudo nginx -s reload
 ```
 
@@ -179,7 +193,7 @@ Po wgraniu `version.json`:
 
 ```bash
 ssh -p 2222 adrian@188.68.236.166
-cd /home/adrian/infradesk-v2
+cd /home/adrian/infradesk
 
 # Identyfikuj problem commit
 git log -5 --oneline
@@ -189,11 +203,13 @@ git log -5 --oneline
 git reset --hard 69963b3
 # LUB git reset --hard HEAD~1
 
-# Backend
-cd backend-v2 && npm ci --omit=dev && pm2 restart infradesk-api
+# Backend (pełny npm ci, bo tsc potrzebny do builda)
+cd backend-v2 && npm ci && npm run build && pm2 restart infradesk-v2-backend --update-env
 
-# Frontend
-cd ../frontend-v2 && npm ci && npm run build && sudo nginx -s reload
+# Frontend — pamiętaj o rsync!
+cd ../frontend-v2 && npm ci && npm run build \
+  && sudo rsync -a --delete --exclude=downloads/ dist/ /var/www/infradesk-v2/ \
+  && sudo nginx -s reload
 
 # Migracje są IDEMPOTENTNE — nie trzeba cofać. Sprawdź:
 # sudo -u postgres psql infradesk_v2_dev -c "SELECT migration_name FROM _prisma_migrations ORDER BY started_at DESC LIMIT 5;"
@@ -206,7 +222,7 @@ soft-delete + idempotency).
 
 ```bash
 # 1. Zatrzymaj backend
-pm2 stop infradesk-api
+pm2 stop infradesk-v2-backend
 
 # 2. Restore z pre-deploy backup
 gunzip -c ~/db-backups/pre-deploy-2026-XX-XX-HHMM.sql.gz | sudo -u postgres psql infradesk_v2_dev_restore
@@ -219,7 +235,7 @@ sudo -u postgres psql -c "ALTER DATABASE infradesk_v2_dev RENAME TO infradesk_v2
 sudo -u postgres psql -c "ALTER DATABASE infradesk_v2_dev_restore RENAME TO infradesk_v2_dev;"
 
 # 5. Start backend
-pm2 start infradesk-api
+pm2 start infradesk-v2-backend
 
 # 6. Po sprawdzeniu — usuń _broken po 7 dniach
 ```
@@ -319,13 +335,13 @@ jobs:
     steps:
       - name: SSH deploy
         run: |
-          ssh ... "cd ~/infradesk-v2 && git pull && cd backend-v2 && npm ci --omit=dev && npx prisma migrate deploy && pm2 restart infradesk-api"
-          ssh ... "cd ~/infradesk-v2/frontend-v2 && npm ci && npm run build && sudo nginx -s reload"
+          ssh ... "cd ~/infradesk && git pull && cd backend-v2 && npm ci && npx prisma migrate deploy && npm run build && pm2 restart infradesk-v2-backend --update-env"
+          ssh ... "cd ~/infradesk/frontend-v2 && npm ci && npm run build && sudo rsync -a --delete --exclude=downloads/ dist/ /var/www/infradesk-v2/ && sudo nginx -s reload"
 ```
 
 ## Checklist po każdym deployu
 
-- [ ] `pm2 logs infradesk-api --err --lines 100` — brak nowych errorów (oprócz znanych)
+- [ ] `pm2 logs infradesk-v2-backend --err --lines 100` — brak nowych errorów (oprócz znanych)
 - [ ] UptimeRobot zielony
 - [ ] Sentry: brak nowych unique errors
 - [ ] Smoke test login + dashboard load
