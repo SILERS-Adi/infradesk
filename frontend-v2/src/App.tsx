@@ -120,6 +120,20 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            style: {
+              background: 'var(--sf)',
+              color: 'var(--tx)',
+              border: '1px solid var(--bd)',
+              borderRadius: 'var(--r-s)',
+              fontSize: 13,
+            },
+          }}
+        />
+        <CookieBanner />
+        <ForceTwoFactorSetup />
         <Suspense fallback={<FullPageSpinner />}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
@@ -225,20 +239,6 @@ export default function App() {
           </Routes>
         </Suspense>
       </BrowserRouter>
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          style: {
-            background: 'var(--sf)',
-            color: 'var(--tx)',
-            border: '1px solid var(--bd)',
-            borderRadius: 'var(--r-s)',
-            fontSize: 13,
-          },
-        }}
-      />
-      <CookieBanner />
-      <ForceTwoFactorSetup />
     </QueryClientProvider>
   );
 }
