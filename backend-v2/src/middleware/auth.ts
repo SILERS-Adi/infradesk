@@ -3,7 +3,6 @@ import { verifyAccessToken } from '../lib/jwt';
 import { HttpError } from '../utils/httpError';
 import { prisma } from '../lib/prisma';
 import { requestContextStore } from '../lib/requestContext';
-import { logger } from '../lib/logger';
 
 function extractToken(req: Request): string | null {
   const header = req.header('authorization');
@@ -16,34 +15,18 @@ function extractToken(req: Request): string | null {
 export async function requireAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
   try {
     const token = extractToken(req);
-    if (!token) {
-      logger.warn({ path: req.path }, '[auth-debug] no token');
-      throw HttpError.unauthorized('Missing access token');
-    }
+    if (!token) throw HttpError.unauthorized('Missing access token');
 
-    let payload;
-    try { payload = verifyAccessToken(token); } catch (e) {
-      logger.warn({ path: req.path, err: (e as Error).message }, '[auth-debug] jwt verify failed');
-      throw HttpError.unauthorized('Invalid access token');
-    }
+    const payload = verifyAccessToken(token);
 
     // Token revocation check — tokenVersion must match the current User.tokenVersion.
+    // This lets logout-everywhere / password-change invalidate all access tokens.
     const user = await prisma.user.findUnique({
       where: { id: payload.sub },
       select: { id: true, tokenVersion: true, isActive: true, deletedAt: true, isSuperAdmin: true },
     });
-    if (!user) {
-      logger.warn({ path: req.path, sub: payload.sub }, '[auth-debug] user not found by id from token');
-      throw HttpError.unauthorized('Account not active');
-    }
-    if (!user.isActive || user.deletedAt) {
-      logger.warn({ path: req.path, sub: payload.sub, isActive: user.isActive, deletedAt: user.deletedAt }, '[auth-debug] user inactive/deleted');
-      throw HttpError.unauthorized('Account not active');
-    }
-    if (user.tokenVersion !== payload.tokenVersion) {
-      logger.warn({ path: req.path, sub: payload.sub, dbV: user.tokenVersion, tokV: payload.tokenVersion }, '[auth-debug] tokenVersion mismatch');
-      throw HttpError.unauthorized('Token revoked');
-    }
+    if (!user || !user.isActive || user.deletedAt) throw HttpError.unauthorized('Account not active');
+    if (user.tokenVersion !== payload.tokenVersion) throw HttpError.unauthorized('Token revoked');
 
     req.auth = { ...payload, isSuperAdmin: user.isSuperAdmin };
 

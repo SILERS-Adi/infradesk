@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { Loader2 } from 'lucide-react';
 import { RequireAuth } from '@/features/auth/RequireAuth';
+import { AuthBootstrap } from '@/features/auth/AuthBootstrap';
 import { RequireRole, type Role } from '@/features/auth/RequireRole';
 import { CookieBanner } from '@/components/ui/CookieBanner';
 import { ForceTwoFactorSetup } from '@/features/auth/ForceTwoFactorSetup';
@@ -120,6 +121,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        <AuthBootstrap>
         <Toaster
           position="top-right"
           toastOptions={{
@@ -238,6 +240,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
+        </AuthBootstrap>
       </BrowserRouter>
     </QueryClientProvider>
   );
