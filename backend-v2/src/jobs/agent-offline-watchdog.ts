@@ -99,27 +99,52 @@ async function alertOne(a: OfflineAgent): Promise<void> {
       <p style="color:#9ca3af;font-size:12px">Najczęstsze przyczyny: usługa zatrzymana, restart bez auto-start, brak internetu.</p>
     </div>`;
 
-  await Promise.all(recipients.map((u) => sendMail({
-    to: u.email,
-    subject,
-    text,
-    html,
-  })));
+  // allSettled — jedna wadliwa skrzynka (np. 511 EENVELOPE bounce) nie może
+  // zablokować markera cooldown, bo wtedy co iterację (60min) leci ten sam alert
+  // dla wszystkich pozostałych asystentów = log spam i kosztowne SMTP retry.
+  const results = await Promise.all(
+    recipients.map(async (u) => {
+      try {
+        await sendMail({ to: u.email, subject, text, html });
+        return { ok: true as const, email: u.email };
+      } catch (err) {
+        return { ok: false as const, email: u.email, err };
+      }
+    }),
+  );
+  const sent = results.filter((r) => r.ok).length;
+  const bounced = results.filter((r) => !r.ok);
+  for (const b of bounced) {
+    logger.warn(
+      { agentId: a.id, recipient: b.email, err: b.err },
+      '[agent-offline-watchdog] recipient bounce — marker zapiszemy mimo to',
+    );
+  }
 
-  // Marker żeby nie spamować
+  // Marker ZAWSZE — nawet gdy wszystkie maile bounce'owały. Inaczej spam co 1h.
   await prismaBg.activityLog.create({
     data: {
       workspaceId: a.workspaceId,
       entityType: 'agent',
       entityId: a.id,
       actionType: 'agent_offline_alert_sent',
-      description: `Alert wysłany — Asystent ${a.hostname} offline ${hoursOffline}h`,
+      description: `Alert wysłany — Asystent ${a.hostname} offline ${hoursOffline}h (sent=${sent}, bounced=${bounced.length})`,
       performedByUserId: null,
-      metadata: { hostname: a.hostname, hoursOffline, lastSeen: a.lastSeen?.toISOString() ?? null },
+      metadata: {
+        hostname: a.hostname,
+        hoursOffline,
+        lastSeen: a.lastSeen?.toISOString() ?? null,
+        sent,
+        bounced: bounced.length,
+        bouncedRecipients: bounced.map((b) => b.email),
+      },
     },
   }).catch((err: unknown) => logger.warn({ err, agentId: a.id }, '[agent-offline-watchdog] activity log failed'));
 
-  logger.warn({ agentId: a.id, hostname: a.hostname, hoursOffline }, '[agent-offline-watchdog] alert sent');
+  logger.warn(
+    { agentId: a.id, hostname: a.hostname, hoursOffline, sent, bounced: bounced.length },
+    '[agent-offline-watchdog] alert processed',
+  );
 }
 
 export async function runAgentOfflineSweep(): Promise<{ found: number; alerted: number }> {
