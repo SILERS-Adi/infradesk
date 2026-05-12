@@ -4,14 +4,18 @@
 import { useEffect, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import QRCode from 'qrcode';
 import { Loader2, Shield, AlertTriangle, Copy, Check } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { useAuthStore } from '@/store/auth';
 
 interface SetupResponse {
-  qrCodeDataUrl: string;
   secret: string;
+  otpauthUri: string;
+}
+
+interface ConfirmResponse {
   backupCodes: string[];
 }
 
@@ -23,18 +27,30 @@ export function ForceTwoFactorSetup() {
   const [step, setStep] = useState<'init' | 'qr' | 'verify' | 'backup'>('init');
   const [code, setCode] = useState('');
   const [setup, setSetup] = useState<SetupResponse | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
   const [copied, setCopied] = useState(false);
 
   const setupMut = useMutation({
     mutationFn: async () => (await api.post<SetupResponse>('/auth/2fa/setup')).data,
-    onSuccess: (data) => { setSetup(data); setStep('qr'); },
+    onSuccess: async (data) => {
+      setSetup(data);
+      try {
+        const dataUrl = await QRCode.toDataURL(data.otpauthUri, { margin: 1, width: 220 });
+        setQrDataUrl(dataUrl);
+      } catch {
+        // Fallback: jeśli generacja QR padła, user może wpisać secret ręcznie.
+      }
+      setStep('qr');
+    },
     onError: (err: { response?: { data?: { message?: string } } }) =>
       toast.error(err?.response?.data?.message ?? 'Nie udało się rozpocząć konfiguracji'),
   });
 
   const confirmMut = useMutation({
-    mutationFn: async () => (await api.post('/auth/2fa/confirm', { code })).data,
-    onSuccess: () => {
+    mutationFn: async () => (await api.post<ConfirmResponse>('/auth/2fa/confirm', { code })).data,
+    onSuccess: (data) => {
+      setBackupCodes(data.backupCodes);
       // Aktualizuj store: 2FA włączone, flaga zniknęła
       if (user) {
         setSession({ ...user, twoFactorEnabled: true, mustEnable2FA: false }, accessToken!, workspaceId ?? undefined);
@@ -99,7 +115,11 @@ export function ForceTwoFactorSetup() {
         {step === 'qr' && setup && (
           <div className="space-y-3">
             <div className="rounded-[var(--r-s)] p-3 bg-white flex justify-center">
-              <img src={setup.qrCodeDataUrl} alt="QR code 2FA" width={180} height={180} />
+              {qrDataUrl ? (
+                <img src={qrDataUrl} alt="QR code 2FA" width={180} height={180} />
+              ) : (
+                <p className="text-[11px] text-tx2 text-center py-8">QR niedostępny — użyj sekretu poniżej ręcznie.</p>
+              )}
             </div>
             <p className="text-[11px] text-tx3 text-center">
               Zeskanuj w aplikacji TOTP. Lub wpisz ręcznie sekret:
@@ -150,7 +170,7 @@ export function ForceTwoFactorSetup() {
           </div>
         )}
 
-        {step === 'backup' && setup && (
+        {step === 'backup' && backupCodes && (
           <div className="space-y-3">
             <p className="text-[12px] text-tx font-semibold">2FA aktywne ✓</p>
             <p className="text-[11px] text-tx3">
@@ -158,14 +178,14 @@ export function ForceTwoFactorSetup() {
               Każdy działa <strong>tylko raz</strong>.
             </p>
             <div className="grid grid-cols-2 gap-1 p-3 rounded-[var(--r-s)] bg-sf-h font-mono text-[11px]">
-              {setup.backupCodes.map((c) => (
+              {backupCodes.map((c) => (
                 <div key={c} className="text-tx">{c}</div>
               ))}
             </div>
             <Button
               onClick={() => {
                 const blob = new Blob(
-                  [`InfraDesk — kody zapasowe 2FA dla ${user?.email}\n\n${setup.backupCodes.join('\n')}\n\nKażdy kod działa raz. Trzymaj w sejfie.`],
+                  [`InfraDesk — kody zapasowe 2FA dla ${user?.email}\n\n${backupCodes.join('\n')}\n\nKażdy kod działa raz. Trzymaj w sejfie.`],
                   { type: 'text/plain' },
                 );
                 const url = URL.createObjectURL(blob);
