@@ -16,13 +16,25 @@ export function AuthBootstrap({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!needsBootstrap) return;
     let cancelled = false;
+    // setReady(true) PRZED setAccessToken/logout — inaczej store update
+    // triggeruje re-render, useEffect cleanup ustawia cancelled=true,
+    // a .finally() wykonuje się PO cleanup i guard blokuje setReady →
+    // wieczny spinner. Deps celowo puste: effect ma odpalić raz przy mount.
     axios
       .post('/api/v2/auth/refresh', null, { withCredentials: true })
-      .then((r) => { if (!cancelled) setAccessToken(r.data.accessToken); })
-      .catch(() => { if (!cancelled) logout(); })
-      .finally(() => { if (!cancelled) setReady(true); });
+      .then((r) => {
+        if (cancelled) return;
+        setReady(true);
+        setAccessToken(r.data.accessToken);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setReady(true);
+        logout();
+      });
     return () => { cancelled = true; };
-  }, [needsBootstrap, setAccessToken, logout]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!ready) {
     return (
