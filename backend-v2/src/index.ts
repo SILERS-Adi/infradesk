@@ -2,6 +2,14 @@
 import { initSentry } from './lib/sentry';
 initSentry();
 
+// BigInt nie ma natywnej obsługi JSON.stringify — Express res.json() wywala 500
+// dla każdego response zawierającego pole typu Bytes/Counter (np. backup history
+// sizeBytes, workspace storageQuotaBytes, storage file sizeBytes). Patch globalny:
+// BigInt zawsze serializuje się jako string (frontend i tak czyta string).
+(BigInt.prototype as unknown as { toJSON: () => string }).toJSON = function () {
+  return this.toString();
+};
+
 import { buildApp } from './app';
 import { config } from './config';
 import { logger } from './lib/logger';
