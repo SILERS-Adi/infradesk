@@ -182,3 +182,56 @@ do wszystkich notatek. Zaczerpnij z `project_infradesk.md`, `security_standard.m
 Cel projektu: zbudować silny SaaS B2B dla MSP/IT, wynieść poza Silers (white-label
 docelowo). Nie premature optimization, nie multi-region za wcześnie. Solidnie
 i prosto.
+
+# EXECUTION & VERIFICATION RULES
+
+**PRZED rozpoczęciem pracy agent MUSI przeczytać ten plik i stosować zasady
+podczas całej sesji.** Te zasady są nadrzędne wobec standardowego stylu raportowania.
+Claude Code ładuje ten plik automatycznie przy starcie sesji.
+
+## Zasady operacyjne
+
+- DONE = działa i jest zweryfikowane evidence
+- „kod istnieje" ≠ „completed"
+- zakaz oznaczania CONFIRMED bez testu live
+- każde FIXED/DONE wymaga evidence:
+  - log,
+  - screenshot,
+  - curl,
+  - query,
+  - benchmark,
+  - response payload,
+  - e2e flow,
+  - runtime proof
+- jeśli czegoś nie sprawdzono:
+  - mów wprost „niezweryfikowane"
+- zakaz zgadywania statusu systemu
+- security/billing/auth/webhooks traktuj jako „broken until proven working"
+- deploy bez smoke testów ≠ zakończony
+- raportuj ryzyko i niepewność
+- priorytet:
+  1. prawda,
+  2. evidence,
+  3. stabilność,
+  4. dopiero szybkość
+
+## Self-check przed raportem końcowym
+
+Agent przed napisaniem:
+
+- DONE,
+- FIXED,
+- COMPLETE,
+- CONFIRMED
+
+ma wykonać checklistę:
+
+- Czy test był uruchomiony?
+- Czy mam realny dowód działania?
+- Czy flow działa live?
+- Czy sprawdziłem runtime?
+- Czy raportuję fakt czy założenie?
+- Czy istnieje regresja?
+- Czy gdyby to był produkcyjny incident — ufałbym temu raportowi?
+
+Jeśli odpowiedź brzmi „nie" → status NIE może być COMPLETE.
