@@ -79,6 +79,24 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Wyczyść Service Workera z v1 (przed cutoverem na v2). Bez tego stary SW
+      // przechwytuje requesty na infradesk.pl i krzaczy SPA. Reload jednorazowy.
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(regs) {
+          var hadSW = false;
+          regs.forEach(function(r) { r.unregister(); hadSW = true; });
+          if (hadSW && !sessionStorage.getItem('sw_cleared_v2')) {
+            caches.keys().then(function(keys) {
+              return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+            }).then(function() {
+              sessionStorage.setItem('sw_cleared_v2', '1');
+              location.reload();
+            });
+          }
+        });
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

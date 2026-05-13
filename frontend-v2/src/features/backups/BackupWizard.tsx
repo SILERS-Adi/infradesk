@@ -322,7 +322,7 @@ export default function BackupWizard({ open, onClose, companyFilter }: { open: b
       }).then(r => r.data.config);
     },
     onSuccess: async (data) => {
-      qc.invalidateQueries({ queryKey: ['backup-configs'] });
+      qc.invalidateQueries({ queryKey: ['backups'] });
       if (runNow && data?.id) {
         try { await api.post(`/backups/${data.id}/run-now`); } catch {}
       }
