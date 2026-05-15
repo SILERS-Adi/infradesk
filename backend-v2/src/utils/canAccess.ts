@@ -22,6 +22,7 @@ export type Role = 'OWNER' | 'ADMIN' | 'MEMBER';
 export type Scope = 'FULL' | 'SCOPED';
 export type AccessLevel = 'NONE' | 'VIEW' | 'EDIT' | 'DELETE';
 export type ModuleAction = 'view' | 'edit' | 'delete';
+export type WorkspacePlan = 'START' | 'TEAM' | 'PRO' | 'ENTERPRISE';
 
 export interface PermissionOverrideLike {
   moduleKey: string;
@@ -146,3 +147,38 @@ export function visibleModules(ctx: MembershipContext): string[] {
 
 // Eksport dla testów / UI.
 export const __internal = { DEFAULT_MEMBER_LEVELS, LEVEL_ORDER };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Plan-based module gating — niezależne od ról/uprawnień użytkownika.
+// Sprawdzane W BACKEND middleware przed canAccess: jeśli plan workspace nie
+// pokrywa modułu, ADMIN/OWNER nie może obejść tego przez PermissionOverride.
+// ═══════════════════════════════════════════════════════════════════════════════
+const PLAN_ORDER: Record<WorkspacePlan, number> = {
+  START: 1,
+  TEAM: 2,
+  PRO: 3,
+  ENTERPRISE: 4,
+};
+
+// Minimum plan wymagany aby moduł był dostępny. Brak entry = dostępny na każdym
+// planie (w tym START). Mapa ZGODNA z `docs/V2_BLUEPRINT.md` i `CennikPage`.
+export const MODULE_MIN_PLAN: Partial<Record<string, WorkspacePlan>> = {
+  [MODULES.MONITORING]: 'TEAM',
+  [MODULES.INVOICES]: 'TEAM',
+  [MODULES.AI_COPILOT]: 'PRO',
+  [MODULES.BACKUPS]: 'PRO',
+  [MODULES.REPORTS]: 'PRO',
+  [MODULES.GPS]: 'ENTERPRISE',
+};
+
+export function meetsPlanRequirement(currentPlan: WorkspacePlan, moduleKey: string): boolean {
+  const required = MODULE_MIN_PLAN[moduleKey];
+  if (!required) return true;
+  return PLAN_ORDER[currentPlan] >= PLAN_ORDER[required];
+}
+
+export function planUpgradeRequired(currentPlan: WorkspacePlan, moduleKey: string): WorkspacePlan | null {
+  const required = MODULE_MIN_PLAN[moduleKey];
+  if (!required) return null;
+  return PLAN_ORDER[currentPlan] < PLAN_ORDER[required] ? required : null;
+}

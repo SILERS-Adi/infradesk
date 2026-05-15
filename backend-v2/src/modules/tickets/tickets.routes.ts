@@ -96,6 +96,49 @@ router.post('/:id/transition', requireAccess(MODULES.TICKETS, 'edit'), async (re
   } catch (err) { next(err); }
 });
 
+// D6 — jawne cofnięcie anulowania ticketa. Zwykła maszyna stanów NIE pozwala
+// CANCELLED → OPEN (CANCELLED jest terminalny). Reopen wymaga:
+//   - permission MODULES.TICKETS:delete (OWNER/ADMIN tylko)
+//   - status musi być CANCELLED
+//   - ActivityLog wpis z explicit reason
+// Dzięki temu „anuluj" niesie ciężar końca rozdziału, a nie chwilowego odhaczenia.
+router.post('/:id/reopen-cancelled', requireAccess(MODULES.TICKETS, 'delete'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = String(req.params.id);
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.slice(0, 500) : '';
+    if (!reason.trim()) {
+      throw HttpError.badRequest('Podaj powód przywrócenia ticketu (pole `reason`).', 'reason_required');
+    }
+    const existing = await prisma.ticket.findFirst({
+      where: { id, workspaceId: req.workspaceId! },
+      select: { id: true, status: true, ticketNumber: true },
+    });
+    if (!existing) throw HttpError.notFound();
+    if (existing.status !== 'CANCELLED') {
+      throw HttpError.badRequest(
+        `Ticket nie jest w statusie CANCELLED (obecny: ${existing.status}). Reopen-cancelled dotyczy tylko anulowanych.`,
+        'not_cancelled',
+      );
+    }
+    const updated = await prisma.ticket.update({
+      where: { id: existing.id },
+      data: { status: 'OPEN' },
+      select: { id: true, status: true, ticketNumber: true, workspaceId: true },
+    });
+    void logActivity({
+      workspaceId: req.workspaceId!,
+      entityType: 'ticket',
+      entityId: id,
+      actionType: 'ticket_reopened_from_cancelled',
+      description: `Cofnięto anulowanie ticketu ${existing.ticketNumber ?? id}. Powód: ${reason}`,
+      performedByUserId: req.auth!.sub,
+      ...reqContext(req),
+      metadata: { reason, previousStatus: 'CANCELLED', newStatus: 'OPEN' },
+    });
+    res.json({ ticket: updated });
+  } catch (err) { next(err); }
+});
+
 router.post('/:id/comments', requireAccess(MODULES.TICKETS, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const input = commentSchema.parse(req.body);

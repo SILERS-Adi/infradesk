@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { updateWorkspaceInContext } from '../lib/requestContext';
 import { HttpError } from '../utils/httpError';
+import { isAccountGateExempt } from './auth';
 
 /**
  * Resolves the active workspace for the request.
@@ -44,6 +45,17 @@ export async function requireWorkspace(req: Request, _res: Response, next: NextF
     }
 
     if (!membership) throw HttpError.forbidden('No active workspace membership');
+
+    // P1.2 — backend 2FA enforcement dla OWNER. Frontend modal można obejść
+    // przez DevTools / bezpośrednie API. Egzekwujemy też tutaj: OWNER bez 2FA
+    // dostaje 403 na każdym endpoint poza /auth/* i /public/*.
+    const twoFactorEnabled = (req as Request & { _userTwoFactorEnabled?: boolean })._userTwoFactorEnabled;
+    if (membership.role === 'OWNER' && !twoFactorEnabled && !isAccountGateExempt(req.originalUrl)) {
+      throw HttpError.forbidden(
+        'Konto OWNER wymaga włączenia 2FA — przejdź do ustawień bezpieczeństwa.',
+        '2fa_setup_required',
+      );
+    }
 
     req.workspaceId = membership.workspaceId;
     req.membershipId = membership.id;
