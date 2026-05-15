@@ -224,9 +224,49 @@ model Workspace {
   asProvider    WorkspaceRelation[] @relation("AsProvider")
   asClient      WorkspaceRelation[] @relation("AsClient")
 
+  payments      Payment[]
+
   @@index([slug])
   @@index([type])
   @@index([plan])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PAYMENT — trwały rekord każdej zaakceptowanej płatności od bramki Paynow.
+// Database-level idempotency: `paymentId @unique` blokuje powtórne wstawienie
+// tego samego webhooka. Bez tego modelu webhook polegał na `activityLog.findFirst`
+// z `.catch` swallow → ryzyko podwójnej aktywacji planu pri race condition.
+// ═══════════════════════════════════════════════════════════════════════════════
+model Payment {
+  id              String        @id @default(uuid())
+  workspaceId     String
+  paymentId       String        @unique // identyfikator po stronie Paynow (lub naszego pay.infradesk.pl)
+  paynowId        String?       // wewnętrzny ID Paynow gdy dostępny
+  externalId      String?       // referencja klienta (np. nasze checkout-session-id)
+  amountGrosze    Int
+  currency        String        @default("PLN")
+  status          PaymentStatus
+  plan            Plan?
+  cycle           String?       // 'monthly' | 'yearly'
+  periodMonths    Int?
+  metadata        Json?
+  paidAt          DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  workspace       Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum PaymentStatus {
+  CONFIRMED
+  REJECTED
+  EXPIRED
+  ABANDONED
+  REFUNDED
 }
 
 enum WorkspaceType {

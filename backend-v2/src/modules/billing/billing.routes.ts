@@ -12,6 +12,12 @@ import { HttpError } from '../../utils/httpError';
 import { config } from '../../config';
 import { logger } from '../../lib/logger';
 import { sendMail } from '../../lib/mailer';
+import {
+  verifyWebhookSignature,
+  extractWebhookActivation,
+  calculateNewExpiry,
+  type WebhookBody,
+} from './billing.service';
 
 const router = Router();
 
@@ -183,26 +189,16 @@ router.post('/billing/checkout', requireAuth, requireWorkspace, async (req: Requ
 // ─── POST /api/v2/webhooks/payment ───────────────────────────────────────
 // Public endpoint, weryfikowany HMAC z PAY_WEBHOOK_SECRET. Wywoływany przez pay.infradesk.pl
 // po Paynow notification z statusem CONFIRMED|REJECTED|EXPIRED|ABANDONED|ERROR|REFUNDED.
-
-interface WebhookBody {
-  paymentId: string;
-  paynowId: string;
-  status: 'CONFIRMED' | 'REJECTED' | 'EXPIRED' | 'ABANDONED' | 'ERROR' | 'REFUNDED' | 'PENDING' | 'NEW';
-  externalId: string;
-  amount: number;
-  clientId?: string | null;
-  type?: string | null;
-  metadata?: {
-    workspaceId?: string;
-    plan?: PlanKey;
-    cycle?: Cycle;
-    periodMonths?: number;
-    amountNet?: number;
-    userEmail?: string;
-    userId?: string;
-  } | null;
-  paidAt?: string | null;
-}
+//
+// Etap B (P0.2/P0.3/P0.4):
+//   - signature verification MUSI mieć rawBody (express.json verify hook). Jeśli
+//     brak → 400 (a NIE fallback do JSON.stringify który mógłby być spoofowany).
+//   - workspaceId MUSI być w meta.workspaceId (HMAC-signed przez nasz checkout).
+//     Brak fallbacku do body.clientId — to było P0.3 tampering vector.
+//   - idempotency oparta o `Payment.paymentId @unique` (database-level), nie
+//     o findFirst(activityLog) z catch swallow → twarde zabezpieczenie przed
+//     race condition.
+type PaymentWebhookStatus = 'CONFIRMED' | 'REJECTED' | 'EXPIRED' | 'ABANDONED' | 'ERROR' | 'REFUNDED' | 'PENDING' | 'NEW';
 
 export const paymentWebhookHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -211,63 +207,62 @@ export const paymentWebhookHandler = async (req: Request, res: Response, next: N
       res.status(503).json({ error: 'webhook_not_configured' });
       return;
     }
+
+    // P0.2 — signature verification BEZ fallbacku. Pure function w service.
     const sig = req.headers['x-pay-signature'] as string | undefined;
-    if (!sig) { res.status(401).json({ error: 'missing_signature' }); return; }
+    const rawBody = (req as Request & { rawBody?: Buffer }).rawBody ?? null;
+    const verify = verifyWebhookSignature(rawBody, sig, config.PAY_WEBHOOK_SECRET);
+    if (!verify.ok) {
+      const httpStatus = verify.reason === 'missing_raw_body' ? 400 : 401;
+      logger.warn({ reason: verify.reason }, '[billing] webhook signature reject');
+      res.status(httpStatus).json({ error: verify.reason });
+      return;
+    }
 
-    const rawBody = (req as Request & { rawBody?: Buffer }).rawBody?.toString('utf-8') ?? JSON.stringify(req.body);
-    const expected = hmacSign(rawBody, config.PAY_WEBHOOK_SECRET);
-    let valid = false;
-    try {
-      valid = crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(sig));
-    } catch { /* length mismatch → false */ }
-    if (!valid) { res.status(401).json({ error: 'invalid_signature' }); return; }
+    const body = req.body as WebhookBody & { status: PaymentWebhookStatus };
+    logger.info(
+      { paymentId: body.paymentId, status: body.status, workspaceId: body.metadata?.workspaceId },
+      '[billing] webhook',
+    );
 
-    const body = req.body as WebhookBody;
-    logger.info({ paymentId: body.paymentId, status: body.status, workspaceId: body.metadata?.workspaceId }, '[billing] webhook');
-
-    // Process tylko CONFIRMED (aktywacja). REJECTED/etc tylko logujemy.
+    // Process tylko CONFIRMED (aktywacja). REJECTED/etc — zapisujemy do Payment
+    // żeby admin widział historię, ale nie aktywujemy planu.
     if (body.status !== 'CONFIRMED') {
-      res.status(202).json({ accepted: true, action: 'logged_only' });
+      await prismaBg.payment.upsert({
+        where: { paymentId: body.paymentId },
+        create: {
+          workspaceId: body.metadata?.workspaceId ?? body.clientId ?? '__unknown__',
+          paymentId: body.paymentId,
+          paynowId: body.paynowId ?? null,
+          externalId: body.externalId ?? null,
+          amountGrosze: body.amount ?? 0,
+          status: (body.status === 'REJECTED' || body.status === 'EXPIRED' || body.status === 'ABANDONED' || body.status === 'REFUNDED')
+            ? body.status
+            : 'EXPIRED',
+          metadata: (body.metadata as object) ?? {},
+        },
+        update: { status: (body.status === 'REJECTED' || body.status === 'EXPIRED' || body.status === 'ABANDONED' || body.status === 'REFUNDED') ? body.status : 'EXPIRED' },
+      }).catch((err: unknown) => logger.warn({ err, paymentId: body.paymentId }, '[billing] non-confirmed payment upsert failed'));
+      res.status(202).json({ accepted: true, action: 'logged_only', status: body.status });
       return;
     }
 
-    const meta = body.metadata;
-    const workspaceId = meta?.workspaceId ?? body.clientId;
-    if (!workspaceId || !meta?.plan || !meta?.periodMonths) {
-      logger.warn({ body }, '[billing] webhook missing metadata — cannot activate plan');
-      res.status(202).json({ accepted: true, action: 'noop_no_metadata' });
+    // P0.3 — extract workspace activation BEZ fallbacku do body.clientId.
+    const activation = extractWebhookActivation(body);
+    if (!activation.ok) {
+      logger.warn({ reason: activation.reason, paymentId: body.paymentId }, '[billing] activation rejected');
+      const httpStatus = activation.reason === 'workspace_clientid_mismatch' ? 400 : 202;
+      res.status(httpStatus).json({ accepted: httpStatus === 202, action: activation.reason });
       return;
     }
+    const { workspaceId, plan, periodMonths, cycle, metadata: meta } = activation;
 
-    // Defensywnie: jeżeli oba są podane i się różnią, odrzuć (potencjalne tampering)
-    if (meta?.workspaceId && body.clientId && meta.workspaceId !== body.clientId) {
-      logger.warn({ metaWs: meta.workspaceId, bodyClient: body.clientId, paymentId: body.paymentId },
-        '[billing] webhook workspaceId/clientId mismatch — rejected');
-      res.status(400).json({ error: 'workspace_clientid_mismatch' });
-      return;
-    }
-
-    // Idempotency: jeśli ten paymentId był już przetworzony, NIE aktywuj ponownie
-    // (Paynow może retransmitować webhook przy timeout-ach → podwójne przedłużenie planu).
-    const alreadyProcessed = await prismaBg.activityLog.findFirst({
-      where: {
-        workspaceId,
-        actionType: 'plan_paid_activated',
-        metadata: { path: ['paymentId'], equals: body.paymentId },
-      },
-      select: { id: true, createdAt: true },
-    });
-    if (alreadyProcessed) {
-      logger.info({ paymentId: body.paymentId, processedAt: alreadyProcessed.createdAt },
-        '[billing] webhook already processed — idempotent skip');
-      res.status(200).json({ accepted: true, action: 'duplicate_ignored', processedAt: alreadyProcessed.createdAt });
-      return;
-    }
-
-    // prismaBg — webhook nie ma user/workspace context (RLS by zablokował update)
+    // P0.4 — database-level idempotency. Próba INSERT z duplikatem paymentId
+    // rzuca P2002 (unique constraint), wtedy traktujemy jako duplicate.
+    // prismaBg — webhook nie ma user/workspace context (RLS by zablokował update).
     const ws = await prismaBg.workspace.findUnique({
       where: { id: workspaceId },
-      select: { id: true, name: true, plan: true, planExpiresAt: true },
+      select: { id: true, name: true, plan: true, planExpiresAt: true, planStartedAt: true },
     });
     if (!ws) {
       logger.warn({ workspaceId }, '[billing] webhook for unknown workspace');
@@ -275,78 +270,96 @@ export const paymentWebhookHandler = async (req: Request, res: Response, next: N
       return;
     }
 
-    // Wylicz nowy planExpiresAt — przedłuża istniejący jeśli jeszcze aktywny.
     const now = new Date();
-    const baseDate = ws.planExpiresAt && ws.planExpiresAt > now ? ws.planExpiresAt : now;
-    const newExpiry = new Date(baseDate);
-    newExpiry.setMonth(newExpiry.getMonth() + meta.periodMonths);
+    const newExpiry = calculateNewExpiry(ws.planExpiresAt, periodMonths, now);
 
-    await prismaBg.workspace.update({
-      where: { id: workspaceId },
-      data: {
-        plan: meta.plan,
-        planStartedAt: now,
-        planExpiresAt: newExpiry,
-        trialEndsAt: null,
-      },
-    });
+    // Atomic transaction: INSERT Payment + UPDATE Workspace + LOG ActivityLog
+    // razem. Jeśli Payment.paymentId duplikat — cała transakcja się rolluje,
+    // workspace NIE zostaje zaktualizowany podwójnie.
+    try {
+      await prismaBg.$transaction(async (tx) => {
+        await tx.payment.create({
+          data: {
+            workspaceId,
+            paymentId: body.paymentId,
+            paynowId: body.paynowId ?? null,
+            externalId: body.externalId ?? null,
+            amountGrosze: body.amount,
+            status: 'CONFIRMED',
+            plan,
+            cycle: cycle ?? 'monthly',
+            periodMonths,
+            metadata: (meta as object),
+            paidAt: body.paidAt ? new Date(body.paidAt) : now,
+          },
+        });
+        await tx.workspace.update({
+          where: { id: workspaceId },
+          data: {
+            plan,
+            // P1.14 — planStartedAt zachowuje original signup; nie nadpisujemy gdy już set
+            planStartedAt: ws.planStartedAt ?? now,
+            planExpiresAt: newExpiry,
+            trialEndsAt: null,
+          },
+        });
+        await tx.activityLog.create({
+          data: {
+            workspaceId,
+            entityType: 'workspace',
+            entityId: workspaceId,
+            actionType: 'plan_paid_activated',
+            description: `Plan ${plan} (${cycle ?? 'monthly'}) aktywowany — opłacone ${(body.amount / 100).toFixed(2)} zł netto. Wygasa ${newExpiry.toISOString().slice(0, 10)}.`,
+            performedByUserId: meta.userId ?? null,
+            metadata: {
+              paymentId: body.paymentId,
+              paynowId: body.paynowId ?? null,
+              externalId: body.externalId ?? null,
+              amountGrosze: body.amount,
+              plan,
+              cycle: cycle ?? 'monthly',
+              periodMonths,
+            },
+          },
+        });
+      });
+    } catch (err: unknown) {
+      // P2002 = unique constraint violation on Payment.paymentId → duplicate webhook
+      const errObj = err as { code?: string };
+      if (errObj?.code === 'P2002') {
+        logger.info({ paymentId: body.paymentId }, '[billing] webhook duplicate (db unique) — idempotent skip');
+        res.status(200).json({ accepted: true, action: 'duplicate_ignored' });
+        return;
+      }
+      throw err;
+    }
 
-    await prismaBg.activityLog.create({
-      data: {
-        workspaceId,
-        entityType: 'workspace',
-        entityId: workspaceId,
-        actionType: 'plan_paid_activated',
-        description: `Plan ${meta.plan} (${meta.cycle ?? 'monthly'}) aktywowany — opłacone ${(body.amount / 100).toFixed(2)} zł netto. Wygasa ${newExpiry.toISOString().slice(0, 10)}.`,
-        performedByUserId: meta.userId ?? null,
-        metadata: {
-          paymentId: body.paymentId,
-          paynowId: body.paynowId,
-          externalId: body.externalId,
-          amountGrosze: body.amount,
-          plan: meta.plan,
-          cycle: meta.cycle,
-          periodMonths: meta.periodMonths,
-        },
-      },
-    }).catch((err: unknown) => logger.warn({ err }, '[billing] activity log failed'));
-
-    // TODO(idfaktura): po skończeniu projektu id-faktura.pl wstawić tu wywołanie:
-    //   await fetch('https://faktura.infradesk.pl/api/invoices', {
-    //     method: 'POST',
-    //     headers: { 'Authorization': `Bearer ${IDFAKTURA_API_KEY}`, 'Content-Type': 'application/json' },
-    //     body: JSON.stringify({
-    //       buyer: { taxId: ws.taxId, name: ws.name, address: {...} },
-    //       lines: [{ name: meta.description, qty: 1, netPrice: meta.amountNet, vatRate: 23 }],
-    //       paymentRef: body.externalId,
-    //       paidAt: body.paidAt,
-    //     }),
-    //   });
-    // Aktualnie faktura wystawiana ręcznie — user dostaje "faktura osobno w 24h" w mailu.
+    // TODO(idfaktura): po skończeniu projektu id-faktura.pl wstawić tu wywołanie
+    // (P1.17 — wymaga decyzji ownerskiej D4). Aktualnie faktura wystawiana ręcznie.
 
     // Email "Plan aktywowany" do owner'a
     if (meta.userEmail) {
       const html = `
         <div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#1a1a1a">
-          <h2 style="font-size:20px;margin:0 0 16px">Plan ${meta.plan} aktywowany</h2>
+          <h2 style="font-size:20px;margin:0 0 16px">Plan ${plan} aktywowany</h2>
           <p>Dziękujemy za płatność.</p>
-          <p>Twój workspace <strong>${ws.name}</strong> ma teraz plan <strong>${meta.plan}</strong> aktywny do <strong>${newExpiry.toISOString().slice(0, 10)}</strong>.</p>
+          <p>Twój workspace <strong>${ws.name}</strong> ma teraz plan <strong>${plan}</strong> aktywny do <strong>${newExpiry.toISOString().slice(0, 10)}</strong>.</p>
           <p>Faktura VAT zostanie wysłana osobno w ciągu 24h.</p>
           <p style="text-align:center;margin:28px 0">
             <a href="https://infradesk.pl/plan-and-modules" style="display:inline-block;background:#6366f1;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600">Otwórz panel</a>
           </p>
-          <p style="color:#9ca3af;font-size:12px;margin-top:20px">Zapłacono: ${(body.amount / 100).toFixed(2)} zł netto · ID transakcji: ${body.externalId}</p>
+          <p style="color:#9ca3af;font-size:12px;margin-top:20px">Zapłacono: ${(body.amount / 100).toFixed(2)} zł netto · ID transakcji: ${body.externalId ?? body.paymentId}</p>
         </div>
       `;
       void sendMail({
         to: meta.userEmail,
-        subject: `Plan ${meta.plan} aktywowany — InfraDesk`,
-        text: `Dziękujemy! Plan ${meta.plan} aktywny do ${newExpiry.toISOString().slice(0, 10)}. Zobacz w panelu: https://infradesk.pl/plan-and-modules`,
+        subject: `Plan ${plan} aktywowany — InfraDesk`,
+        text: `Dziękujemy! Plan ${plan} aktywny do ${newExpiry.toISOString().slice(0, 10)}. Zobacz w panelu: https://infradesk.pl/plan-and-modules`,
         html,
       });
     }
 
-    res.status(200).json({ accepted: true, action: 'plan_activated', plan: meta.plan, expiresAt: newExpiry });
+    res.status(200).json({ accepted: true, action: 'plan_activated', plan, expiresAt: newExpiry });
   } catch (err) { next(err); }
 };
 
