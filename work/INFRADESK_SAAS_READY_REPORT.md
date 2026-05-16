@@ -360,14 +360,62 @@ P2.* — wprowadzać incrementally, niezablokowane
 | `prisma.payment.count()` na prod | ✓ Payment table istnieje (0 rows) |
 | Liczba aktywnych polityk RLS na 19 tabelach docelowych | ✓ **27 polityk** (16 backfill _tenant + 2 dzieci + Payment + istniejące dla DownloadPin/PartnerShare) |
 
-### Co NIE rozpoczęte (zgodnie z zakresem A+B)
+### Etap C — UX onboarding fixy (2026-05-16, commit `34bc881`)
 
-- Etap C (UX onboarding): 2FA modal recovery, NewTicketModal client guard, devices agent-install flow, invite copy URL, BackupWizard close — czeka na osobny ack
-- Etap D (infra/tests): frontend eslint install, .env.test setup, healthcheck endpoint — czeka
-- Etap E (polish P2): @@index dodatki, sameSite strict, CSP enable, KIM 23% VAT — rolling
-- D4 (id-faktura.pl auto-invoice): wymaga decyzji ownerskiej
-- D5 (self-signup): bez zmian
-- D7 (plan downgrade → reset WorkspaceModule.enabled): nie ruszane
+**Backend:**
+- **P1.22** — POST `/api/v2/auth/resend-verification` + `service.resendVerificationEmail` z 60s throttle per user, constant-time response (anti-enumeration)
+- **P1.33** — GET `/api/v2/health` z DB ping (SELECT 1) + 5s cache; `/health` zostaje jako liveness
+- **D7** — `trial-expiry` po downgrade na START resetuje `WorkspaceModule.enabled=false` dla modułów z `requiredPlan != START`
+- usunięty stale `src/utils/canAccess.js` — artefakt jakiegoś buildu obok TS source, powodował fail testów
+
+**Frontend:**
+- **P1.20** — `ForceTwoFactorSetup` przy `setupMut.isError` pokazuje AlertTriangle + "Spróbuj ponownie" + "Wyloguj i zaloguj"
+- **P1.22** — `LoginPage` obsługa 403 `email_verification_required`: panel + button "Wyślij ponownie email weryfikacyjny"
+- **P1.23** — `NewTicketModal` twardszy guard na `clientWorkspaceId`; bez klientów step1 pokazuje CTA "Dodaj pierwszego klienta"
+- **P1.24** — `DashboardPage` "Aktywne sesje" zapytanie do `/sessions/stats` (retry: false dla 403)
+- **P1.27** — `BackupWizard` "Zamknij" w done step robi `reset() + onClose()` (wcześniej tylko reset → modal nie zamykał się)
+
+### Etap D — Frontend infra tooling (2026-05-16, commit `a206d8b`)
+
+- **P1.30** — `eslint@^9` + `typescript-eslint` + `eslint-plugin-react-hooks` zainstalowane w devDeps
+- `frontend-v2/eslint.config.js` (NOWY) — flat config ESLint v9 z relaxed react-hooks rules (warn nie error) dla pre-existing legacy code; refactor jako P2
+- skrypt `lint` updated z `eslint src --ext .ts,.tsx` (v8 syntax) na `eslint src` (v9)
+- Po fix: lint biegnie, exit 0; 84 warnings widoczne dev-om, 1 error misclassified (use-memo) nie blokuje
+
+### Co NIE rozpoczęte (świadomie pominięte)
+
+- **P1.17 + D4** — Invoice automation (id-faktura.pl API): wymaga produkcyjnego API klienta + decyzji biznesowej. Pominę do clarification.
+- **P1.25** — DevicesPage agent-install flow: wymaga UX design + token generation flow design.
+- **P1.26** — UsersPage invite copy URL: refactor MemberForm component.
+- **P2** całość: VAT hardcoded 23%, CSP enable (ryzyko popsucia inline JSON-LD), sameSite strict cookie, @@index dodatki na pozostałych modelach, 404 page.
+- **D5** self-signup — already exists in production, bez zmian.
+
+### Evidence produkcyjna po Etap C/D deploy
+
+| Test | Wynik |
+|---|---|
+| `git pull` na prod (3 nowe commity) | ✓ `5f86a73..a206d8b` |
+| `npm install --include=dev` backend | ✓ |
+| `npm run build` backend | ✓ |
+| `pm2 restart infradesk-v2-backend` | ✓ PID 2709276 online |
+| `npm install --include=dev` frontend | ✓ +96 packages |
+| `npm run build` frontend | ✓ ~7.7s |
+| `sudo rsync + nginx -s reload` | ✓ |
+| `curl /health` (liveness) | ✓ 200 |
+| `curl /api/v2/health` (DB readiness — NEW) | ✓ **200** |
+| `curl POST /api/v2/auth/resend-verification` (nonexistent email) | ✓ **200 `{"success":true}`** (anti-enumeration, expected) |
+
+### Testy lokalne (po wszystkich zmianach A+B+C+D)
+
+| Test | Wynik |
+|---|---|
+| `npm run lint` backend | ✓ exit 0 |
+| `npm run typecheck` backend | ✓ exit 0 |
+| `npm run build` backend | ✓ exit 0 |
+| `npm run lint` frontend (NEW) | ✓ exit 0 (1 misclassified + 84 warnings, no errors blocking) |
+| `npm run typecheck` frontend | ✓ exit 0 |
+| `npm run build` frontend | ✓ exit 0 |
+| `npx jest` unit (3 suites) | ✓ **31/31 PASS** (6 ticketStateMachine + 16 billing + 9 planEnforcement) |
 
 ## 10. Następny krok
 
