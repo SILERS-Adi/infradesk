@@ -144,7 +144,13 @@ export function TicketCreator({ onClose, variant = 'modal' }: { onClose: () => v
     return devices.filter((d) => d.location?.id === locationId);
   }, [devices, locationId]);
 
-  const canGoNext = !!clientWorkspaceId || clients.length === 0;
+  // P1.23 — wcześniej `|| clients.length === 0` przepuszczało submit z pustym
+  // clientWorkspaceId gdy lista klientów była pusta → ticket bez kontekstu
+  // workspace lub assigned do wrong workspace przez fallback. Teraz: jeśli brak
+  // klientów, user widzi CTA "Dodaj klienta" w Step 1 (poniżej), a guard
+  // wymusza wybór gdy klienci są.
+  const hasClients = clients.length > 0;
+  const canGoNext = !!clientWorkspaceId && hasClients;
 
   function addOrderItem() {
     setOrderItems([...orderItems, { name: '', quantity: 1, unitNet: 0, withInstallation: false }]);
@@ -262,7 +268,23 @@ export function TicketCreator({ onClose, variant = 'modal' }: { onClose: () => v
     </div>
   );
 
-  const step1Content = (
+  const step1Content = !hasClients ? (
+    // P1.23 — gdy brak klientów, nie ma sensu pokazywać formularza ticketu,
+    // bo workspaceId nie miałby skąd wziąć kontekstu. Zamiast tego prowadzimy
+    // do dodania klienta.
+    <div className="text-center py-8 px-4">
+      <p className="text-[14px] font-semibold text-tx mb-2">Najpierw dodaj klienta</p>
+      <p className="text-[12px] text-tx3 mb-5 max-w-[360px] mx-auto">
+        Ticket musi być powiązany z klientem (firmą obsługiwaną). Dodaj pierwszego klienta i wróć tutaj — zajmie to chwilę.
+      </p>
+      <Button
+        onClick={() => { onClose(); window.location.assign('/clients/new'); }}
+        size="md"
+      >
+        Dodaj pierwszego klienta
+      </Button>
+    </div>
+  ) : (
     <Step1
       clients={clients}
       locations={filteredLocations}

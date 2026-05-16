@@ -1211,7 +1211,10 @@ export default function BackupWizard({ open, onClose, companyFilter }: { open: b
                   ✓ Pierwszy backup został uruchomiony
                 </p>
               )}
-              <Button onClick={reset}>Zamknij</Button>
+              {/* P1.27 — wcześniej Zamknij wywoływało tylko reset (state cofa się
+                  do source step, ale modal zostaje otwarty). User myślał że nic
+                  się nie dzieje. Teraz: reset stanu + zamknięcie modala. */}
+              <Button onClick={() => { reset(); onClose(); }}>Zamknij</Button>
             </div>
           )}
 

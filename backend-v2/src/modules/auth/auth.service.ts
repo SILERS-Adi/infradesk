@@ -483,6 +483,40 @@ export async function verifyEmail(token: string): Promise<void> {
   });
 }
 
+// Resend verification email — wymagane po wdrożeniu P1.21 (backend wymusza
+// emailVerified). Bez tej ścieżki user któremu zaginął oryginalny email nie ma
+// jak odzyskać dostęp. Constant-time response: zawsze success — bez ujawniania
+// czy email istnieje (anti-enumeration), zgodnie z resztą endpointów auth.
+export async function resendVerificationEmail(email: string): Promise<{ resent: boolean }> {
+  const user = await prisma.user.findUnique({
+    where: { email: email.trim().toLowerCase() },
+    select: {
+      id: true, email: true, firstName: true,
+      emailVerified: true, isActive: true, deletedAt: true,
+      emailVerifySentAt: true,
+    },
+  });
+  if (!user || !user.isActive || user.deletedAt) return { resent: false };
+  if (user.emailVerified) return { resent: false };
+
+  // Throttle: nie wysyłaj nowego linka częściej niż co 60s — żeby ktoś z forma
+  // signup spam nie generował hurt SMTP wolumenu.
+  if (user.emailVerifySentAt && Date.now() - user.emailVerifySentAt.getTime() < 60_000) {
+    return { resent: false };
+  }
+
+  const verifyToken = randomToken(24);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      emailVerifyToken: hashToken(verifyToken),
+      emailVerifySentAt: new Date(),
+    },
+  });
+  void sendVerificationEmail(user.email, verifyToken, user.firstName);
+  return { resent: true };
+}
+
 // Accept-invite: invitee clicks link from email, sets password, gets logged in.
 // Reuses User.emailVerifyToken (set by /memberships/invite). Activates ALL pending
 // INVITED memberships of this user — typically one, but could be many in MSP setups.

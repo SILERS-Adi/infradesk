@@ -105,10 +105,37 @@ export function ForceTwoFactorSetup() {
           </p>
         </div>
 
-        {step === 'init' && (
+        {step === 'init' && !setupMut.isError && (
           <div className="text-center py-6">
             <Loader2 className="h-6 w-6 mx-auto animate-spin text-pri" />
             <p className="text-[12px] text-tx3 mt-2">Generowanie sekretu...</p>
+          </div>
+        )}
+
+        {/* P1.20 — przy padzie /auth/2fa/setup user nie miał ścieżki retry.
+            Modal stał na 'init' z spinerem w nieskończoność. Teraz: przy error
+            pokazujemy "Spróbuj ponownie" button + opcję wylogowania na wszelki
+            wypadek (jeśli to wina sesji). */}
+        {step === 'init' && setupMut.isError && (
+          <div className="text-center py-4 space-y-3">
+            <AlertTriangle className="h-8 w-8 mx-auto" style={{ color: 'var(--er)' }} />
+            <p className="text-[13px] text-tx font-semibold">Nie udało się zacząć konfiguracji 2FA</p>
+            <p className="text-[11px] text-tx3">
+              Sprawdź połączenie z internetem i spróbuj ponownie. Jeśli problem się powtarza, wyloguj się i zaloguj jeszcze raz.
+            </p>
+            <Button onClick={() => setupMut.mutate()} disabled={setupMut.isPending} size="md" className="w-full">
+              {setupMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Spróbuj ponownie'}
+            </Button>
+            <button
+              type="button"
+              onClick={async () => {
+                try { await api.post('/auth/logout'); } catch { /* ignore */ }
+                window.location.href = '/login';
+              }}
+              className="text-[11px] text-tx3 underline hover:text-pri press"
+            >
+              Wyloguj i zaloguj ponownie
+            </button>
           </div>
         )}
 

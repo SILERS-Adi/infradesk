@@ -71,6 +71,16 @@ export function DashboardPage() {
     retry: false,
   });
 
+  // P1.24 — wcześniej "Aktywne sesje" było hardcoded "—". Teraz: zapytanie do
+  // /sessions/stats (chronione MODULES.SESSIONS:view). Przy braku dostępu —
+  // fallback do "—".
+  const { data: sessStats } = useQuery<{ stats: { active: number } }>({
+    queryKey: ['dashboard', 'sessions-stats'],
+    queryFn: async () => (await api.get('/sessions/stats')).data,
+    refetchInterval: 60_000,
+    retry: false,
+  });
+
   const items = data?.items ?? [];
   const open = items.filter((t) => !['CLOSED', 'CANCELLED', 'RESOLVED'].includes(t.status));
   const critical = items.filter((t) => t.priority === 'CRITICAL').length;
@@ -227,7 +237,7 @@ export function DashboardPage() {
         <StatCard icon={Ticket} label="Otwarte zgłoszenia" value={open.length} accent="primary" />
         <StatCard icon={AlertTriangle} label="Krytyczne" value={critical} accent="danger" />
         <StatCard icon={Server} label="Urządzenia" value={sum ? sum.totalDevices : '—'} accent="neutral" />
-        <StatCard icon={Clock} label="Aktywne sesje" value="—" accent="warning" />
+        <StatCard icon={Clock} label="Aktywne sesje" value={sessStats?.stats.active ?? '—'} accent="warning" />
       </div>
 
       <AgentVersionWidget />

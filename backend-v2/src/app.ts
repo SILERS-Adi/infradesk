@@ -114,6 +114,28 @@ export function buildApp(): Express {
     res.json({ status: 'ok', service: 'infradesk-backend-v2', version: '2.0.0-alpha.1' });
   });
 
+  // P1.33 — health endpoint z DB ping dla uptime monitorów. Lekkie (jedna
+  // SELECT 1), bez auth, ale rate-limited globalnie. Cache 5s żeby UptimeRobot
+  // co minutę nie generował puls postgresowych. `/health` (powyżej) zostaje
+  // jako liveness — ten jest readiness.
+  let healthCache: { ts: number; ok: boolean } = { ts: 0, ok: false };
+  app.get('/api/v2/health', async (_req, res) => {
+    const now = Date.now();
+    if (now - healthCache.ts < 5_000) {
+      res.status(healthCache.ok ? 200 : 503).json({ status: healthCache.ok ? 'ok' : 'degraded', cached: true });
+      return;
+    }
+    try {
+      const { prismaBg } = await import('./lib/prisma-bg');
+      await prismaBg.$queryRaw`SELECT 1`;
+      healthCache = { ts: now, ok: true };
+      res.json({ status: 'ok', db: 'ok', service: 'infradesk-backend-v2', version: '2.0.0-alpha.1' });
+    } catch (err) {
+      healthCache = { ts: now, ok: false };
+      res.status(503).json({ status: 'degraded', db: 'error', message: (err as Error).message });
+    }
+  });
+
   if (!config.isTest) app.use(globalLimiter);
 
   app.use('/api/v2/public', publicRouter);

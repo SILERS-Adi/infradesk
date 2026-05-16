@@ -186,6 +186,18 @@ router.post('/verify-email', tokenConsumeLimiter, async (req: Request, res: Resp
   } catch (err) { next(err); }
 });
 
+// P1.22 — resend email verification. Rate-limited tak samo jak password-reset
+// (anti-spam + anti-enumeration). Zwraca zawsze 200, niezależnie czy email
+// istnieje w bazie — żeby nie wyciekać informacji.
+router.post('/resend-verification', passwordResetLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const schema = z.object({ email: z.string().email().max(254) });
+    const input = schema.parse(req.body);
+    await service.resendVerificationEmail(input.email);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
 router.post('/accept-invite', tokenConsumeLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const schema = z.object({ token: z.string().min(20).max(80), password: z.string().min(10).max(200) });

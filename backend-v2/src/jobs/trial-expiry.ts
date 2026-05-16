@@ -58,6 +58,18 @@ async function findExpiredPaidPlans(): Promise<ExpiredPaid[]> {
   });
 }
 
+// D7 — gdy plan workspace spada do START, wszystkie moduły wymagające wyższego
+// planu muszą zostać wyłączone w `WorkspaceModule.enabled`. Bez tego frontend
+// (który czyta enabled jako toggle widoczności w menu) dalej pokazuje moduły
+// PRO/TEAM/ENT — co backend od P1.1 odrzuca z 403 plan_upgrade_required.
+async function resetModulesForDowngrade(workspaceId: string): Promise<number> {
+  const result = await prismaBg.workspaceModule.updateMany({
+    where: { workspaceId, requiredPlan: { not: 'START' } },
+    data: { enabled: false },
+  });
+  return result.count;
+}
+
 async function downgradeOne(ws: ExpiredTrial): Promise<void> {
   await prismaBg.workspace.update({
     where: { id: ws.id },
@@ -67,6 +79,11 @@ async function downgradeOne(ws: ExpiredTrial): Promise<void> {
       planStartedAt: new Date(),
     },
   });
+
+  const disabledModules = await resetModulesForDowngrade(ws.id);
+  if (disabledModules > 0) {
+    logger.info({ workspaceId: ws.id, count: disabledModules }, '[trial-expiry] disabled modules above START plan');
+  }
 
   await prismaBg.activityLog.create({
     data: {
@@ -132,6 +149,12 @@ async function downgradePaidOne(ws: ExpiredPaid): Promise<void> {
       planStartedAt: new Date(),
     },
   });
+
+  const disabledModules = await resetModulesForDowngrade(ws.id);
+  if (disabledModules > 0) {
+    logger.info({ workspaceId: ws.id, count: disabledModules }, '[trial-expiry] disabled modules above START plan');
+  }
+
   await prismaBg.activityLog.create({
     data: {
       workspaceId: ws.id,

@@ -34,7 +34,12 @@ export function LoginPage() {
   const nextUrl = searchParams.get("next");
   const [twoFactorRequired, setTwoFactorRequired] = useState(false);
   const [hint, setHint] = useState<WorkspaceHint['workspace']>(null);
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginForm>({
+  // P1.22 — po wprowadzeniu P1.21 (backend wymusza emailVerified), user któremu
+  // zaginął oryginalny email weryfikacyjny musi mieć ścieżkę resend. Tracujemy
+  // email z formularza żeby przy 403 email_verification_required pokazać link.
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
+  const { register, handleSubmit, getValues, formState: { errors, isSubmitting } } = useForm<LoginForm>({
     resolver: zodResolver(schema),
   });
 
@@ -53,6 +58,7 @@ export function LoginPage() {
   if (user) { if (target) { window.location.href = target; return null; } return <Navigate to="/dashboard" replace />; }
 
   const onSubmit = async (data: LoginForm) => {
+    setUnverifiedEmail(null);
     try {
       const res = await api.post('/auth/login', data);
       setSession(res.data.user, res.data.accessToken, res.data.defaultWorkspaceId);
@@ -67,7 +73,27 @@ export function LoginPage() {
         toast('Podaj kod 2FA');
         return;
       }
+      if (code === 'email_verification_required') {
+        setUnverifiedEmail(data.email);
+        toast.error('Musisz potwierdzić adres email zanim się zalogujesz.');
+        return;
+      }
       toast.error(message);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    const email = unverifiedEmail ?? getValues('email');
+    if (!email) return;
+    setResending(true);
+    try {
+      await api.post('/auth/resend-verification', { email });
+      // Backend zawsze zwraca 200 (anti-enumeration) — komunikat neutralny.
+      toast.success('Jeśli email istnieje i jest niepotwierdzony, link został wysłany. Sprawdź skrzynkę.');
+    } catch {
+      toast.error('Nie udało się wysłać. Spróbuj za chwilę.');
+    } finally {
+      setResending(false);
     }
   };
 
@@ -135,6 +161,22 @@ export function LoginPage() {
               <div className="anim-up">
                 <label className="block text-[10px] font-bold uppercase tracking-[0.12em] mb-1.5 text-tx2" htmlFor="twoFactorCode">Kod 2FA</label>
                 <input id="twoFactorCode" inputMode="numeric" autoComplete="one-time-code" placeholder="123456" className={inpCls} {...register('twoFactorCode')} onFocus={onFocus} onBlurCapture={onBlur} />
+              </div>
+            )}
+
+            {unverifiedEmail && (
+              <div className="anim-up p-3 rounded-[var(--r-s)] border" style={{ background: 'var(--wn-l)', borderColor: 'var(--wn-b)' }}>
+                <p className="text-[12px] text-tx2 mb-2">
+                  Twój adres <strong>{unverifiedEmail}</strong> nie został potwierdzony. Sprawdź skrzynkę albo wyślij link ponownie.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleResendVerification}
+                  disabled={resending}
+                  className="text-[12px] font-semibold underline text-pri disabled:opacity-50"
+                >
+                  {resending ? 'Wysyłanie...' : 'Wyślij ponownie email weryfikacyjny'}
+                </button>
               </div>
             )}
 
