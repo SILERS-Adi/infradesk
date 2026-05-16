@@ -114,7 +114,15 @@ router.post(
         const inviterName = inviter ? `${inviter.firstName} ${inviter.lastName}`.trim() : null;
         void sendClientInviteEmail(input.email, inviteToken, ws?.name ?? '', inviterName).catch(() => {});
       }
-      res.status(201).json({ membership: m, invited: wantsInvite });
+      // P1.26 — admin który zaprasza dostaje też URL żeby mógł skopiować
+      // i wysłać alternatywnym kanałem (Slack/SMS) jeśli email nie dotrze.
+      // Token jest hashowany w DB (linia 82) — wyciek z response nie odzyska
+      // wartości z bazy. Wymaga auth + requireAccess(MEMBERS, 'edit'), więc tylko
+      // admin/owner go widzi. TTL 7 dni.
+      const inviteUrl = wantsInvite && inviteToken
+        ? `https://infradesk.pl/accept-invite?token=${encodeURIComponent(inviteToken)}`
+        : null;
+      res.status(201).json({ membership: m, invited: wantsInvite, inviteUrl });
     } catch (err) { next(err); }
   },
 );

@@ -113,3 +113,57 @@ export function calculateNewExpiry(
   newExpiry.setMonth(newExpiry.getMonth() + periodMonths);
   return newExpiry;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Invoice generation — automatyczne fakturowanie po payment CONFIRMED.
+// P1.17/D4: wbudowane invoicing (bez zależności od id-faktura.pl, do KSeF 2026-07).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function generateInvoiceNumber(seq: number, date: Date): string {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const nnnn = String(seq).padStart(4, '0');
+  return `FV/${yyyy}/${mm}/${nnnn}`;
+}
+
+export interface InvoiceTotals {
+  netDecimal: number;
+  vatDecimal: number;
+  grossDecimal: number;
+  vatRate: number;
+}
+
+/**
+ * Liczy net/VAT/gross z amountGrosze (z webhooka). VAT 23% hardcoded dla PL
+ * klientów. Pełny multi-VAT (EU reverse charge, zwolnieni) — KSeF post-MVP.
+ * Reverse: `amount` z gateway to NET grosze (zapisane w meta.amountNet).
+ */
+export function calculateInvoiceTotals(amountGrosze: number, vatRate: number = 23): InvoiceTotals {
+  const netDecimal = amountGrosze / 100;
+  const vatDecimal = Math.round(netDecimal * (vatRate / 100) * 100) / 100;
+  const grossDecimal = Math.round((netDecimal + vatDecimal) * 100) / 100;
+  return { netDecimal, vatDecimal, grossDecimal, vatRate };
+}
+
+export interface InvoiceBuyer {
+  name: string;
+  taxId: string | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  postalCode: string | null;
+  city: string | null;
+}
+
+export function formatBuyerAddress(buyer: InvoiceBuyer): string {
+  const lines = [
+    buyer.addressLine1,
+    buyer.addressLine2,
+    [buyer.postalCode, buyer.city].filter(Boolean).join(' '),
+  ].filter(Boolean);
+  return lines.join('\n') || '(adres nie podany)';
+}
+
+export function buildInvoiceItemName(plan: string, cycle: string | null | undefined): string {
+  const cycleLabel = cycle === 'yearly' ? 'roczny' : 'miesięczny';
+  return `InfraDesk ${plan} — abonament ${cycleLabel}`;
+}

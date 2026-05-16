@@ -3,6 +3,10 @@ import {
   verifyWebhookSignature,
   extractWebhookActivation,
   calculateNewExpiry,
+  generateInvoiceNumber,
+  calculateInvoiceTotals,
+  formatBuyerAddress,
+  buildInvoiceItemName,
   type WebhookBody,
 } from '../../src/modules/billing/billing.service';
 
@@ -119,6 +123,64 @@ describe('billing.service / extractWebhookActivation (P0.3)', () => {
       ...okBody,
       metadata: { workspaceId: 'ws-1', plan: 'PRO', periodMonths: 0 },
     })).toEqual({ ok: false, reason: 'missing_period_months' });
+  });
+});
+
+describe('billing.service / invoice helpers (P1.17 — auto-invoicing)', () => {
+  it('generateInvoiceNumber follows FV/YYYY/MM/NNNN format', () => {
+    expect(generateInvoiceNumber(1, new Date('2026-05-15'))).toBe('FV/2026/05/0001');
+    expect(generateInvoiceNumber(42, new Date('2026-12-01'))).toBe('FV/2026/12/0042');
+    expect(generateInvoiceNumber(9999, new Date('2027-01-15'))).toBe('FV/2027/01/9999');
+  });
+
+  it('calculateInvoiceTotals computes correct PL VAT (23% default)', () => {
+    // 399 PLN netto → 91.77 VAT → 490.77 brutto
+    const r = calculateInvoiceTotals(39900);
+    expect(r.netDecimal).toBe(399);
+    expect(r.vatDecimal).toBe(91.77);
+    expect(r.grossDecimal).toBe(490.77);
+    expect(r.vatRate).toBe(23);
+  });
+
+  it('calculateInvoiceTotals handles 49 PLN START plan', () => {
+    const r = calculateInvoiceTotals(4900);
+    expect(r.netDecimal).toBe(49);
+    expect(r.vatDecimal).toBe(11.27);
+    expect(r.grossDecimal).toBe(60.27);
+  });
+
+  it('calculateInvoiceTotals supports custom VAT rate (EU 0% reverse charge)', () => {
+    const r = calculateInvoiceTotals(39900, 0);
+    expect(r.netDecimal).toBe(399);
+    expect(r.vatDecimal).toBe(0);
+    expect(r.grossDecimal).toBe(399);
+    expect(r.vatRate).toBe(0);
+  });
+
+  it('formatBuyerAddress joins lines and skips empty', () => {
+    expect(formatBuyerAddress({
+      name: 'X',
+      taxId: null,
+      addressLine1: 'ul. Testowa 1',
+      addressLine2: null,
+      postalCode: '00-001',
+      city: 'Warszawa',
+    })).toBe('ul. Testowa 1\n00-001 Warszawa');
+
+    expect(formatBuyerAddress({
+      name: 'X',
+      taxId: null,
+      addressLine1: null,
+      addressLine2: null,
+      postalCode: null,
+      city: null,
+    })).toBe('(adres nie podany)');
+  });
+
+  it('buildInvoiceItemName labels cycle in Polish', () => {
+    expect(buildInvoiceItemName('PRO', 'monthly')).toBe('InfraDesk PRO — abonament miesięczny');
+    expect(buildInvoiceItemName('TEAM', 'yearly')).toBe('InfraDesk TEAM — abonament roczny');
+    expect(buildInvoiceItemName('START', null)).toBe('InfraDesk START — abonament miesięczny');
   });
 });
 

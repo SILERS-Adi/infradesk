@@ -16,6 +16,10 @@ import {
   verifyWebhookSignature,
   extractWebhookActivation,
   calculateNewExpiry,
+  generateInvoiceNumber,
+  calculateInvoiceTotals,
+  formatBuyerAddress,
+  buildInvoiceItemName,
   type WebhookBody,
 } from './billing.service';
 
@@ -226,8 +230,13 @@ export const paymentWebhookHandler = async (req: Request, res: Response, next: N
     );
 
     // Process tylko CONFIRMED (aktywacja). REJECTED/etc — zapisujemy do Payment
-    // żeby admin widział historię, ale nie aktywujemy planu.
+    // żeby admin widział historię, plus wysyłamy email do ownera o nieudanej
+    // płatności (P1.16). Plan NIE downgraduje się od razu — workspace żyje
+    // do planExpiresAt, dopiero job trial-expiry downgrade po expiry.
     if (body.status !== 'CONFIRMED') {
+      const mappedStatus = (body.status === 'REJECTED' || body.status === 'EXPIRED' || body.status === 'ABANDONED' || body.status === 'REFUNDED')
+        ? body.status
+        : 'EXPIRED';
       await prismaBg.payment.upsert({
         where: { paymentId: body.paymentId },
         create: {
@@ -236,13 +245,36 @@ export const paymentWebhookHandler = async (req: Request, res: Response, next: N
           paynowId: body.paynowId ?? null,
           externalId: body.externalId ?? null,
           amountGrosze: body.amount ?? 0,
-          status: (body.status === 'REJECTED' || body.status === 'EXPIRED' || body.status === 'ABANDONED' || body.status === 'REFUNDED')
-            ? body.status
-            : 'EXPIRED',
+          status: mappedStatus,
           metadata: (body.metadata as object) ?? {},
         },
-        update: { status: (body.status === 'REJECTED' || body.status === 'EXPIRED' || body.status === 'ABANDONED' || body.status === 'REFUNDED') ? body.status : 'EXPIRED' },
+        update: { status: mappedStatus },
       }).catch((err: unknown) => logger.warn({ err, paymentId: body.paymentId }, '[billing] non-confirmed payment upsert failed'));
+
+      // P1.16 — owner email o nieudanej płatności. Tylko gdy mamy email i to
+      // nie REFUNDED (refund to nie awaria — to świadomy zwrot pieniędzy).
+      if (body.metadata?.userEmail && mappedStatus !== 'REFUNDED') {
+        const planLabel = body.metadata.plan ?? '?';
+        const reason = mappedStatus === 'REJECTED' ? 'odrzucona przez bank/gateway'
+          : mappedStatus === 'EXPIRED' ? 'wygasła (link nieaktywny)'
+          : 'anulowana';
+        void sendMail({
+          to: body.metadata.userEmail,
+          subject: `Płatność za plan ${planLabel} nie powiodła się — InfraDesk`,
+          text: `Niestety, próba płatności za plan ${planLabel} ${reason}. Twój obecny plan działa dalej do końca opłaconego okresu. Możesz spróbować ponownie w panelu: https://infradesk.pl/plan-and-modules`,
+          html: `
+            <div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#1a1a1a">
+              <h2 style="font-size:20px;margin:0 0 16px">Płatność nieudana</h2>
+              <p>Niestety, próba płatności za plan <strong>${planLabel}</strong> ${reason}.</p>
+              <p>Twój obecny plan działa dalej do końca opłaconego okresu. Możesz spróbować ponownie:</p>
+              <p style="text-align:center;margin:28px 0">
+                <a href="https://infradesk.pl/plan-and-modules" style="display:inline-block;background:#6366f1;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600">Spróbuj ponownie</a>
+              </p>
+              <p style="color:#9ca3af;font-size:12px;margin-top:20px">Pytania? Odpisz na ten email lub napisz na biuro@silers.pl</p>
+            </div>`,
+        });
+      }
+
       res.status(202).json({ accepted: true, action: 'logged_only', status: body.status });
       return;
     }
@@ -262,7 +294,10 @@ export const paymentWebhookHandler = async (req: Request, res: Response, next: N
     // prismaBg — webhook nie ma user/workspace context (RLS by zablokował update).
     const ws = await prismaBg.workspace.findUnique({
       where: { id: workspaceId },
-      select: { id: true, name: true, plan: true, planExpiresAt: true, planStartedAt: true },
+      select: {
+        id: true, name: true, plan: true, planExpiresAt: true, planStartedAt: true,
+        taxId: true, addressLine1: true, addressLine2: true, postalCode: true, city: true,
+      },
     });
     if (!ws) {
       logger.warn({ workspaceId }, '[billing] webhook for unknown workspace');
@@ -273,11 +308,31 @@ export const paymentWebhookHandler = async (req: Request, res: Response, next: N
     const now = new Date();
     const newExpiry = calculateNewExpiry(ws.planExpiresAt, periodMonths, now);
 
-    // Atomic transaction: INSERT Payment + UPDATE Workspace + LOG ActivityLog
-    // razem. Jeśli Payment.paymentId duplikat — cała transakcja się rolluje,
-    // workspace NIE zostaje zaktualizowany podwójnie.
+    // P1.17/D4 — invoice numbering per-workspace per-month. Czytamy ostatnią
+    // fakturę w tym workspace dla bieżącego miesiąca i inkrementujemy. Sequence
+    // BEZ unique-on-prefix index w bazie, ale unique([workspaceId, invoiceNumber])
+    // zapobiega kolizji w race condition (P2002 → retry z next seq).
+    const yearMonthPrefix = `FV/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/`;
+    const lastInvoice = await prismaBg.invoice.findFirst({
+      where: { workspaceId, invoiceNumber: { startsWith: yearMonthPrefix } },
+      orderBy: { invoiceNumber: 'desc' },
+      select: { invoiceNumber: true },
+    });
+    const nextSeq = lastInvoice
+      ? parseInt(lastInvoice.invoiceNumber.split('/')[3] ?? '0', 10) + 1
+      : 1;
+    const invoiceNumber = generateInvoiceNumber(nextSeq, now);
+    const totals = calculateInvoiceTotals(body.amount); // VAT 23% domyślnie
+    const buyerAddress = formatBuyerAddress(ws);
+    const itemName = buildInvoiceItemName(plan, cycle);
+
+    // Atomic transaction: INSERT Payment + UPDATE Workspace + INSERT Invoice +
+    // INSERT InvoiceItem + LOG ActivityLog razem. Jeśli Payment.paymentId
+    // duplikat — cała transakcja się rolluje, workspace NIE zostaje
+    // zaktualizowany podwójnie i NIE wystawiamy duplikatu faktury.
+    let createdInvoiceId: string | null = null;
     try {
-      await prismaBg.$transaction(async (tx) => {
+      const result = await prismaBg.$transaction(async (tx) => {
         await tx.payment.create({
           data: {
             workspaceId,
@@ -303,13 +358,50 @@ export const paymentWebhookHandler = async (req: Request, res: Response, next: N
             trialEndsAt: null,
           },
         });
+        const invoice = await tx.invoice.create({
+          data: {
+            workspaceId,
+            invoiceNumber,
+            type: 'VAT',
+            status: 'ISSUED',
+            sellerName: 'SILERS Adrian Błaszczykowski',
+            sellerTaxId: 'PL8261941094',
+            sellerAddress: 'ul. Żeromskiego 28\n08-400 Garwolin',
+            buyerName: ws.name,
+            buyerTaxId: ws.taxId,
+            buyerAddress,
+            netTotal: totals.netDecimal,
+            vatTotal: totals.vatDecimal,
+            grossTotal: totals.grossDecimal,
+            currency: 'PLN',
+            issueDate: now,
+            saleDate: now,
+            dueDate: now, // już opłacone
+            paymentMethod: 'TRANSFER',
+            paidAt: now,
+            paidAmount: totals.grossDecimal,
+            items: {
+              create: [{
+                name: itemName,
+                quantity: 1,
+                unitNet: totals.netDecimal,
+                vatRate: totals.vatRate,
+                netTotal: totals.netDecimal,
+                vatTotal: totals.vatDecimal,
+                grossTotal: totals.grossDecimal,
+                unit: 'szt.',
+              }],
+            },
+          },
+          select: { id: true },
+        });
         await tx.activityLog.create({
           data: {
             workspaceId,
             entityType: 'workspace',
             entityId: workspaceId,
             actionType: 'plan_paid_activated',
-            description: `Plan ${plan} (${cycle ?? 'monthly'}) aktywowany — opłacone ${(body.amount / 100).toFixed(2)} zł netto. Wygasa ${newExpiry.toISOString().slice(0, 10)}.`,
+            description: `Plan ${plan} (${cycle ?? 'monthly'}) aktywowany — opłacone ${(body.amount / 100).toFixed(2)} zł netto. Faktura ${invoiceNumber}. Wygasa ${newExpiry.toISOString().slice(0, 10)}.`,
             performedByUserId: meta.userId ?? null,
             metadata: {
               paymentId: body.paymentId,
@@ -319,10 +411,14 @@ export const paymentWebhookHandler = async (req: Request, res: Response, next: N
               plan,
               cycle: cycle ?? 'monthly',
               periodMonths,
+              invoiceNumber,
+              invoiceId: invoice.id,
             },
           },
         });
+        return { invoiceId: invoice.id };
       });
+      createdInvoiceId = result.invoiceId;
     } catch (err: unknown) {
       // P2002 = unique constraint violation on Payment.paymentId → duplicate webhook
       const errObj = err as { code?: string };
@@ -334,27 +430,34 @@ export const paymentWebhookHandler = async (req: Request, res: Response, next: N
       throw err;
     }
 
-    // TODO(idfaktura): po skończeniu projektu id-faktura.pl wstawić tu wywołanie
-    // (P1.17 — wymaga decyzji ownerskiej D4). Aktualnie faktura wystawiana ręcznie.
+    // P1.17/D4 — faktura wystawiona automatycznie w transakcji powyżej.
+    // Klient dostaje link do widoku HTML faktury (drukowalny → zapis do PDF).
+    // KSeF 2026-07-01: integracja w osobnym sprincie (model już ma pola
+    // ksefXml/ksefStatus przygotowane).
 
-    // Email "Plan aktywowany" do owner'a
+    // Email "Plan aktywowany + link do faktury" do owner'a (P1.18 — defer-fix
+    // odpadł, bo faktura już GOTOWA przed wysłaniem maila)
     if (meta.userEmail) {
+      const invoiceUrl = createdInvoiceId
+        ? `https://infradesk.pl/billing/invoices/${createdInvoiceId}`
+        : 'https://infradesk.pl/billing';
       const html = `
         <div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#1a1a1a">
           <h2 style="font-size:20px;margin:0 0 16px">Plan ${plan} aktywowany</h2>
           <p>Dziękujemy za płatność.</p>
           <p>Twój workspace <strong>${ws.name}</strong> ma teraz plan <strong>${plan}</strong> aktywny do <strong>${newExpiry.toISOString().slice(0, 10)}</strong>.</p>
-          <p>Faktura VAT zostanie wysłana osobno w ciągu 24h.</p>
+          <p>Wystawiliśmy fakturę VAT <strong>${invoiceNumber}</strong> na kwotę <strong>${totals.grossDecimal.toFixed(2)} zł brutto</strong>.</p>
           <p style="text-align:center;margin:28px 0">
-            <a href="https://infradesk.pl/plan-and-modules" style="display:inline-block;background:#6366f1;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600">Otwórz panel</a>
+            <a href="${invoiceUrl}" style="display:inline-block;background:#6366f1;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600">Pobierz fakturę</a>
+            <a href="https://infradesk.pl/plan-and-modules" style="display:inline-block;background:transparent;color:#6366f1;padding:12px 28px;border:1px solid #6366f1;border-radius:8px;text-decoration:none;font-weight:600;margin-left:8px">Otwórz panel</a>
           </p>
-          <p style="color:#9ca3af;font-size:12px;margin-top:20px">Zapłacono: ${(body.amount / 100).toFixed(2)} zł netto · ID transakcji: ${body.externalId ?? body.paymentId}</p>
+          <p style="color:#9ca3af;font-size:12px;margin-top:20px">Netto: ${totals.netDecimal.toFixed(2)} zł · VAT 23%: ${totals.vatDecimal.toFixed(2)} zł · Brutto: ${totals.grossDecimal.toFixed(2)} zł · ID transakcji: ${body.externalId ?? body.paymentId}</p>
         </div>
       `;
       void sendMail({
         to: meta.userEmail,
-        subject: `Plan ${plan} aktywowany — InfraDesk`,
-        text: `Dziękujemy! Plan ${plan} aktywny do ${newExpiry.toISOString().slice(0, 10)}. Zobacz w panelu: https://infradesk.pl/plan-and-modules`,
+        subject: `Plan ${plan} aktywowany — faktura ${invoiceNumber} — InfraDesk`,
+        text: `Dziękujemy! Plan ${plan} aktywny do ${newExpiry.toISOString().slice(0, 10)}. Faktura ${invoiceNumber} (${totals.grossDecimal.toFixed(2)} zł brutto): ${invoiceUrl}`,
         html,
       });
     }
@@ -364,5 +467,67 @@ export const paymentWebhookHandler = async (req: Request, res: Response, next: N
 };
 
 router.post('/webhooks/payment', paymentWebhookHandler);
+
+// ─── GET /api/v2/billing/invoices — lista faktur dla aktualnego workspace
+// P1.17/D4: klient widzi historię swoich faktur (do księgowości / Ctrl+P → PDF).
+router.get('/billing/invoices', requireAuth, requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const invoices = await prisma.invoice.findMany({
+      where: { workspaceId: req.workspaceId!, deletedAt: null },
+      orderBy: { issueDate: 'desc' },
+      select: {
+        id: true,
+        invoiceNumber: true,
+        type: true,
+        status: true,
+        issueDate: true,
+        dueDate: true,
+        paidAt: true,
+        netTotal: true,
+        vatTotal: true,
+        grossTotal: true,
+        currency: true,
+      },
+      take: 100,
+    });
+    res.json({
+      invoices: invoices.map((inv) => ({
+        ...inv,
+        netTotal: Number(inv.netTotal),
+        vatTotal: Number(inv.vatTotal),
+        grossTotal: Number(inv.grossTotal),
+      })),
+    });
+  } catch (err) { next(err); }
+});
+
+// ─── GET /api/v2/billing/invoices/:id — JSON pojedynczej faktury (do widoku UI)
+router.get('/billing/invoices/:id', requireAuth, requireWorkspace, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const invoice = await prisma.invoice.findFirst({
+      where: { id: String(req.params.id), workspaceId: req.workspaceId!, deletedAt: null },
+      include: { items: true },
+    });
+    if (!invoice) throw HttpError.notFound('Faktura nie znaleziona');
+    res.json({
+      invoice: {
+        ...invoice,
+        netTotal: Number(invoice.netTotal),
+        vatTotal: Number(invoice.vatTotal),
+        grossTotal: Number(invoice.grossTotal),
+        paidAmount: invoice.paidAmount ? Number(invoice.paidAmount) : null,
+        items: invoice.items.map((it: typeof invoice.items[number]) => ({
+          ...it,
+          quantity: Number(it.quantity),
+          unitNet: Number(it.unitNet),
+          vatRate: Number(it.vatRate),
+          netTotal: Number(it.netTotal),
+          vatTotal: Number(it.vatTotal),
+          grossTotal: Number(it.grossTotal),
+        })),
+      },
+    });
+  } catch (err) { next(err); }
+});
 
 export default router;

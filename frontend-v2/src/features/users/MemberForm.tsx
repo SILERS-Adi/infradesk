@@ -132,6 +132,7 @@ export function MemberFormCore({ onClose, variant = 'modal', membershipId, works
       })).filter((o) => o.moduleKey);
 
       let targetMembershipId: string;
+      let inviteUrl: string | null = null;
       if (isEdit && membershipId) {
         // EDIT: zaktualizuj role/scope istniejącego membership
         await api.patch(`/memberships/${membershipId}`, { role, scope });
@@ -143,17 +144,27 @@ export function MemberFormCore({ onClose, variant = 'modal', membershipId, works
           ...(workspaceIdOverride ? { workspaceId: workspaceIdOverride } : {}),
         });
         targetMembershipId = invite.data?.membership?.id;
+        inviteUrl = invite.data?.inviteUrl ?? null;
       }
 
       if (scope === 'SCOPED' && targetMembershipId) {
         await api.put(`/permissions/${targetMembershipId}/overrides`, { overrides: backendOverrides });
       }
-      return { membershipId: targetMembershipId };
+      return { membershipId: targetMembershipId, inviteUrl };
     },
-    onSuccess: () => {
-      toast.success(isEdit ? 'Zmiany zapisane' : 'Użytkownik zaproszony');
+    onSuccess: async (data) => {
       qc.invalidateQueries({ queryKey: ['memberships'] });
       qc.invalidateQueries({ queryKey: ['membership'] });
+      // P1.26 — przy invite skopiuj link do schowka i pokaż dłuższy toast z URL,
+      // żeby admin mógł go alternatywnie wysłać (Slack/SMS) gdy email nie dotrze.
+      if (!isEdit && data.inviteUrl) {
+        try { await navigator.clipboard?.writeText(data.inviteUrl); } catch { /* ignore */ }
+        toast.success(`Zaproszenie wysłane na ${email}. Link skopiowany do schowka — możesz też wysłać go inną drogą.`, {
+          duration: 8000,
+        });
+      } else {
+        toast.success(isEdit ? 'Zmiany zapisane' : 'Użytkownik dodany');
+      }
       if (variant === 'page') nav('/users');
       else onClose();
     },

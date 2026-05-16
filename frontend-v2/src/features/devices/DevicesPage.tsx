@@ -355,8 +355,19 @@ export function DevicesPage() {
         <Card className="p-10 text-center">
           <ServerIcon className="h-10 w-10 mx-auto mb-3 text-tx3" />
           <p className="text-tx font-medium mb-2">Brak urządzeń</p>
-          <p className="text-[13px] text-tx3 mb-4">Dodaj pierwsze urządzenie albo zatwierdź agenta (który je auto-doda).</p>
-          <Button onClick={handleAdd}><Plus className="h-4 w-4" /> Dodaj urządzenie</Button>
+          <p className="text-[13px] text-tx3 mb-4 max-w-[420px] mx-auto">
+            Najszybciej: zainstaluj <strong>Asystenta Business</strong> na urządzeniu — sam się zarejestruje i pojawi tutaj. Pobierz instalator z sekcji Pliki do pobrania.
+          </p>
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            <Button onClick={handleAdd}><Plus className="h-4 w-4" /> Dodaj ręcznie</Button>
+            <Link
+              to="/downloads"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-[var(--r-s)] text-[13px] font-semibold border press"
+              style={{ borderColor: 'var(--bd)', color: 'var(--tx)' }}
+            >
+              Pobierz Asystenta →
+            </Link>
+          </div>
         </Card>
       ) : view === 'visual' ? (
         <DevicesGrid

@@ -13,6 +13,7 @@ const ADMIN_ONLY: readonly Role[] = ['OWNER', 'ADMIN'];
 const SUPER_ADMIN_ONLY: readonly Role[] = []; // empty = require isSuperAdmin shortcut in RequireRole
 import { AppShell } from '@/components/layout/AppShell';
 import { ComingSoon } from '@/components/ui/ComingSoon';
+import { NotFoundPage } from '@/components/ui/NotFoundPage';
 
 // ─── helper: lazy-load a named export ──────────────────────────────────────
 function lazyNamed<P>(
@@ -67,6 +68,7 @@ const OrderDetailPage   = lazyNamed(() => import('@/features/orders/OrderDetailP
 const DelegationsPage   = lazyNamed(() => import('@/features/delegations/DelegationsPage'), 'DelegationsPage');
 const CalendarPage      = lazyNamed(() => import('@/features/calendar/CalendarPage'),       'CalendarPage');
 const BillingPage       = lazyNamed(() => import('@/features/billing/BillingPage'),         'BillingPage');
+const InvoicePage       = lazyNamed(() => import('@/features/billing/InvoicePage'),         'InvoicePage');
 const ClientsPage       = lazyNamed(() => import('@/features/clients/ClientsPage'),         'ClientsPage');
 const ClientNewPage     = lazyNamed(() => import('@/features/clients/ClientsPage'),         'ClientNewPage');
 const ClientDetailPage  = lazyNamed(() => import('@/features/clients/ClientDetailPage'),    'ClientDetailPage');
@@ -182,6 +184,7 @@ export default function App() {
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/sessions" element={<SessionsPage />} />
               <Route path="/billing" element={<BillingPage />} />
+              <Route path="/billing/invoices/:id" element={<InvoicePage />} />
               <Route path="/alerts" element={<AlertsPage />} />
               <Route path="/orders" element={<OrdersPage />} />
               <Route path="/orders/new" element={<OrderNewPage />} />
@@ -237,7 +240,7 @@ export default function App() {
               <Route path="/design/id-core" element={<RequireRole roles={SUPER_ADMIN_ONLY}><IdCoreShowcasePage /></RequireRole>} />
             </Route>
 
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
         </AuthBootstrap>
