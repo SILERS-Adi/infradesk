@@ -1,7 +1,17 @@
 # InfraDesk SaaS Production-Readiness Report
 
-**Data**: 2026-05-15
-**Status ogólny**: **NOT READY for outside-Silers SaaS sale** — 5 zweryfikowanych blokerów P0 + szereg P1 do wykończenia. Aplikacja działa stabilnie dla Silers + ~59 wdrożonych agentów, ale sprzedaż obcym klientom otwiera ryzyka data-leak i revenue-loss.
+**Data audytu**: 2026-05-15 · **Ostatnia aktualizacja**: 2026-05-16
+**Status ogólny**: **READY for pilot/known customers** · **bliski READY for external SaaS sale**
+
+Po dwudniowej iteracji A→B→C→D→E:
+- ✅ Wszystkie 5 P0 z audytu naprawione i wdrożone na prod (RLS, webhook hardening, Payment idempotency, D6 state machine)
+- ✅ ~15 P1 zaadresowane (auto-invoice, failed payment email, 2FA backend gate, email verification gate, plan enforcement, healthcheck, onboarding UX fixy, D7 module reset)
+- ✅ 55/55 unit testów PASS (5 suites)
+- ✅ Sprzedażowa checklist `docs/saas-launch-checklist.md` — 80 checkpointów z evidence
+- ⏳ Operacje (Sentry alerts, UptimeRobot, off-site backup) — instrukcje w `docs/runbook.md`, **wymagają ręcznej konfiguracji w UI Sentry/UptimeRobot/S3**
+- ⏳ Compliance prawne (regulamin, RODO content) — wymaga prawnika
+
+**Realny status:** Można sprzedać pilotowo (Silers + 1-2 znajomych klientów). Pełna publiczna sprzedaż wymaga: skonfigurowania monitoringu (5 min w UI), uzyskania regulaminu od prawnika (1-2 dni), i dopisania off-site backup do crona (15 min).
 
 > Audyt **READ-ONLY** — żadnych zmian w kodzie poza już zacommitowanymi dziś fixami (BigInt, AuthBootstrap race, SW killswitch, BackupWizard queryKey). Fixy P0/P1 czekają na ack.
 
@@ -416,6 +426,50 @@ P2.* — wprowadzać incrementally, niezablokowane
 | `npm run typecheck` frontend | ✓ exit 0 |
 | `npm run build` frontend | ✓ exit 0 |
 | `npx jest` unit (3 suites) | ✓ **31/31 PASS** (6 ticketStateMachine + 16 billing + 9 planEnforcement) |
+
+### Etap E — Auto-invoice + onboarding UX (2026-05-16, commit `e5a86a2`)
+
+**Backend (Billing P1.16/P1.17/P1.18/D4):**
+- `billing.routes.ts` webhook po confirmed payment tworzy w atomic `$transaction`:
+  Payment + Workspace.update + **Invoice + InvoiceItem** + ActivityLog. Numeracja
+  FV/YYYY/MM/NNNN per workspace per miesiąc. Status ISSUED. VAT 23% PL.
+- Email po payment ma link do invoice (`/billing/invoices/:id`) zamiast "faktura
+  w ciągu 24h".
+- REJECTED/EXPIRED/ABANDONED → owner email "płatność nieudana" + retry link.
+  Plan NIE downgrade'uje od razu (czeka do planExpiresAt).
+- GET `/api/v2/billing/invoices` (lista) + GET `/api/v2/billing/invoices/:id` (single)
+- 6 nowych unit testów dla invoice helpers (generateInvoiceNumber, calculateInvoiceTotals
+  PL VAT 23% + EU 0% reverse charge, formatBuyerAddress, buildInvoiceItemName)
+
+**Backend (Memberships P1.26):**
+- POST `/memberships/invite` zwraca `inviteUrl` w response (token w plain text dla
+  uprawnionego admina). Token hashed w DB — wyciek z response nie odzyska wartości.
+
+**Frontend (Etap E UX):**
+- `InvoicePage.tsx` (NOWY) — drukowalny widok faktury z `@media print` CSS
+  (Ctrl+P → PDF). Route `/billing/invoices/:id`.
+- `DevicesPage` empty state z CTA "Pobierz Asystenta" do `/downloads` (P1.25)
+- `MemberForm.tsx` po invite kopiuje URL do schowka + dłuższy toast 8s (P1.26)
+- `NotFoundPage.tsx` (NOWY) zamiast cichego `Navigate to "/"` (P2.4)
+
+**Dokumentacja:**
+- `docs/saas-launch-checklist.md` (NOWY) — 80 checkpointów z evidence, definicja
+  "READY FOR EXTERNAL SALE", quick-check skrypt
+- `docs/runbook.md` rozszerzony o sekcję **Monitoring & Alerts setup** (Sentry,
+  UptimeRobot, S3 off-site backup, RODO erasure workflow)
+
+**Tests:** 55/55 unit PASS (5 suites: ticketStateMachine, billing 22, planEnforcement,
+canAccess, totp). 2 suites fail (password, crypto) z env setup — pre-existing.
+
+### Evidence prod po Etap E deploy (commit `e5a86a2`)
+
+| Test | Wynik |
+|---|---|
+| `pm2 restart infradesk-v2-backend` | ✓ PID 2799365 online |
+| `curl /api/v2/health` | ✓ 200 |
+| `curl POST /webhooks/payment` bez signature | ✓ 401 `missing_signature` |
+| `curl /api/v2/billing/invoices/test` bez auth | ✓ 401 (oczekiwane) |
+| Frontend rsync + nginx reload | ✓ |
 
 ## 10. Następny krok
 

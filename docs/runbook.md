@@ -512,3 +512,79 @@ Jeśli nie wiesz co robić:
 - [ ] <ulepszyć detection>
 - [ ] <ulepszyć runbook>
 ```
+
+---
+
+# Monitoring & Alerts — setup poza kodem
+
+Te kroki **trzeba wykonać ręcznie w UI** (kod sam tego nie skonfiguruje).
+
+## Sentry — alerty na 5xx i webhook fails
+
+1. Wejdź na https://sentry.io → projekt `infradesk-backend-v2`
+2. Settings → **Alerts** → **Create Alert Rule**
+3. **Reguła #1 — "Każdy 5xx z prod":**
+   - When: `An event is captured`
+   - If: `event.level == error` AND `environment == production`
+   - Then: email do `biuro@silers.pl` + Slack do `#incidents` (jeśli skonfigurowane)
+   - Throttle: 1 powiadomienie per 15 min per fingerprint
+4. **Reguła #2 — "Webhook signature reject":**
+   - When: `Issue is first seen`
+   - If: message contains `[billing] webhook signature reject`
+   - Then: email natychmiast (to potencjalny atak — nie czekaj)
+5. **Reguła #3 — "Mass plan downgrade":**
+   - When: `Number of events > 5 in 1 hour`
+   - If: tag `actionType:plan_auto_downgraded`
+   - Then: email — >5 downgradeów na godzinę = coś jest źle z renewal flow
+
+## UptimeRobot — uptime monitoring
+
+1. https://uptimerobot.com → New Monitor
+2. **Monitor 1 — liveness:**
+   - URL: `https://infradesk.pl/health` · Interval: 5 min · SMS + email
+3. **Monitor 2 — DB readiness:**
+   - URL: `https://infradesk.pl/api/v2/health` · Expected: 200 (jeśli 503 → DB padło)
+4. **Monitor 3 — landing page:**
+   - URL: `https://infradesk.pl/` · Keyword: `InfraDesk`
+
+Status page (opcjonalnie, gdy >5 klientów): `status.infradesk.pl` CNAME.
+
+## Off-site backup do S3/R2
+
+Aktualnie tylko local `~/db-backups/` (14d retention). Jeśli VPS padnie — backup pada razem z nim. Off-site to **must** dla SaaS.
+
+```bash
+# Setup jednorazowy:
+sudo apt install awscli && aws configure   # klucz od Cloudflare R2 / AWS S3
+
+# Test:
+aws s3 cp ~/db-backups/infradesk_v2_$(date +%Y%m%d).sql.gz \
+  s3://infradesk-backups/db/ --storage-class STANDARD_IA
+
+# Cron (crontab -e):
+# 4 0 * * *  /usr/bin/aws s3 cp /home/adrian/db-backups/infradesk_v2_$(date +\%Y\%m\%d).sql.gz s3://infradesk-backups/db/ --storage-class STANDARD_IA >> /var/log/s3-backup.log 2>&1
+
+# Retention (lifecycle policy):
+# 0-30d STANDARD_IA · 30-365d GLACIER · >365d delete
+```
+
+**Sugerowany provider:** Cloudflare R2 (zero egress, ~$0.015/GB/m-c). Backup DB ~50-200MB skompresowany → <1 PLN/m-c.
+
+## RODO right to erasure — workflow ad hoc
+
+Brak UI w MVP. Gdy klient zgłosi:
+
+```sql
+-- 1. Soft delete + mark
+UPDATE "User" SET "erasureRequestedAt" = NOW(), "deletedAt" = NOW()
+  WHERE email = 'klient@example.pl';
+
+-- 2. Anonymize AuditEvent (zachowaj historię, usuń PII)
+UPDATE "AuditEvent" SET "userId" = NULL, "ipAddress" = NULL, "userAgent" = NULL
+  WHERE "userId" = (SELECT id FROM "User" WHERE email = 'klient@example.pl');
+
+-- 3. Po 30 dniach grace — hard delete:
+DELETE FROM "User" WHERE "erasureRequestedAt" < NOW() - INTERVAL '30 days';
+```
+
+Usunięcie workspace ownera = cascade na wszystkie dane workspace.
