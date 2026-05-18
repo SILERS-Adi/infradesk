@@ -37,14 +37,16 @@ export function PortalPage() {
   });
 
   // Portal jest tylko dla klientów. MSP/INTERNAL_IT trafiają na /dashboard.
+  // UWAGA: early return MUSI być PO wszystkich hookach (Rules of Hooks).
+  // Wcześniej `if (!wsLoading && ws.type !== 'CLIENT') return <Navigate>` było
+  // przed useQuery/useState/useMutation — pierwszy render miał 6 hooków, drugi 2 →
+  // React error #300 "Rendered fewer hooks than during previous render" → cała
+  // strona crashowała pod Error Boundary "Coś poszło nie tak" (P0 fix 2026-05-18).
   const { data: ws, isLoading: wsLoading } = useQuery<{ workspace: { type: 'MSP' | 'CLIENT' | 'INTERNAL_IT' } | null }>({
     queryKey: ['workspaces', 'current'],
     queryFn: async () => (await api.get('/workspaces/current')).data,
     staleTime: 5 * 60_000,
   });
-  if (!wsLoading && ws?.workspace && ws.workspace.type !== 'CLIENT') {
-    return <Navigate to="/dashboard" replace />;
-  }
 
   const { data, isLoading } = useQuery<{ items: PortalTicket[] }>({
     queryKey: ['portal', 'tickets', me?.user?.id ?? null],
@@ -76,6 +78,11 @@ export function PortalPage() {
     onError: (err: { response?: { data?: { message?: string } } }) =>
       toast.error(err?.response?.data?.message ?? 'Błąd tworzenia'),
   });
+
+  // Redirect MSP/INTERNAL_IT do dashboardu — TERAZ, po wszystkich hookach.
+  if (!wsLoading && ws?.workspace && ws.workspace.type !== 'CLIENT') {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return (
     <div className="space-y-5">

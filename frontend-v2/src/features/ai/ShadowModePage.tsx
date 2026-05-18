@@ -17,14 +17,20 @@ interface ShadowDecision {
   createdAt: string;
 }
 
-interface Report {
-  days: number;
+interface FeatureReport {
+  feature: string;
   total: number;
+  resolved: number;
   matched: number;
-  mismatched: number;
-  unresolved: number;
-  matchRate: number;
-  byFeature: { feature: string; total: number; matched: number; matchRate: number }[];
+  accuracy: number;            // 0..1
+  savedPlnIfAutoApplied: number;
+  readyForAutoApply: boolean;
+}
+
+interface Report {
+  since: string;
+  features: FeatureReport[];
+  totalSavingsPln: number;
 }
 
 export function ShadowModePage() {
@@ -53,39 +59,52 @@ export function ShadowModePage() {
         </p>
       </div>
 
-      {r && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-[var(--sp-3)]">
-          <StatCard label="Decyzji (7 dni)" value={r.total} />
-          <StatCard
-            label="Match rate"
-            value={`${r.matchRate}%`}
-            color={r.matchRate >= 90 ? 'var(--ok)' : r.matchRate >= 70 ? 'var(--wn)' : 'var(--er)'}
-          />
-          <StatCard label="Zgodnych" value={r.matched} color="var(--ok)" />
-          <StatCard label="Niezgodnych" value={r.mismatched} color="var(--er)" />
-        </div>
-      )}
+      {r && (() => {
+        const features = r.features ?? [];
+        const total = features.reduce((s, f) => s + f.total, 0);
+        const matched = features.reduce((s, f) => s + f.matched, 0);
+        const resolved = features.reduce((s, f) => s + f.resolved, 0);
+        const matchRatePct = resolved > 0 ? Math.round((matched / resolved) * 100) : 0;
+        const mismatched = resolved - matched;
+        return (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-[var(--sp-3)]">
+              <StatCard label="Decyzji (7 dni)" value={total} />
+              <StatCard
+                label="Match rate"
+                value={resolved > 0 ? `${matchRatePct}%` : '—'}
+                color={matchRatePct >= 90 ? 'var(--ok)' : matchRatePct >= 70 ? 'var(--wn)' : 'var(--er)'}
+              />
+              <StatCard label="Zgodnych" value={matched} color="var(--ok)" />
+              <StatCard label="Niezgodnych" value={mismatched} color="var(--er)" />
+            </div>
 
-      {r && r.byFeature.length > 0 && (
-        <Card className="overflow-hidden">
-          <div className="px-[var(--sp-4)] py-[var(--sp-3)] border-b border-[var(--bd)] text-[13px] font-medium">
-            Match rate per funkcjonalność
-          </div>
-          <div className="divide-y divide-[var(--bd)]">
-            {r.byFeature.map((f) => (
-              <div key={f.feature} className="flex items-center justify-between px-[var(--sp-4)] py-[var(--sp-3)]">
-                <div>
-                  <div className="text-[13px]">{f.feature}</div>
-                  <div className="text-[11px] text-[var(--tx3)]">{f.total} decyzji · {f.matched} zgodnych</div>
+            {features.length > 0 && (
+              <Card className="overflow-hidden">
+                <div className="px-[var(--sp-4)] py-[var(--sp-3)] border-b border-[var(--bd)] text-[13px] font-medium">
+                  Match rate per funkcjonalność
                 </div>
-                <Badge variant={f.matchRate >= 90 ? 'success' : f.matchRate >= 70 ? 'warning' : 'danger'}>
-                  {f.matchRate}%
-                </Badge>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
+                <div className="divide-y divide-[var(--bd)]">
+                  {features.map((f) => {
+                    const pct = Math.round(f.accuracy * 100);
+                    return (
+                      <div key={f.feature} className="flex items-center justify-between px-[var(--sp-4)] py-[var(--sp-3)]">
+                        <div>
+                          <div className="text-[13px]">{f.feature}</div>
+                          <div className="text-[11px] text-[var(--tx3)]">{f.total} decyzji · {f.matched} zgodnych{f.readyForAutoApply ? ' · gotowe do auto-apply' : ''}</div>
+                        </div>
+                        <Badge variant={pct >= 90 ? 'success' : pct >= 70 ? 'warning' : 'danger'}>
+                          {pct}%
+                        </Badge>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+            )}
+          </>
+        );
+      })()}
 
       <Card className="overflow-hidden">
         <div className="px-[var(--sp-4)] py-[var(--sp-3)] border-b border-[var(--bd)] text-[13px] font-medium">
