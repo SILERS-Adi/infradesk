@@ -125,7 +125,7 @@ Wzorzec: ConnectWise Manage — workflow rules, escalation. Atera — czas pracy
 | ❓ | P1 | Email z ticketa do klienta (reply) | Verify |
 | ❓ | P0 | SLA breach alerts | `sla-breach.ts` scheduler (5min) — verify że faktycznie wysyła maile |
 | ❓ | P0 | Auto-close (RESOLVED → CLOSED po 7d) | `ticket-auto-close.ts` (6h) — verify scheduler log |
-| 🔴 | P1 | **Tasks: brak komentarzy** | tasks.routes.ts NIE MA endpointu `POST /tasks/:id/comments`. To może być co user miał na myśli mówiąc "nie dziala prawidlo zadania". Atera/Syncro mają komentarze do zadań. |
+| 🟢 | P1 | **Tasks: komentarze** | **FIXED 2026-05-18 (commit 8fb760a)** — nowy model TaskComment + migracja z RLS + POST /tasks/:id/comments + embed w GET + UI w TaskDetailPage. Live verified. |
 | 🟢 | P0 | Tasks: create + status transitions | Verified 2026-05-18: TSK-2026-0059 utworzone z linkedTicket, NEW→IN_PROGRESS→DONE OK |
 | 🟡 | P1 | Tasks: brak history/events | Tickety mają events+history, taski nie |
 | 🟡 | P1 | Kanban view (drag&drop) | Tabela tylko? Brak kanbana. |
@@ -291,7 +291,7 @@ Bazując na obecnych statusach 🔴/❓/🟡 z prio P0:
 5. ~~🔴 users/search sameWorkspace bug~~ → 🟢 **FIXED 2026-05-18 (5666928)**
 6. 🔴 **`ANTHROPIC_API_KEY` brak na prod** — Iris nie może zadzwonić do LLM. **Akcja owner: dodać klucz do .env**.
 7. 🔴 **Email→ticket złamany od 25 dni** — `ENCRYPTION_KEY` rotacja zepsuła decrypt IMAP hasła. **Akcja owner: re-enter password w UI CRM → Email**.
-8. 🔴 **Tasks: brak komentarzy** — `POST /tasks/:id/comments` nie istnieje. Wymaga: nowy model TaskComment + migracja + endpoint + UI w TaskDetailPage.
+8. ~~🔴 Tasks: brak komentarzy~~ → 🟢 **FIXED 2026-05-18 (8fb760a, deployed live)**
 9. 🟡 **/backups/google-auth-url 404** — BackupWizard wywołuje, backend brak. Auto-backup do Google Drive nie da się skonfigurować.
 10. 🟡 **Knowledge base** — kompletny brak, dla MSP B2B krytyczne (Hudu/ITGlue mają)
 11. 🟡 **Sentry / błędy** — runbook wspomina setup, verify że eventy lecą
@@ -364,3 +364,10 @@ Po wypełnieniu statusów: P0 → P1 → P2. Każdy fix:
     - imap-sync 120s ⚠️ (uruchamia się, ale 0 mailboxów isActive=true)
     - trial-expiry 60min, renewal-reminder 12h, rustdesk-health 30min ✅
   - **Mailer faktycznie wysyła** (pm2 confirms 2 maile podczas mojego testu ticketów)
+  - **Security boundaries**:
+    - 401 bez tokena / invalid token ✅
+    - 404 unknown endpoint ✅
+    - POST /tickets z `workspaceId` w body → backend stripuje, używa req.workspaceId (super-admin nie może wstrzyknąć cudzego workspace) ✅
+    - Cross-workspace ticket access przez super-admin lub aktywny WorkspaceRelation z canViewDevices=true ✅ (intencjonalne dla MSP)
+
+- **2026-05-18 (#6 — Tasks Comments FIX)** — nowy model `TaskComment` paralel do `TicketComment` z denormalizowanym `workspaceId` (RLS bez joina). Migracja `20260518213000_task_comments` idempotentna + RLS policy z cross-workspace MSP via `WorkspaceRelation.canViewDevices`. Backend `POST /tasks/:id/comments` + embed w `GET`. Frontend `TaskDetailPage`: karta "Komentarze" z listą, textarea (Enter=send, Shift+Enter=nowa linia), checkbox isInternal. **Live-verified na prodzie**: POST 201, GET embed OK.
