@@ -1,6 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
+import { prismaBg } from '../../lib/prisma-bg';
 import { requireAuth } from '../../middleware/auth';
 import { hashPassword, verifyPassword, validatePasswordStrength } from '../../lib/password';
 import { HttpError } from '../../utils/httpError';
@@ -99,8 +100,12 @@ router.post('/me/change-password', requireAuth, async (req: Request, res: Respon
 router.get('/search', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const q = z.object({ email: z.string().email() }).parse(req.query);
-    const callerWsId = (req as Request & { workspaceId?: string }).workspaceId;
-    const user = await prisma.user.findUnique({
+    // sameWorkspace check potrzebuje workspaceId wywołującego — bierzemy z JWT,
+    // bo /search nie używa requireWorkspace (działa też dla użytkowników w trakcie
+    // onboardingu bez wybranego workspace). prismaBg pomija RLS (workspace bez ALS
+    // dał wcześniej zawsze sameWorkspace=false, P0 fix 2026-05-18).
+    const callerWsId = req.auth?.workspaceId ?? null;
+    const user = await prismaBg.user.findUnique({
       where: { email: q.email.toLowerCase() },
       select: { id: true, isActive: true },
     });
@@ -108,7 +113,7 @@ router.get('/search', requireAuth, async (req: Request, res: Response, next: Nex
     let sameWorkspace = false;
     let displayName: string | null = null;
     if (callerWsId) {
-      const m = await prisma.membership.findFirst({
+      const m = await prismaBg.membership.findFirst({
         where: { userId: user.id, workspaceId: callerWsId, status: 'ACTIVE' },
         select: { user: { select: { firstName: true, lastName: true } } },
       });

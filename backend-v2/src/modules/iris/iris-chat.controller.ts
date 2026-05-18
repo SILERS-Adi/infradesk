@@ -698,10 +698,6 @@ async function chatHandler(req: Request, res: Response, next: NextFunction): Pro
     const auth = await resolveIrisAuth(req);
     if (!auth) throw HttpError.unauthorized('Brak uwierzytelnienia');
 
-    // Cost guard: enforce per-plan miesięczny limit Iris AI calls przed wywołaniem
-    // Anthropic. Bez tego START user (49 zł/mc) może wygenerować 260k zł kosztu.
-    await enforceAiCallLimit(auth.workspaceId);
-
     // Lookup isSuperAdmin via bg client (User has no RLS) — needed for ALS context
     const _userMeta = await prismaBg.user.findUnique({
       where: { id: auth.userId },
@@ -709,11 +705,18 @@ async function chatHandler(req: Request, res: Response, next: NextFunction): Pro
     });
     const _isSuperAdmin = _userMeta?.isSuperAdmin ?? false;
 
-    // Wrap rest in ALS — Prisma extension reads ctx and SET LOCAL per query
+    // Wrap rest in ALS — Prisma extension reads ctx and SET LOCAL per query.
+    // enforceAiCallLimit musi być TU (nie wcześniej) bo używa prisma RLS-aware
+    // do lookup Workspace + LlmUsage — bez ALS Workspace_select policy nie matchuje
+    // i loadWorkspace rzuca 404 "Workspace not found" (P0 bug do 2026-05-18).
     const _ctxBox = {
       current: { userId: auth.userId, workspaceId: auth.workspaceId, isSuperAdmin: _isSuperAdmin },
     };
     await requestContextStore.run(_ctxBox, async () => {
+    // Cost guard: enforce per-plan miesięczny limit Iris AI calls przed wywołaniem
+    // Anthropic. Bez tego START user (49 zł/mc) może wygenerować 260k zł kosztu.
+    await enforceAiCallLimit(auth.workspaceId);
+
     const body = chatBodySchema.parse(req.body);
     const model = body.model ?? 'claude-sonnet-4-6';
 
