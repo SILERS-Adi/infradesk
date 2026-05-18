@@ -92,7 +92,7 @@ Wzorzec: NinjaOne — agent zawsze online, push commands, scripts library, sched
 |--------|------|---------|---------|
 | 🟢 | P0 | Instalacja asystenta (.exe pobrany z `/pobieranie`) | Działa, PIN gate verified 2026-05-18 |
 | 🟢 | P0 | Rejestracja asystenta + zgłoszenie do zatwierdzenia | Działa — Wismont DESKTOP-PI1GH1U zatwierdzony przez SQL 2026-05-18 |
-| 🔴 | P0 | **Zatwierdzanie asystenta z UI** | Owner zgłosił 2026-05-18 że UI nie działa. Approve route istnieje — verify czemu Frontend nie pozwala. |
+| 🟢 | P0 | **Zatwierdzanie asystenta z UI** | **FIXED 2026-05-18** (commit a45abdd). Bug: backend approve szukał agenta w req.workspaceId (Silers) zamiast reg.workspaceId (Wismont) — cross-workspace MSP nie działał. Plus frontend pobierał locations bez ?workspaceId. Oba naprawione. |
 | ❓ | P0 | WS keepalive + lastSeen | [[audit_2026_05_01]] mówi że lastSeen FP fixed |
 | ❓ | P1 | Komendy zdalne (restart usługi, instalacja) | `allowRemoteCommands` toggle istnieje. Verify jakie komendy realnie działają. |
 | 🟢 | P1 | RustDesk launch z UI | Działa po 2026-05-18 (silers.msi via verify-pin) |
@@ -264,7 +264,7 @@ Specyficzne dla InfraDesk. Wzorzec: Atera Copilot, NinjaOne AI Copilot.
 
 | Status | Prio | Pozycja | Notatka |
 |--------|------|---------|---------|
-| 🔴 | P0 | **Stary Service Worker z v1** | [[sw_gotcha_v1_to_v2]] — biały spinner u części klientów |
+| 🟢 | P0 | Stary Service Worker z v1 | Unregister-script jest w frontend-v2/index.html od 2026-05-13 (commit cf0d308). Pamięć była nieaktualna. |
 | 🟡 | P1 | Mobile responsiveness | AppShell ma drawer — verify że wszystkie strony OK na mobile |
 | 🟡 | P2 | Dark mode | Verify czy działa wszędzie |
 | 🟡 | P2 | i18n (EN/DE/...) | Brak — tylko PL |
@@ -277,8 +277,8 @@ Specyficzne dla InfraDesk. Wzorzec: Atera Copilot, NinjaOne AI Copilot.
 
 Bazując na obecnych statusach 🔴/❓/🟡 z prio P0:
 
-1. 🔴 **Zatwierdzanie asystenta z UI** — owner zgłosił że nie działa (2026-05-18)
-2. 🔴 **Stary SW z v1** — biały spinner u klientów
+1. ~~🔴 Zatwierdzanie asystenta z UI~~ → 🟢 **FIXED 2026-05-18 (a45abdd)**
+2. ~~🔴 Stary SW z v1~~ → 🟢 **już naprawione (cf0d308 z 2026-05-13)**
 3. ❓ **Tasks (zadania)** — owner zgłosił że "nie dziala prawidlo zadania" — co dokładnie?
 4. ❓ **Edycja ticketu z UI** — czy pełna edycja statusu/priorytetu/assignee działa
 5. ❓ **Email → ticket** — IMAP sync z biuro@silers.pl
@@ -310,4 +310,11 @@ Po wypełnieniu statusów: P0 → P1 → P2. Każdy fix:
 
 ---
 
-**Ostatnia aktualizacja:** 2026-05-18 (Faza 1 — szkielet)
+**Ostatnia aktualizacja:** 2026-05-18 (Faza 1 — szkielet + 2 fixy P0)
+
+## Changelog audytu
+
+- **2026-05-18 (initial)** — szkielet 15 modułów, ~150 pozycji, większość ❓ TODO-VERIFY.
+- **2026-05-18 (#1)** — Edycja lokalizacji urządzenia 🔴→🟢 (commit 42fdeb1).
+- **2026-05-18 (#2)** — Cross-workspace approve asystenta 🔴→🟢 (commit a45abdd). Wymagało fix backend + frontend.
+- **2026-05-18 (#3)** — Stary SW z v1: pamięć nieaktualna, fix już od cf0d308 (2026-05-13).
