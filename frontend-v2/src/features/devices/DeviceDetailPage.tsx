@@ -455,12 +455,17 @@ function OverviewTab({ device: d, agent, isOnline }: { device: Device; agent: Ag
 
 function ConfigTab({ device: d, agent }: { device: Device; agent: AgentInfo | null }) {
   const qc = useQueryClient();
+  const locationsQ = useQuery<{ locations: Array<{ id: string; name: string; city: string | null }> }>({
+    queryKey: ['locations', d.workspaceId],
+    queryFn: async () => (await api.get('/locations', { params: { workspaceId: d.workspaceId } })).data,
+  });
   const [form, setForm] = useState({
     name: d.name,
     hostname: d.hostname ?? '',
     category: d.category,
     criticality: d.criticality,
     status: d.status,
+    locationId: d.location?.id ?? '',
     serialNumber: d.serialNumber ?? '',
     manufacturer: d.manufacturer ?? '',
     model: d.model ?? '',
@@ -531,7 +536,25 @@ function ConfigTab({ device: d, agent }: { device: Device; agent: AgentInfo | nu
               options={[{ value: 'LOW', label: 'Niski' }, { value: 'MEDIUM', label: 'Średni' }, { value: 'HIGH', label: 'Wysoki' }, { value: 'CRITICAL', label: 'Krytyczny' }]} />
             <FieldSelect label="Status" value={form.status} onChange={(v) => setForm({ ...form, status: v })}
               options={[{ value: 'ACTIVE', label: 'Aktywne' }, { value: 'INACTIVE', label: 'Nieaktywne' }, { value: 'DECOMMISSIONED', label: 'Wycofane' }]} />
+            <FieldSelect
+              label="Lokalizacja"
+              value={form.locationId}
+              onChange={(v) => setForm({ ...form, locationId: v })}
+              options={[
+                ...(form.locationId ? [] : [{ value: '', label: '— wybierz —' }]),
+                ...((locationsQ.data?.locations ?? []).map((l) => ({
+                  value: l.id,
+                  label: l.city ? `${l.name} (${l.city})` : l.name,
+                }))),
+              ]}
+            />
           </div>
+          {locationsQ.isLoading && <p className="text-[11px] text-tx3 mt-2">Wczytywanie lokalizacji…</p>}
+          {!locationsQ.isLoading && (locationsQ.data?.locations.length ?? 0) === 0 && (
+            <p className="text-[11px] text-warn mt-2">
+              Brak lokalizacji w tej firmie. <Link to="/locations" className="text-pri hover:underline">Dodaj lokalizację</Link>
+            </p>
+          )}
         </Card>
 
         <Card className="p-5">

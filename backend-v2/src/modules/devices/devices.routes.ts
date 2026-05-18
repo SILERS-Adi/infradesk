@@ -243,6 +243,13 @@ router.patch('/:id', requireAccess(MODULES.DEVICES, 'edit'), async (req: Request
       });
       if (dup) throw HttpError.conflict('Device o takiej nazwie już istnieje', 'device_name_taken');
     }
+    if (rest.locationId) {
+      const loc = await prisma.location.findFirst({
+        where: { id: rest.locationId, workspaceId: existing.workspaceId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!loc) throw HttpError.badRequest('Lokalizacja nie należy do firmy urządzenia', 'invalid_location');
+    }
     const data = {
       ...rest,
       purchaseDate: rest.purchaseDate ? new Date(rest.purchaseDate) : undefined,
