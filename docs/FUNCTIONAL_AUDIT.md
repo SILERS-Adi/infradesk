@@ -286,14 +286,15 @@ Bazując na obecnych statusach 🔴/❓/🟡 z prio P0:
 
 1. ~~🔴 Zatwierdzanie asystenta z UI~~ → 🟢 **FIXED 2026-05-18 (a45abdd)**
 2. ~~🔴 Stary SW z v1~~ → 🟢 **już naprawione (cf0d308 z 2026-05-13)**
-3. ❓ **Tasks (zadania)** — owner zgłosił że "nie dziala prawidlo zadania" — co dokładnie?
-4. ❓ **Edycja ticketu z UI** — czy pełna edycja statusu/priorytetu/assignee działa
-5. ❓ **Email → ticket** — IMAP sync z biuro@silers.pl
-6. ❓ **SLA breach alerts** — czy faktycznie wysyłają maile
-7. ❓ **Watchdog offline** — czy alert po 24h offline naprawdę leci
-8. ❓ **Setup wizard** — czy nowy klient daje radę zarejestrować + dodać asystenta bez pomocy
-9. 🟡 **Knowledge base** — kompletny brak, dla MSP B2B krytyczne (Hudu/ITGlue mają)
-10. 🟡 **Sentry / błędy** — czy faktycznie eventy lecą i ktoś je czyta
+3. ~~🔴 Edycja lokalizacji urządzenia~~ → 🟢 **FIXED 2026-05-18 (42fdeb1)**
+4. ~~🔴 Iris/chat workspace_not_found~~ → 🟢 **FIXED 2026-05-18 (5666928)**
+5. ~~🔴 users/search sameWorkspace bug~~ → 🟢 **FIXED 2026-05-18 (5666928)**
+6. 🔴 **`ANTHROPIC_API_KEY` brak na prod** — Iris nie może zadzwonić do LLM. **Akcja owner: dodać klucz do .env**.
+7. 🔴 **Email→ticket złamany od 25 dni** — `ENCRYPTION_KEY` rotacja zepsuła decrypt IMAP hasła. **Akcja owner: re-enter password w UI CRM → Email**.
+8. 🔴 **Tasks: brak komentarzy** — `POST /tasks/:id/comments` nie istnieje. Wymaga: nowy model TaskComment + migracja + endpoint + UI w TaskDetailPage.
+9. 🟡 **/backups/google-auth-url 404** — BackupWizard wywołuje, backend brak. Auto-backup do Google Drive nie da się skonfigurować.
+10. 🟡 **Knowledge base** — kompletny brak, dla MSP B2B krytyczne (Hudu/ITGlue mają)
+11. 🟡 **Sentry / błędy** — runbook wspomina setup, verify że eventy lecą
 
 ---
 
@@ -330,3 +331,36 @@ Po wypełnieniu statusów: P0 → P1 → P2. Każdy fix:
   - 🟡 **Tasks: brak history/events** — tickety mają, taski nie.
   - ⚠️ **Auto-transition OPEN→ASSIGNED na PATCH** by design — UI musi sprawdzać status przed POST /transition (else 400 illegal).
   - 🟡 **Auto-creation linked task na service component** — POST /tickets z `components.service` tworzy task automatycznie (TSK-...). Może zaskakiwać.
+
+- **2026-05-18 (#5 — WIDE SWEEP, token 3h)** — Cały panel: ~50 endpointów GET, wszystkie schedulery, IMAP, RLS, frontend↔backend mapping.
+  
+  **P0 NAPRAWIONE w tej sesji (commit 5666928):**
+  - 🟢 **Iris/chat całkowicie rozwalone** — `enforceAiCallLimit` (planLimits.ts:96) używał RLS-aware `prisma` ale był wywoływany w iris-chat.controller.ts:703 PRZED `requestContextStore.run`. Workspace_select policy nie matchowała → `loadWorkspace` rzuca "Workspace not found" → user dostaje HTTP 404 (formalnie 403, ale UI pewnie pokazuje generic error). Fix: przesunięcie wywołania do wnętrza ALS run().
+  - 🟢 **users/search sameWorkspace zawsze false** — endpoint `requireAuth` (bez requireWorkspace), `req.workspaceId` undefined → `sameWorkspace` zawsze false → MemberForm pokazuje "ten email nie jest w twoim workspace" nawet dla istniejących członków. Fix: czytaj workspaceId z JWT payload (req.auth.workspaceId) + użyj prismaBg dla membership lookup.
+  
+  **P0 ZNALEZIONE ale wymaga akcji ownera (nie kod):**
+  - 🔴 **`ANTHROPIC_API_KEY` brak na prod .env** — Iris po fix RLS dochodzi do wywołania Anthropic i dostaje "ai_not_configured". Owner musi dodać klucz do `/home/adrian/infradesk/backend-v2/.env` + pm2 restart.
+  - 🔴 **Email→ticket złamany od 25 dni** — konto `zgloszenia@silers.pl` w DB ma `isActive=false`, `lastErrorMsg="Unable to authenticate data"`. To **decrypt failure** — `ENCRYPTION_KEY` w env zrotował, zaszyfrowane hasło IMAP nie da się odszyfrować. Owner musi w UI (CRM → Email) ponownie wpisać hasło IMAP do skrzynki. **Krytyczne: klienci mogą wysyłać maile do biuro/zgloszenia od 23.04, NIC się nie dzieje.**
+  
+  **P1 FINDINGS (do fix-listy):**
+  - 🟡 **agent-offline-watchdog metryka log myląca** — `alerted=N` liczy też pominięcia z 24h cooldown. Powinno być `processed=N, sent=M`.
+  - 🟡 **/backups/google-auth-url 404** — BackupWizard.tsx:403 to wywołuje, backend endpoint nie istnieje. Backupy do Google Drive nie da się skonfigurować.
+  - 🟡 **Routing billing double-prefix** — billingRouter ma `/billing/...` paths W ŚRODKU mounted na `/api/v2/billing` → URLe typu `/api/v2/billing/billing/checkout`. Cudza linia (paymentBillingRouter na `/api/v2`) ratuje frontend. Ale to confusing dla maintenance.
+  
+  **🟢 ZWERYFIKOWANE OK (smoke + live):**
+  - Login, 2FA, dashboard, sidebar nav
+  - Workspaces (current, plan, modules, costs, onboarding)
+  - Memberships (list + invite endpoint)
+  - Tickets (CRUD + lifecycle + comments + rating + close + delete)
+  - Tasks (CRUD + status — brak comments)
+  - Devices, Locations, Agents (approve fix dzisiaj), Clients
+  - Monitoring (overview, alerts, network)
+  - Calendar, Activity Logs, Sessions, Partner Shares, Orders, Backups (list), Vault (list), Storage
+  - Auth (me, sessions, google/status)
+  - **Schedulery wszystkie działają** (każdy ma wpis "scheduler started" w pm2 logs co restart):
+    - agent-offline-watchdog 60min ✅ (każdy sweep `found=25-26, alerted=25-26` — większość pominięta przez 24h cooldown)
+    - ticket-auto-close 6h ✅ (no recent runs to verify but registered)
+    - sla-breach 5min ✅ (widziałem `checked:1, breached:1` w logach)
+    - imap-sync 120s ⚠️ (uruchamia się, ale 0 mailboxów isActive=true)
+    - trial-expiry 60min, renewal-reminder 12h, rustdesk-health 30min ✅
+  - **Mailer faktycznie wysyła** (pm2 confirms 2 maile podczas mojego testu ticketów)
