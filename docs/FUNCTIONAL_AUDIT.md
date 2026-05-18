@@ -371,3 +371,9 @@ Po wypełnieniu statusów: P0 → P1 → P2. Każdy fix:
     - Cross-workspace ticket access przez super-admin lub aktywny WorkspaceRelation z canViewDevices=true ✅ (intencjonalne dla MSP)
 
 - **2026-05-18 (#6 — Tasks Comments FIX)** — nowy model `TaskComment` paralel do `TicketComment` z denormalizowanym `workspaceId` (RLS bez joina). Migracja `20260518213000_task_comments` idempotentna + RLS policy z cross-workspace MSP via `WorkspaceRelation.canViewDevices`. Backend `POST /tasks/:id/comments` + embed w `GET`. Frontend `TaskDetailPage`: karta "Komentarze" z listą, textarea (Enter=send, Shift+Enter=nowa linia), checkbox isInternal. **Live-verified na prodzie**: POST 201, GET embed OK.
+
+- **2026-05-18 (#7 — Playwright UI Audit + 2 crashe naprawione)** — Zainstalowany Playwright+Chromium w `C:\Users\adria\playwright-audit\` (poza repo). Skrypt klika przez 34 routy autoryzowany ACCESS_TOKEN injectowany do localStorage (omija AuthBootstrap), łapie console errors/page errors/failed API. Generuje HTML report z fullpage screenshotami. **Filtruje noise z Sentry** envelope aborts.
+  - **🔴 P0 FIX (ddd23de)**: `/ai/shadow` — schema drift backend↔frontend. Frontend oczekiwał `r.byFeature[]`, backend zwracał `r.features[]` z innymi polami. `r.byFeature.length` → TypeError → Error Boundary "Coś poszło nie tak". Fix: zaktualizowano interface Report i agregację w komponencie.
+  - **🔴 P0 FIX (ddd23de)**: `/portal` — Rules of Hooks violation. Early return `if (ws.type !== 'CLIENT') return <Navigate>` między `useQuery` a `useState`. Pierwszy render = 6 hooków, drugi = 2 → React error #300 → Error Boundary. Fix: return po wszystkich hookach.
+  - **Owner (MSP) trafił na /portal → crash**. Po fix → redirect do `/dashboard`.
+  - Re-audit po deploy: 0 prawdziwych issues (tylko 429 rate-limit z hammering Playwright + Gravatar 404 na /users — oba noise).
