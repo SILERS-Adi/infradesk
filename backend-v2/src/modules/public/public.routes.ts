@@ -13,7 +13,9 @@ const router = Router();
 //   2. technician's personal reusable PIN (User.personalDownloadPin)
 const RUSTDESK_URL = process.env.RUSTDESK_DOWNLOAD_URL
   ?? 'https://github.com/rustdesk/rustdesk/releases/download/1.3.6/rustdesk-1.3.6-x86_64.exe';
-const RUSTDESK_FILENAME = 'rustdesk-1.3.6-x86_64.exe';
+const RUSTDESK_FILENAME = process.env.RUSTDESK_FILENAME
+  ?? RUSTDESK_URL.split('/').pop()
+  ?? 'rustdesk-1.3.6-x86_64.exe';
 
 const pinLimiter = rateLimit({
   windowMs: 60_000,
