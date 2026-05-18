@@ -77,6 +77,7 @@ model User {
   createdTickets   Ticket[]       @relation("TicketCreatedBy")
   assignedTickets  Ticket[]       @relation("TicketAssignedTo")
   ticketComments   TicketComment[]
+  taskComments     TaskComment[]
   workSessions     WorkSession[]
   auditEvents      AuditEvent[]
   credentialViews  CredentialViewLog[]
@@ -200,6 +201,7 @@ model Workspace {
   shadowDecisions  ShadowDecision[]
   clientRiskScores ClientRiskScore[]
   tasks          Task[]
+  taskComments   TaskComment[]
   delegations    Delegation[]
   crmActivities  CrmActivity[]
   backupConfigs  BackupConfig[]
@@ -1495,12 +1497,32 @@ model Task {
   createdBy        User      @relation("TaskCreatedBy", fields: [createdByUserId], references: [id])
   assignedTo       User?     @relation("TaskAssignedTo", fields: [assignedToUserId], references: [id])
   linkedTicket     Ticket?   @relation(fields: [linkedTicketId], references: [id])
+  comments         TaskComment[]
 
   @@unique([workspaceId, taskNumber])
   @@index([workspaceId, status])
   @@index([assignedToUserId])
   @@index([scheduledAt])
   @@index([workspaceId, deletedAt])
+}
+
+model TaskComment {
+  id          String   @id @default(uuid())
+  workspaceId String   // dla RLS — workspace zadania, denormalizowany żeby
+                       // RLS policy mogła filtrować bez joina do Task
+  taskId      String
+  userId      String
+  comment     String   @db.Text
+  isInternal  Boolean  @default(false)  // true = niewidoczne dla klienta w portalu
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([taskId])
+  @@index([workspaceId])
 }
 
 enum TaskStatus {

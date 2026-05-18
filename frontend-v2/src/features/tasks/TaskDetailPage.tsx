@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Loader2, AlertCircle, CheckCircle2, Trash2, User } from 'lucide-react';
+import { ArrowLeft, Loader2, AlertCircle, CheckCircle2, Trash2, User, MessageSquare, Send } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -33,6 +34,13 @@ interface TaskDetail {
   assignedTo: { id: string; firstName: string; lastName: string; email: string } | null;
   createdBy: { id: string; firstName: string; lastName: string };
   linkedTicket: { id: string; ticketNumber: string; title: string; status: string } | null;
+  comments?: Array<{
+    id: string;
+    comment: string;
+    isInternal: boolean;
+    createdAt: string;
+    user: { id: string; firstName: string; lastName: string; email: string };
+  }>;
 }
 
 const STATUS_OPTIONS: Array<{ key: string; label: string; variant: 'neutral' | 'accent' | 'warning' | 'success' | 'danger' }> = [
@@ -72,6 +80,20 @@ export function TaskDetailPage() {
     },
     onError: (err: { response?: { data?: { message?: string } }; message?: string }) =>
       toast.error(err?.response?.data?.message ?? err?.message ?? 'Błąd usuwania'),
+  });
+
+  const [commentDraft, setCommentDraft] = useState('');
+  const [isInternal, setIsInternal] = useState(false);
+  const addComment = useMutation({
+    mutationFn: async () => (await api.post(`/tasks/${id}/comments`, {
+      comment: commentDraft.trim(), isInternal,
+    })).data,
+    onSuccess: () => {
+      setCommentDraft('');
+      qc.invalidateQueries({ queryKey: ['tasks', id] });
+    },
+    onError: (err: { response?: { data?: { message?: string } }; message?: string }) =>
+      toast.error(err?.response?.data?.message ?? err?.message ?? 'Błąd dodawania komentarza'),
   });
 
   if (isLoading) return (
@@ -161,6 +183,69 @@ export function TaskDetailPage() {
                     {s.label}
                   </Button>
                 ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" />
+                Komentarze ({t.comments?.length ?? 0})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {(t.comments?.length ?? 0) === 0 ? (
+                <p className="text-[12px] text-tx3 italic">Brak komentarzy. Dodaj pierwszy poniżej.</p>
+              ) : (
+                <ul className="space-y-3">
+                  {t.comments!.map((c) => (
+                    <li key={c.id} className="border-l-2 pl-3 py-1" style={{ borderColor: c.isInternal ? 'var(--wn)' : 'var(--pri)' }}>
+                      <div className="flex items-center gap-2 mb-1 text-[11px] text-tx3">
+                        <User className="h-3 w-3" />
+                        <span className="text-tx2 font-medium">{c.user.firstName} {c.user.lastName}</span>
+                        <span>·</span>
+                        <span>{formatRelativePl(c.createdAt)}</span>
+                        {c.isInternal && <span className="ml-1 px-1.5 py-0.5 rounded text-[10px]" style={{ background: 'var(--wn)', color: 'white' }}>wewnętrzny</span>}
+                      </div>
+                      <p className="text-[13px] text-tx whitespace-pre-wrap">{c.comment}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="border-t border-bd pt-3 space-y-2">
+                <textarea
+                  value={commentDraft}
+                  onChange={(e) => setCommentDraft(e.target.value)}
+                  placeholder="Napisz komentarz... (Shift+Enter = nowa linia, Enter = wyślij)"
+                  className="w-full px-3 py-2 rounded-[var(--r-s)] border border-bd bg-sf text-[13px] text-tx resize-y min-h-[72px]"
+                  rows={3}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && commentDraft.trim() && !addComment.isPending) {
+                      e.preventDefault();
+                      addComment.mutate();
+                    }
+                  }}
+                />
+                <div className="flex items-center justify-between gap-3">
+                  <label className="flex items-center gap-2 text-[12px] text-tx2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isInternal}
+                      onChange={(e) => setIsInternal(e.target.checked)}
+                      className="cursor-pointer"
+                    />
+                    Wewnętrzny (niewidoczny dla klienta)
+                  </label>
+                  <Button
+                    size="sm"
+                    onClick={() => addComment.mutate()}
+                    disabled={!commentDraft.trim() || addComment.isPending}
+                  >
+                    {addComment.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                    Wyślij
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>

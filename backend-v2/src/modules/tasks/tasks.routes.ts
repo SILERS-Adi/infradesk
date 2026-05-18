@@ -189,10 +189,42 @@ router.get('/:id', requireAccess(MODULES.TICKETS, 'view'), async (req: Request, 
         assignedTo: { select: { id: true, firstName: true, lastName: true, email: true } },
         createdBy: { select: { id: true, firstName: true, lastName: true } },
         linkedTicket: { select: { id: true, ticketNumber: true, title: true, status: true } },
+        comments: {
+          orderBy: { createdAt: 'asc' },
+          include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } },
+        },
       },
     });
     if (!t) throw HttpError.notFound();
     res.json({ task: t });
+  } catch (err) { next(err); }
+});
+
+// POST /tasks/:id/comments — dodaj komentarz
+const commentSchema = z.object({
+  comment: z.string().min(1).max(10_000),
+  isInternal: z.boolean().default(false),
+});
+router.post('/:id/comments', requireAccess(MODULES.TICKETS, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const input = commentSchema.parse(req.body);
+    const visibleWs = await resolveAccessibleWorkspaceIds(req.workspaceId!);
+    const task = await prisma.task.findFirst({
+      where: { id: String(req.params.id), workspaceId: { in: visibleWs } },
+      select: { id: true, workspaceId: true },
+    });
+    if (!task) throw HttpError.notFound();
+    const c = await prisma.taskComment.create({
+      data: {
+        workspaceId: task.workspaceId,
+        taskId: task.id,
+        userId: req.auth!.sub,
+        comment: input.comment,
+        isInternal: input.isInternal,
+      },
+      include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } },
+    });
+    res.status(201).json({ comment: c });
   } catch (err) { next(err); }
 });
 
