@@ -113,14 +113,21 @@ Wzorzec: ConnectWise Manage — workflow rules, escalation. Atera — czas pracy
 
 | Status | Prio | Pozycja | Notatka |
 |--------|------|---------|---------|
-| ❓ | P0 | Tworzenie ticketu z UI | TicketsPage |
-| ❓ | P0 | Edycja ticketu (status, priorytet, assignee) | [[audit_2026_05_03_tickets]] mówiło że brak edycji UI — czy [[audit_2026_05_03_final]] to naprawił? |
-| 🟢 | P0 | Komentarze do ticketu + notifyComment | Fix R3+P4 w final audit |
-| ❓ | P1 | Email → ticket (skrzynka biuro@silers.pl) | `crm-email/imap-sync.ts` — verify że IMAP poll działa, ticket się tworzy |
+| 🟢 | P0 | Tworzenie ticketu z UI/API | Verified 2026-05-18 API: T-2026-0007 utworzony, status OPEN, auto-task TSK-2026-0058 z service component |
+| 🟢 | P0 | Edycja ticketu (status, priorytet, assignee) | Verified 2026-05-18 PATCH: priority+assignee OK. **Auto-transition** OPEN→ASSIGNED gdy nadasz assignee (by design w tickets.service.ts:562-569). |
+| 🟢 | P0 | Komentarze do ticketu (POST) | Verified 2026-05-18, HTTP 201. Komentarze embedded w GET /tickets/:id (nie ma osobnego GET /comments). |
+| 🟢 | P0 | Pełen flow transition | ASSIGNED→IN_PROGRESS→RESOLVED→CLOSED verified 2026-05-18, resolvedAt+closedAt OK |
+| 🟢 | P0 | Email notifications na assign + resolve | Verified 2026-05-18 z pm2 logs: 2 maile wysłane do adrian@silers.pl podczas testu (assignment + resolution) |
+| 🟢 | P1 | Rating 1-5 | Verified 2026-05-18: POST /tickets/:id/rate HTTP 200, rating + ratingComment zapisane |
+| 🟢 | P1 | Soft-delete ticketu | Verified 2026-05-18: DELETE /tickets/:id HTTP 200 |
+| ⚠️ | P1 | POST transition do tego samego statusu | Zwraca HTTP 400 "illegal_transition: X → X". Po PATCH+assignee status już ASSIGNED, więc jeśli UI wysyła POST transition→ASSIGNED to dostaje błąd. UI musi sprawdzać aktualny status przed wysłaniem. |
+| ❓ | P1 | Email → ticket (skrzynka biuro@silers.pl) | `crm-email/imap-sync.ts` — verify że IMAP poll działa |
 | ❓ | P1 | Email z ticketa do klienta (reply) | Verify |
-| ❓ | P0 | SLA (deadline, alert breached) | `sla-policies` + `sla-breach.ts` scheduler — verify |
-| ❓ | P0 | Auto-close po N dniach (RESOLVED → CLOSED) | `ticket-auto-close.ts` (6h) — verify |
-| ❓ | P1 | Tasks (zadania techniczne, nie tickety) | Owner zgłosił 2026-05-18 że "nie dziala prawidlo zadania" — szczegóły? |
+| ❓ | P0 | SLA breach alerts | `sla-breach.ts` scheduler (5min) — verify że faktycznie wysyła maile |
+| ❓ | P0 | Auto-close (RESOLVED → CLOSED po 7d) | `ticket-auto-close.ts` (6h) — verify scheduler log |
+| 🔴 | P1 | **Tasks: brak komentarzy** | tasks.routes.ts NIE MA endpointu `POST /tasks/:id/comments`. To może być co user miał na myśli mówiąc "nie dziala prawidlo zadania". Atera/Syncro mają komentarze do zadań. |
+| 🟢 | P0 | Tasks: create + status transitions | Verified 2026-05-18: TSK-2026-0059 utworzone z linkedTicket, NEW→IN_PROGRESS→DONE OK |
+| 🟡 | P1 | Tasks: brak history/events | Tickety mają events+history, taski nie |
 | 🟡 | P1 | Kanban view (drag&drop) | Tabela tylko? Brak kanbana. |
 | 🟡 | P1 | Time tracking per ticket (rozliczanie godzin) | Atera/Syncro ma. Brak. |
 | ❓ | P1 | Rating ticketu przez klienta | [[audit_2026_05_03_final]] N8 — naprawione 1-3 vs 1-5 |
@@ -318,3 +325,8 @@ Po wypełnieniu statusów: P0 → P1 → P2. Każdy fix:
 - **2026-05-18 (#1)** — Edycja lokalizacji urządzenia 🔴→🟢 (commit 42fdeb1).
 - **2026-05-18 (#2)** — Cross-workspace approve asystenta 🔴→🟢 (commit a45abdd). Wymagało fix backend + frontend.
 - **2026-05-18 (#3)** — Stary SW z v1: pamięć nieaktualna, fix już od cf0d308 (2026-05-13).
+- **2026-05-18 (#4)** — **Live walk ticket-flow przez API** (token usera adrian@silers.pl). Pełen flow działa: create→edit→comment→task→transition→rate→close→delete. Maile wychodzą realnie (pm2 logs). Findings:
+  - 🔴 **Tasks: brak komentarzy** (P1) — `POST /tasks/:id/comments` nie istnieje. Atera/Syncro mają.
+  - 🟡 **Tasks: brak history/events** — tickety mają, taski nie.
+  - ⚠️ **Auto-transition OPEN→ASSIGNED na PATCH** by design — UI musi sprawdzać status przed POST /transition (else 400 illegal).
+  - 🟡 **Auto-creation linked task na service component** — POST /tickets z `components.service` tworzy task automatycznie (TSK-...). Może zaskakiwać.
