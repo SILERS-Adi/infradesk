@@ -177,20 +177,32 @@ const approveSchema = z.object({
   criticality: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).default('MEDIUM'),
 });
 
+// MSP cross-workspace: gdy provider (Silers) zatwierdza asystenta klienta
+// (Wismont), `req.workspaceId` to Silers, ale `reg.workspaceId` to Wismont.
+// Device + location muszą wylądować w workspace klienta, nie providera.
+async function findAccessibleAgentRegistration(agentId: string, callerWs: string) {
+  const rels = await prisma.workspaceRelation.findMany({
+    where: { providerWorkspaceId: callerWs, status: 'ACTIVE', canViewDevices: true },
+    select: { clientWorkspaceId: true },
+  });
+  const accessibleWsIds = [callerWs, ...rels.map((r) => r.clientWorkspaceId)];
+  return prisma.agentRegistration.findFirst({
+    where: { id: agentId, workspaceId: { in: accessibleWsIds } },
+  });
+}
+
 adminRouter.post('/:id/approve', requireAccess(MODULES.DEVICES, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const input = approveSchema.parse(req.body);
-    const reg = await prisma.agentRegistration.findFirst({
-      where: { id: String(req.params.id), workspaceId: req.workspaceId! },
-    });
+    const reg = await findAccessibleAgentRegistration(String(req.params.id), req.workspaceId!);
     if (!reg) throw HttpError.notFound();
     if (reg.status === 'ACTIVE') throw HttpError.badRequest('Agent jest już zatwierdzony', 'already_active');
 
     const loc = await prisma.location.findFirst({
-      where: { id: input.locationId, workspaceId: req.workspaceId!, deletedAt: null },
+      where: { id: input.locationId, workspaceId: reg.workspaceId, deletedAt: null },
       select: { id: true },
     });
-    if (!loc) throw HttpError.badRequest('Location nie należy do workspace', 'invalid_location');
+    if (!loc) throw HttpError.badRequest('Lokalizacja nie należy do firmy asystenta', 'invalid_location');
 
     const { default: crypto } = await import('crypto');
     const qrCodeValue = `IDSK-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
@@ -198,7 +210,7 @@ adminRouter.post('/:id/approve', requireAccess(MODULES.DEVICES, 'edit'), async (
     const updated = await prisma.$transaction(async (tx) => {
       const device = await tx.device.create({
         data: {
-          workspaceId: req.workspaceId!,
+          workspaceId: reg.workspaceId,
           locationId: input.locationId,
           name: input.deviceName,
           hostname: reg.hostname,
@@ -224,10 +236,7 @@ adminRouter.post('/:id/approve', requireAccess(MODULES.DEVICES, 'edit'), async (
 
 adminRouter.post('/:id/reject', requireAccess(MODULES.DEVICES, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const reg = await prisma.agentRegistration.findFirst({
-      where: { id: String(req.params.id), workspaceId: req.workspaceId! },
-      select: { id: true, status: true },
-    });
+    const reg = await findAccessibleAgentRegistration(String(req.params.id), req.workspaceId!);
     if (!reg) throw HttpError.notFound();
     const updated = await prisma.agentRegistration.update({
       where: { id: reg.id },

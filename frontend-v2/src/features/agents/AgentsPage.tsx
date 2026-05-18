@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
@@ -34,6 +35,8 @@ interface AgentReg {
   contactEmail: string | null;
   createdAt: string;
   deviceId: string | null;
+  workspaceId: string;
+  workspace?: { id: string; name: string; type: string } | null;
 }
 
 export function AgentsPage() {
@@ -330,9 +333,10 @@ interface Location { id: string; name: string }
 
 function ApproveAgentModal({ agent, onClose }: { agent: AgentReg; onClose: () => void }) {
   const qc = useQueryClient();
-  const { data: locs } = useQuery<{ locations: Location[] }>({
-    queryKey: ['locations'],
-    queryFn: async () => (await api.get('/locations')).data,
+  // Cross-workspace MSP: pobierz lokalizacje workspace asystenta, nie wywołującego.
+  const { data: locs, isLoading: locsLoading } = useQuery<{ locations: Location[] }>({
+    queryKey: ['locations', agent.workspaceId],
+    queryFn: async () => (await api.get('/locations', { params: { workspaceId: agent.workspaceId } })).data,
   });
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<AForm>({
     resolver: zodResolver(approveSchema),
@@ -366,7 +370,14 @@ function ApproveAgentModal({ agent, onClose }: { agent: AgentReg; onClose: () =>
                 <p className="text-tx font-semibold">{agent.hostname}</p>
                 <p>{agent.manufacturer ?? '—'} {agent.model ?? ''}</p>
                 <p>{agent.osName ?? '—'} {agent.osVersion ?? ''}</p>
-                {agent.companyName && <p className="pt-1 mt-1 border-t border-bd">{agent.companyName}</p>}
+                {agent.workspace && (
+                  <p className="pt-1 mt-1 border-t border-bd text-tx2">
+                    <span className="text-tx3">Firma:</span> {agent.workspace.name}
+                  </p>
+                )}
+                {agent.companyName && agent.companyName !== agent.workspace?.name && (
+                  <p>{agent.companyName}</p>
+                )}
               </div>
             </Card>
 
@@ -378,11 +389,17 @@ function ApproveAgentModal({ agent, onClose }: { agent: AgentReg; onClose: () =>
               </div>
               <div>
                 <label className="block text-[10px] font-semibold text-tx3 mb-1">Lokalizacja *</label>
-                <Select {...register('locationId')}>
-                  <option value="">—</option>
+                <Select {...register('locationId')} disabled={locsLoading}>
+                  <option value="">{locsLoading ? 'Wczytywanie…' : '—'}</option>
                   {(locs?.locations ?? []).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
                 </Select>
                 {errors.locationId && <p className="text-[11px] text-er mt-1">{errors.locationId.message}</p>}
+                {!locsLoading && (locs?.locations.length ?? 0) === 0 && (
+                  <p className="text-[11px] text-warn mt-1">
+                    Brak lokalizacji w firmie {agent.workspace?.name ?? ''}.{' '}
+                    <Link to="/locations" className="text-pri hover:underline">Dodaj lokalizację</Link>
+                  </p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
