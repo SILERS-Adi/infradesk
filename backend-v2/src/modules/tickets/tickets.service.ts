@@ -571,6 +571,34 @@ export async function updateTicket(workspaceId: string, userId: string, id: stri
   const t = await prisma.ticket.findFirst({ where: { id, workspaceId: { in: visibleWsIds }, deletedAt: null } });
   if (!t) throw HttpError.notFound();
 
+  // MSP cross-workspace: location/device należą do clientWorkspaceId (jeśli set),
+  // nie do ticket.workspaceId (MSP). Bez walidacji można było PATCH ticketem
+  // wstawić locationId z innego workspace (integrity bug). Mirror logiki z createTicket.
+  const targetClientWs = patch.clientWorkspaceId !== undefined ? patch.clientWorkspaceId : t.clientWorkspaceId;
+  if (patch.clientWorkspaceId && patch.clientWorkspaceId !== t.clientWorkspaceId) {
+    const rel = await prisma.workspaceRelation.findFirst({
+      where: { providerWorkspaceId: workspaceId, clientWorkspaceId: patch.clientWorkspaceId, status: 'ACTIVE', canViewDevices: true },
+      select: { id: true },
+    });
+    if (!rel) throw HttpError.badRequest('Brak aktywnej relacji z tym klientem', 'invalid_client_workspace');
+  }
+  const resourceWs = targetClientWs ?? t.workspaceId;
+  if (patch.locationId) {
+    const l = await prisma.location.findFirst({ where: { id: patch.locationId, workspaceId: resourceWs }, select: { id: true } });
+    if (!l) throw HttpError.badRequest('Location nie należy do firmy ticketu', 'invalid_location');
+  }
+  if (patch.deviceId) {
+    const d = await prisma.device.findFirst({ where: { id: patch.deviceId, workspaceId: resourceWs }, select: { id: true } });
+    if (!d) throw HttpError.badRequest('Device nie należy do firmy ticketu', 'invalid_device');
+  }
+  if (patch.assignedToUserId) {
+    const m = await prisma.membership.findFirst({
+      where: { userId: patch.assignedToUserId, workspaceId, status: 'ACTIVE' },
+      select: { id: true },
+    });
+    if (!m) throw HttpError.badRequest('Assignee nie jest członkiem workspace', 'invalid_assignee');
+  }
+
   const data: Record<string, unknown> = { ...patch };
   if (patch.dueAt !== undefined) data.dueAt = patch.dueAt ? new Date(patch.dueAt) : null;
 
