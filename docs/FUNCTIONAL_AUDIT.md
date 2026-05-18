@@ -289,8 +289,8 @@ Bazując na obecnych statusach 🔴/❓/🟡 z prio P0:
 3. ~~🔴 Edycja lokalizacji urządzenia~~ → 🟢 **FIXED 2026-05-18 (42fdeb1)**
 4. ~~🔴 Iris/chat workspace_not_found~~ → 🟢 **FIXED 2026-05-18 (5666928)**
 5. ~~🔴 users/search sameWorkspace bug~~ → 🟢 **FIXED 2026-05-18 (5666928)**
-6. 🔴 **`ANTHROPIC_API_KEY` brak na prod** — Iris nie może zadzwonić do LLM. **Akcja owner: dodać klucz do .env**.
-7. 🔴 **Email→ticket złamany od 25 dni** — `ENCRYPTION_KEY` rotacja zepsuła decrypt IMAP hasła. **Akcja owner: re-enter password w UI CRM → Email**.
+6. ~~🔴 `ANTHROPIC_API_KEY` brak na prod~~ → 🟢 **FIXED 2026-05-18** — owner dał klucz, dopisany do `.env` + pm2 restart. Iris live: HTTP 200, tool calls działają.
+7. ~~🔴 Email→ticket złamany od 25 dni~~ → 🟢 **FIXED 2026-05-18** — owner dał IMAP creds, re-encrypt password przez PATCH /crm/mailboxes/:id + SQL `isActive=true`. Sync-now: HTTP 200, lastSyncAt updated, lastErrorMsg cleared.
 8. ~~🔴 Tasks: brak komentarzy~~ → 🟢 **FIXED 2026-05-18 (8fb760a, deployed live)**
 9. 🟡 **/backups/google-auth-url 404** — BackupWizard wywołuje, backend brak. Auto-backup do Google Drive nie da się skonfigurować.
 10. 🟡 **Knowledge base** — kompletny brak, dla MSP B2B krytyczne (Hudu/ITGlue mają)
