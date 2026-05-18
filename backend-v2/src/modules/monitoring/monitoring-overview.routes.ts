@@ -10,6 +10,19 @@ router.use(requireAuth, requireWorkspace);
 
 const ONLINE_WINDOW_MIN = 10;
 
+// MSP cross-workspace: monitoring widzi własne urządzenia + urządzenia
+// klientów (workspace gdzie my jesteśmy providerem z canViewDevices=true).
+// Wzorzec z devices.routes.ts:75-79 i agents.routes.ts:149-157.
+// Bez tego owner Silers widział tylko 2 swoje urządzenia zamiast ~59
+// asystentów rozsianych po klientach (P0 fix 2026-05-18).
+async function visibleWorkspaceIds(callerWs: string): Promise<string[]> {
+  const rels = await prisma.workspaceRelation.findMany({
+    where: { providerWorkspaceId: callerWs, status: 'ACTIVE', canViewDevices: true },
+    select: { clientWorkspaceId: true },
+  });
+  return [callerWs, ...rels.map((r) => r.clientWorkspaceId)];
+}
+
 interface AgentMetricsSnapshot {
   auditScore?: number;
   cpuUsage?: number;
@@ -27,17 +40,18 @@ router.get(
   requireAccess(MODULES.MONITORING, 'view'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const workspaceId = req.workspaceId!;
+      const visibleWs = await visibleWorkspaceIds(req.workspaceId!);
       const onlineCutoff = new Date(Date.now() - ONLINE_WINDOW_MIN * 60_000);
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60_000);
 
       const [devices, activeAlertsBySev, alertsLast7d, deviceCount] = await Promise.all([
         prisma.device.findMany({
-          where: { workspaceId, deletedAt: null },
+          where: { workspaceId: { in: visibleWs }, deletedAt: null },
           select: {
             id: true, name: true, hostname: true, category: true, criticality: true, status: true,
-            ipAddress: true, operatingSystem: true, locationId: true,
+            ipAddress: true, operatingSystem: true, locationId: true, workspaceId: true,
             location: { select: { id: true, name: true, city: true } },
+            workspace: { select: { id: true, name: true, type: true } },
             agent: {
               select: {
                 lastSeen: true, serverMetrics: true, agentVersion: true, status: true,
@@ -48,19 +62,19 @@ router.get(
               select: { id: true, severity: true },
             },
           },
-          orderBy: { name: 'asc' },
+          orderBy: [{ workspace: { name: 'asc' } }, { name: 'asc' }],
         }),
         prisma.monitoringAlert.groupBy({
           by: ['severity'],
-          where: { workspaceId, resolved: false },
+          where: { workspaceId: { in: visibleWs }, resolved: false },
           _count: true,
         }),
         prisma.monitoringAlert.findMany({
-          where: { workspaceId, createdAt: { gte: sevenDaysAgo } },
+          where: { workspaceId: { in: visibleWs }, createdAt: { gte: sevenDaysAgo } },
           select: { severity: true, createdAt: true, resolved: true },
           orderBy: { createdAt: 'asc' },
         }),
-        prisma.device.count({ where: { workspaceId, deletedAt: null } }),
+        prisma.device.count({ where: { workspaceId: { in: visibleWs }, deletedAt: null } }),
       ]);
 
       // Shape device rows with audit snapshot.
@@ -81,6 +95,7 @@ router.get(
           ipAddress: d.ipAddress,
           operatingSystem: d.operatingSystem,
           location: d.location,
+          workspace: d.workspace,
           online: isOnline,
           lastSeen: agent?.lastSeen ?? null,
           agentVersion: agent?.agentVersion ?? null,
@@ -154,13 +169,14 @@ router.get(
   requireAccess(MODULES.MONITORING, 'view'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const workspaceId = req.workspaceId!;
+      const visibleWs = await visibleWorkspaceIds(req.workspaceId!);
       const onlineCutoff = new Date(Date.now() - ONLINE_WINDOW_MIN * 60_000);
 
       const locations = await prisma.location.findMany({
-        where: { workspaceId, deletedAt: null },
+        where: { workspaceId: { in: visibleWs }, deletedAt: null },
         select: {
           id: true, name: true, city: true,
+          workspace: { select: { id: true, name: true, type: true } },
           devices: {
             where: { deletedAt: null },
             select: {
@@ -176,6 +192,7 @@ router.get(
         id: loc.id,
         name: loc.name,
         city: loc.city,
+        workspace: loc.workspace,
         deviceCount: loc.devices.length,
         devices: loc.devices.map((d) => ({
           id: d.id,
