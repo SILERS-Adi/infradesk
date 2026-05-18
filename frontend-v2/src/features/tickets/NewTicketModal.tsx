@@ -35,8 +35,8 @@ interface ClientRow {
     taxId?: string | null; city?: string | null; email?: string | null;
   };
 }
-interface LocationRow { id: string; name: string; city: string | null; clientWorkspaceId?: string | null }
-interface DeviceRow { id: string; name: string; hostname: string | null; location: { id: string; name: string } | null }
+interface LocationRow { id: string; name: string; city: string | null; workspaceId: string }
+interface DeviceRow { id: string; name: string; hostname: string | null; workspaceId: string; location: { id: string; name: string } | null }
 interface MemberRow {
   id: string; role: string; status: string;
   user: { id: string; firstName: string | null; lastName: string | null; email: string };
@@ -110,14 +110,25 @@ export function TicketCreator({ onClose, variant = 'modal' }: { onClose: () => v
     queryFn: async () => (await api.get('/clients')).data,
     staleTime: 60_000,
   });
+  // Lokalizacje i urządzenia filtrowane przez wybraną firmę-klienta.
+  // Owner Silers wybierając PKS Garwolin musi widzieć TYLKO lokalizacje PKS,
+  // nie wszystkich klientów MSP (P0 fix 2026-05-18, bez tego dropdown pokazywał
+  // ~30 lokalizacji ze wszystkich workspaces, a backend i tak odrzucał save z
+  // "Location nie należy do tego workspace").
   const locationsQ = useQuery<{ locations: LocationRow[] }>({
-    queryKey: ['locations', 'list'],
-    queryFn: async () => (await api.get('/locations')).data,
+    queryKey: ['locations', 'list', clientWorkspaceId || 'own'],
+    queryFn: async () => (await api.get('/locations', {
+      params: clientWorkspaceId ? { workspaceId: clientWorkspaceId } : undefined,
+    })).data,
+    enabled: true,
     staleTime: 60_000,
   });
   const devicesQ = useQuery<{ devices: DeviceRow[] }>({
-    queryKey: ['devices', 'list'],
-    queryFn: async () => (await api.get('/devices')).data,
+    queryKey: ['devices', 'list', clientWorkspaceId || 'own'],
+    queryFn: async () => (await api.get('/devices', {
+      params: clientWorkspaceId ? { workspaceId: clientWorkspaceId } : undefined,
+    })).data,
+    enabled: true,
     staleTime: 60_000,
   });
   const membersQ = useQuery<{ memberships: MemberRow[] }>({
@@ -131,11 +142,11 @@ export function TicketCreator({ onClose, variant = 'modal' }: { onClose: () => v
   const devices = devicesQ.data?.devices ?? [];
   const members = (membersQ.data?.memberships ?? []).filter((m) => m.status === 'ACTIVE');
 
-  // Filtruj lokalizacje po kliencie (jeśli backend serwuje clientWorkspaceId — inaczej pokaż wszystkie)
+  // Server-side już filtruje przez ?workspaceId=. Tu dodatkowy guard
+  // gdyby cache zwrócił mieszane dane (np. między zmianami klienta).
   const filteredLocations = useMemo(() => {
     if (!clientWorkspaceId) return locations;
-    const withCw = locations.filter((l) => l.clientWorkspaceId === clientWorkspaceId);
-    return withCw.length > 0 ? withCw : locations;
+    return locations.filter((l) => l.workspaceId === clientWorkspaceId);
   }, [locations, clientWorkspaceId]);
 
   // Urządzenia filtrowane przez lokalizację (jeśli wybrana)

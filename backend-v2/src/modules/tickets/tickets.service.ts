@@ -109,18 +109,38 @@ async function nextOrderNumber(tx: Parameters<Parameters<typeof prisma.$transact
 }
 
 export async function createTicket(workspaceId: string, userId: string, input: CreateTicketInput) {
-  // Validate references belong to workspace.
+  // MSP cross-workspace: gdy ticket jest dla klienta (clientWorkspaceId set),
+  // location i device należą do workspace klienta, NIE caller's workspace.
+  // Caller musi mieć aktywną relację provider→client z canViewDevices=true.
+  // (Bez tego owner Silers tworząc ticket dla PKS Garwolin dostawał "Location
+  // nie należy do tego workspace" — owner P0 zgłoszenie 2026-05-18).
+  let resourceWs = workspaceId;
+  if (input.clientWorkspaceId) {
+    const rel = await prisma.workspaceRelation.findFirst({
+      where: {
+        providerWorkspaceId: workspaceId,
+        clientWorkspaceId: input.clientWorkspaceId,
+        status: 'ACTIVE',
+        canViewDevices: true,
+      },
+      select: { id: true },
+    });
+    if (!rel) throw HttpError.badRequest('Brak aktywnej relacji z tym klientem', 'invalid_client_workspace');
+    resourceWs = input.clientWorkspaceId;
+  }
+
   if (input.locationId) {
-    const l = await prisma.location.findFirst({ where: { id: input.locationId, workspaceId }, select: { id: true } });
+    const l = await prisma.location.findFirst({ where: { id: input.locationId, workspaceId: resourceWs }, select: { id: true } });
     if (!l) throw HttpError.badRequest('Location nie należy do tego workspace', 'invalid_location');
   }
   if (input.components.service?.deviceId) {
     const d = await prisma.device.findFirst({
-      where: { id: input.components.service.deviceId, workspaceId },
+      where: { id: input.components.service.deviceId, workspaceId: resourceWs },
       select: { id: true },
     });
     if (!d) throw HttpError.badRequest('Device nie należy do tego workspace', 'invalid_device');
   }
+  // Assignee TO MSP technik — zawsze w callera workspace, nawet dla ticketu klienta.
   if (input.components.service?.assignedToUserId) {
     const m = await prisma.membership.findFirst({
       where: { userId: input.components.service.assignedToUserId, workspaceId, status: 'ACTIVE' },
