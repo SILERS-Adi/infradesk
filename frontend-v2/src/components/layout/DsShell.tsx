@@ -19,7 +19,7 @@
 import { useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Bell, LogOut, MonitorCog } from 'lucide-react';
+import { Bell, LogOut, MonitorCog, Moon, Monitor, Sun } from 'lucide-react';
 
 import {
   AppShell,
@@ -29,6 +29,7 @@ import {
   Sidebar,
   SidebarItem,
   SidebarSection,
+  Tooltip,
   Topbar,
   TopbarBurger,
   TopbarTitle,
@@ -49,6 +50,59 @@ import {
 import './DsShell.css';
 
 interface NotifSummary { unread?: number }
+
+/**
+ * Mapuje pathname na widoczny tytuł w topbar. Owner brief Faza 2D QA Round 2:
+ * brand "InfraDesk" zostaje TYLKO w sidebar header; topbar pokazuje page title.
+ * Najdłuższy prefix wygrywa (np. /tickets/123 → "Zgłoszenia").
+ */
+const ROUTE_TITLES: Array<[string, string]> = [
+  ['/dashboard',        'Kokpit'],
+  ['/tickets',          'Zgłoszenia'],
+  ['/tasks',            'Zadania'],
+  ['/calendar',         'Kalendarz'],
+  ['/sessions',         'Sesje pracy'],
+  ['/billing',          'Rozliczenia'],
+  ['/alerts',           'Alerty'],
+  ['/orders',           'Zamówienia'],
+  ['/delegations',      'Delegacje'],
+  ['/portal-settings',  'Portal i obsługa'],
+  ['/portal',           'Portal klienta'],
+  ['/clients',          'Firmy klientów'],
+  ['/crm',              'CRM'],
+  ['/locations',        'Lokalizacje'],
+  ['/partners',         'Partnerzy IT'],
+  ['/devices',          'Urządzenia'],
+  ['/agents',           'Asystenci'],
+  ['/monitoring',       'Audyt i sieć'],
+  ['/backups',          'Kopie zapasowe'],
+  ['/activity-logs',    'Logi aktywności'],
+  ['/downloads',        'Dysk'],
+  ['/storage',          'Pamięć'],
+  ['/vault',            'Sejf haseł'],
+  ['/ai',               'Asystent AI'],
+  ['/my-company',       'Moja firma'],
+  ['/users',            'Użytkownicy'],
+  ['/plan-and-modules', 'Plan i moduły'],
+  ['/settings',         'Ustawienia'],
+  ['/design',           'Design system'],
+];
+
+function pageTitleFor(pathname: string): string {
+  const match = ROUTE_TITLES.find(([prefix]) => pathname === prefix || pathname.startsWith(prefix + '/'));
+  return match ? match[1] : 'InfraDesk';
+}
+
+/**
+ * Trasy które są już w pełni zmigrowane na DS — nie pokazuj banneru migracji.
+ * Wszystko inne (legacy content w DS shell) → soft banner "ta sekcja w migracji".
+ */
+const MIGRATED_PATHS = new Set<string>(['/dashboard']);
+
+function isFullyMigrated(pathname: string): boolean {
+  if (MIGRATED_PATHS.has(pathname)) return true;
+  return Array.from(MIGRATED_PATHS).some(p => pathname.startsWith(p + '/'));
+}
 
 export function DsShell() {
   const { user, logout } = useAuthStore();
@@ -169,52 +223,65 @@ export function DsShell() {
     </Sidebar>
   );
 
+  const pageTitle = pageTitleFor(location.pathname);
+  const fullyMigrated = isFullyMigrated(location.pathname);
+
+  const ThemeIcon = themeMode === 'light' ? Sun : themeMode === 'dark' ? Moon : Monitor;
+  const themeNextLabel = themeMode === 'light' ? 'Przełącz na ciemny' : themeMode === 'dark' ? 'Przełącz na auto' : 'Przełącz na jasny';
+
   const topbar = (
     <Topbar
       left={
         <>
-          <TopbarBurger onClick={() => setSidebarOpen((v) => !v)} label="Menu" />
-          <TopbarTitle>InfraDesk</TopbarTitle>
+          {/* Burger tylko na mobile (M3): CSS w DsShell.css ukrywa >= md */}
+          <span className="ds-shell__burger-wrap">
+            <TopbarBurger onClick={() => setSidebarOpen((v) => !v)} label="Menu" />
+          </span>
+          <TopbarTitle>{pageTitle}</TopbarTitle>
         </>
       }
       right={
         <>
-          <IrisCoreButton
-            size="xs"
-            status="idle"
-            aria-label="Otwórz asystenta Iris"
-            onClick={() => navigate('/ai')}
-          />
-          <Button
-            variant="ghost"
-            iconOnly
-            aria-label={`Motyw: ${themeMode}`}
-            title={`Motyw: ${themeMode}`}
-            onClick={cycleTheme}
-          >
-            <span className="ds-shell__theme-glyph" aria-hidden="true">
-              {themeMode === 'light' ? '☀' : themeMode === 'dark' ? '☾' : 'A'}
-            </span>
-          </Button>
-          <Button
-            variant="ghost"
-            iconOnly
-            aria-label={unread > 0 ? `Powiadomienia (${unread} nieprzeczytane)` : 'Powiadomienia'}
-          >
-            <span className="ds-shell__bell">
-              <Bell size={16} />
-              {unread > 0 && <span className="ds-shell__bell-dot" aria-hidden="true" />}
-            </span>
-          </Button>
-          <Button
-            variant="ghost"
-            iconOnly
-            aria-label="Wróć do klasycznego UI"
-            title="Wróć do klasycznego UI"
-            onClick={rollbackToLegacy}
-          >
-            <MonitorCog size={16} />
-          </Button>
+          <Tooltip content="Asystent Iris" placement="bottom">
+            <IrisCoreButton
+              size="2xs"
+              status="idle"
+              aria-label="Otwórz asystenta Iris"
+              onClick={() => navigate('/ai')}
+            />
+          </Tooltip>
+          <Tooltip content={themeNextLabel} placement="bottom">
+            <Button
+              variant="ghost"
+              iconOnly
+              aria-label={`Motyw: ${themeMode}. ${themeNextLabel}`}
+              onClick={cycleTheme}
+            >
+              <ThemeIcon size={16} />
+            </Button>
+          </Tooltip>
+          <Tooltip content={unread > 0 ? `Powiadomienia (${unread} nieprzeczytane)` : 'Powiadomienia'} placement="bottom">
+            <Button
+              variant="ghost"
+              iconOnly
+              aria-label={unread > 0 ? `Powiadomienia (${unread} nieprzeczytane)` : 'Powiadomienia'}
+            >
+              <span className="ds-shell__bell">
+                <Bell size={16} />
+                {unread > 0 && <span className="ds-shell__bell-dot" aria-hidden="true" />}
+              </span>
+            </Button>
+          </Tooltip>
+          <Tooltip content="Wróć do klasycznego UI" placement="bottom">
+            <Button
+              variant="ghost"
+              iconOnly
+              aria-label="Wróć do klasycznego UI"
+              onClick={rollbackToLegacy}
+            >
+              <MonitorCog size={16} />
+            </Button>
+          </Tooltip>
         </>
       }
     />
@@ -231,7 +298,41 @@ export function DsShell() {
       // żeby max-width 1440px działał globalnie.
       fluid
     >
+      {!fullyMigrated && <MigrationBanner />}
       <Outlet />
     </AppShell>
+  );
+}
+
+/**
+ * Subtelny non-blocking banner pokazywany na trasach jeszcze nie zmigrowanych do DS.
+ * Owner brief Faza 2D QA Round 2 (C3): bez hard blocka, bez redirect — tylko info.
+ * Dismiss persistent w localStorage (per-session).
+ */
+function MigrationBanner() {
+  const [dismissed, setDismissed] = useState(() => {
+    try { return sessionStorage.getItem('ds-migration-banner-dismissed') === '1'; }
+    catch { return false; }
+  });
+  if (dismissed) return null;
+  const onDismiss = () => {
+    setDismissed(true);
+    try { sessionStorage.setItem('ds-migration-banner-dismissed', '1'); } catch { /* ignore */ }
+  };
+  return (
+    <div className="ds-shell__migration-banner" role="status" aria-live="polite">
+      <span className="ds-shell__migration-banner-dot" aria-hidden="true" />
+      <span className="ds-shell__migration-banner-text">
+        Ta sekcja jest jeszcze w migracji do nowego interfejsu.
+      </span>
+      <button
+        type="button"
+        className="ds-shell__migration-banner-close"
+        onClick={onDismiss}
+        aria-label="Zamknij komunikat"
+      >
+        ✕
+      </button>
+    </div>
   );
 }

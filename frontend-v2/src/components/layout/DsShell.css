@@ -69,9 +69,60 @@
   white-space: nowrap;
 }
 
-.ds-shell__theme-glyph {
+/* Burger tylko mobile/tablet (< md). Desktop sidebar zawsze widoczny → ukryj burger. */
+.ds-shell__burger-wrap {
+  display: inline-flex;
+}
+@media (min-width: 768px) {
+  .ds-shell__burger-wrap {
+    display: none;
+  }
+}
+
+/* Migration banner — subtelny info-banner dla niemigrowanych tras (Owner brief C3). */
+.ds-shell__migration-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--sd-space-3);
+  padding: var(--sd-space-2) var(--sd-space-4);
+  margin-bottom: var(--sd-space-4);
+  background: var(--sd-color-state-info-bg);
+  border: 1px solid var(--sd-color-state-info);
+  border-radius: var(--sd-radius-md);
   font-size: var(--sd-typography-size-body-sm);
+  color: var(--sd-color-state-info);
+}
+
+.ds-shell__migration-banner-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--sd-radius-pill);
+  background: var(--sd-color-state-info);
+  flex-shrink: 0;
+}
+
+.ds-shell__migration-banner-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.ds-shell__migration-banner-close {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  padding: var(--sd-space-1) var(--sd-space-2);
+  border-radius: var(--sd-radius-sm);
+  font-size: var(--sd-typography-size-caption);
   line-height: 1;
+  transition: background-color var(--sd-motion-duration-fast) var(--sd-motion-easing-standard);
+}
+.ds-shell__migration-banner-close:hover {
+  background: var(--sd-color-surface-hover);
+}
+.ds-shell__migration-banner-close:focus-visible {
+  outline: none;
+  box-shadow: var(--sd-elevation-ring);
 }
 
 .ds-shell__bell {

@@ -279,7 +279,7 @@ export function DashboardPageNew() {
         </CardBody>
       </Card>
 
-      {/* SLA + summary */}
+      {/* SLA — sam gauge z krótkim opisem (4 KPI są w osobnej sekcji poniżej) */}
       <Card>
         <CardBody>
           <div className="dashboard-new__sla">
@@ -304,32 +304,13 @@ export function DashboardPageNew() {
                 center={<span className="dashboard-new__gauge-empty">—</span>}
               />
             )}
-            <div className="dashboard-new__sla-summary">
-              <p className="dashboard-new__sla-eyebrow">Dzisiaj w liczbach</p>
-              <StatsCard
-                label="Otwarte"
-                value={open.length}
-                accent="primary"
-                icon={<TicketIcon size={18} />}
-              />
-              <StatsCard
-                label="Krytyczne"
-                value={critical}
-                accent="danger"
-                icon={<AlertTriangle size={18} />}
-              />
-              <StatsCard
-                label="W toku"
-                value={inProgress}
-                accent="warning"
-                icon={<Clock size={18} />}
-              />
-              <StatsCard
-                label="Urządzenia online"
-                value={sum ? sum.onlineDevices : '—'}
-                accent="success"
-                icon={<Server size={18} />}
-              />
+            <div className="dashboard-new__sla-copy">
+              <h3 className="dashboard-new__sla-title">SLA — zgodność dzisiaj</h3>
+              <p className="dashboard-new__sla-text">
+                {slaPct != null
+                  ? `Tickets-with-policy w terminie. ${critical} krytycznych otwartych, ${inProgress} w toku.`
+                  : 'Brak danych SLA — dodaj polityki SLA w ustawieniach, żeby zobaczyć wskaźnik tutaj.'}
+              </p>
             </div>
           </div>
         </CardBody>
