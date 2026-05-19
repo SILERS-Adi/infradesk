@@ -39,6 +39,10 @@ const updateSchema = createSchema.partial();
 async function resolveTargetWs(req: Request, overrideWsId: string | undefined): Promise<string> {
   const target = overrideWsId ?? req.workspaceId!;
   if (overrideWsId && overrideWsId !== req.workspaceId) {
+    // Super-admin bypass: może zarządzać lokacjami w każdym workspace (analogia
+    // do RLS app_is_super_admin). Bez tego rejestracje świeżych tenantów bez
+    // relacji wymagają ręcznego SQL.
+    if (req.auth?.isSuperAdmin === true) return target;
     const rel = await prisma.workspaceRelation.findFirst({
       where: { providerWorkspaceId: req.workspaceId!, clientWorkspaceId: overrideWsId, status: 'ACTIVE' },
       select: { id: true },

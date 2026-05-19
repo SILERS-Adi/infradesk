@@ -180,7 +180,15 @@ const approveSchema = z.object({
 // MSP cross-workspace: gdy provider (Silers) zatwierdza asystenta klienta
 // (Wismont), `req.workspaceId` to Silers, ale `reg.workspaceId` to Wismont.
 // Device + location muszą wylądować w workspace klienta, nie providera.
-async function findAccessibleAgentRegistration(agentId: string, callerWs: string) {
+//
+// Super-admin bypass: User.isSuperAdmin (analogia do app_is_super_admin w RLS)
+// omija check WorkspaceRelation — może zatwierdzać każdego asystenta w systemie.
+// Bez tego edge-cases typu "świeży tenant zarejestrowany przez /register bez
+// relacji MSP" wymagałyby ręcznego SQL (2026-05-19: MEBLOMAX case).
+async function findAccessibleAgentRegistration(agentId: string, callerWs: string, isSuperAdmin = false) {
+  if (isSuperAdmin) {
+    return prisma.agentRegistration.findFirst({ where: { id: agentId } });
+  }
   const rels = await prisma.workspaceRelation.findMany({
     where: { providerWorkspaceId: callerWs, status: 'ACTIVE', canViewDevices: true },
     select: { clientWorkspaceId: true },
@@ -194,7 +202,7 @@ async function findAccessibleAgentRegistration(agentId: string, callerWs: string
 adminRouter.post('/:id/approve', requireAccess(MODULES.DEVICES, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const input = approveSchema.parse(req.body);
-    const reg = await findAccessibleAgentRegistration(String(req.params.id), req.workspaceId!);
+    const reg = await findAccessibleAgentRegistration(String(req.params.id), req.workspaceId!, req.auth?.isSuperAdmin === true);
     if (!reg) throw HttpError.notFound();
     if (reg.status === 'ACTIVE') throw HttpError.badRequest('Agent jest już zatwierdzony', 'already_active');
 
@@ -236,7 +244,7 @@ adminRouter.post('/:id/approve', requireAccess(MODULES.DEVICES, 'edit'), async (
 
 adminRouter.post('/:id/reject', requireAccess(MODULES.DEVICES, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const reg = await findAccessibleAgentRegistration(String(req.params.id), req.workspaceId!);
+    const reg = await findAccessibleAgentRegistration(String(req.params.id), req.workspaceId!, req.auth?.isSuperAdmin === true);
     if (!reg) throw HttpError.notFound();
     const updated = await prisma.agentRegistration.update({
       where: { id: reg.id },
