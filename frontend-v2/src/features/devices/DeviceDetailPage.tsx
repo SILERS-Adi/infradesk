@@ -369,12 +369,35 @@ function ContactBox({ agent }: { agent: AgentInfo | null }) {
 }
 
 function OverviewTab({ device: d, agent, isOnline }: { device: Device; agent: AgentInfo | null; isOnline: boolean }) {
+  const qc = useQueryClient();
   const sm = (agent?.serverMetrics as ServerMetricsBag | null) ?? null;
   const cpu = typeof sm?.cpuUsage === 'number' ? sm.cpuUsage : null;
   const ram = typeof sm?.ramUsage === 'number' ? sm.ramUsage : null;
   const diskFree = agent?.diskFreeGb;
   const diskTotal = agent?.diskTotalGb;
   const diskPct = diskFree && diskTotal ? Math.round(((diskTotal - diskFree) / diskTotal) * 100) : null;
+
+  // Quick edit lokacji bez przechodzenia do zakładki Konfiguracja (P1 UX fix 2026-05-19:
+  // user prosił "to powinna być oczywista funkcja" — wcześniej trzeba było wejść w
+  // tab Konfiguracja → karta Podstawowe → 6-te pole → Zapisz, niezauważalne).
+  const [editLoc, setEditLoc] = useState(false);
+  const [newLocId, setNewLocId] = useState(d.location?.id ?? '');
+  const locsQ = useQuery<{ locations: Array<{ id: string; name: string; city: string | null }> }>({
+    queryKey: ['locations', d.workspaceId],
+    queryFn: async () => (await api.get('/locations', { params: { workspaceId: d.workspaceId } })).data,
+    enabled: editLoc,
+  });
+  const saveLoc = useMutation({
+    mutationFn: async () => (await api.patch(`/devices/${d.id}`, { locationId: newLocId })).data,
+    onSuccess: () => {
+      toast.success('Lokacja zmieniona');
+      qc.invalidateQueries({ queryKey: ['device', d.id] });
+      qc.invalidateQueries({ queryKey: ['devices'] });
+      setEditLoc(false);
+    },
+    onError: (err: { response?: { data?: { message?: string } } }) =>
+      toast.error(err?.response?.data?.message ?? 'Błąd zmiany lokacji'),
+  });
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -414,12 +437,51 @@ function OverviewTab({ device: d, agent, isOnline }: { device: Device; agent: Ag
         <ContactBox agent={agent} />
 
         <Card className="p-5">
-          <h3 className="text-[14px] font-semibold text-tx mb-3">Lokalizacja</h3>
-          <KvList items={[
-            ['Lokalizacja', d.location?.name ?? '—'],
-            ['Miasto',      d.location?.city ?? '—'],
-            ['Workspace',   d.workspace?.name ?? '—'],
-          ]} />
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-[14px] font-semibold text-tx">Lokalizacja</h3>
+            {!editLoc && (
+              <button
+                type="button"
+                onClick={() => { setNewLocId(d.location?.id ?? ''); setEditLoc(true); }}
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-pri hover:underline press"
+                title="Przenieś urządzenie do innej lokacji"
+              >
+                <Edit3 className="h-3 w-3" /> Zmień
+              </button>
+            )}
+          </div>
+          {!editLoc ? (
+            <KvList items={[
+              ['Lokalizacja', d.location?.name ?? '—'],
+              ['Miasto',      d.location?.city ?? '—'],
+              ['Workspace',   d.workspace?.name ?? '—'],
+            ]} />
+          ) : (
+            <div className="space-y-2">
+              <label className="block text-[10px] font-semibold text-tx3">Wybierz lokalizację w firmie {d.workspace?.name ?? ''}</label>
+              <Select value={newLocId} onChange={(e) => setNewLocId(e.target.value)} disabled={locsQ.isLoading}>
+                <option value="">{locsQ.isLoading ? 'Wczytywanie…' : '—'}</option>
+                {(locsQ.data?.locations ?? []).map((l) => (
+                  <option key={l.id} value={l.id}>{l.name}{l.city ? ` (${l.city})` : ''}</option>
+                ))}
+              </Select>
+              {!locsQ.isLoading && (locsQ.data?.locations.length ?? 0) === 0 && (
+                <p className="text-[11px] text-warn">
+                  Brak lokalizacji w tej firmie. <Link to="/locations" className="text-pri hover:underline">Dodaj lokalizację</Link>
+                </p>
+              )}
+              <div className="flex items-center gap-2 pt-1">
+                <Button
+                  size="sm"
+                  onClick={() => saveLoc.mutate()}
+                  disabled={!newLocId || newLocId === d.location?.id || saveLoc.isPending}
+                >
+                  {saveLoc.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Zapisz'}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setEditLoc(false)}>Anuluj</Button>
+              </div>
+            </div>
+          )}
         </Card>
 
         <Card className="p-5">
