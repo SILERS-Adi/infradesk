@@ -250,7 +250,7 @@ export function DashboardPageNew() {
                 <div className="dashboard-new__hero-input">
                   <Input
                     value={irisQ}
-                    onChange={(e) => setIrisQ(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setIrisQ(e.target.value)}
                     placeholder="Zapytaj Iris…"
                     aria-label="Zapytaj Iris"
                   />
@@ -414,7 +414,7 @@ export function DashboardPageNew() {
               loading={ticketsQ.isLoading}
               emptyTitle="Brak zgłoszeń"
               emptyDescription="Wszystkie zostały zamknięte. Dobrze się spisałeś."
-              onRowClick={(row) => navigate(`/tickets/${row.id}`)}
+              onRowClick={(row: TicketRow) => navigate(`/tickets/${row.id}`)}
             />
           </div>
         </CardBody>
