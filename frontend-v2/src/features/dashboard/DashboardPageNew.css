@@ -1,0 +1,245 @@
+/* Faza 2D Batch 1 — DS-based dashboard. Token-only. */
+
+.dashboard-new {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-6);
+}
+
+.dashboard-new__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sd-space-4);
+  flex-wrap: wrap;
+}
+
+.dashboard-new__greeting {
+  margin: 0;
+  font-size: var(--sd-typography-size-title-xl);
+  font-weight: var(--sd-typography-weight-bold);
+  color: var(--sd-color-text-primary);
+  line-height: var(--sd-typography-line-height-tight);
+}
+
+.dashboard-new__subtitle {
+  margin: var(--sd-space-1) 0 0;
+  font-size: var(--sd-typography-size-body-sm);
+  color: var(--sd-color-text-muted);
+}
+
+.dashboard-new__hero {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--sd-space-6);
+  align-items: center;
+}
+
+@media (max-width: 767px) {
+  .dashboard-new__hero {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+}
+
+.dashboard-new__hero-eyebrow {
+  margin: 0 0 var(--sd-space-2);
+  font-size: var(--sd-typography-size-micro);
+  font-weight: var(--sd-typography-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: var(--sd-typography-tracking-wide);
+  color: var(--sd-color-brand-primary);
+}
+
+.dashboard-new__hero-title {
+  margin: 0;
+  font-size: var(--sd-typography-size-title-md);
+  font-weight: var(--sd-typography-weight-bold);
+  color: var(--sd-color-text-primary);
+  line-height: var(--sd-typography-line-height-tight);
+}
+
+.dashboard-new__hero-description {
+  margin: var(--sd-space-1) 0 var(--sd-space-4);
+  font-size: var(--sd-typography-size-body-sm);
+  color: var(--sd-color-text-muted);
+  max-width: 540px;
+}
+
+.dashboard-new__hero-form {
+  display: flex;
+  gap: var(--sd-space-2);
+  margin-bottom: var(--sd-space-3);
+  width: 100%;
+}
+
+.dashboard-new__hero-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.dashboard-new__suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sd-space-1);
+}
+
+.dashboard-new__suggestion {
+  background: var(--sd-color-surface-1);
+  color: var(--sd-color-text-secondary);
+  border: 1px solid var(--sd-color-border-default);
+  border-radius: var(--sd-radius-pill);
+  padding: var(--sd-space-1) var(--sd-space-3);
+  font-size: var(--sd-typography-size-caption);
+  font-weight: var(--sd-typography-weight-medium);
+  cursor: pointer;
+  transition:
+    background-color var(--sd-motion-duration-fast) var(--sd-motion-easing-standard),
+    color var(--sd-motion-duration-fast) var(--sd-motion-easing-standard),
+    border-color var(--sd-motion-duration-fast) var(--sd-motion-easing-standard);
+}
+
+.dashboard-new__suggestion:hover {
+  background: var(--sd-color-surface-hover);
+  color: var(--sd-color-text-primary);
+  border-color: var(--sd-color-border-strong);
+}
+
+.dashboard-new__suggestion:focus-visible {
+  outline: none;
+  box-shadow: var(--sd-elevation-ring);
+}
+
+.dashboard-new__sla {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--sd-space-6);
+  align-items: center;
+}
+
+@media (max-width: 767px) {
+  .dashboard-new__sla {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+}
+
+.dashboard-new__sla-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sd-space-4);
+  min-width: 0;
+}
+
+.dashboard-new__sla-eyebrow {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: var(--sd-typography-size-micro);
+  font-weight: var(--sd-typography-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: var(--sd-typography-tracking-wide);
+  color: var(--sd-color-text-muted);
+}
+
+.dashboard-new__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--sd-layout-content-gutter);
+}
+
+.dashboard-new__row {
+  display: flex;
+  align-items: center;
+  gap: var(--sd-space-3);
+  padding: var(--sd-space-3) 0;
+}
+
+.dashboard-new__row + .dashboard-new__row {
+  border-top: 1px solid var(--sd-color-border-subtle);
+}
+
+.dashboard-new__row-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-1);
+}
+
+.dashboard-new__row-meta {
+  font-size: var(--sd-typography-size-caption);
+  color: var(--sd-color-text-muted);
+}
+
+.dashboard-new__row-number {
+  font-family: var(--sd-typography-family-mono);
+  font-size: var(--sd-typography-size-caption);
+  color: var(--sd-color-text-muted);
+}
+
+.dashboard-new__row-text {
+  font-size: var(--sd-typography-size-body-sm);
+  color: var(--sd-color-text-primary);
+  font-weight: var(--sd-typography-weight-medium);
+}
+
+.dashboard-new__versions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--sd-space-3);
+}
+
+.dashboard-new__version-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-1);
+  padding: var(--sd-space-3);
+  border-radius: var(--sd-radius-md);
+  border: 1px solid var(--sd-color-border-subtle);
+  background: var(--sd-color-surface-inset);
+  text-align: center;
+}
+
+.dashboard-new__version-card[data-tone="latest"] {
+  background: var(--sd-color-state-success-bg);
+  border-color: var(--sd-color-state-success);
+}
+
+.dashboard-new__version-card[data-tone="unknown"] {
+  background: var(--sd-color-state-danger-bg);
+  border-color: var(--sd-color-state-danger);
+}
+
+.dashboard-new__version-label {
+  font-size: var(--sd-typography-size-caption);
+  font-weight: var(--sd-typography-weight-semibold);
+  font-family: var(--sd-typography-family-mono);
+  color: var(--sd-color-text-secondary);
+}
+
+.dashboard-new__version-count {
+  font-size: var(--sd-typography-size-title-md);
+  font-weight: var(--sd-typography-weight-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--sd-color-text-primary);
+}
+
+.dashboard-new__gauge-empty {
+  color: var(--sd-color-text-muted);
+  font-size: var(--sd-typography-size-title-lg);
+  font-weight: var(--sd-typography-weight-medium);
+}
+
+.dashboard-new__alert {
+  display: flex;
+  align-items: center;
+  gap: var(--sd-space-2);
+  padding: var(--sd-space-3) var(--sd-space-4);
+  border-radius: var(--sd-radius-md);
+  background: var(--sd-color-state-warning-bg);
+  border: 1px solid var(--sd-color-state-warning);
+  color: var(--sd-color-state-warning);
+  font-size: var(--sd-typography-size-body-sm);
+  margin-bottom: var(--sd-space-3);
+}

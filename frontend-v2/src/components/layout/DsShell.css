@@ -1,0 +1,93 @@
+/* DsShell — InfraDesk warstwa konsumenta. Wartości = tokeny DS (var(--sd-*)). */
+
+.ds-shell__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sd-space-2);
+  width: 100%;
+  min-width: 0;
+}
+
+.ds-shell__brand-logo {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.ds-shell__brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+.ds-shell__brand-name {
+  font-size: var(--sd-typography-size-label);
+  font-weight: var(--sd-typography-weight-semibold);
+  color: var(--sd-color-text-primary);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ds-shell__brand-sub {
+  font-size: var(--sd-typography-size-micro);
+  font-weight: var(--sd-typography-weight-semibold);
+  letter-spacing: var(--sd-typography-tracking-wide);
+  text-transform: uppercase;
+  color: var(--sd-color-text-muted);
+}
+
+.ds-shell__user {
+  display: flex;
+  align-items: center;
+  gap: var(--sd-space-2);
+  min-width: 0;
+}
+
+.ds-shell__user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.ds-shell__user-name {
+  font-size: var(--sd-typography-size-label);
+  font-weight: var(--sd-typography-weight-semibold);
+  color: var(--sd-color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ds-shell__user-email {
+  font-size: var(--sd-typography-size-caption);
+  color: var(--sd-color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ds-shell__theme-glyph {
+  font-size: var(--sd-typography-size-body-sm);
+  line-height: 1;
+}
+
+.ds-shell__bell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ds-shell__bell-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  background: var(--sd-color-state-danger);
+  border-radius: var(--sd-radius-pill);
+  box-shadow: 0 0 0 2px var(--sd-color-surface-1);
+}

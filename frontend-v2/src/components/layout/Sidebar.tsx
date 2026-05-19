@@ -1,128 +1,11 @@
 import { useState, type ReactNode, useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import {
-  LayoutDashboard, Ticket, CheckSquare, Calendar, Timer, Receipt, Bell, ShoppingCart, Car, Globe2,
-  Building2, Users, MapPin, Handshake,
-  Server, Zap, Activity, HardDriveDownload, Scroll, HardDrive, Database,
-  Key, Brain, Radar, Lightbulb, Clock, DollarSign,
-  Building, UserCog, Package2, Cog,
-  ChevronDown, LogOut, Palette,
-} from 'lucide-react';
+import { ChevronDown, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
 import { api } from '@/lib/api';
-
-type WorkspaceType = 'MSP' | 'CLIENT' | 'INTERNAL_IT';
-
-interface NavItem {
-  to: string;
-  icon: typeof Ticket;
-  label: string;
-  badge?: number;
-  comingSoon?: boolean;
-  /** Permission module key — if set, item hides when user's effective level is NONE. */
-  moduleKey?: string;
-  superAdminOnly?: boolean;
-}
-
-interface NavGroup {
-  id: string;
-  label: string;
-  items: NavItem[];
-}
-
-// Groups visible for each workspace type. CLIENT portal is drastically trimmed:
-// only their own tickets/devices/vault + AI chat + own settings. No MSP-only admin views.
-const CLIENT_VISIBLE_PATHS = new Set<string>([
-  '/', '/tickets', '/calendar',
-  '/devices', '/activity-logs', '/downloads',
-  '/vault', '/vault/mine', '/vault/shared',
-  '/ai',
-  '/my-company', '/users', '/settings',
-]);
-
-// Group IDs hidden entirely in CLIENT portal.
-const CLIENT_HIDDEN_GROUPS = new Set<string>(['clients']);
-
-const GROUPS: NavGroup[] = [
-  {
-    id: 'operations',
-    label: 'Operacje',
-    items: [
-      { to: '/dashboard', icon: LayoutDashboard, label: 'Kokpit', moduleKey: 'dashboard' },
-      { to: '/tickets', icon: Ticket, label: 'Zgłoszenia', moduleKey: 'tickets' },
-      { to: '/tasks', icon: CheckSquare, label: 'Zadania', moduleKey: 'tasks' },
-      { to: '/calendar', icon: Calendar, label: 'Kalendarz' },
-      { to: '/sessions', icon: Timer, label: 'Sesje pracy', moduleKey: 'sessions' },
-      { to: '/billing', icon: Receipt, label: 'Rozliczenia', moduleKey: 'billing' },
-      { to: '/alerts', icon: Bell, label: 'Alerty', moduleKey: 'alerts' },
-      { to: '/orders', icon: ShoppingCart, label: 'Zamówienia', moduleKey: 'orders' },
-      { to: '/delegations', icon: Car, label: 'Delegacje', moduleKey: 'delegations' },
-      { to: '/portal-settings', icon: Globe2, label: 'Portal i obsługa', moduleKey: 'workspace.settings' },
-    ],
-  },
-  {
-    id: 'clients',
-    label: 'Klienci',
-    items: [
-      { to: '/clients', icon: Building2, label: 'Firmy klientów', moduleKey: 'clients' },
-      { to: '/crm', icon: Users, label: 'CRM', moduleKey: 'crm' },
-      { to: '/locations', icon: MapPin, label: 'Lokalizacje', moduleKey: 'locations' },
-      { to: '/partners', icon: Handshake, label: 'Partnerzy IT' },
-    ],
-  },
-  {
-    id: 'infrastructure',
-    label: 'Infrastruktura IT',
-    items: [
-      { to: '/devices', icon: Server, label: 'Urządzenia', moduleKey: 'devices' },
-      { to: '/agents', icon: Zap, label: 'Asystenci', moduleKey: 'agents' },
-      { to: '/monitoring', icon: Activity, label: 'Audyt i sieć', moduleKey: 'monitoring' },
-      { to: '/backups', icon: HardDriveDownload, label: 'Kopie zapasowe', moduleKey: 'backups' },
-      { to: '/activity-logs', icon: Scroll, label: 'Logi aktywności', moduleKey: 'activity-logs' },
-      { to: '/downloads', icon: HardDrive, label: 'Dysk', moduleKey: 'downloads' },
-      { to: '/storage', icon: Database, label: 'Pamięć', superAdminOnly: true },
-    ],
-  },
-  {
-    id: 'vault',
-    label: 'Sejf haseł',
-    items: [
-      { to: '/vault', icon: Key, label: 'Wszystkie', moduleKey: 'vault' },
-      { to: '/vault/mine', icon: Key, label: 'Moje', moduleKey: 'vault' },
-      { to: '/vault/shared', icon: Key, label: 'Współdzielone', moduleKey: 'vault' },
-    ],
-  },
-  {
-    id: 'ai',
-    label: 'Asystent AI',
-    items: [
-      { to: '/ai', icon: Brain, label: 'Czat i komendy', moduleKey: 'ai.copilot' },
-      { to: '/ai/shadow', icon: Radar, label: 'Shadow Mode', moduleKey: 'ai.copilot' },
-      { to: '/ai/insights', icon: Lightbulb, label: 'Insights', moduleKey: 'ai.copilot' },
-      { to: '/ai/time', icon: Clock, label: 'Invisible Time', comingSoon: true },
-      { to: '/ai/usage', icon: DollarSign, label: 'Koszty AI', moduleKey: 'ai.copilot' },
-    ],
-  },
-  {
-    id: 'company',
-    label: 'Moja firma',
-    items: [
-      { to: '/my-company', icon: Building, label: 'Moje dane', moduleKey: 'workspace.settings' },
-      { to: '/users', icon: UserCog, label: 'Użytkownicy', moduleKey: 'members' },
-      { to: '/plan-and-modules', icon: Package2, label: 'Plan i moduły', moduleKey: 'billing' },
-      { to: '/settings', icon: Cog, label: 'Ustawienia', moduleKey: 'workspace.settings' },
-    ],
-  },
-  {
-    id: 'system',
-    label: 'System',
-    items: [
-      { to: '/design', icon: Palette, label: 'Design' },
-    ],
-  },
-];
+import { GROUPS, CLIENT_VISIBLE_PATHS, CLIENT_HIDDEN_GROUPS, type NavItem, type NavGroup, type WorkspaceType, type PermissionPayload } from './_nav';
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const { user, logout } = useAuthStore();
@@ -137,11 +20,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const isClient = workspace?.type === 'CLIENT';
 
   // Permissions for current user: map moduleKey → effective access level
-  const permQ = useQuery<{
-    role: 'OWNER' | 'ADMIN' | 'MEMBER';
-    effective: Record<string, 'NONE' | 'VIEW' | 'EDIT' | 'DELETE'>;
-    overrides: Array<{ moduleKey: string; level: 'NONE' | 'VIEW' | 'EDIT' | 'DELETE' }>;
-  }>({
+  const permQ = useQuery<PermissionPayload>({
     queryKey: ['permissions', 'me'],
     queryFn: async () => (await api.get('/permissions/me')).data,
     staleTime: 60_000,

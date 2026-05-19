@@ -2,8 +2,28 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
+import { DsShell } from './DsShell';
+import { useUiFlag } from '@/lib/uiFlag';
 
+/**
+ * AppShell — globalny layout InfraDesk.
+ *
+ * Faza 2D Batch 1: dwa warianty, sterowane feature flag `?ui=new`:
+ *  - 'new'    → DS shell (DsShell.tsx) z Silers Design System primitives
+ *  - 'legacy' → istniejący layout (zachowany 1:1, zero zmian behavior)
+ *
+ * Rollback: dodaj `?ui=legacy` do URL lub wyczyść localStorage["sd-ui"].
+ *
+ * Logika auth/routing/permissions NIE jest zmieniana — oba warianty czytają te
+ * same useQuery z @tanstack/react-query (cache współdzielony).
+ */
 export function AppShell() {
+  const variant = useUiFlag();
+  if (variant === 'new') return <DsShell />;
+  return <LegacyAppShell />;
+}
+
+function LegacyAppShell() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
