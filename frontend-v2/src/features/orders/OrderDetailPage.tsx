@@ -1,13 +1,46 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Loader2, AlertCircle, Trash2, Package } from 'lucide-react';
+import { ArrowLeft, Loader2, AlertCircle, Trash2, Package, ArrowRight, CheckCircle2, XCircle } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { confirmDialog } from '@/components/ui/ConfirmDialog';
 import { formatDatePl } from '@/lib/utils';
+
+// Pełen workflow: DRAFT → QUOTE_SENT → APPROVED → ORDERED → IN_TRANSIT → DELIVERED → INVOICED
+// CANCELLED dostępny z większości stanów. Po DELIVERED można jeszcze oznaczyć INVOICED.
+// Bez tej tabeli UI nie miał żadnych przycisków zmiany statusu — order zostawał DRAFT na zawsze
+// (P0 bug znaleziony 2026-05-19 podczas audytu komponentów ticketu).
+const STATUS_NEXT: Record<string, Array<{ status: string; label: string; hint: string; variant: 'primary' | 'outline' | 'danger' }>> = {
+  DRAFT:      [
+    { status: 'QUOTE_SENT', label: 'Wyślij wycenę',       hint: 'Klient dostał ofertę z cenami',           variant: 'primary' },
+    { status: 'APPROVED',   label: 'Zatwierdź bez wyceny', hint: 'Pomiń wycenę — od razu zamawiamy',        variant: 'outline' },
+    { status: 'CANCELLED',  label: 'Anuluj',              hint: 'Rezygnujemy z zamówienia',                variant: 'danger'  },
+  ],
+  QUOTE_SENT: [
+    { status: 'APPROVED',   label: 'Klient zatwierdził',  hint: 'Klient zaakceptował wycenę',              variant: 'primary' },
+    { status: 'CANCELLED',  label: 'Klient odrzucił',     hint: 'Klient nie zaakceptował oferty',          variant: 'danger'  },
+  ],
+  APPROVED:   [
+    { status: 'ORDERED',    label: 'Zamówione u dostawcy', hint: 'Wysłaliśmy PO do dostawcy',              variant: 'primary' },
+    { status: 'CANCELLED',  label: 'Anuluj',              hint: 'Cofnij przed wysyłką do dostawcy',        variant: 'danger'  },
+  ],
+  ORDERED:    [
+    { status: 'IN_TRANSIT', label: 'W drodze',            hint: 'Dostawca potwierdził wysyłkę',            variant: 'primary' },
+    { status: 'DELIVERED',  label: 'Dostarczone bezpośrednio', hint: 'Pominięto status W drodze',         variant: 'outline' },
+    { status: 'CANCELLED',  label: 'Dostawca anulował',   hint: 'Brak towaru / inny problem',              variant: 'danger'  },
+  ],
+  IN_TRANSIT: [
+    { status: 'DELIVERED',  label: 'Dostarczone',         hint: 'Towar u klienta / w magazynie',           variant: 'primary' },
+  ],
+  DELIVERED:  [
+    { status: 'INVOICED',   label: 'Zafakturowane',       hint: 'Wystawiliśmy fakturę klientowi',          variant: 'primary' },
+  ],
+  INVOICED:   [],
+  CANCELLED:  [],
+};
 
 interface OrderItem {
   id: string;
@@ -72,6 +105,17 @@ export function OrderDetailPage() {
       toast.error(err?.response?.data?.message ?? err?.message ?? 'Błąd usuwania'),
   });
 
+  const updateStatus = useMutation({
+    mutationFn: async (status: string) => (await api.post(`/orders/${id}/status`, { status })).data,
+    onSuccess: (_d, status) => {
+      toast.success(`Status zmieniony na ${ORDER_STATUS_LABEL[status]?.label ?? status}`);
+      qc.invalidateQueries({ queryKey: ['orders', id] });
+      qc.invalidateQueries({ queryKey: ['orders'] });
+    },
+    onError: (err: { response?: { data?: { message?: string } }; message?: string }) =>
+      toast.error(err?.response?.data?.message ?? err?.message ?? 'Błąd zmiany statusu'),
+  });
+
   if (isLoading) return (
     <div className="flex items-center justify-center py-20">
       <Loader2 className="h-7 w-7 animate-spin" style={{ color: 'var(--pri)' }} />
@@ -133,6 +177,64 @@ export function OrderDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-5">
+          {/* Status workflow — "co dalej" — DRAFT→QUOTE_SENT→APPROVED→ORDERED→IN_TRANSIT→DELIVERED→INVOICED */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ArrowRight className="h-4 w-4" />
+                Co dalej?
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(STATUS_NEXT[o.status]?.length ?? 0) === 0 ? (
+                <div className="flex items-center gap-2 text-[13px] text-tx2">
+                  {o.status === 'INVOICED' ? <CheckCircle2 className="h-4 w-4 text-ok" /> : <XCircle className="h-4 w-4 text-tx3" />}
+                  {o.status === 'INVOICED'
+                    ? 'Zamówienie zafakturowane — proces zakończony.'
+                    : o.status === 'CANCELLED'
+                      ? 'Zamówienie anulowane.'
+                      : 'Brak dalszych akcji dla tego statusu.'}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {STATUS_NEXT[o.status]!.map((next) => (
+                    <button
+                      key={next.status}
+                      type="button"
+                      disabled={updateStatus.isPending}
+                      onClick={async () => {
+                        const danger = next.variant === 'danger';
+                        const ok = !danger || await confirmDialog({
+                          title: `${next.label}?`,
+                          message: next.hint,
+                          confirmLabel: next.label,
+                          danger: true,
+                        });
+                        if (ok) updateStatus.mutate(next.status);
+                      }}
+                      className="text-left p-3 rounded-[var(--r-s)] border press transition-colors"
+                      style={{
+                        borderColor: next.variant === 'danger' ? 'var(--er)' : next.variant === 'primary' ? 'var(--pri)' : 'var(--bd)',
+                        background: next.variant === 'primary' ? 'color-mix(in srgb, var(--pri) 6%, var(--sf))' : 'var(--sf)',
+                      }}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span
+                          className="text-[13px] font-semibold"
+                          style={{ color: next.variant === 'danger' ? 'var(--er)' : next.variant === 'primary' ? 'var(--pri)' : 'var(--tx)' }}
+                        >
+                          {next.label}
+                        </span>
+                        {updateStatus.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin text-tx3" /> : <ArrowRight className="h-3.5 w-3.5 text-tx3" />}
+                      </div>
+                      <p className="text-[11px] text-tx3 leading-snug">{next.hint}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {o.description && (
             <Card>
               <CardHeader><CardTitle>Opis</CardTitle></CardHeader>
