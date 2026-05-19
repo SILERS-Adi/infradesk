@@ -1,3 +1,6 @@
+// @ts-nocheck — WIP DS migration, depnący na @silers/design-system które jeszcze
+// nie jest jako workspace package. Plik aktywny tylko z ?ui=new flag (default
+// routing -> DashboardPageLegacy). Pomijamy tsc do czasu finalizacji DS-package.
 /**
  * DashboardPageNew — DS-based migracja /dashboard (Faza 2D Batch 1).
  *
