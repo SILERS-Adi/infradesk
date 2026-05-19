@@ -38,6 +38,8 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src'),
       // Shared canAccess with backend — import the single source of truth file.
       '@shared/canAccess': path.resolve(__dirname, '../backend-v2/src/utils/canAccess.ts'),
+      // Silers Design System (Faza 2B pilot — patrz docs/MIGRATION_PLAYBOOK.md w silers-design-system).
+      '@silers/design-system': path.resolve(__dirname, '../../silers-design-system'),
     },
   },
   server: {

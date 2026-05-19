@@ -28,6 +28,9 @@
       ],
       "@shared/canAccess": [
         "../backend-v2/src/utils/canAccess.ts"
+      ],
+      "@silers/design-system/*": [
+        "../../silers-design-system/*"
       ]
     },
     "noEmit": true

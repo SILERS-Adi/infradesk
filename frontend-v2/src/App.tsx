@@ -101,6 +101,8 @@ const StoragePage       = lazyNamed(() => import('@/features/storage/StoragePage
 const IdCoreShowcasePage = lazyNamed(() => import('@/features/design/IdCoreShowcasePage'),  'IdCoreShowcasePage');
 const DesignIndexPage   = lazyNamed(() => import('@/features/design/DesignIndexPage'),      'DesignIndexPage');
 const UiSystemPage      = lazyNamed(() => import('@/features/design/UiSystemPage'),         'UiSystemPage');
+// Silers Design System — Faza 2B pilot (osobna trasa, własny AppShell, NIE zastępuje /dashboard)
+const DashboardPilotPage = lazyNamed(() => import('@/features/dashboard/DashboardPilotPage'), 'DashboardPilotPage');
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -149,6 +151,16 @@ export default function App() {
             <Route path="/share/:token" element={<PartnerSharePage />} />
             <Route path="/iris-embed" element={<IrisEmbedPage />} />
             <Route path="/public/design/id-core-preview" element={<IdCorePublicPreview />} />
+
+            {/* Silers DS pilot — auth required, własny AppShell (z DS). Patrz docs/MIGRATION_PLAYBOOK.md */}
+            <Route
+              path="/dashboard-pilot"
+              element={
+                <RequireAuth>
+                  <DashboardPilotPage />
+                </RequireAuth>
+              }
+            />
 
             {/* PUBLIC marketing site */}
             <Route element={<PublicLayout />}>

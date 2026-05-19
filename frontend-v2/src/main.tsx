@@ -2,6 +2,9 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { initSentry, Sentry } from './lib/sentry';
 import App from './App';
+// Silers Design System — wgrywane przed legacy styles żeby InfraDesk overrides były na wierzchu w okresie migracji.
+import '@silers/design-system/tokens/dist/silers.css';
+import '@silers/design-system/primitives/primitives.css';
 import './styles/globals.css';
 
 initSentry();
