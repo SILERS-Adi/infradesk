@@ -370,6 +370,56 @@ router.get('/activities', requireAccess(MODULES.CLIENTS, 'view'), async (req: Re
 });
 
 
+// PATCH /crm/activities/:id — edycja notatek, dat, oznaczenie jako wykonana.
+// Wcześniej był tylko GET — user widział aktywności ale nie mógł nic z nimi
+// zrobić (P0 bug 2026-05-19: "co dalej" dla CRM ticketu = nic, nawet
+// "zrobione" nie da się oznaczyć).
+const updateActivitySchema = z.object({
+  title: z.string().max(200).optional().nullable(),
+  notes: z.string().max(5000).optional().nullable(),
+  scheduledAt: z.string().datetime().optional().nullable(),
+  followUpRequired: z.boolean().optional(),
+  followUpAt: z.string().datetime().optional().nullable(),
+  billable: z.boolean().optional(),
+  quoteValueNet: z.coerce.number().nonnegative().optional().nullable(),
+  completed: z.boolean().optional(),
+});
+router.patch('/activities/:id', requireAccess(MODULES.CLIENTS, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const input = updateActivitySchema.parse(req.body);
+    const existing = await prisma.crmActivity.findFirst({
+      where: { id: String(req.params.id), workspaceId: req.workspaceId! },
+      select: { id: true },
+    });
+    if (!existing) throw HttpError.notFound();
+
+    const data: Record<string, unknown> = {};
+    if (input.title !== undefined) data.title = input.title;
+    if (input.notes !== undefined) data.notes = input.notes;
+    if (input.scheduledAt !== undefined) data.scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : null;
+    if (input.followUpRequired !== undefined) data.followUpRequired = input.followUpRequired;
+    if (input.followUpAt !== undefined) data.followUpAt = input.followUpAt ? new Date(input.followUpAt) : null;
+    if (input.billable !== undefined) data.billable = input.billable;
+    if (input.quoteValueNet !== undefined) data.quoteValueNet = input.quoteValueNet;
+    if (input.completed !== undefined) data.completedAt = input.completed ? new Date() : null;
+
+    const updated = await prisma.crmActivity.update({ where: { id: existing.id }, data });
+    res.json({ activity: updated });
+  } catch (err) { next(err); }
+});
+
+router.delete('/activities/:id', requireAccess(MODULES.CLIENTS, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const existing = await prisma.crmActivity.findFirst({
+      where: { id: String(req.params.id), workspaceId: req.workspaceId! },
+      select: { id: true },
+    });
+    if (!existing) throw HttpError.notFound();
+    await prisma.crmActivity.delete({ where: { id: existing.id } });
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
 router.post('/mailboxes/:id/sync-now', requireAccess(MODULES.CLIENTS, 'edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = String(req.params.id);
