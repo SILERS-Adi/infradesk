@@ -25,6 +25,14 @@ To znaczy że **kod jest zweryfikowany type-check + build**, ale **functional en
 | 11 | `1f1f292` | **Edycja ticketu** walidacja FK cross-workspace | **NIE zweryfikowane live** |
 | 12 | `535c63b` | NIGHT_PLAN.md | — |
 
+## ✅ ZWERYFIKOWANE 2026-05-19 rano (po świeżym tokenie)
+
+Wszystkie 3 nocne fixy potwierdzone live API + Playwright:
+- **createTicket cross-workspace** (5abb93c): POST z `clientWorkspaceId=PKS` + lokacją PKS → `T-2026-0009` utworzony, wczorajszy bug "Location nie należy" minął
+- **updateTicket FK validation** (1f1f292): PATCH → ten sam workspace = 200, PATCH → workspace innej firmy = **400 "Location nie należy do firmy ticketu"** (poprawnie odrzucone)
+- **Wszystkie 34 strony bez crashów** (Playwright re-run morning): /ai/shadow renderuje stat cards, /portal redirect MSP→/dashboard, /monitoring pokazuje 60 urządzeń pogrupowanych po firmach
+- Pozostała 1 console error na /users — Gravatar avatary 404 (kosmetyka, nie crash)
+
 ## 🔴 Co WYMAGA twojej weryfikacji w UI (rano)
 
 Te zmiany są **deployed na prod, kod type-checkował, build przeszedł, ale nie mogłem klikać**:
