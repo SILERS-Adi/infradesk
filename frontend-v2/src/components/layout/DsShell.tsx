@@ -180,7 +180,7 @@ export function DsShell() {
       right={
         <>
           <IrisCoreButton
-            size="sm"
+            size="xs"
             status="idle"
             aria-label="Otwórz asystenta Iris"
             onClick={() => navigate('/ai')}
@@ -226,6 +226,10 @@ export function DsShell() {
       sidebar={sidebar}
       sidebarOpen={sidebarOpen}
       onSidebarOpenChange={setSidebarOpen}
+      // fluid=true: legacy pages (tickets/devices/billing/…) zachowują pełną szerokość.
+      // /dashboard ma własny .dashboard-new wrapper. Po pełnej migracji można usunąć fluid
+      // żeby max-width 1440px działał globalnie.
+      fluid
     >
       <Outlet />
     </AppShell>

@@ -56,10 +56,13 @@ interface Props {
   plasmaAsset?: string;
 }
 
+// Legacy canvas sizes (28/56/96/200) → DS iris tokens (24/56/96/220).
+// Mapping dopasowany do pikseli: sm→xs (28≈24), md→sm (56=56), lg→md (96=96), hero→xl (200≈220).
+// Bez tej translacji "size=sm" w starym Topbar renderował się dwukrotnie za duży.
 const SIZE_MAP: Record<IrisSize, DsIrisSize> = {
-  sm: 'sm',
-  md: 'md',
-  lg: 'lg',
+  sm: 'xs',
+  md: 'sm',
+  lg: 'md',
   hero: 'xl',
 };
 
